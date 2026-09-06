@@ -17,6 +17,7 @@ These are done; do not redo them.
 1. Cloud-agent wiring for [dzhng/deep-research](https://github.com/dzhng/deep-research): `.cursor/environment.json` `install` → `scripts/setup_deep_research.sh` clones into gitignored `agent-tools/open-deep-research`. Wrapper: `scripts/run_deep_research.py`.
 2. `skills/deep-research/SKILL.md` stack now has the local runner as #2 after Exa.
 3. Catalog pass (skills.sh, Skills Hub, GitHub, PyPI, vendor docs) written into the inventory.
+4. **Maintainer role** (`skills/skill-maintainer/SKILL.md`) plus machine-readable `skills/lists/` from a live registry pass. Parallel Search MCP adopted in `mcp.example.json`.
 
 Still missing for a live cycle: a truthful `profiles/candidate.yaml` (only the gitignored example copy exists), resume PDFs, and research API keys.
 
@@ -64,6 +65,7 @@ Discovery bot (needs network):
 | Exa MCP | Cursor dashboard HTTP `https://mcp.exa.ai/mcp?tools=...` | discovery |
 | Firecrawl MCP | `npx -y firecrawl-mcp` + `FIRECRAWL_API_KEY` | discovery |
 | Tavily MCP | remote URL or `npx -y tavily-mcp@latest` | discovery (optional) |
+| Parallel Search MCP | `https://search.parallel.ai/mcp` (no key on free tier) | discovery |
 | Indeed MCP | Claude/Cursor connector when the client supports it | discovery |
 | workatastartup-mcp | `uvx workatastartup-mcp` | discovery |
 | ats-jobs-mcp | `uvx ats-jobs-mcp` | discovery |
@@ -240,15 +242,16 @@ Do these as separate PRs. Discovery still must not Easy Apply.
 ## How it plugs into the existing process
 
 ```
-catalog (this doc + skills-and-mcps.md)
-    → deep-research (Exa, else local dzhng, else Firecrawl/Tavily/search)
+catalog (skills-and-mcps.md)
+    → maintainer writes skills/lists/          # seldom; not a job cycle
+    → deep-research (Exa, else local dzhng, else Firecrawl/Tavily/Parallel/search)
     → job-discovery (platforms.md methods; MCPs where vetted)
     → ledger apply_packet
     → job-apply (Playwright / ATS)          # later cycle
     → job-outreach (Gmail+PDF, LinkedIn DM, Hunter, Calendar)
 ```
 
-No fourth owner. Research stays a capability.
+Research stays a capability. Maintainer is the fourth owner and only touches the skill tree.
 
 ## Verification for this PR (no live research run)
 

@@ -13,7 +13,8 @@ Shared skill. You do not own jobs. You return briefs other roles paste into the 
 2. Local [dzhng/deep-research](https://github.com/dzhng/deep-research) via `python3 scripts/run_deep_research.py` when Exa is missing and Firecrawl + OpenAI/Fireworks keys exist
 3. Firecrawl agent / scrape
 4. Tavily
-5. Built-in WebSearch and WebFetch
+5. Parallel Search MCP (`https://search.parallel.ai/mcp`, no key on the free tier)
+6. Built-in WebSearch and WebFetch
 
 Read `docs/catalogs/deep-research.md` for tool notes and the local runner. If Exa is present, **use it** for shortlist and outreach people-finding. Do not only keyword-search when a deep research tool exists.
 

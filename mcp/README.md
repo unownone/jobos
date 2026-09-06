@@ -7,7 +7,7 @@ This template does **not** vendor a hosted stack. Attach what the current role n
 ## Discovery (do not put Playwright or send-mail here)
 
 1. **Exa** — deep research (strongly recommended)
-2. **Firecrawl / Tavily** — fallbacks
+2. **Firecrawl / Tavily / Parallel Search** — fallbacks (`https://search.parallel.ai/mcp` needs no key on the free tier)
 3. **Indeed** — official OAuth MCP if your client can add the Indeed connector (`https://mcp.indeed.com/claude/mcp`, historically Claude)
 4. **workatastartup-mcp** — YC jobs (`uvx workatastartup-mcp`)
 5. **ats-jobs-mcp** — Greenhouse / Ashby / Lever public boards (`uvx ats-jobs-mcp`)
@@ -33,5 +33,7 @@ Exa notes: https://github.com/exa-labs/exa-mcp-server
 Google Workspace MCP: https://developers.google.com/workspace/guides/configure-mcp-servers
 Hunter MCP: https://hunter.io/mcp
 Apollo MCP: https://docs.apollo.io/docs/apollo-mcp
+Parallel Search MCP: https://docs.parallel.ai/integrations/mcp/search-mcp
 
+Lists (maintainer): [`skills/lists/INDEX.md`](../skills/lists/INDEX.md).
 Full inventory: [`docs/catalogs/skills-and-mcps.md`](../docs/catalogs/skills-and-mcps.md).

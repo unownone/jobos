@@ -1,10 +1,10 @@
 # Skills and MCPs
 
-This file is the **workspace inventory**. Discovery refreshes it. Anyone can add a row after vetting.
+This file is the **workspace inventory**. Discovery refreshes it. Maintainer writes the machine-readable copy in [`skills/lists/`](../../skills/lists/). Anyone can add a row after vetting.
 
 Do not lock to one marketplace. Search, vet, then add.
 
-**Last catalog pass:** 2026-09-06 (this week). Registries queried: skills.sh (`npx skills find`), Skills Hub CLI, GitHub, vendor docs (Indeed, Exa, Firecrawl, Tavily, Hunter, Apollo, Google Workspace), PyPI (`workatastartup-mcp`, `ats-jobs-mcp`).
+**Last catalog pass:** 2026-09-06 (this week). **Last maintainer pass:** 2026-09-06 — live `npx skills find`, Skills Hub CLI, GitHub, vendor docs, Smithery. Lists: [`skills/lists/INDEX.md`](../../skills/lists/INDEX.md).
 
 Build plan (what to install next, in order): [`docs/research/platform-mcp-build-plan.md`](../research/platform-mcp-build-plan.md).
 
@@ -45,7 +45,7 @@ These are the defaults the three skills expect. Swap implementations, keep the *
 | Deep research | Exa MCP | `https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,company_research_exa,linkedin_search_exa,deep_researcher_start,deep_researcher_check,agent_run,crawling_exa` | all |
 | Recursive local research | dzhng/open-deep-research | `bash scripts/setup_deep_research.sh` then `python3 scripts/run_deep_research.py` (`FIRECRAWL_KEY` + `OPENAI_KEY`) | research |
 | Extraction fallback | Firecrawl MCP | `npx -y firecrawl-mcp` / `FIRECRAWL_API_KEY` | discovery, research |
-| Fast search fallback | Tavily or built-in WebSearch | `TAVILY_API_KEY` or `https://mcp.tavily.com/mcp/?tavilyApiKey=` | all |
+| Fast search fallback | Tavily or Parallel Search MCP | `TAVILY_API_KEY` or `https://search.parallel.ai/mcp` (no key on free tier) | all |
 | Indeed jobs | Official Indeed MCP (OAuth) | `https://mcp.indeed.com/claude/mcp` — Claude connector historically | discovery |
 | YC jobs | `workatastartup-mcp` | PyPI `workatastartup-mcp` 0.1.2 ([MIt9/workatastartup-mcp](https://github.com/MIt9/workatastartup-mcp)) | discovery |
 | Public ATS boards | `ats-jobs-mcp` | `pip install ats-jobs-mcp` ([groundtruthtools/ats-jobs-mcp](https://github.com/groundtruthtools/ats-jobs-mcp)) | discovery |
@@ -110,6 +110,7 @@ Legend: **D** discovery, **R** research / hiring-manager lookup, **M** mail, **O
 | Exa | remote MCP | y | y | | | | **use** | OAuth / `EXA_API_KEY` | Default research |
 | Firecrawl | `firecrawl-mcp` | | y | | | | **use** | `FIRECRAWL_API_KEY` | URL extract; also powers local deep-research |
 | Tavily | tavily-mcp | | y | | | | **use** | `TAVILY_API_KEY` | Fast confirmation search |
+| Parallel Search | official `https://search.parallel.ai/mcp` | | y | | | | **use** | none on free tier | Maintainer pass 2026-09-06. Added to `mcp.example.json`. Bearer key for production |
 | dzhng/deep-research | local CLI/API | | y | | | | **use** | Firecrawl + OpenAI | Wired in `.cursor/environment.json`. See deep-research catalog |
 | jobpilot-mcp | RemoteOK + WWR + Himalayas + auto_apply | y | | | | y | **reject** as discovery | Notion + Playwright | Combined search-and-apply. May fork `search_jobs` later |
 | jobhound | Ashby/Greenhouse/Lever + apply | y | | | | y | **reject** as discovery | | Same split problem |
@@ -168,6 +169,7 @@ When you vet one, append a `### <name>` block. 2026-09-06 verdicts:
 | --- | --- | --- | --- | --- |
 | 2026-09-06 | template | skills.sh, skills-hub.ai, GitHub, Indeed docs, Exa docs | Exa deep research, Indeed MCP, workatastartup-mcp, RemoteOK API, Gmail attachments | combined auto-apply as discovery |
 | 2026-09-06 | cursor-cloud-agent | skills.sh, skills-hub CLI, GitHub, PyPI, Indeed/Exa/Firecrawl/Tavily/Hunter/Apollo/Google Workspace docs, dzhng/deep-research clone | dzhng/open-deep-research local runner + cloud `environment.json`; ats-jobs-mcp; Hunter MCP; Playwright MCP; Google Calendar/Drive (already attached); platform MCP matrix | LinkedIn cookie messengers as discovery; Smartlead/Instantly sequences; Greenhouse Harvest recruiter MCP; resume-optimizer skills; jobpilot/jobhound combined apply; Apify scrapers as default |
+| 2026-09-06 | cursor-cloud-agent (maintainer) | skills.sh (15 queries), Skills Hub CLI, GitHub, vendor docs (Indeed, Hunter, Apollo, Parallel, Playwright), Smithery | `skills/lists/` adopted/wanted/rejected; Parallel Search MCP in `mcp.example.json`; maintainer role + skill; job-scout-mcp and LinkedIn session forks in wanted | go-job combined claim/easy-apply; jobspy-mcp; jobspipe; antibrow anti-detect; TheirStack paid aggregator; Skills Hub name-collision “discovery” skills |
 
 ## Indeed MCP notes
 

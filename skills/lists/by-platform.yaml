@@ -1,0 +1,100 @@
+# Map docs/catalogs/platforms.md ids → skills/lists ids.
+# capability letters match the catalog matrix: D discovery, R research, M mail, O outreach, A apply.
+updated: "2026-09-06"
+
+platforms:
+  linkedin:
+    adopted: [websearch-dorks, exa-mcp, playwright-mcp]
+    wanted: [linkedin-mcp-stickerdaniel, hs-linkedin-resolve, compose-outreach]
+    rejected: [prakharagarwal-linkedin-mcp, gooseworks-job-scraper, jobspy-mcp, linkedin-ghostwriting]
+    gap: official LinkedIn Jobs MCP
+  indeed:
+    adopted: [indeed-mcp, websearch-dorks]
+    wanted: []
+    rejected: [indeed-lead-scraper, jobspy-mcp, apify-scrapers]
+    gap: Cursor attach unproven (Claude Connector)
+  wellfound:
+    adopted: [websearch-dorks, exa-mcp]
+    wanted: [wellfound-method]
+    rejected: [wellfound-lead-scraper, apify-scrapers]
+    gap: official Wellfound MCP
+  workatastartup:
+    adopted: [workatastartup-mcp]
+    wanted: []
+    rejected: [waas-cookie-fork]
+    gap: none
+  google_jobs:
+    adopted: [websearch-dorks, exa-mcp]
+    wanted: []
+    rejected: []
+    gap: none
+  google_dorks:
+    adopted: [websearch-dorks, exa-mcp, ats-jobs-mcp]
+    wanted: [job-scout-mcp]
+    rejected: []
+    gap: none
+  remoteok:
+    adopted: [remoteok-http]
+    wanted: [job-scout-mcp]
+    rejected: []
+    gap: none
+  weekday:
+    adopted: [websearch-dorks]
+    wanted: [weekday-method]
+    rejected: []
+    gap: no MCP
+  rororemote:
+    adopted: []
+    wanted: [rororemote-method]
+    rejected: []
+    gap: live URL unconfirmed
+  flexiple:
+    adopted: [playwright-mcp]
+    wanted: [network-playwright]
+    rejected: []
+    gap: no MCP
+  turing:
+    adopted: [playwright-mcp]
+    wanted: [network-playwright]
+    rejected: []
+    gap: no MCP
+  bairesdev:
+    adopted: [playwright-mcp]
+    wanted: [network-playwright]
+    rejected: []
+    gap: no MCP
+  toptal:
+    adopted: [playwright-mcp]
+    wanted: [network-playwright]
+    rejected: []
+    gap: no MCP
+  lemonio:
+    adopted: [playwright-mcp]
+    wanted: [network-playwright]
+    rejected: []
+    gap: no MCP
+  amazon:
+    adopted: [websearch-dorks, ats-jobs-mcp, playwright-mcp]
+    wanted: []
+    rejected: []
+    gap: none
+  microsoft:
+    adopted: [websearch-dorks, ats-jobs-mcp, playwright-mcp]
+    wanted: []
+    rejected: []
+    gap: none
+  google:
+    adopted: [websearch-dorks, ats-jobs-mcp, playwright-mcp]
+    wanted: []
+    rejected: []
+    gap: none
+  uber:
+    adopted: [websearch-dorks, ats-jobs-mcp, playwright-mcp]
+    wanted: []
+    rejected: []
+    gap: none
+  gmail:
+    adopted: [gmail-mcp, hunter-mcp]
+    wanted: [compose-outreach, gws-gmail-cli, apollo-people]
+    rejected: [smartlead-instantly, apollo-sequences, cold-email-writer]
+    gap: none

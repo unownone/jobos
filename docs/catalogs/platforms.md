@@ -33,7 +33,7 @@ Legend for `kind`:
 
 Add rows in your fork. Do not delete template rows; mark `ignored` in a local note instead.
 
-MCP / skill coverage for these rows (what exists, what is a gap, what to install next) lives in [`skills-and-mcps.md`](skills-and-mcps.md) and [`docs/research/platform-mcp-build-plan.md`](../research/platform-mcp-build-plan.md). Do not invent an MCP because a platform is listed here.
+MCP / skill coverage for these rows (what exists, what is a gap, what to install next) lives in [`skills-and-mcps.md`](skills-and-mcps.md), [`skills/lists/INDEX.md`](../../skills/lists/INDEX.md), and [`docs/research/platform-mcp-build-plan.md`](../research/platform-mcp-build-plan.md). Do not invent an MCP because a platform is listed here.
 
 ## Google dork patterns
 

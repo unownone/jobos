@@ -2,12 +2,13 @@
 
 A template for a **distributed job search**, not a single auto-apply bot.
 
-One repo. Three exclusive roles. One shared ledger. Bots can be airgapped.
+One repo. Three exclusive job-search roles, plus a seldom-used maintainer. One shared ledger. Bots can be airgapped.
 
 ```
 Discovery finds and shortlists.
 Apply submits with writing worth reading.
 Outreach follows up by email and LinkedIn only.
+Maintainer (seldom) updates skills and MCP lists.
 Nobody jumps the queue.
 ```
 
@@ -20,7 +21,8 @@ This is the agent-facing operating system: how to pick a role, which skills and 
 3. Read [`docs/process.md`](docs/process.md) once. That is the contract.
 4. Pick a role in [`AGENTS.md`](AGENTS.md). One bot may hold every role. Several bots may split a role by portal or channel.
 5. Discovery owner runs [`skills/skill-and-mcp-catalog`](skills/skill-and-mcp-catalog/SKILL.md) first, then [`skills/deep-research`](skills/deep-research/SKILL.md), then [`skills/job-discovery`](skills/job-discovery/SKILL.md).
-6. Everyone writes to [`ledger/`](ledger/README.md). Git is the live list. No deploy required.
+6. When the work is the **skill tree** (find MCPs, prune, write lists), claim **maintainer** and run [`skills/skill-maintainer`](skills/skill-maintainer/SKILL.md). That is not a discovery cycle.
+7. Everyone writes to [`ledger/`](ledger/README.md). Git is the live list. No deploy required.
 
 ## Why this is split
 
@@ -31,12 +33,14 @@ Combined “search and Easy Apply” agents optimize for volume. This template o
 | Discovery | Find, enrich, score, shortlist, write an apply packet | Easy Apply, form submit, outreach |
 | Apply | Submit using the packet, write the message, log proof | Inventing jobs, cold outreach, skipping the packet |
 | Outreach | Email + LinkedIn DM after apply (or when there is no portal) | SMS, WhatsApp, spam, applying |
+| Maintainer (seldom) | Search registries, vet, write `skills/lists/`, patch example MCP config | Discovering jobs, applying, sending mail |
 
 Roles can be subdivided:
 
 - Discovery by portal (Indeed vs YC vs Amazon careers)
 - Apply by ATS (Greenhouse vs Workday vs LinkedIn)
 - Outreach by channel (email vs LinkedIn DM)
+- Maintainer is not subdivided; it is rare and repo-wide
 
 The ledger stays the same. That is the point.
 
@@ -51,9 +55,12 @@ flowchart TD
   ledger[Git ledger]
   apply[Apply role]
   outreach[Outreach role]
+  maintainer[Maintainer seldom]
 
   profile --> discovery
   catalog --> discovery
+  catalog --> maintainer
+  maintainer -->|"skills/lists"| catalog
   research --> discovery
   research --> apply
   research --> outreach
@@ -83,7 +90,8 @@ Discovery owners the ledger “portal”: they resolve conflicts, rebuild the in
 
 | Skill | Owner | Job |
 | --- | --- | --- |
-| [`skill-and-mcp-catalog`](skills/skill-and-mcp-catalog/SKILL.md) | Discovery first, anyone later | Discover, vet, and add skills/MCPs from any registry |
+| [`skill-and-mcp-catalog`](skills/skill-and-mcp-catalog/SKILL.md) | Discovery first, maintainer as subroutine | Discover, vet, and add skills/MCPs from any registry |
+| [`skill-maintainer`](skills/skill-maintainer/SKILL.md) | Maintainer (seldom) | Search registries, write `skills/lists/`, prune dead tools |
 | [`deep-research`](skills/deep-research/SKILL.md) | Shared | Company, people, role, and portal research |
 | [`job-discovery`](skills/job-discovery/SKILL.md) | Discovery | Portals, career sites, dorks, shortlist, apply packets |
 | [`job-apply`](skills/job-apply/SKILL.md) | Apply | High-quality submit + proof |
@@ -97,7 +105,7 @@ Attach what you have. Degrade if you do not.
 
 | Need | Preferred | Fallback |
 | --- | --- | --- |
-| Deep research | Exa MCP (`deep_researcher_*`, `agent_run`, company + people search) | Local [dzhng/deep-research](https://github.com/dzhng/deep-research) (`scripts/run_deep_research.py`), Firecrawl agent, Tavily, built-in web search |
+| Deep research | Exa MCP (`deep_researcher_*`, `agent_run`, company + people search) | Local [dzhng/deep-research](https://github.com/dzhng/deep-research) (`scripts/run_deep_research.py`), Firecrawl, Tavily, Parallel Search MCP (`https://search.parallel.ai/mcp`), built-in web search |
 | Job search API | Official Indeed MCP (OAuth) | Public pages + Google dorks |
 | YC startups | `workatastartup-mcp` | workatastartup.com in a browser |
 | Remote feed | `https://remoteok.com/api` | RemoteOK site |
@@ -148,6 +156,7 @@ docs/sharing.md           Airgapped ledger protocol
 docs/catalogs/            Platforms, MCPs, career sites, research
 docs/research/            Build plans (MCP coverage, deep-research wrap)
 skills/                   Agent Skills (SKILL.md)
+skills/lists/             Maintainer board: adopted / wanted / rejected YAML
 .cursor/environment.json  Cloud-agent install (clones open-deep-research)
 ledger/                   Shared live list
 profiles/                 Candidate profile (example committed)
@@ -155,6 +164,7 @@ mcp/                      Example MCP config
 handoffs/                 Packet templates
 assets/                   Resumes (local) + writing templates
 scripts/rebuild_index.py  Optional INDEX.md generator
+scripts/rebuild_skill_index.py  skills/lists/INDEX.md from YAML
 scripts/setup_deep_research.sh  Clone dzhng/open-deep-research
 scripts/run_deep_research.py    Non-interactive research API wrapper
 ```
@@ -164,6 +174,7 @@ scripts/run_deep_research.py    Non-interactive research API wrapper
 ```bash
 # optional, if uv is available
 uv run scripts/rebuild_index.py
+uv run scripts/rebuild_skill_index.py
 ```
 
 Then, in the agent:
@@ -171,6 +182,7 @@ Then, in the agent:
 - Discovery: “Run the discovery skill for this candidate. Do not apply.”
 - Apply: “Apply only to jobs in apply_ready. Write like a human worth reading.”
 - Outreach: “Work outreach_ready. Email + LinkedIn only. Attach the PDF on email.”
+- Maintainer (seldom): “Refresh skills/lists. Find MCPs. Do not discover jobs.”
 
 ## Public template
 

@@ -1,0 +1,174 @@
+# Named tools we will not install. Keep the reason so the next bot does not rediscover them.
+updated: "2026-09-06"
+actor: cursor-cloud-agent
+
+items:
+  - id: resume-linkedin-optimizer
+    kind: skill
+    name: paramchoudhary/resumeskills@linkedin-profile-optimizer
+    capability: [apply]
+    source: https://skills.sh
+    reason: User does not want resume or LinkedIn-profile curation.
+
+  - id: linkedin-ghostwriting
+    kind: skill
+    name: linkedin-posts / linkedin-ghostwriting
+    capability: [outreach]
+    source: skills.sh
+    reason: Content mill, not application outreach (email + LinkedIn DM).
+
+  - id: cold-email-writer
+    kind: skill
+    name: paramchoudhary/resumeskills@cold-email-writer
+    capability: [outreach]
+    source: https://skills.sh/paramchoudhary/resumeskills/cold-email-writer
+    reason: 4.1K installs but generic spray copy. Outreach uses in-repo templates + proof from the profile.
+
+  - id: smartlead-instantly
+    kind: mcp
+    name: Smartlead / Instantly sequence MCPs
+    capability: [mail, outreach]
+    source: community
+    reason: High-volume sequences. Violates 2-touch cap and “not a spray.”
+
+  - id: apollo-sequences
+    kind: mcp
+    name: Apollo sequence tools
+    capability: [outreach]
+    source: https://docs.apollo.io/docs/apollo-mcp
+    reason: People/enrichment may be forked. Sequence tools stay off.
+
+  - id: gooseworks-hiring-signal
+    kind: skill
+    name: gooseworks-ai end-to-end-hiring-signal
+    capability: [discovery, outreach]
+    source: skills.sh
+    reason: Combined pipeline with no discovery stop flag. Sales spray.
+
+  - id: gooseworks-job-scraper
+    kind: skill
+    name: gooseworks-ai/goose-skills@job-scraper / linkedin-job-scraper
+    capability: [discovery]
+    source: https://skills.sh/gooseworks-ai/goose-skills/job-scraper
+    reason: Scraper family. Prefer official APIs / public ATS JSON.
+
+  - id: jobpilot-mcp
+    kind: mcp
+    name: jobpilot-mcp
+    capability: [discovery, apply]
+    source: community
+    reason: Combined search-and-apply. May fork search_jobs later; not discovery default.
+
+  - id: jobhound
+    kind: mcp
+    name: jobhound
+    capability: [discovery, apply]
+    source: community
+    reason: Same split problem as jobpilot.
+
+  - id: go-job
+    kind: mcp
+    name: anatolykoptev/go-job
+    capability: [discovery, apply]
+    source: https://github.com/anatolykoptev/go-job
+    reason: >
+      Maintainer pass 2026-09-06. 28 tools including opportunity_claim and
+      LinkedIn easy_apply filter. Combined search-and-act. Reject as discovery.
+
+  - id: jobspy-mcp
+    kind: mcp
+    name: VennieSo/jobspy-mcp-server
+    capability: [discovery]
+    source: https://github.com/VennieSo/jobspy-mcp-server
+    reason: python-jobspy scrape of LinkedIn/Indeed/Glassdoor. Not an official API.
+
+  - id: jobspipe-mcp
+    kind: mcp
+    name: jobspipe/jobspipe-mcp
+    capability: [discovery]
+    source: https://smithery.ai/servers/jobspipe/jobspipe-mcp
+    reason: Hosted aggregator including LinkedIn scrape + Upwork. Prefer ats-jobs-mcp + public feeds.
+
+  - id: prakharagarwal-linkedin-mcp
+    kind: mcp
+    name: prakharagarwal-dev/linkedin-mcp-server
+    capability: [discovery, outreach, apply]
+    source: GitHub
+    reason: Combines search, publish, and messaging. Do not enable as-is on discovery.
+
+  - id: greenhouse-harvest
+    kind: mcp
+    name: mikelane/greenhouse-mcp-server / membranedev greenhouse-harvest
+    capability: [apply]
+    source: https://skills.sh/membranedev/application-skills/greenhouse-harvest
+    reason: Recruiter-side Harvest API. Not for applicants.
+
+  - id: waas-cookie-fork
+    kind: mcp
+    name: moutasem-isentemiz/workatastartup-mcp
+    capability: [discovery]
+    source: GitHub
+    reason: Cookie-session fork. Prefer PyPI public workatastartup-mcp.
+
+  - id: apify-scrapers
+    kind: mcp
+    name: Apify Wellfound/Indeed actors
+    capability: [discovery]
+    source: Apify
+    reason: ToS / scrape farm. Prefer official APIs.
+
+  - id: antibrow-browser
+    kind: skill
+    name: antibrow/anti-detect-browser-skills@browser-mcp-agent
+    capability: [apply]
+    source: https://skills.sh/antibrow/anti-detect-browser-skills/browser-mcp-agent
+    reason: 44.6K installs but anti-detect browser. Use official Playwright MCP.
+
+  - id: wellfound-lead-scraper
+    kind: skill
+    name: sam6dvpte34/lead-generation-skill@wellfound-startup-lead-scraper
+    capability: [discovery]
+    source: skills.sh
+    reason: Lead-gen scraper, not a job board API.
+
+  - id: indeed-lead-scraper
+    kind: skill
+    name: sam6dvpte34/lead-generation-skill@indeed-job-lead-scraper
+    capability: [discovery]
+    source: skills.sh
+    reason: Lead-gen scraper. Prefer official Indeed MCP.
+
+  - id: regional-job-boards
+    kind: skill
+    name: daangn-jobs-search / jobkorea / boss-job-search / proficientlyjobs
+    capability: [discovery]
+    source: skills.sh
+    reason: Regional boards (Korea etc.) not in platforms.md. Add a platform row first if the human wants them.
+
+  - id: theirstack
+    kind: mcp
+    name: TheirStack jobs MCP
+    capability: [discovery]
+    source: https://theirstack.com/en/blog/best-jobs-mcp
+    reason: Paid aggregator. Template prefers public ATS JSON + official Indeed. Revisit only if the human pays.
+
+  - id: job-tracker-sqlite
+    kind: mcp
+    name: kurkul608/job-tracker-mcp
+    capability: [maintain]
+    source: https://github.com/kurkul608/job-tracker-mcp
+    reason: Parallel ledger in SQLite. Git YAML is the live list.
+
+  - id: skills-hub-false-positives
+    kind: skill
+    name: azure-microsoft-discovery / customer-discovery
+    capability: [discovery]
+    source: npx @skills-hub-ai/cli search "job discovery"
+    reason: Name collision. Not job-board discovery.
+
+  - id: contact-hunter-skill
+    kind: skill
+    name: onewave-ai/claude-skills@contact-hunter
+    capability: [outreach]
+    source: skills.sh
+    reason: Not Hunter.io. Use official Hunter MCP for verify-before-send.

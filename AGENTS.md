@@ -8,7 +8,7 @@ You are working in **Job Apply OS**. Read this before doing anything else.
 2. Read `docs/process.md` if you have not already this session.
 3. Claim a role from `docs/roles.md`. Write the claim into `ledger/INDEX.md` under **Active operators**.
 
-If the user says you own everything, you still run the three roles **in order**: catalog + research + discovery, then apply, then outreach. Never Easy Apply during discovery.
+If the user says you own everything, you still run the three roles **in order**: catalog + research + discovery, then apply, then outreach. Never Easy Apply during discovery. Maintainer is a fourth owner and is **seldom** used; run it when the skill/MCP inventory is the work, not mid-search.
 
 ## Role picker
 
@@ -19,8 +19,9 @@ If the user says you own everything, you still run the three roles **in order**:
 | outreach, email, LinkedIn DM, referral, hiring manager | `skills/job-outreach/SKILL.md` |
 | find skills, find MCPs, skillhub, skills.sh | `skills/skill-and-mcp-catalog/SKILL.md` |
 | research the company, find the hiring manager, deep research | `skills/deep-research/SKILL.md` |
+| maintain, update skills, manage catalog, skill lists | `skills/skill-maintainer/SKILL.md` |
 
-Discovery **starts** with the catalog skill unless `docs/catalogs/skills-and-mcps.md` was updated this week.
+Discovery **starts** with the catalog skill unless `docs/catalogs/skills-and-mcps.md` was updated this week. If the work is **updating the skill tree itself** (lists, mcp.example.json, pruning dead tools), that is the seldom-used **maintainer** role, not discovery.
 
 ## Hard rules
 

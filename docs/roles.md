@@ -2,6 +2,8 @@
 
 A role is a **permission set** plus a **skill**. People or bots pick one, several, or all. Combined ownership is allowed. Skipping the process order is not.
 
+Job search has **three owners**. A fourth owner, **maintainer**, exists and is **seldom used**: it owns the skill/MCP tree, not jobs.
+
 ## The three owners
 
 ### Discovery owner
@@ -58,6 +60,22 @@ LinkedIn Easy Apply is an **apply** subdivision, not a discovery shortcut.
 - `outreach/email`
 - `outreach/linkedin`
 
+### Maintainer (seldom)
+
+**Skill:** [`skills/skill-maintainer/SKILL.md`](../skills/skill-maintainer/SKILL.md)
+
+**Also runs:** catalog skill as a subroutine (search registries, vet). Writes [`skills/lists/`](../skills/lists/).
+
+**Owns:** `skills/` (in-repo SKILL.md files), `skills/lists/`, `docs/catalogs/` inventory, `mcp/mcp.example.json`, cloud-agent tool wiring in `.cursor/environment.json`.
+
+**Writes:** adopted / wanted / rejected lists, catalog workspace log, example MCP config, environment install/egress. Rebuilds `skills/lists/INDEX.md`.
+
+**Must never:** discover jobs, Easy Apply, submit, send outreach, invent an MCP, put secrets in lists.
+
+**When to claim:** the user asks to maintain skills; the catalog is stale and nobody is mid-cycle; an MCP died; a research pass needs to be written into lists. Not part of the daily discover → apply → outreach loop.
+
+**Claim name:** `maintainer` (optionally `maintainer/lists`).
+
 ## Combining roles
 
 | Setup | How to run |
@@ -66,6 +84,7 @@ LinkedIn Easy Apply is an **apply** subdivision, not a discovery shortcut.
 | Pair | Discovery + (apply and outreach together) |
 | Trio | One owner each, default |
 | Swarm | Subdivisions above, one INDEX |
+| Maintainer (rare) | Separate turn. Does not run inside a discovery search. |
 
 When combined, keep the **forbidden column** in the README in your head. Combined is not “do everything at once.”
 
@@ -78,6 +97,7 @@ owners:
   discovery: "bot-or-human-name"
   apply: ""
   outreach: ""
+  # maintainer is claimed on ledger/INDEX.md Active operators, not on a job YAML
 ```
 
 If `owners.apply` is set by someone else and status is `applying`, do not steal it unless it is stale (no event for 24h) and you leave a note.
@@ -86,10 +106,10 @@ If `owners.apply` is set by someone else and status is `applying`, do not steal 
 
 | Capability | Skill | Who uses it |
 | --- | --- | --- |
-| Skill/MCP discovery | `skill-and-mcp-catalog` | Discovery first; anyone when blocked |
-| Deep research | `deep-research` | All three |
+| Skill/MCP discovery | `skill-and-mcp-catalog` | Discovery first; maintainer as a subroutine; anyone when blocked |
+| Deep research | `deep-research` | All three job owners |
 
-Do not create a fourth “research bot” unless the user asks. Research is a tool the owners call.
+Do not create a fourth “research bot.” Research stays a tool the owners call. **Maintainer** is the fourth owner, and it is for the skill tree, not for company research.
 
 ## Marketplace vs posting
 

@@ -49,6 +49,10 @@
       "type": "http",
       "url": "https://calendarmcp.googleapis.com/mcp/v1"
     },
+    "parallel-search": {
+      "type": "http",
+      "url": "https://search.parallel.ai/mcp"
+    },
     "playwright": {
       "command": "npx",
       "args": ["@playwright/mcp@latest"]

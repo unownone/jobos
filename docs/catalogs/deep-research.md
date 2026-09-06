@@ -108,7 +108,15 @@ Fast LLM-ready search. Good when you only need confirmation (“is this req stil
 
 Remote: `https://mcp.tavily.com/mcp/?tavilyApiKey=<key>` or `npx -y tavily-mcp@latest` with `TAVILY_API_KEY`. Docs: https://docs.tavily.com/documentation/mcp
 
-### 5. Built-in WebSearch / WebFetch
+### 5. Parallel Search MCP
+
+Official Search + Extract MCP. Free anonymous tier, no API key.
+
+Remote: `https://search.parallel.ai/mcp`. Production: `Authorization: Bearer` with a Parallel key, or `https://search.parallel.ai/mcp-oauth`. Docs: https://docs.parallel.ai/integrations/mcp/search-mcp
+
+Use when Exa and Tavily are missing. Do not skip a working Exa MCP for this.
+
+### 6. Built-in WebSearch / WebFetch
 
 Airgapped-from-paid-keys mode. Still enough for dorks and public careers pages.
 
