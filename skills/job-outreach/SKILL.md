@@ -38,6 +38,10 @@ Order: recruiter on the posting → hiring manager → teammate in-function → 
 
 Cap touches per person from the profile. Log every attempt.
 
+## Copy helpers (optional)
+
+If `.agents/skills/draft-outreach` or `compose-outreach` is linked, use them to draft. They must not send. Common Room MCP is optional — if it is missing, skip CR tools and use the ledger people file + deep-research. Email still goes through Gmail MCP with the PDF attached.
+
 ## Templates
 
 Start from `assets/templates/email.md` and `assets/templates/linkedin-dm.md`, then specialize. If it could be sent to ten companies unchanged, rewrite.

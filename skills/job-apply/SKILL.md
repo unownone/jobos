@@ -36,6 +36,7 @@ Use `skills/deep-research/SKILL.md` only to fetch **one** usable fact. If resear
 - Upload the named PDF
 - Answer screening questions from the profile; if unknown, `apply_blocked`
 - Easy Apply is allowed **here**, not in discovery
+- Browser: Playwright MCP and/or `.agents/skills/playwright-cli` (apply env only)
 - Respect `max_applies_per_day`
 
 ## Proof (required)

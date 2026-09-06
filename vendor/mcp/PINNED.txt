@@ -1,0 +1,6 @@
+# Pins for local MCP launchers. Do not copy source trees into git.
+# PyPI
+workatastartup-mcp==0.1.2
+ats-jobs-mcp==1.0.0
+# Git (cloned to gitignored agent-tools/ on first run)
+job-scout-mcp  b05841644a117b763a03ea0aef58705e5ec7c9e7  https://github.com/pabnatanawan87/job-scout-mcp

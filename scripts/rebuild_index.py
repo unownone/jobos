@@ -29,6 +29,7 @@ DEFAULT_OPERATORS = """## Active operators
 | discovery | _unclaimed_ | all portals | |
 | apply | _unclaimed_ | all ATS | |
 | outreach | _unclaimed_ | email + linkedin_dm | |
+| maintainer | _unclaimed_ | skills + lists | |
 """
 
 

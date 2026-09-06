@@ -1,0 +1,331 @@
+# Source of truth for tools Job Apply OS uses or is wired to use.
+# Rebuild the human board: uv run scripts/rebuild_skill_index.py
+updated: "2026-09-06"
+actor: cursor-cloud-agent
+
+items:
+  - id: skill-and-mcp-catalog
+    kind: skill
+    name: skill-and-mcp-catalog
+    capability: [maintain, discovery]
+    roles: [discovery, maintainer]
+    platforms: []
+    source: skills/skill-and-mcp-catalog/SKILL.md
+    install: in-repo
+    auth: none
+    verdict: use
+    notes: Procurement pass. Discovery calls this first in a cycle.
+
+  - id: skill-maintainer
+    kind: skill
+    name: skill-maintainer
+    capability: [maintain]
+    roles: [maintainer]
+    platforms: []
+    source: skills/skill-maintainer/SKILL.md
+    install: in-repo
+    auth: none
+    verdict: use
+    notes: Seldom-used owner of skills/lists, catalog files, mcp.example.json.
+
+  - id: job-discovery
+    kind: skill
+    name: job-discovery
+    capability: [discovery]
+    roles: [discovery]
+    platforms: []
+    source: skills/job-discovery/SKILL.md
+    install: in-repo
+    auth: none
+    verdict: use
+
+  - id: job-apply
+    kind: skill
+    name: job-apply
+    capability: [apply]
+    roles: [apply]
+    platforms: []
+    source: skills/job-apply/SKILL.md
+    install: in-repo
+    auth: none
+    verdict: use
+
+  - id: job-outreach
+    kind: skill
+    name: job-outreach
+    capability: [outreach, mail]
+    roles: [outreach]
+    platforms: [gmail, linkedin]
+    source: skills/job-outreach/SKILL.md
+    install: in-repo
+    auth: none
+    verdict: use
+
+  - id: deep-research
+    kind: skill
+    name: deep-research
+    capability: [research]
+    roles: [all]
+    platforms: [web]
+    source: skills/deep-research/SKILL.md
+    install: in-repo
+    auth: none
+    verdict: use
+    notes: Stack order is in the skill. Exa first, then local dzhng runner.
+
+  - id: exa-mcp
+    kind: mcp
+    name: Exa MCP
+    capability: [research, discovery]
+    roles: [all]
+    platforms: [web, linkedin-index, google_dorks]
+    source: https://github.com/exa-labs/exa-mcp-server
+    install: "https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,company_research_exa,linkedin_search_exa,deep_researcher_start,deep_researcher_check,agent_run,crawling_exa"
+    auth: oauth_or_api_key
+    verdict: use
+    notes: Preferred research. Not attached on this cloud agent yet.
+
+  - id: dzhng-open-deep-research
+    kind: local
+    name: dzhng/deep-research (open-deep-research)
+    capability: [research]
+    roles: [all]
+    platforms: [web]
+    source: https://github.com/dzhng/deep-research
+    install: bash scripts/setup_deep_research.sh then python3 scripts/run_deep_research.py
+    auth: firecrawl_plus_openai
+    verdict: use
+    notes: Cloud-agent wired via .cursor/environment.json. Not an MCP. Needs FIRECRAWL_KEY + OPENAI_KEY.
+
+  - id: firecrawl-mcp
+    kind: mcp
+    name: Firecrawl MCP
+    capability: [research]
+    roles: [discovery, maintainer]
+    platforms: [web]
+    source: https://www.firecrawl.dev
+    install: npx -y firecrawl-mcp
+    auth: api_key
+    verdict: use
+    notes: Extraction fallback; also powers the local deep-research runner.
+
+  - id: tavily-mcp
+    kind: mcp
+    name: Tavily MCP
+    capability: [research]
+    roles: [all]
+    platforms: [web]
+    source: https://docs.tavily.com
+    install: npx -y tavily-mcp@latest or https://mcp.tavily.com/mcp/?tavilyApiKey=
+    auth: api_key
+    verdict: use
+    notes: Fast confirmation search.
+
+  - id: parallel-search-mcp
+    kind: mcp
+    name: Parallel Search MCP
+    capability: [research]
+    roles: [all]
+    platforms: [web]
+    source: https://docs.parallel.ai/integrations/mcp/search-mcp
+    install: https://search.parallel.ai/mcp
+    auth: none_or_bearer
+    verdict: use
+    notes: >
+      Maintainer pass 2026-09-06. Official Search + Extract MCP. Anonymous
+      free tier (no key). Added to mcp.example.json as a no-key research
+      fallback after Exa/Tavily. Production: Authorization Bearer.
+
+  - id: indeed-mcp
+    kind: mcp
+    name: Official Indeed MCP
+    capability: [discovery, research]
+    roles: [discovery]
+    platforms: [indeed]
+    source: https://docs.indeed.com/mcp/
+    install: https://mcp.indeed.com/claude/mcp
+    auth: oauth
+    verdict: use
+    notes: Tools Job Search, Job Detail, Get Resume, Get Company Data. Docs still say Claude Connector only. Not attached here. Fallback public URLs + dorks.
+
+  - id: workatastartup-mcp
+    kind: mcp
+    name: workatastartup-mcp
+    capability: [discovery, research]
+    roles: [discovery]
+    platforms: [workatastartup]
+    source: https://github.com/MIt9/workatastartup-mcp
+    install: bash scripts/mcp/workatastartup.sh (uvx workatastartup-mcp==0.1.2)
+    auth: none
+    verdict: use
+    notes: Public YC board. Pin in vendor/mcp/PINNED.txt. Do not copy the package into git.
+
+  - id: ats-jobs-mcp
+    kind: mcp
+    name: ats-jobs-mcp
+    capability: [discovery]
+    roles: [discovery]
+    platforms: [google_dorks, amazon, microsoft, google, uber]
+    source: https://github.com/groundtruthtools/ats-jobs-mcp
+    install: bash scripts/mcp/ats-jobs.sh (uvx ats-jobs-mcp==1.0.0)
+    auth: none
+    verdict: use
+    notes: Public Greenhouse / Ashby / Lever APIs. The ~50k-line directory.json stays in the wheel.
+
+  - id: job-scout-mcp
+    kind: mcp
+    name: job-scout-mcp
+    capability: [discovery]
+    roles: [discovery]
+    platforms: [remoteok, google_dorks]
+    source: https://github.com/pabnatanawan87/job-scout-mcp
+    install: bash scripts/mcp/job-scout.sh (clone to gitignored agent-tools/)
+    auth: none
+    verdict: use
+    notes: ATS + HN Who is Hiring + RemoteOK. ToS-clean public feeds. Optional Adzuna/USAJobs keys.
+
+  - id: hiringcafe-http
+    kind: http
+    name: Hiring Cafe public pages
+    capability: [discovery]
+    roles: [discovery]
+    platforms: [hiringcafe]
+    source: https://hiringcafe.com
+    install: python3 scripts/fetch_hiringcafe.py --query "staff software engineer"
+    auth: none
+    verdict: use
+    notes: >
+      Reddit-maintained job search (r/hiringcafe, also hiringcafe.com).
+      Reads public __NEXT_DATA__. Store employer apply_url when present.
+
+  - id: compose-outreach
+    kind: skill
+    name: anthropics compose-outreach
+    capability: [outreach]
+    roles: [outreach]
+    platforms: [gmail, linkedin]
+    source: .agents/skills/compose-outreach
+    install: bash scripts/install_agent_skills.sh
+    auth: none
+    verdict: use
+    notes: Copy helper. Common Room optional. Sending stays Gmail MCP + PDF.
+
+  - id: draft-outreach
+    kind: skill
+    name: anthropics draft-outreach
+    capability: [outreach]
+    roles: [outreach]
+    platforms: [gmail, linkedin]
+    source: .agents/skills/draft-outreach
+    install: bash scripts/install_agent_skills.sh
+    auth: none
+    verdict: use
+    notes: Web-research copy helper. Do not send from the skill.
+
+  - id: playwright-cli-skill
+    kind: skill
+    name: microsoft/playwright-cli
+    capability: [apply]
+    roles: [apply]
+    platforms: []
+    source: .agents/skills/playwright-cli
+    install: bash scripts/install_agent_skills.sh
+    auth: none
+    verdict: use
+    notes: Apply env only. Complements Playwright MCP.
+
+  - id: remoteok-http
+    kind: http
+    name: RemoteOK public API
+    capability: [discovery]
+    roles: [discovery]
+    platforms: [remoteok]
+    source: https://remoteok.com/api
+    install: GET https://remoteok.com/api
+    auth: none
+    verdict: use
+    notes: Skip JSON index 0 (metadata). Credit RemoteOK. Store original job URL.
+
+  - id: websearch-dorks
+    kind: builtin
+    name: WebSearch + ATS dorks
+    capability: [discovery]
+    roles: [discovery]
+    platforms: [google_jobs, google_dorks]
+    source: docs/catalogs/platforms.md
+    install: built-in WebSearch / Exa advanced
+    auth: none
+    verdict: use
+    notes: Always store the employer apply URL, not a Google card.
+
+  - id: gmail-mcp
+    kind: mcp
+    name: Gmail MCP
+    capability: [mail, outreach]
+    roles: [outreach]
+    platforms: [gmail]
+    source: https://developers.google.com/workspace/guides/configure-mcp-servers
+    install: Cursor-hosted Gmail namespace, or https://gmailmcp.googleapis.com/mcp/v1
+    auth: oauth
+    verdict: use
+    notes: Attached on this cloud agent. create_draft must include PDF attachments[{filename, mimeType, content base64}].
+
+  - id: google-drive-mcp
+    kind: mcp
+    name: Google Drive MCP
+    capability: [research]
+    roles: [discovery, outreach]
+    platforms: []
+    source: https://developers.google.com/workspace/guides/configure-mcp-servers
+    install: Cursor-hosted Drive, or https://drivemcp.googleapis.com/mcp/v1
+    auth: oauth
+    verdict: use
+    notes: Optional ledger overlay. Git remains canonical. Attached here.
+
+  - id: google-calendar-mcp
+    kind: mcp
+    name: Google Calendar MCP
+    capability: [outreach]
+    roles: [outreach]
+    platforms: []
+    source: https://developers.google.com/workspace/guides/configure-mcp-servers
+    install: Cursor-hosted Calendar, or https://calendarmcp.googleapis.com/mcp/v1
+    auth: oauth
+    verdict: use
+    notes: suggest_time / create_event after a real interview ask. Attached here.
+
+  - id: hunter-mcp
+    kind: mcp
+    name: Hunter MCP
+    capability: [research, outreach]
+    roles: [outreach]
+    platforms: [gmail]
+    source: https://hunter.io/mcp
+    install: https://mcp.hunter.io/mcp with X-API-Key
+    auth: api_key
+    verdict: use
+    notes: Verify before any email send. Low confidence → LinkedIn DM only.
+
+  - id: playwright-mcp
+    kind: mcp
+    name: Playwright MCP
+    capability: [apply, outreach]
+    roles: [apply, outreach]
+    platforms: [linkedin, amazon, microsoft, google, uber, flexiple, turing, toptal, lemonio, bairesdev]
+    source: https://github.com/microsoft/playwright-mcp
+    install: npx @playwright/mcp@latest
+    auth: none
+    verdict: use
+    notes: Apply bot + LinkedIn DMs. Never on the discovery environment.
+
+  - id: cursor-gmail-this-agent
+    kind: mcp
+    name: Cursor Gmail (this cloud agent)
+    capability: [mail, outreach]
+    roles: [outreach]
+    platforms: [gmail]
+    source: Cursor dynamic namespace Gmail
+    install: already attached
+    auth: oauth
+    verdict: use
+    notes: Same capability as gmail-mcp. Do not duplicate servers on this agent.

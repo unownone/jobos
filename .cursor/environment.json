@@ -1,0 +1,39 @@
+{
+  "name": "job-apply-os",
+  "install": "bash scripts/setup_deep_research.sh && bash scripts/setup_vendor_mcps.sh && bash scripts/link_agent_skills.sh",
+  "repositoryDependencies": [
+    "github.com/dzhng/deep-research"
+  ],
+  "ports": [
+    {
+      "name": "open-deep-research-api",
+      "port": 3051
+    }
+  ],
+  "egressAllowlist": [
+    "github.com",
+    "api.github.com",
+    "codeload.github.com",
+    "registry.npmjs.org",
+    "pypi.org",
+    "files.pythonhosted.org",
+    "api.openai.com",
+    "api.firecrawl.dev",
+    "mcp.exa.ai",
+    "mcp.tavily.com",
+    "mcp.hunter.io",
+    "mcp.apollo.io",
+    "mcp.indeed.com",
+    "search.parallel.ai",
+    "gmailmcp.googleapis.com",
+    "drivemcp.googleapis.com",
+    "calendarmcp.googleapis.com",
+    "people.googleapis.com",
+    "remoteok.com",
+    "www.workatastartup.com",
+    "hiring.cafe",
+    "www.hiringcafe.com",
+    "hiringcafe.com",
+    "www.reddit.com"
+  ]
+}

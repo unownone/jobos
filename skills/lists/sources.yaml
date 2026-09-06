@@ -1,0 +1,69 @@
+# Last maintainer registry pass. Rebuild INDEX from the other YAML files.
+pass: "2026-09-06"
+actor: cursor-cloud-agent
+role: maintainer
+note: >
+  Pinned uvx/git MCPs (no source trees in git). Installed compose-outreach /
+  draft-outreach / playwright-cli via npx skills add. Added Hiring Cafe public
+  fetcher. Hosted MCP snippets in mcp/hosted/.
+
+registries:
+  - name: skills.sh
+    method: npx skills find
+    queries:
+      - job discovery
+      - linkedin jobs
+      - gmail email
+      - outreach
+      - mcp
+      - greenhouse
+      - deep research
+      - hunter
+      - playwright
+      - job search
+      - indeed
+      - wellfound
+      - angellist
+      - work at a startup
+      - remoteok
+  - name: skills-hub.ai
+    method: npx @skills-hub-ai/cli search
+    queries:
+      - job discovery
+      - mcp gmail
+    note: Hits were Azure/customer-discovery and inbox skills; nothing Job Apply OS should adopt from this query set.
+  - name: github
+    method: web + vendor README
+    queries:
+      - groundtruthtools/ats-jobs-mcp
+      - pabnatanawan87/job-scout-mcp
+      - MIt9/workatastartup-mcp
+      - microsoft/playwright-mcp
+      - dzhng/deep-research
+      - stickerdaniel/linkedin-mcp-server
+      - anatolykoptev/go-job
+      - VennieSo/jobspy-mcp-server
+      - michaeltabet/hs-linkedin-mcp
+  - name: vendor-docs
+    method: WebFetch / WebSearch
+    queries:
+      - https://docs.indeed.com/mcp/
+      - https://hunter.io/mcp
+      - https://docs.apollo.io/docs/apollo-mcp
+      - https://docs.parallel.ai/integrations/mcp/search-mcp
+      - Google Workspace MCP
+      - Exa / Firecrawl / Tavily MCP
+  - name: smithery-glama
+    method: WebSearch
+    queries:
+      - jobspipe/jobspipe-mcp
+      - job-scout-mcp
+
+attached_on_this_cloud_agent:
+  - Gmail
+  - Google-drive
+  - Google-calendar
+  - cursor-cloud
+not_attached_on_this_cloud_agent:
+  - Indeed MCP (docs still say Claude Connector)
+  - Exa / Firecrawl / Tavily / Hunter / Playwright

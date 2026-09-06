@@ -8,6 +8,7 @@ This is the contract. Skills implement slices of it. If a skill and this documen
 - At least one resume PDF exists locally at the path named in the profile.
 - The operator has claimed a role in `ledger/INDEX.md`.
 - Discovery has a reasonably current `docs/catalogs/skills-and-mcps.md` (or will refresh it first).
+- Maintainer, when claimed, also keeps `skills/lists/` in sync with that catalog.
 
 ## 1. Catalog pass (discovery, first)
 
@@ -17,7 +18,9 @@ Goal: know which skills and MCPs this workspace can actually use.
 2. Search more than one registry (skills.sh, Skills Hub, ClawHub, GitHub, mcp.so, Smithery).
 3. Vet: license, auth, ToS, whether it applies vs discovers, whether it works airgapped, whether it needs a browser.
 4. Write the chosen stack into `docs/catalogs/skills-and-mcps.md` with install notes.
-5. Do not install an auto-apply skill into the discovery bot.
+5. If the pass is a platform/MCP coverage refresh, also update `docs/research/platform-mcp-build-plan.md`.
+6. If the work is **updating the skill tree** (lists, pruning, example MCP config), load [`skills/skill-maintainer`](../skills/skill-maintainer/SKILL.md) and write `skills/lists/` — that is not a discovery cycle.
+7. Do not install an auto-apply skill into the discovery bot.
 
 ## 2. Profile freeze
 
@@ -47,8 +50,9 @@ Work the platform catalog in [`docs/catalogs/platforms.md`](catalogs/platforms.m
 4. Wellfound
 5. Google Jobs + dorks against Greenhouse / Lever / Ashby / Workday
 6. RemoteOK public API
-7. Named marketplaces (Flexiple, Turing, Weekday, Toptal, Lemon.io, BairesDev, Roro Remote) — record whether each item is a **posting** or a **network apply**
-8. Big-company career sites the candidate cares about
+7. Hiring Cafe (`scripts/fetch_hiringcafe.py` / hiring.cafe public pages)
+8. Named marketplaces (Flexiple, Turing, Weekday, Toptal, Lemon.io, BairesDev, Roro Remote) — record whether each item is a **posting** or a **network apply**
+9. Big-company career sites the candidate cares about
 
 ### 3.2 For every raw hit
 
@@ -190,3 +194,17 @@ Suggested, not mandatory:
 - Every `applied` job has proof and an outreach seed
 - Every outreach touch has a person record
 - Catalog notes any tool that failed, so the next bot does not rediscover a dead MCP
+- If maintainer ran: `skills/lists/INDEX.md` matches the YAML lists
+
+## 10. Maintainer pass (seldom)
+
+Goal: keep the skill/MCP inventory true. **No jobs.**
+
+1. Claim `maintainer` on `ledger/INDEX.md`.
+2. Load [`skills/skill-maintainer`](../skills/skill-maintainer/SKILL.md).
+3. Search at least two registries. Vet. Write `skills/lists/{adopted,wanted,rejected,by-platform,sources}.yaml`.
+4. `uv run scripts/rebuild_skill_index.py`.
+5. Patch `mcp/mcp.example.json` / `.cursor/environment.json` only for tools that moved to **adopted**.
+6. Append catalog workspace log + `ledger/events.jsonl`.
+
+Do not start a discovery search from this pass.

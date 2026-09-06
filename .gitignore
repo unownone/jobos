@@ -22,6 +22,9 @@ __pycache__/
 agent-tools/
 agent-transcripts/
 
+# Vendored MCP runtimes used to live here; they bloated the PR.
+# Source trees stay out of git. Cache clones go in agent-tools/.
+
 # OS / editor
 .DS_Store
 .idea/

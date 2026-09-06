@@ -1,8 +1,24 @@
 {
   "mcpServers": {
+    "workatastartup": {
+      "command": "bash",
+      "args": ["scripts/mcp/workatastartup.sh"]
+    },
+    "ats-jobs": {
+      "command": "bash",
+      "args": ["scripts/mcp/ats-jobs.sh"]
+    },
+    "job-scout": {
+      "command": "bash",
+      "args": ["scripts/mcp/job-scout.sh"]
+    },
     "exa": {
       "type": "http",
       "url": "https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,company_research_exa,linkedin_search_exa,deep_researcher_start,deep_researcher_check,agent_run,crawling_exa"
+    },
+    "parallel-search": {
+      "type": "http",
+      "url": "https://search.parallel.ai/mcp"
     },
     "firecrawl": {
       "command": "npx",
@@ -10,6 +26,44 @@
       "env": {
         "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
       }
+    },
+    "tavily": {
+      "command": "npx",
+      "args": ["-y", "tavily-mcp@latest"],
+      "env": {
+        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+      }
+    },
+    "indeed": {
+      "type": "http",
+      "url": "https://mcp.indeed.com/claude/mcp"
+    },
+    "hunter": {
+      "type": "http",
+      "url": "https://mcp.hunter.io/mcp",
+      "headers": {
+        "X-API-Key": "${HUNTER_API_KEY}"
+      }
+    },
+    "apollo": {
+      "type": "http",
+      "url": "https://mcp.apollo.io/mcp"
+    },
+    "gmail": {
+      "type": "http",
+      "url": "https://gmailmcp.googleapis.com/mcp/v1"
+    },
+    "drive": {
+      "type": "http",
+      "url": "https://drivemcp.googleapis.com/mcp/v1"
+    },
+    "calendar": {
+      "type": "http",
+      "url": "https://calendarmcp.googleapis.com/mcp/v1"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
     }
   }
 }
