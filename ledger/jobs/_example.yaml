@@ -1,0 +1,51 @@
+# Example only. Copy the shape, never keep fake companies in INDEX as live work.
+
+id: exampleco__staff-backend-remote
+company: ExampleCo
+title: Staff Backend Engineer
+location: Remote
+remote: true
+url: https://jobs.example.com/staff-backend
+apply_url: https://boards.greenhouse.io/exampleco/jobs/123
+apply_kind: ats
+ats: greenhouse
+req_id: "123"
+sources: [google_dorks, wellfound]
+status: apply_ready
+score: 4
+owners:
+  discovery: "discovery-1"
+  apply: ""
+  outreach: ""
+created_at: "2026-09-06T12:00:00Z"
+updated_at: "2026-09-06T12:30:00Z"
+research:
+  posting_live: true
+  last_checked: "2026-09-06"
+  company_one_liner: "ExampleCo builds developer infrastructure."
+  red_flags: []
+  team_guess: "Platform / API"
+  sources:
+    - https://jobs.example.com/staff-backend
+apply_packet:
+  url: https://boards.greenhouse.io/exampleco/jobs/123
+  account: "candidate email"
+  documents: ["assets/resume/resume-primary.pdf"]
+  questions:
+    - "Work authorization — answer from candidate.yaml"
+  steps:
+    - "Open apply_url"
+    - "Use candidate identity fields"
+    - "Upload resume-primary.pdf"
+    - "Paste cover note from apply role"
+    - "Do not submit until apply role is running"
+  why_shortlisted: |
+    Matches staff backend + infra. Public req with a real apply URL.
+    Remote stated. Stack overlaps Python/Postgres.
+  do_not_apply_yet: true
+outreach_packet:
+  people: []
+  ask: "15-minute chat"
+  resume: "assets/resume/resume-primary.pdf"
+notes: ""
+conflicts: []

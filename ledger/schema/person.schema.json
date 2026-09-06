@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://job-apply-os.local/schema/person.json",
+  "title": "People ledger record",
+  "type": "object",
+  "required": ["id", "name", "job_id"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "title": { "type": "string" },
+    "company": { "type": "string" },
+    "job_id": { "type": "string" },
+    "linkedin_url": { "type": "string" },
+    "email": { "type": "string" },
+    "email_confidence": { "type": "string", "enum": ["verified", "high", "low", "unknown"] },
+    "do_not_contact": { "type": "boolean" },
+    "touches": { "type": "array" }
+  }
+}

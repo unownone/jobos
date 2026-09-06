@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://job-apply-os.local/schema/job.json",
+  "title": "Job ledger record",
+  "type": "object",
+  "required": ["id", "company", "title", "status", "sources", "created_at"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+__[a-zA-Z0-9._-]+$" },
+    "company": { "type": "string" },
+    "title": { "type": "string" },
+    "location": { "type": "string" },
+    "remote": { "type": ["string", "boolean"] },
+    "url": { "type": "string" },
+    "apply_url": { "type": "string" },
+    "apply_kind": {
+      "type": "string",
+      "enum": [
+        "ats",
+        "linkedin_easy_apply",
+        "indeed",
+        "network",
+        "outreach_only",
+        "unknown"
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "req_id": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "discovered",
+        "enriching",
+        "shortlisted",
+        "skipped",
+        "apply_ready",
+        "applying",
+        "applied",
+        "apply_blocked",
+        "outreach_ready",
+        "outreaching",
+        "waiting",
+        "chatting",
+        "interview",
+        "offer",
+        "closed_rejected",
+        "closed_withdrawn",
+        "closed_expired"
+      ]
+    },
+    "score": { "type": ["number", "null"], "minimum": 1, "maximum": 5 },
+    "owners": {
+      "type": "object",
+      "properties": {
+        "discovery": { "type": "string" },
+        "apply": { "type": "string" },
+        "outreach": { "type": "string" }
+      }
+    },
+    "apply_packet": { "type": "object" },
+    "outreach_packet": { "type": "object" },
+    "research": { "type": "object" },
+    "proof": { "type": "object" },
+    "conflicts": { "type": "array" },
+    "notes": { "type": "string" },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  }
+}

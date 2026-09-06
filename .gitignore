@@ -1,0 +1,31 @@
+# Secrets and live candidate data (keep examples)
+.env
+.env.*
+!.env.example
+profiles/candidate.yaml
+profiles/secrets.yaml
+mcp/mcp.local.json
+assets/resume/*
+!assets/resume/.gitkeep
+!assets/resume/README.md
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Cloud agent scratch (not part of the template)
+agent-tools/
+agent-transcripts/
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp
+
+# Ledger working copies (optional local overlays)
+ledger/.cache/

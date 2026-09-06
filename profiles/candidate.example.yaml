@@ -1,0 +1,56 @@
+# Copy to profiles/candidate.yaml (gitignored) and fill in.
+# This is the only profile every role reads. Keep it truthful and short.
+
+identity:
+  full_name: "Ada Example"
+  preferred_name: "Ada"
+  email: "ada@example.com"
+  phone: ""
+  location: "Bengaluru, India"
+  timezone: "Asia/Kolkata"
+  work_authorization: "India citizen; open to remote / visa-sponsored roles"
+  linkedin_url: "https://www.linkedin.com/in/example"
+  github_url: "https://github.com/example"
+  portfolio_url: ""
+  website: ""
+
+target:
+  titles:
+    - "Staff Software Engineer"
+    - "Senior Backend Engineer"
+    - "Founding Engineer"
+  seniority: ["senior", "staff"]
+  domains: ["developer tools", "infra", "AI products"]
+  locations: ["Remote", "Bengaluru", "San Francisco"]
+  remote: "required-or-hybrid"
+  salary_floor_usd: 0
+  visa_needs: false
+  company_sizes: ["startup", "scaleup", "bigtech"]
+  must_haves:
+    - "Writes production code"
+    - "Ownership of a system, not ticket farming"
+  deal_breakers:
+    - "Unpaid trial projects longer than a few hours"
+    - "Crypto-only / gambling if you want to skip those"
+
+proof:
+  headline: "Backend engineer who ships reliable systems."
+  years_experience: 8
+  stack: ["TypeScript", "Python", "Go", "Postgres", "AWS"]
+  highlights:
+    - "Cut p99 latency 40% on a payments API serving X rps"
+    - "Led migration from monolith to services without a SEV1"
+  do_not_claim:
+    - "Anything not in the resume PDFs"
+
+materials:
+  resume_primary: "assets/resume/resume-primary.pdf"
+  resume_variants: []
+  writing_voice: "Direct, specific, no fluff, no emojis unless the company uses them first."
+
+constraints:
+  max_discovers_per_cycle: 40
+  max_shortlist_per_cycle: 12
+  max_applies_per_day: 8
+  max_outreach_touches_per_person: 2
+  easy_apply_policy: "never during discovery; apply role may use it only after a packet exists"
