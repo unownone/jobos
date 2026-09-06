@@ -252,9 +252,10 @@ No fourth owner. Research stays a capability.
 
 ## Verification for this PR (no live research run)
 
-Live `POST /api/research` was **not** executed: `FIRECRAWL_KEY` and `OPENAI_KEY` are absent. What was verified:
+Live `POST /api/research` was **not** executed: `FIRECRAWL_KEY` and `OPENAI_KEY` are absent. What was verified on this cloud agent:
 
 - Upstream README, `package.json`, `src/run.ts`, `src/api.ts`, `src/deep-research.ts`, `src/ai/providers.ts` from a shallow clone of `dzhng/deep-research`
-- `python3 scripts/run_deep_research.py --help` (after this PR)
+- `bash scripts/setup_deep_research.sh` cloned into `agent-tools/open-deep-research` and `npm ci` succeeded (165 packages)
+- `python3 scripts/run_deep_research.py --help` works; `--setup-only` exits with a clear missing-key error when Firecrawl/OpenAI keys are unset
 - Registry queries listed in the catalog workspace log
 - Gmail `create_draft` schema on this agent includes `attachments[].content` base64
