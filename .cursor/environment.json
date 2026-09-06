@@ -1,6 +1,6 @@
 {
   "name": "job-apply-os",
-  "install": "bash scripts/setup_deep_research.sh && bash scripts/setup_vendor_mcps.sh && bash scripts/link_agent_skills.sh",
+  "install": "bash scripts/setup_uv.sh && bash scripts/setup_deep_research.sh && bash scripts/setup_vendor_mcps.sh && bash scripts/link_agent_skills.sh",
   "repositoryDependencies": [
     "github.com/dzhng/deep-research"
   ],
