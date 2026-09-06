@@ -3,9 +3,9 @@ pass: "2026-09-06"
 actor: cursor-cloud-agent
 role: maintainer
 note: >
-  Vendor pass: cloned local MCP sources into vendor/mcp (pinned SHAs),
-  installed compose-outreach / draft-outreach / playwright-cli via npx skills add,
-  added Hiring Cafe public fetcher. Hosted MCP snippets in mcp/hosted/.
+  Pinned uvx/git MCPs (no source trees in git). Installed compose-outreach /
+  draft-outreach / playwright-cli via npx skills add. Added Hiring Cafe public
+  fetcher. Hosted MCP snippets in mcp/hosted/.
 
 registries:
   - name: skills.sh

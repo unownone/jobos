@@ -1,23 +1,19 @@
-# Vendored local MCP servers
+# Local MCP pins (not source trees)
 
-These are **downloaded copies** of small, no-key (or optional-key) MCP servers so a clone of Job Apply OS can run discovery without hunting GitHub.
+Do **not** commit upstream MCP repos. `ats-jobs-mcp` ships a ~50k-line company
+directory in its **wheel**. Copying that into git made the PR look huge for no
+operator benefit.
 
-| Dir | Upstream | License | Launch |
-| --- | --- | --- | --- |
-| `workatastartup-mcp` | [MIt9/workatastartup-mcp](https://github.com/MIt9/workatastartup-mcp) | MIT | `bash scripts/mcp/workatastartup.sh` |
-| `ats-jobs-mcp` | [groundtruthtools/ats-jobs-mcp](https://github.com/groundtruthtools/ats-jobs-mcp) | MIT | `bash scripts/mcp/ats-jobs.sh` |
-| `job-scout-mcp` | [pabnatanawan87/job-scout-mcp](https://github.com/pabnatanawan87/job-scout-mcp) | MIT | `bash scripts/mcp/job-scout.sh` |
+| Server | How it runs | Pin |
+| --- | --- | --- |
+| Work at a Startup | `uvx --from workatastartup-mcp==0.1.2` via `scripts/mcp/workatastartup.sh` | PyPI 0.1.2 |
+| ATS boards | `uvx --from ats-jobs-mcp==1.0.0` via `scripts/mcp/ats-jobs.sh` | PyPI 1.0.0 |
+| job-scout | clone into gitignored `agent-tools/job-scout-mcp` via `scripts/mcp/job-scout.sh` | SHA in `PINNED.txt` |
 
-Pins: [`PINNED.txt`](PINNED.txt).
-
-Do **not** vendor LinkedIn session/cookie servers, Apify scrapers, or recruiter-side Harvest APIs.
-
-Refresh (maintainer):
+Warm cache (cloud-agent `install` already does this):
 
 ```bash
-bash scripts/setup_vendor_mcps.sh --refresh
+bash scripts/setup_vendor_mcps.sh
 ```
 
-`node_modules` and `.venv` stay gitignored. First launch of a Python server uses `uv run` (downloads deps into that package’s `.venv`). Job-scout needs `npm ci` once; `setup_vendor_mcps.sh` does that.
-
-Hosted MCPs (Exa, Gmail, Hunter, …) are **not** here. Copy-paste configs: [`mcp/hosted/`](../../mcp/hosted/) and [`mcp/SETUP.md`](../../mcp/SETUP.md).
+Hosted MCPs: [`mcp/hosted/`](../../mcp/hosted/) and [`mcp/SETUP.md`](../../mcp/SETUP.md).

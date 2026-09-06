@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
+# Pin: PyPI workatastartup-mcp 0.1.2 (see vendor/mcp/PINNED.txt)
 set -euo pipefail
-ROOT="$("$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_repo_root.sh")"
-exec uv run --directory "$ROOT/vendor/mcp/workatastartup-mcp" workatastartup-mcp "$@"
+exec uvx --from "workatastartup-mcp==0.1.2" workatastartup-mcp "$@"

@@ -1,39 +1,24 @@
 #!/usr/bin/env bash
-# Install local MCP runtime deps. --refresh re-clones pinned upstreams.
+# Prefetch job-scout into gitignored agent-tools/. Python MCPs use uvx on first attach.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENDOR="$ROOT/vendor/mcp"
-REFRESH=0
-if [[ "${1:-}" == "--refresh" ]]; then
-  REFRESH=1
-fi
+DIR="${JOBOS_JOB_SCOUT_DIR:-$ROOT/agent-tools/job-scout-mcp}"
+PINNED="${JOBOS_JOB_SCOUT_SHA:-b05841644a117b763a03ea0aef58705e5ec7c9e7}"
+URL="${JOBOS_JOB_SCOUT_REPO:-https://github.com/pabnatanawan87/job-scout-mcp.git}"
 
-clone_one() {
-  local name="$1" sha="$2" url="$3"
-  local dest="$VENDOR/$name"
-  local tmp
+if [[ ! -f "$DIR/dist/index.js" ]]; then
+  mkdir -p "$(dirname "$DIR")"
   tmp="$(mktemp -d)"
-  git clone --depth 1 "$url" "$tmp"
-  git -C "$tmp" fetch --depth 1 origin "$sha"
-  git -C "$tmp" checkout --detach "$sha"
-  rm -rf "$dest"
-  mkdir -p "$dest"
-  cp -a "$tmp/." "$dest/"
-  rm -rf "$dest/.git" "$tmp"
-}
-
-if [[ "$REFRESH" -eq 1 ]]; then
-  while read -r name sha url; do
-    [[ -z "${name:-}" || "$name" == \#* ]] && continue
-    echo "refresh $name @ $sha"
-    clone_one "$name" "$sha" "$url"
-  done < <(awk 'NF==3 {print}' "$VENDOR/PINNED.txt")
+  git clone --depth 1 "$URL" "$tmp"
+  git -C "$tmp" fetch --depth 1 origin "$PINNED"
+  git -C "$tmp" checkout --detach "$PINNED"
+  rm -rf "$DIR"
+  mkdir -p "$DIR"
+  cp -a "$tmp/." "$DIR/"
+  rm -rf "$DIR/.git" "$tmp"
+  npm --prefix "$DIR" ci --no-audit --no-fund
+  npm --prefix "$DIR" run build
 fi
 
-if [[ -f "$VENDOR/job-scout-mcp/package.json" ]]; then
-  npm --prefix "$VENDOR/job-scout-mcp" ci --no-audit --no-fund
-  npm --prefix "$VENDOR/job-scout-mcp" run build
-fi
-
-echo "setup_vendor_mcps: python MCPs start via uv run on first use"
-echo "setup_vendor_mcps: job-scout node_modules ready"
+echo "setup_vendor_mcps: job-scout ready under agent-tools/ (gitignored)"
+echo "setup_vendor_mcps: workatastartup-mcp==0.1.2 and ats-jobs-mcp==1.0.0 via uvx on first use"

@@ -34,9 +34,9 @@ Narrative inventory: [`docs/catalogs/skills-and-mcps.md`](../../docs/catalogs/sk
 | `tavily-mcp` | Tavily MCP | mcp | research | all | use | npx -y tavily-mcp@latest or https://mcp.tavily.com/mcp/?tavilyApiKey= |
 | `parallel-search-mcp` | Parallel Search MCP | mcp | research | all | use | https://search.parallel.ai/mcp |
 | `indeed-mcp` | Official Indeed MCP | mcp | discovery, research | discovery | use | https://mcp.indeed.com/claude/mcp |
-| `workatastartup-mcp` | workatastartup-mcp | mcp | discovery, research | discovery | use | bash scripts/mcp/workatastartup.sh (vendored in vendor/mcp/workatastartup-mcp) |
-| `ats-jobs-mcp` | ats-jobs-mcp | mcp | discovery | discovery | use | bash scripts/mcp/ats-jobs.sh (vendored in vendor/mcp/ats-jobs-mcp) |
-| `job-scout-mcp` | job-scout-mcp | mcp | discovery | discovery | use | bash scripts/mcp/job-scout.sh (vendored; dist committed) |
+| `workatastartup-mcp` | workatastartup-mcp | mcp | discovery, research | discovery | use | bash scripts/mcp/workatastartup.sh (uvx workatastartup-mcp==0.1.2) |
+| `ats-jobs-mcp` | ats-jobs-mcp | mcp | discovery | discovery | use | bash scripts/mcp/ats-jobs.sh (uvx ats-jobs-mcp==1.0.0) |
+| `job-scout-mcp` | job-scout-mcp | mcp | discovery | discovery | use | bash scripts/mcp/job-scout.sh (clone to gitignored agent-tools/) |
 | `hiringcafe-http` | Hiring Cafe public pages | http | discovery | discovery | use | python3 scripts/fetch_hiringcafe.py --query "staff software engineer" |
 | `compose-outreach` | anthropics compose-outreach | skill | outreach | outreach | use | bash scripts/install_agent_skills.sh |
 | `draft-outreach` | anthropics draft-outreach | skill | outreach | outreach | use | bash scripts/install_agent_skills.sh |

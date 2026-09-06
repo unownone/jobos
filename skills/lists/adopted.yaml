@@ -155,10 +155,10 @@ items:
     roles: [discovery]
     platforms: [workatastartup]
     source: https://github.com/MIt9/workatastartup-mcp
-    install: bash scripts/mcp/workatastartup.sh (vendored in vendor/mcp/workatastartup-mcp)
+    install: bash scripts/mcp/workatastartup.sh (uvx workatastartup-mcp==0.1.2)
     auth: none
     verdict: use
-    notes: Public YC board. search_jobs / get_job_details / get_company_details. Ready in-repo.
+    notes: Public YC board. Pin in vendor/mcp/PINNED.txt. Do not copy the package into git.
 
   - id: ats-jobs-mcp
     kind: mcp
@@ -167,10 +167,10 @@ items:
     roles: [discovery]
     platforms: [google_dorks, amazon, microsoft, google, uber]
     source: https://github.com/groundtruthtools/ats-jobs-mcp
-    install: bash scripts/mcp/ats-jobs.sh (vendored in vendor/mcp/ats-jobs-mcp)
+    install: bash scripts/mcp/ats-jobs.sh (uvx ats-jobs-mcp==1.0.0)
     auth: none
     verdict: use
-    notes: Public Greenhouse / Ashby / Lever board APIs. Directory JSON is in the vendor copy.
+    notes: Public Greenhouse / Ashby / Lever APIs. The ~50k-line directory.json stays in the wheel.
 
   - id: job-scout-mcp
     kind: mcp
@@ -179,7 +179,7 @@ items:
     roles: [discovery]
     platforms: [remoteok, google_dorks]
     source: https://github.com/pabnatanawan87/job-scout-mcp
-    install: bash scripts/mcp/job-scout.sh (vendored; dist committed)
+    install: bash scripts/mcp/job-scout.sh (clone to gitignored agent-tools/)
     auth: none
     verdict: use
     notes: ATS + HN Who is Hiring + RemoteOK. ToS-clean public feeds. Optional Adzuna/USAJobs keys.

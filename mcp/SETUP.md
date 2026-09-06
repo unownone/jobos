@@ -6,12 +6,12 @@ Goal: attach tools so discovery / apply / outreach can run **from a fresh clone*
    - Cursor: project `.cursor/mcp.json` or `~/.cursor/mcp.json`
    - Claude Code: `.mcp.json` or Claude Desktop `claude_desktop_config.json`
 2. Keep secrets in gitignored `mcp/mcp.local.json` or `.env` — never in git.
-3. Local servers in this JSON use `bash scripts/mcp/*.sh` so paths resolve from the repo, not `uvx` cache luck.
+3. Local servers use `bash scripts/mcp/*.sh` (`uvx` pins for Python; job-scout clones into gitignored `agent-tools/`).
 4. Hosted servers: copy a snippet from [`hosted/`](hosted/) (one file per server) if you only want that tool.
 
-Cloud-agent install already runs `scripts/setup_vendor_mcps.sh` so job-scout `node_modules` exist.
+Cloud-agent install warms the uvx cache and job-scout clone via `scripts/setup_vendor_mcps.sh`.
 
-## What is already in the repo (local)
+## What is already wired (local)
 
 | Server | Command (from repo root) | Auth |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ Cloud-agent install already runs `scripts/setup_vendor_mcps.sh` so job-scout `no
 | job-scout (ATS + HN + RemoteOK) | `bash scripts/mcp/job-scout.sh` | none (optional Adzuna/USAJobs env) |
 | Hiring Cafe | not an MCP — `python3 scripts/fetch_hiringcafe.py --query "staff engineer"` | none |
 
-First Python MCP launch needs network once (`uv` creates `vendor/mcp/<pkg>/.venv`).
+First Python MCP launch needs network once (`uvx` downloads the pinned wheel). The ATS company directory is inside that wheel, not this repo.
 
 ## What you attach (hosted)
 

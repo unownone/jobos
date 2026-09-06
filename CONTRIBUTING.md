@@ -18,7 +18,7 @@ Add a row to `docs/catalogs/platforms.md` or `big-tech-careers.md`. If it needs 
 
 Cloud-agent install (clone of dzhng/deep-research, vendor MCP npm install, skill links) lives in `.cursor/environment.json`. Keep `install` idempotent.
 
-Vendored MCP sources: `vendor/mcp/` (pins in `PINNED.txt`). Refresh with `bash scripts/setup_vendor_mcps.sh --refresh`. Third-party skills: `bash scripts/install_agent_skills.sh`.
+MCP pins (`uvx` / git SHA, no source trees): `vendor/mcp/PINNED.txt`. Refresh caches with `bash scripts/setup_vendor_mcps.sh`. Third-party skills: `bash scripts/install_agent_skills.sh`.
 
 ## Add a subdivision
 

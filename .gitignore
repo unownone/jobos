@@ -22,10 +22,8 @@ __pycache__/
 agent-tools/
 agent-transcripts/
 
-# Vendored MCP runtimes (source is committed; deps are not)
-vendor/mcp/**/node_modules/
-vendor/mcp/**/.venv/
-vendor/mcp/**/venv/
+# Vendored MCP runtimes used to live here; they bloated the PR.
+# Source trees stay out of git. Cache clones go in agent-tools/.
 
 # OS / editor
 .DS_Store

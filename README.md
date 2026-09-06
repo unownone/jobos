@@ -107,13 +107,13 @@ Attach what you have. Degrade if you do not.
 | --- | --- | --- |
 | Deep research | Exa MCP (`deep_researcher_*`, `agent_run`, company + people search) | Local [dzhng/deep-research](https://github.com/dzhng/deep-research) (`scripts/run_deep_research.py`), Firecrawl, Tavily, Parallel Search MCP (`https://search.parallel.ai/mcp`), built-in web search |
 | Job search API | Official Indeed MCP (OAuth) | Public pages + Google dorks |
-| YC startups | Vendored `workatastartup-mcp` (`bash scripts/mcp/workatastartup.sh`) | workatastartup.com in a browser |
+| YC startups | `uvx workatastartup-mcp==0.1.2` (`bash scripts/mcp/workatastartup.sh`) | workatastartup.com in a browser |
 | Remote feed | `https://remoteok.com/api` | RemoteOK site |
 | Email + PDF | Gmail MCP draft with `attachments[].content` as base64 | Manual send from the draft |
 | Verified contact email | Hunter MCP (`https://mcp.hunter.io/mcp`) | LinkedIn DM only if unverified |
 | LinkedIn DM | Logged-in browser / official LinkedIn tools you already have | Copy the DM into the ledger for a human to send |
 | Browser apply | Playwright MCP (`@playwright/mcp`) on the apply bot only | Human completes the last submit |
-| Public ATS boards | Vendored `ats-jobs-mcp` (`bash scripts/mcp/ats-jobs.sh`) | Google dorks + employer careers page |
+| Public ATS boards | `uvx ats-jobs-mcp==1.0.0` (`bash scripts/mcp/ats-jobs.sh`) | Google dorks + employer careers page |
 | Hiring Cafe | `python3 scripts/fetch_hiringcafe.py` | Public hiring.cafe `/jobs/{slug}` page |
 
 Do not scrape behind logins you do not own. Do not build exploit PoCs. Prefer official APIs, public feeds, and career pages.
@@ -161,7 +161,7 @@ skills/                   Agent Skills (SKILL.md) — canonical OS skills
 .claude/skills/<name>     Per-skill symlink for Claude Code
 .cursor/skills/<name>     Per-skill symlink for Cursor
 skills/lists/             Maintainer board: adopted / wanted / rejected YAML
-vendor/mcp/               Vendored local MCP servers (no keys)
+vendor/mcp/PINNED.txt     uvx / git SHA pins for local MCPs (no source trees)
 mcp/hosted/               Copy-paste hosted MCP snippets
 mcp/SETUP.md              How to attach local vs hosted MCPs
 .cursor/environment.json  Cloud-agent install (clones open-deep-research)

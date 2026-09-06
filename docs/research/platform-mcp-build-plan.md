@@ -16,7 +16,7 @@ These are done; do not redo them.
 
 1. Cloud-agent wiring for [dzhng/deep-research](https://github.com/dzhng/deep-research): `.cursor/environment.json` `install` → `scripts/setup_deep_research.sh` clones into gitignored `agent-tools/open-deep-research`. Wrapper: `scripts/run_deep_research.py`.
 2. `skills/deep-research/SKILL.md` stack now has the local runner as #2 after Exa.
-3. **Vendored local MCPs** in `vendor/mcp/` plus `mcp/hosted/` copy-paste configs and `mcp/SETUP.md`.
+3. **Pinned local MCPs** (`uvx` / `agent-tools` clone) plus `mcp/hosted/` copy-paste configs and `mcp/SETUP.md`. Do not commit upstream trees (ats-jobs directory.json is ~50k lines in the wheel).
 4. **Maintainer role** (`skills/skill-maintainer/SKILL.md`) plus machine-readable `skills/lists/` from a live registry pass. Parallel Search MCP adopted in `mcp.example.json`.
 5. Hiring Cafe (`hiring.cafe` / r/hiringcafe) as a discovery board with `scripts/fetch_hiringcafe.py`.
 

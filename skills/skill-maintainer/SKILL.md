@@ -37,7 +37,7 @@ Write yourself under **Active operators** in `ledger/INDEX.md` as `maintainer`. 
 
 5. Rebuild the human board: `uv run scripts/rebuild_skill_index.py`.
 6. Append a row to the catalog workspace log. If coverage changed, update `docs/research/platform-mcp-build-plan.md`.
-7. If a tool is clearly adopted, vendor the **local** copy into `vendor/mcp/` (or `.agents/skills/` via `npx skills add`) and patch `mcp/mcp.example.json` / `.cursor/environment.json`. Hosted tools get a snippet in `mcp/hosted/`. In-repo OS skills stay under `skills/<name>/`.
+7. If a tool is clearly adopted, **pin it** (`uvx package==version`, or a SHA clone into gitignored `agent-tools/`). Do not copy 50k-line data files or upstream trees into git. Hosted tools get a snippet in `mcp/hosted/`. Third-party skills go in `.agents/skills/` via `npx skills add`.
 8. Append `ledger/events.jsonl`. No job YAML.
 
 ## Do not
