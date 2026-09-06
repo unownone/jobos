@@ -155,7 +155,8 @@ docs/roles.md             Split / combine / subdivide roles
 docs/sharing.md           Airgapped ledger protocol
 docs/catalogs/            Platforms, MCPs, career sites, research
 docs/research/            Build plans (MCP coverage, deep-research wrap)
-skills/                   Agent Skills (SKILL.md)
+skills/                   Agent Skills (SKILL.md) — canonical
+.claude/skills            Symlink → ../skills (Claude Code / Claude agents)
 skills/lists/             Maintainer board: adopted / wanted / rejected YAML
 .cursor/environment.json  Cloud-agent install (clones open-deep-research)
 ledger/                   Shared live list

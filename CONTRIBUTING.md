@@ -6,7 +6,7 @@ This repo is the **operating system**, not a live job search. Keep PII and live 
 
 1. Edit `docs/process.md` (contract)
 2. Align `docs/architecture.md` / `docs/roles.md` / `docs/sharing.md` if the motion changed
-3. Update the matching `skills/*/SKILL.md`
+3. Update the matching `skills/*/SKILL.md` (Claude agents see the same files via `.claude/skills` → `../skills`)
 4. If you added or dropped a tool, update `skills/lists/` and run `uv run scripts/rebuild_skill_index.py`
 5. Update catalogs if portals or MCPs changed
 

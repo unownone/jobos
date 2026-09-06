@@ -1,6 +1,10 @@
 # Skills
 
-Agent Skills for this template. Install by leaving them in `skills/` (Cursor and other SKILL.md hosts pick them up) or copy into `~/.cursor/skills/`.
+Agent Skills for this template. Canonical files live in `skills/<name>/SKILL.md`.
+
+Cursor picks them up from `skills/`. Claude Code / Claude agents pick them up from `.claude/skills`, which is a symlink to this directory. Do not duplicate skill folders.
+
+Alternatively copy a skill into `~/.cursor/skills/` or `~/.claude/skills/` for user-global install.
 
 | Skill | Role |
 | --- | --- |
