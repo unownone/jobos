@@ -1,6 +1,6 @@
 ---
 name: job-discovery
-description: Discover and shortlist jobs for Job Apply OS. Covers LinkedIn, Indeed, Wellfound, Work at a Startup, Google Jobs and ATS dorks, RemoteOK, Weekday, Roro Remote, talent networks (Flexiple, Turing, Toptal, Lemon.io, BairesDev), and big-company career sites. Writes apply packets. Never applies, including Easy Apply. Use when sourcing, searching, or shortlisting jobs.
+description: Discover and shortlist jobs for Job Apply OS. Covers LinkedIn, Indeed, Wellfound, Work at a Startup, Google Jobs and ATS dorks, RemoteOK, Hiring Cafe, Weekday, Roro Remote, talent networks (Flexiple, Turing, Toptal, Lemon.io, BairesDev), and big-company career sites. Writes apply packets. Never applies, including Easy Apply. Use when sourcing, searching, or shortlisting jobs.
 ---
 
 # Job discovery
@@ -31,7 +31,7 @@ Stop at `max_shortlist_per_cycle`. Prefer a tight list.
 
 ## IDs
 
-`{source}__{stable_id}` where `stable_id` is ATS req id or a slug of company + title + location. Example: `amazon__JOB-US-123`, `remoteok__123456`.
+`{source}__{stable_id}` where `stable_id` is ATS req id or a slug of company + title + location. Example: `amazon__JOB-US-123`, `remoteok__123456`, `hiringcafe__abc123`.
 
 ## Hard no
 

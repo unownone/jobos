@@ -3,10 +3,9 @@ pass: "2026-09-06"
 actor: cursor-cloud-agent
 role: maintainer
 note: >
-  Live queries this pass (not a copy of last week's catalog essay).
-  skills.sh via `npx skills find`; Skills Hub CLI; GitHub; vendor docs
-  (Indeed, Hunter, Apollo, Exa/Firecrawl/Tavily, Parallel Search, Playwright);
-  PyPI/GitHub for workatastartup-mcp, ats-jobs-mcp, job-scout-mcp.
+  Vendor pass: cloned local MCP sources into vendor/mcp (pinned SHAs),
+  installed compose-outreach / draft-outreach / playwright-cli via npx skills add,
+  added Hiring Cafe public fetcher. Hosted MCP snippets in mcp/hosted/.
 
 registries:
   - name: skills.sh

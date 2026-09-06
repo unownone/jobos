@@ -93,6 +93,7 @@ Legend: **D** discovery, **R** research / hiring-manager lookup, **M** mail, **O
 | Greenhouse / Ashby / Lever | `ats-jobs-mcp` | y | | | | | **use** | none | Public board APIs, ~7.5k mapped companies. `list_open_jobs`, `compare_companies`. No scraping, no key |
 | Greenhouse Harvest | [mikelane/greenhouse-mcp-server](https://github.com/mikelane/greenhouse-mcp-server) | | | | | y | **reject** for applicants | Harvest API token | Recruiter-side. Not for Job Apply OS applicants |
 | RemoteOK | HTTP `https://remoteok.com/api` | y | | | | | **use** | none | First JSON element is metadata — skip it |
+| Hiring Cafe | `scripts/fetch_hiringcafe.py` | y | | | | | **use** | none | Public `__NEXT_DATA__`. Store employer apply URL |
 | Weekday | none found | y | | | | | **gap** | | Public pages / Workable |
 | Roro Remote | none found | | | | | | **gap** | | Confirm live URL on first discovery cycle |
 | Flexiple / Turing / Toptal / Lemon.io / BairesDev | none found | | | | y | y | **gap** | profile | `apply_kind: network`. Playwright for intake forms (apply role) |
@@ -169,7 +170,7 @@ When you vet one, append a `### <name>` block. 2026-09-06 verdicts:
 | --- | --- | --- | --- | --- |
 | 2026-09-06 | template | skills.sh, skills-hub.ai, GitHub, Indeed docs, Exa docs | Exa deep research, Indeed MCP, workatastartup-mcp, RemoteOK API, Gmail attachments | combined auto-apply as discovery |
 | 2026-09-06 | cursor-cloud-agent | skills.sh, skills-hub CLI, GitHub, PyPI, Indeed/Exa/Firecrawl/Tavily/Hunter/Apollo/Google Workspace docs, dzhng/deep-research clone | dzhng/open-deep-research local runner + cloud `environment.json`; ats-jobs-mcp; Hunter MCP; Playwright MCP; Google Calendar/Drive (already attached); platform MCP matrix | LinkedIn cookie messengers as discovery; Smartlead/Instantly sequences; Greenhouse Harvest recruiter MCP; resume-optimizer skills; jobpilot/jobhound combined apply; Apify scrapers as default |
-| 2026-09-06 | cursor-cloud-agent (maintainer) | skills.sh (15 queries), Skills Hub CLI, GitHub, vendor docs (Indeed, Hunter, Apollo, Parallel, Playwright), Smithery | `skills/lists/` adopted/wanted/rejected; Parallel Search MCP in `mcp.example.json`; maintainer role + skill; job-scout-mcp and LinkedIn session forks in wanted | go-job combined claim/easy-apply; jobspy-mcp; jobspipe; antibrow anti-detect; TheirStack paid aggregator; Skills Hub name-collision “discovery” skills |
+| 2026-09-06 | cursor-cloud-agent (maintainer) | vendor clones + npx skills add + hiring.cafe public pages | Vendored workatastartup-mcp, ats-jobs-mcp, job-scout-mcp; agent skills compose/draft-outreach + playwright-cli; Hiring Cafe platform + fetch_hiringcafe.py; mcp/hosted copy-paste configs | Apify HiringCafe scrapers; LinkedIn session MCPs still not vendored |
 
 ## Indeed MCP notes
 

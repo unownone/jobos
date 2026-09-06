@@ -1,10 +1,10 @@
 # Skills
 
-Agent Skills for this template. Canonical files live in `skills/<name>/SKILL.md`.
+Agent Skills for this template.
 
-Cursor picks them up from `skills/`. Claude Code / Claude agents pick them up from `.claude/skills`, which is a symlink to this directory. Do not duplicate skill folders.
-
-Alternatively copy a skill into `~/.cursor/skills/` or `~/.claude/skills/` for user-global install.
+- **OS skills** (this folder): Cursor loads `skills/<name>/SKILL.md`.
+- **Third-party skills**: `.agents/skills/` via `npx skills add` (`skills-lock.json`). Refresh: `bash scripts/install_agent_skills.sh`.
+- **Claude Code + Cursor links**: `.claude/skills/<name>` and `.cursor/skills/<name>` are **per-skill** symlinks (`bash scripts/link_agent_skills.sh`). A single directory symlink is not enough for some Claude clients.
 
 | Skill | Role |
 | --- | --- |
@@ -14,5 +14,8 @@ Alternatively copy a skill into `~/.cursor/skills/` or `~/.claude/skills/` for u
 | [job-discovery](job-discovery/SKILL.md) | Source and shortlist only |
 | [job-apply](job-apply/SKILL.md) | Submit with writing worth reading |
 | [job-outreach](job-outreach/SKILL.md) | Email + LinkedIn DM, PDF on email |
+| [playwright-cli](../.agents/skills/playwright-cli/SKILL.md) | Apply: browser CLI (vendored agent skill) |
+| [draft-outreach](../.agents/skills/draft-outreach/SKILL.md) | Outreach copy helper (vendored; do not send) |
+| [compose-outreach](../.agents/skills/compose-outreach/SKILL.md) | Outreach copy helper (vendored; Common Room optional) |
 
 The three job owners are discovery, apply, outreach. Catalog and deep research are capabilities those owners call. Maintainer is a fourth owner and is seldom used. Human board for tools: [`lists/INDEX.md`](lists/INDEX.md).

@@ -1,6 +1,6 @@
 {
   "name": "job-apply-os",
-  "install": "bash scripts/setup_deep_research.sh",
+  "install": "bash scripts/setup_deep_research.sh && bash scripts/setup_vendor_mcps.sh && bash scripts/link_agent_skills.sh",
   "repositoryDependencies": [
     "github.com/dzhng/deep-research"
   ],
@@ -30,6 +30,10 @@
     "calendarmcp.googleapis.com",
     "people.googleapis.com",
     "remoteok.com",
-    "www.workatastartup.com"
+    "www.workatastartup.com",
+    "hiring.cafe",
+    "www.hiringcafe.com",
+    "hiringcafe.com",
+    "www.reddit.com"
   ]
 }

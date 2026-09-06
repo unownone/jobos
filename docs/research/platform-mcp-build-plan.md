@@ -16,8 +16,9 @@ These are done; do not redo them.
 
 1. Cloud-agent wiring for [dzhng/deep-research](https://github.com/dzhng/deep-research): `.cursor/environment.json` `install` → `scripts/setup_deep_research.sh` clones into gitignored `agent-tools/open-deep-research`. Wrapper: `scripts/run_deep_research.py`.
 2. `skills/deep-research/SKILL.md` stack now has the local runner as #2 after Exa.
-3. Catalog pass (skills.sh, Skills Hub, GitHub, PyPI, vendor docs) written into the inventory.
+3. **Vendored local MCPs** in `vendor/mcp/` plus `mcp/hosted/` copy-paste configs and `mcp/SETUP.md`.
 4. **Maintainer role** (`skills/skill-maintainer/SKILL.md`) plus machine-readable `skills/lists/` from a live registry pass. Parallel Search MCP adopted in `mcp.example.json`.
+5. Hiring Cafe (`hiring.cafe` / r/hiringcafe) as a discovery board with `scripts/fetch_hiringcafe.py`.
 
 Still missing for a live cycle: a truthful `profiles/candidate.yaml` (only the gitignored example copy exists), resume PDFs, and research API keys.
 

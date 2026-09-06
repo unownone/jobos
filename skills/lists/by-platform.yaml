@@ -4,7 +4,7 @@ updated: "2026-09-06"
 
 platforms:
   linkedin:
-    adopted: [websearch-dorks, exa-mcp, playwright-mcp]
+    adopted: [websearch-dorks, exa-mcp, playwright-mcp, compose-outreach, draft-outreach]
     wanted: [linkedin-mcp-stickerdaniel, hs-linkedin-resolve, compose-outreach]
     rejected: [prakharagarwal-linkedin-mcp, gooseworks-job-scraper, jobspy-mcp, linkedin-ghostwriting]
     gap: official LinkedIn Jobs MCP
@@ -29,13 +29,13 @@ platforms:
     rejected: []
     gap: none
   google_dorks:
-    adopted: [websearch-dorks, exa-mcp, ats-jobs-mcp]
-    wanted: [job-scout-mcp]
+    adopted: [websearch-dorks, exa-mcp, ats-jobs-mcp, job-scout-mcp]
+    wanted: []
     rejected: []
     gap: none
   remoteok:
-    adopted: [remoteok-http]
-    wanted: [job-scout-mcp]
+    adopted: [remoteok-http, job-scout-mcp]
+    wanted: []
     rejected: []
     gap: none
   weekday:
@@ -94,7 +94,12 @@ platforms:
     rejected: []
     gap: none
   gmail:
-    adopted: [gmail-mcp, hunter-mcp]
-    wanted: [compose-outreach, gws-gmail-cli, apollo-people]
+    adopted: [gmail-mcp, hunter-mcp, compose-outreach, draft-outreach]
+    wanted: [gws-gmail-cli, apollo-people]
     rejected: [smartlead-instantly, apollo-sequences, cold-email-writer]
+    gap: none
+  hiringcafe:
+    adopted: [hiringcafe-http]
+    wanted: []
+    rejected: [apify-scrapers]
     gap: none

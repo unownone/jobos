@@ -120,7 +120,7 @@ A role is a **permission set**, not a process count.
 
 ```
 Discovery
-  ├─ boards (LinkedIn, Indeed, Wellfound, YC, RemoteOK, Weekday, Google dorks)
+  ├─ boards (LinkedIn, Indeed, Wellfound, YC, RemoteOK, Hiring Cafe, Weekday, Google dorks)
   ├─ marketplaces (Toptal, Lemon.io, Flexiple, Turing, BairesDev)
   └─ big-tech careers (Amazon, Microsoft, Google, Uber, ...)
 

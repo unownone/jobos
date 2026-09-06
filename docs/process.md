@@ -50,8 +50,9 @@ Work the platform catalog in [`docs/catalogs/platforms.md`](catalogs/platforms.m
 4. Wellfound
 5. Google Jobs + dorks against Greenhouse / Lever / Ashby / Workday
 6. RemoteOK public API
-7. Named marketplaces (Flexiple, Turing, Weekday, Toptal, Lemon.io, BairesDev, Roro Remote) — record whether each item is a **posting** or a **network apply**
-8. Big-company career sites the candidate cares about
+7. Hiring Cafe (`scripts/fetch_hiringcafe.py` / hiring.cafe public pages)
+8. Named marketplaces (Flexiple, Turing, Weekday, Toptal, Lemon.io, BairesDev, Roro Remote) — record whether each item is a **posting** or a **network apply**
+9. Big-company career sites the candidate cares about
 
 ### 3.2 For every raw hit
 

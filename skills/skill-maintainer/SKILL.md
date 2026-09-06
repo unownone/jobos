@@ -37,14 +37,14 @@ Write yourself under **Active operators** in `ledger/INDEX.md` as `maintainer`. 
 
 5. Rebuild the human board: `uv run scripts/rebuild_skill_index.py`.
 6. Append a row to the catalog workspace log. If coverage changed, update `docs/research/platform-mcp-build-plan.md`.
-7. If a tool is clearly adopted, patch `mcp/mcp.example.json` and/or `.cursor/environment.json` (`egressAllowlist`, `install`). If an in-repo skill changed, edit that `SKILL.md`.
+7. If a tool is clearly adopted, vendor the **local** copy into `vendor/mcp/` (or `.agents/skills/` via `npx skills add`) and patch `mcp/mcp.example.json` / `.cursor/environment.json`. Hosted tools get a snippet in `mcp/hosted/`. In-repo OS skills stay under `skills/<name>/`.
 8. Append `ledger/events.jsonl`. No job YAML.
 
 ## Do not
 
 - Discover, shortlist, or invent jobs
 - Easy Apply, submit, or send email / LinkedIn DMs
-- Copy third-party `SKILL.md` files into `skills/` (point at them from lists; in-repo skills stay Job Apply OS)
+- Copy third-party `SKILL.md` files into `skills/` next to OS skills (use `.agents/skills/` + `scripts/link_agent_skills.sh`)
 - Put API keys or cookies in lists or the catalog
 - Enable a combined search-and-apply tool on discovery
 - Resume / LinkedIn-profile curation skills (user does not want that)

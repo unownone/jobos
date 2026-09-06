@@ -1,16 +1,18 @@
 # MCP config
 
-Copy [`mcp.example.json`](mcp.example.json) into your client's MCP file (`~/.cursor/mcp.json` or project `.cursor/mcp.json`), then copy to gitignored `mcp/mcp.local.json` if you keep secrets beside the repo.
+Copy [`mcp.example.json`](mcp.example.json) into your client's MCP file. **Setup instructions (local vs hosted):** [`SETUP.md`](SETUP.md).
 
-This template does **not** vendor a hosted stack. Attach what the current role needs.
+Local no-key servers are vendored under [`vendor/mcp/`](../vendor/mcp/) and launched with `bash scripts/mcp/*.sh`. Hosted snippets (Exa, Gmail, Hunter, …) live in [`hosted/`](hosted/).
 
 ## Discovery (do not put Playwright or send-mail here)
 
 1. **Exa** — deep research (strongly recommended)
 2. **Firecrawl / Tavily / Parallel Search** — fallbacks (`https://search.parallel.ai/mcp` needs no key on the free tier)
 3. **Indeed** — official OAuth MCP if your client can add the Indeed connector (`https://mcp.indeed.com/claude/mcp`, historically Claude)
-4. **workatastartup-mcp** — YC jobs (`uvx workatastartup-mcp`)
-5. **ats-jobs-mcp** — Greenhouse / Ashby / Lever public boards (`uvx ats-jobs-mcp`)
+4. **workatastartup-mcp** — vendored, `bash scripts/mcp/workatastartup.sh`
+5. **ats-jobs-mcp** — vendored, `bash scripts/mcp/ats-jobs.sh`
+6. **job-scout-mcp** — vendored, `bash scripts/mcp/job-scout.sh` (ATS + HN + RemoteOK)
+7. **Hiring Cafe** — `python3 scripts/fetch_hiringcafe.py` (not an MCP)
 
 Local recursive research is **not** an MCP: `.cursor/environment.json` clones [dzhng/deep-research](https://github.com/dzhng/deep-research) and operators run `python3 scripts/run_deep_research.py`. See [`docs/catalogs/deep-research.md`](../docs/catalogs/deep-research.md).
 

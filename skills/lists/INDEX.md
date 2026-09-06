@@ -34,8 +34,13 @@ Narrative inventory: [`docs/catalogs/skills-and-mcps.md`](../../docs/catalogs/sk
 | `tavily-mcp` | Tavily MCP | mcp | research | all | use | npx -y tavily-mcp@latest or https://mcp.tavily.com/mcp/?tavilyApiKey= |
 | `parallel-search-mcp` | Parallel Search MCP | mcp | research | all | use | https://search.parallel.ai/mcp |
 | `indeed-mcp` | Official Indeed MCP | mcp | discovery, research | discovery | use | https://mcp.indeed.com/claude/mcp |
-| `workatastartup-mcp` | workatastartup-mcp | mcp | discovery, research | discovery | use | uvx workatastartup-mcp |
-| `ats-jobs-mcp` | ats-jobs-mcp | mcp | discovery | discovery | use | uvx ats-jobs-mcp |
+| `workatastartup-mcp` | workatastartup-mcp | mcp | discovery, research | discovery | use | bash scripts/mcp/workatastartup.sh (vendored in vendor/mcp/workatastartup-mcp) |
+| `ats-jobs-mcp` | ats-jobs-mcp | mcp | discovery | discovery | use | bash scripts/mcp/ats-jobs.sh (vendored in vendor/mcp/ats-jobs-mcp) |
+| `job-scout-mcp` | job-scout-mcp | mcp | discovery | discovery | use | bash scripts/mcp/job-scout.sh (vendored; dist committed) |
+| `hiringcafe-http` | Hiring Cafe public pages | http | discovery | discovery | use | python3 scripts/fetch_hiringcafe.py --query "staff software engineer" |
+| `compose-outreach` | anthropics compose-outreach | skill | outreach | outreach | use | bash scripts/install_agent_skills.sh |
+| `draft-outreach` | anthropics draft-outreach | skill | outreach | outreach | use | bash scripts/install_agent_skills.sh |
+| `playwright-cli-skill` | microsoft/playwright-cli | skill | apply | apply | use | bash scripts/install_agent_skills.sh |
 | `remoteok-http` | RemoteOK public API | http | discovery | discovery | use | GET https://remoteok.com/api |
 | `websearch-dorks` | WebSearch + ATS dorks | builtin | discovery | discovery | use | built-in WebSearch / Exa advanced |
 | `gmail-mcp` | Gmail MCP | mcp | mail, outreach | outreach | use | Cursor-hosted Gmail namespace, or https://gmailmcp.googleapis.com/mcp/v1 |
@@ -49,14 +54,10 @@ Narrative inventory: [`docs/catalogs/skills-and-mcps.md`](../../docs/catalogs/sk
 
 | id | name | kind | capability | roles | verdict | next_action |
 | --- | --- | --- | --- | --- | --- | --- |
-| `job-scout-mcp` | job-scout-mcp | mcp | discovery | discovery | fork | Attach on discovery env if ats-jobs-mcp is not enough. Adds HN Who is Hiring + RemoteOK + optional Adzuna/USAJobs on top of public ATS JSON. ToS-clean (no scrape). Overlaps ats-jobs-mcp — pick one ATS path, keep RemoteOK HTTP either way.  |
 | `linkedin-mcp-stickerdaniel` | stickerdaniel/linkedin-mcp-server | mcp | discovery, research | discovery | fork | Only after the human says they own a LinkedIn session. Disable send_message on discovery. |
 | `hs-linkedin-resolve` | hs-linkedin-mcp (resolve_apply_url only) | mcp | apply, discovery | apply | fork | Apply-role only. Use resolve_apply_url so packets store the real ATS URL. Do not enable Easy Apply drive-to-completion on discovery. |
 | `apollo-people` | Apollo MCP (people + enrichment only) | mcp | research, outreach | outreach | fork | Attach on outreach env. Deny-list sequence tools. People search OK. |
-| `compose-outreach` | anthropics/knowledge-work-plugins@compose-outreach | skill | outreach | outreach | fork | Copy-quality bar only. Sending stays Gmail MCP. Skip if it requires Common Room. |
-| `draft-outreach` | anthropics/knowledge-work-plugins@draft-outreach | skill | outreach | outreach | fork | Same as compose-outreach. Do not send from the skill. |
 | `brave-search-mcp` | Brave Search MCP | mcp | research | all | fork | Only if Exa + Tavily + Parallel are all missing. Needs BRAVE_API_KEY. |
-| `playwright-cli-skill` | microsoft/playwright-cli@playwright-cli | skill | apply | apply | fork | Apply env only, alongside Playwright MCP. skills.sh 144K installs. |
 | `gws-gmail-cli` | googleworkspace/cli gws-gmail | cli | mail | outreach | fork | Fallback if Gmail MCP dies. Not a second mailer. |
 | `firecrawl-deep-research-skill` | firecrawl/firecrawl-workflows@firecrawl-deep-research | skill | research | all | fork | Only when the human wants a long cited report. Default brief stays Exa / dzhng depth 2. |
 | `parallel-deep-research-skill` | parallel-web/parallel-agent-skills@parallel-deep-research | skill | research | all | fork | Optional long-report path using Parallel. Default still Exa. Search MCP already adopted. |

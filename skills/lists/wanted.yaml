@@ -3,22 +3,6 @@ updated: "2026-09-06"
 actor: cursor-cloud-agent
 
 items:
-  - id: job-scout-mcp
-    kind: mcp
-    name: job-scout-mcp
-    capability: [discovery]
-    roles: [discovery]
-    platforms: [remoteok, google_dorks]
-    source: https://github.com/pabnatanawan87/job-scout-mcp
-    install: node dist after clone; TRACKED_COMPANIES=greenhouse:slug,lever:slug,ashby:slug
-    auth: none
-    verdict: fork
-    next_action: >
-      Attach on discovery env if ats-jobs-mcp is not enough. Adds HN Who is Hiring
-      + RemoteOK + optional Adzuna/USAJobs on top of public ATS JSON. ToS-clean
-      (no scrape). Overlaps ats-jobs-mcp — pick one ATS path, keep RemoteOK HTTP either way.
-    notes: Maintainer pass 2026-09-06. Glama listing confirmed public Greenhouse/Lever/Ashby/HN/RemoteOK.
-
   - id: linkedin-mcp-stickerdaniel
     kind: mcp
     name: stickerdaniel/linkedin-mcp-server
@@ -58,31 +42,6 @@ items:
     next_action: Attach on outreach env. Deny-list sequence tools. People search OK.
     notes: Sequences are spray. Off unless the user adds that channel.
 
-  - id: compose-outreach
-    kind: skill
-    name: anthropics/knowledge-work-plugins@compose-outreach
-    capability: [outreach]
-    roles: [outreach]
-    platforms: [gmail, linkedin]
-    source: https://skills.sh/anthropics/knowledge-work-plugins/compose-outreach
-    install: npx skills add anthropics/knowledge-work-plugins --skill compose-outreach
-    auth: none
-    verdict: fork
-    next_action: Copy-quality bar only. Sending stays Gmail MCP. Skip if it requires Common Room.
-    notes: skills.sh 2.6K installs. Pair with draft-outreach (2.9K).
-
-  - id: draft-outreach
-    kind: skill
-    name: anthropics/knowledge-work-plugins@draft-outreach
-    capability: [outreach]
-    roles: [outreach]
-    platforms: [gmail, linkedin]
-    source: https://skills.sh/anthropics/knowledge-work-plugins/draft-outreach
-    install: npx skills add anthropics/knowledge-work-plugins --skill draft-outreach
-    auth: none
-    verdict: fork
-    next_action: Same as compose-outreach. Do not send from the skill.
-
   - id: brave-search-mcp
     kind: mcp
     name: Brave Search MCP
@@ -95,19 +54,6 @@ items:
     verdict: fork
     next_action: Only if Exa + Tavily + Parallel are all missing. Needs BRAVE_API_KEY.
     notes: Official MCP SDK server. Redundant with Parallel (no key) for this OS.
-
-  - id: playwright-cli-skill
-    kind: skill
-    name: microsoft/playwright-cli@playwright-cli
-    capability: [apply]
-    roles: [apply]
-    platforms: []
-    source: https://skills.sh/microsoft/playwright-cli/playwright-cli
-    install: npx skills add microsoft/playwright-cli --skill playwright-cli
-    auth: none
-    verdict: fork
-    next_action: Apply env only, alongside Playwright MCP. skills.sh 144K installs.
-    notes: Maintainer pass 2026-09-06. Complements @playwright/mcp; do not put on discovery.
 
   - id: gws-gmail-cli
     kind: cli

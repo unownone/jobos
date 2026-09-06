@@ -22,6 +22,11 @@ __pycache__/
 agent-tools/
 agent-transcripts/
 
+# Vendored MCP runtimes (source is committed; deps are not)
+vendor/mcp/**/node_modules/
+vendor/mcp/**/.venv/
+vendor/mcp/**/venv/
+
 # OS / editor
 .DS_Store
 .idea/

@@ -155,10 +155,10 @@ items:
     roles: [discovery]
     platforms: [workatastartup]
     source: https://github.com/MIt9/workatastartup-mcp
-    install: uvx workatastartup-mcp
+    install: bash scripts/mcp/workatastartup.sh (vendored in vendor/mcp/workatastartup-mcp)
     auth: none
     verdict: use
-    notes: PyPI 0.1.2. Public YC board. search_jobs / get_job_details / get_company_details.
+    notes: Public YC board. search_jobs / get_job_details / get_company_details. Ready in-repo.
 
   - id: ats-jobs-mcp
     kind: mcp
@@ -167,10 +167,72 @@ items:
     roles: [discovery]
     platforms: [google_dorks, amazon, microsoft, google, uber]
     source: https://github.com/groundtruthtools/ats-jobs-mcp
-    install: uvx ats-jobs-mcp
+    install: bash scripts/mcp/ats-jobs.sh (vendored in vendor/mcp/ats-jobs-mcp)
     auth: none
     verdict: use
-    notes: Public Greenhouse / Ashby / Lever board APIs. find_company_board, list_open_jobs, compare_companies. Highest-leverage missing attach.
+    notes: Public Greenhouse / Ashby / Lever board APIs. Directory JSON is in the vendor copy.
+
+  - id: job-scout-mcp
+    kind: mcp
+    name: job-scout-mcp
+    capability: [discovery]
+    roles: [discovery]
+    platforms: [remoteok, google_dorks]
+    source: https://github.com/pabnatanawan87/job-scout-mcp
+    install: bash scripts/mcp/job-scout.sh (vendored; dist committed)
+    auth: none
+    verdict: use
+    notes: ATS + HN Who is Hiring + RemoteOK. ToS-clean public feeds. Optional Adzuna/USAJobs keys.
+
+  - id: hiringcafe-http
+    kind: http
+    name: Hiring Cafe public pages
+    capability: [discovery]
+    roles: [discovery]
+    platforms: [hiringcafe]
+    source: https://hiringcafe.com
+    install: python3 scripts/fetch_hiringcafe.py --query "staff software engineer"
+    auth: none
+    verdict: use
+    notes: >
+      Reddit-maintained job search (r/hiringcafe, also hiringcafe.com).
+      Reads public __NEXT_DATA__. Store employer apply_url when present.
+
+  - id: compose-outreach
+    kind: skill
+    name: anthropics compose-outreach
+    capability: [outreach]
+    roles: [outreach]
+    platforms: [gmail, linkedin]
+    source: .agents/skills/compose-outreach
+    install: bash scripts/install_agent_skills.sh
+    auth: none
+    verdict: use
+    notes: Copy helper. Common Room optional. Sending stays Gmail MCP + PDF.
+
+  - id: draft-outreach
+    kind: skill
+    name: anthropics draft-outreach
+    capability: [outreach]
+    roles: [outreach]
+    platforms: [gmail, linkedin]
+    source: .agents/skills/draft-outreach
+    install: bash scripts/install_agent_skills.sh
+    auth: none
+    verdict: use
+    notes: Web-research copy helper. Do not send from the skill.
+
+  - id: playwright-cli-skill
+    kind: skill
+    name: microsoft/playwright-cli
+    capability: [apply]
+    roles: [apply]
+    platforms: []
+    source: .agents/skills/playwright-cli
+    install: bash scripts/install_agent_skills.sh
+    auth: none
+    verdict: use
+    notes: Apply env only. Complements Playwright MCP.
 
   - id: remoteok-http
     kind: http

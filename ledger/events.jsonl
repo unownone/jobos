@@ -1,3 +1,4 @@
 {"ts":"2026-09-06T00:00:00Z","job_id":null,"actor":"template","role":"system","from":null,"to":null,"note":"ledger opened"}
 {"ts":"2026-09-06T16:20:00Z","job_id":null,"actor":"cursor-cloud-agent","role":"discovery","from":null,"to":null,"note":"claimed catalog+research; refreshed skills-and-mcps.md; wired dzhng/deep-research into .cursor/environment.json; no jobs discovered or applied"}
 {"ts":"2026-09-06T16:45:00Z","job_id":null,"actor":"cursor-cloud-agent","role":"maintainer","from":null,"to":null,"note":"claimed maintainer; live registry pass into skills/lists; Parallel Search MCP adopted in mcp.example.json; no jobs discovered or applied"}
+{"ts":"2026-09-06T18:50:00Z","job_id":null,"actor":"cursor-cloud-agent","role":"maintainer","from":null,"to":null,"note":"vendored local MCPs + agent skills; hosted MCP copy-paste configs; added hiringcafe platform; no jobs discovered or applied"}

@@ -16,7 +16,9 @@ Skills should stay short and point at docs. Do not fork the status enum in three
 
 Add a row to `docs/catalogs/platforms.md` or `big-tech-careers.md`. If it needs a tool, run the catalog skill (or the **maintainer** skill if you are updating lists) and log it in `docs/catalogs/skills-and-mcps.md` plus `skills/lists/`. Coverage and next patches: `docs/research/platform-mcp-build-plan.md`.
 
-Cloud-agent install (clone of dzhng/deep-research, etc.) lives in `.cursor/environment.json`. Keep `install` idempotent.
+Cloud-agent install (clone of dzhng/deep-research, vendor MCP npm install, skill links) lives in `.cursor/environment.json`. Keep `install` idempotent.
+
+Vendored MCP sources: `vendor/mcp/` (pins in `PINNED.txt`). Refresh with `bash scripts/setup_vendor_mcps.sh --refresh`. Third-party skills: `bash scripts/install_agent_skills.sh`.
 
 ## Add a subdivision
 
