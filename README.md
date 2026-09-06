@@ -97,13 +97,15 @@ Attach what you have. Degrade if you do not.
 
 | Need | Preferred | Fallback |
 | --- | --- | --- |
-| Deep research | Exa MCP (`deep_researcher_*`, `agent_run`, company + people search) | Firecrawl agent, Tavily, built-in web search |
+| Deep research | Exa MCP (`deep_researcher_*`, `agent_run`, company + people search) | Local [dzhng/deep-research](https://github.com/dzhng/deep-research) (`scripts/run_deep_research.py`), Firecrawl agent, Tavily, built-in web search |
 | Job search API | Official Indeed MCP (OAuth) | Public pages + Google dorks |
 | YC startups | `workatastartup-mcp` | workatastartup.com in a browser |
 | Remote feed | `https://remoteok.com/api` | RemoteOK site |
 | Email + PDF | Gmail MCP draft with `attachments[].content` as base64 | Manual send from the draft |
+| Verified contact email | Hunter MCP (`https://mcp.hunter.io/mcp`) | LinkedIn DM only if unverified |
 | LinkedIn DM | Logged-in browser / official LinkedIn tools you already have | Copy the DM into the ledger for a human to send |
-| Browser apply | Playwright / computer-use on the apply bot only | Human completes the last submit |
+| Browser apply | Playwright MCP (`@playwright/mcp`) on the apply bot only | Human completes the last submit |
+| Public ATS boards | `ats-jobs-mcp` (Greenhouse / Ashby / Lever) | Google dorks + employer careers page |
 
 Do not scrape behind logins you do not own. Do not build exploit PoCs. Prefer official APIs, public feeds, and career pages.
 
@@ -144,13 +146,17 @@ docs/architecture.md      Components and data flow
 docs/roles.md             Split / combine / subdivide roles
 docs/sharing.md           Airgapped ledger protocol
 docs/catalogs/            Platforms, MCPs, career sites, research
+docs/research/            Build plans (MCP coverage, deep-research wrap)
 skills/                   Agent Skills (SKILL.md)
+.cursor/environment.json  Cloud-agent install (clones open-deep-research)
 ledger/                   Shared live list
 profiles/                 Candidate profile (example committed)
 mcp/                      Example MCP config
 handoffs/                 Packet templates
 assets/                   Resumes (local) + writing templates
 scripts/rebuild_index.py  Optional INDEX.md generator
+scripts/setup_deep_research.sh  Clone dzhng/open-deep-research
+scripts/run_deep_research.py    Non-interactive research API wrapper
 ```
 
 ## Run a cycle

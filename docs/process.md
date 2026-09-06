@@ -17,7 +17,8 @@ Goal: know which skills and MCPs this workspace can actually use.
 2. Search more than one registry (skills.sh, Skills Hub, ClawHub, GitHub, mcp.so, Smithery).
 3. Vet: license, auth, ToS, whether it applies vs discovers, whether it works airgapped, whether it needs a browser.
 4. Write the chosen stack into `docs/catalogs/skills-and-mcps.md` with install notes.
-5. Do not install an auto-apply skill into the discovery bot.
+5. If the pass is a platform/MCP coverage refresh, also update `docs/research/platform-mcp-build-plan.md`.
+6. Do not install an auto-apply skill into the discovery bot.
 
 ## 2. Profile freeze
 

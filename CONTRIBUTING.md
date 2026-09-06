@@ -13,7 +13,9 @@ Skills should stay short and point at docs. Do not fork the status enum in three
 
 ## Add a platform
 
-Add a row to `docs/catalogs/platforms.md` or `big-tech-careers.md`. If it needs a tool, run the catalog skill and log it in `docs/catalogs/skills-and-mcps.md`.
+Add a row to `docs/catalogs/platforms.md` or `big-tech-careers.md`. If it needs a tool, run the catalog skill and log it in `docs/catalogs/skills-and-mcps.md`. Coverage and next patches: `docs/research/platform-mcp-build-plan.md`.
+
+Cloud-agent install (clone of dzhng/deep-research, etc.) lives in `.cursor/environment.json`. Keep `install` idempotent.
 
 ## Add a subdivision
 

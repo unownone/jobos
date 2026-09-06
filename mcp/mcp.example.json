@@ -10,6 +10,48 @@
       "env": {
         "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
       }
+    },
+    "tavily": {
+      "command": "npx",
+      "args": ["-y", "tavily-mcp@latest"],
+      "env": {
+        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+      }
+    },
+    "workatastartup": {
+      "command": "uvx",
+      "args": ["workatastartup-mcp"]
+    },
+    "ats-jobs": {
+      "command": "uvx",
+      "args": ["ats-jobs-mcp"]
+    },
+    "hunter": {
+      "type": "http",
+      "url": "https://mcp.hunter.io/mcp",
+      "headers": {
+        "X-API-Key": "${HUNTER_API_KEY}"
+      }
+    },
+    "apollo": {
+      "type": "http",
+      "url": "https://mcp.apollo.io/mcp"
+    },
+    "gmail": {
+      "type": "http",
+      "url": "https://gmailmcp.googleapis.com/mcp/v1"
+    },
+    "drive": {
+      "type": "http",
+      "url": "https://drivemcp.googleapis.com/mcp/v1"
+    },
+    "calendar": {
+      "type": "http",
+      "url": "https://calendarmcp.googleapis.com/mcp/v1"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
     }
   }
 }

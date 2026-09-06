@@ -1,1 +1,2 @@
 {"ts":"2026-09-06T00:00:00Z","job_id":null,"actor":"template","role":"system","from":null,"to":null,"note":"ledger opened"}
+{"ts":"2026-09-06T16:20:00Z","job_id":null,"actor":"cursor-cloud-agent","role":"discovery","from":null,"to":null,"note":"claimed catalog+research; refreshed skills-and-mcps.md; wired dzhng/deep-research into .cursor/environment.json; no jobs discovered or applied"}

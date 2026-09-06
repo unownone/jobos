@@ -6,7 +6,7 @@ Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts
 
 | role | name | scope | since |
 | --- | --- | --- | --- |
-| discovery | _unclaimed_ | all portals | |
+| discovery | cursor-cloud-agent | catalog + research (no apply, no Easy Apply) | 2026-09-06 |
 | apply | _unclaimed_ | all ATS | |
 | outreach | _unclaimed_ | email + linkedin_dm | |
 
