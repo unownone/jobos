@@ -10,7 +10,6 @@ from typing import Any
 
 from app.constants import JSON_FIELDS, STATUSES
 from app.message_store import ensure_messages_schema
-from app.people import ensure_people_schema
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -146,6 +145,25 @@ CREATE INDEX IF NOT EXISTS idx_queue_job ON queue_items(job_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_kind_job
     ON queue_items(kind, job_id)
     WHERE job_id IS NOT NULL AND job_id != '';
+
+CREATE TABLE IF NOT EXISTS people (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    title TEXT,
+    company TEXT,
+    job_id TEXT,
+    linkedin_url TEXT,
+    email TEXT,
+    email_confidence TEXT,
+    do_not_contact INTEGER NOT NULL DEFAULT 0,
+    touches_json TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_people_job ON people(job_id);
+CREATE INDEX IF NOT EXISTS idx_people_company ON people(company);
 """
 
 COLUMN_TO_FIELD = {
@@ -187,7 +205,6 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE invites ADD COLUMN allow_multiple_owners INTEGER NOT NULL DEFAULT 0"
         )
     ensure_messages_schema(conn)
-    ensure_people_schema(conn)
 
 
 def _dump(value: Any) -> str | None:

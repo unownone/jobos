@@ -15,7 +15,6 @@ sys.path.insert(0, str(ROOT / "board"))
 
 from app.db import BoardDB  # noqa: E402
 from app.export import build_ledger_files  # noqa: E402
-from app.people import ensure_people_schema  # noqa: E402
 
 
 def main() -> int:
@@ -24,7 +23,6 @@ def main() -> int:
     parser.add_argument("--dest", default=str(ROOT / "ledger"))
     args = parser.parse_args()
     db = BoardDB(Path(args.db))
-    ensure_people_schema(db.conn)
     dest = Path(args.dest)
     files = build_ledger_files(db)
     for rel, text in files.items():
