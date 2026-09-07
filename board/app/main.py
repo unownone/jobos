@@ -41,6 +41,8 @@ from app.identity import (
     verify_invite_secret,
 )
 from app.metrics import MetricsStore
+from app.onboarding import create_onboarding_router
+from app.pack import PackStore
 from app.permissions import (
     authorize_create,
     authorize_patch,
@@ -263,6 +265,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     principal_dep = require_principal(settings, db)
     queue = QueueService(db)
+    pack = PackStore(settings)
+    pack.ensure_current()
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
@@ -274,6 +278,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.db = db
     app.state.metrics = metrics
     app.state.queue = queue
+    app.state.pack = pack
     app.state.bootstrap_token = minted
     register_queue_routes(app, queue=queue, principal_dep=principal_dep)
     if minted:
@@ -286,6 +291,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    app.include_router(create_onboarding_router(settings, db, pack, principal_dep))
 
     @app.get("/")
     def index() -> FileResponse:

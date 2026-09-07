@@ -30,6 +30,7 @@ fi
 
 uv run "$REPO/scripts/board_gen_tokens.py" --dir "$BOARD"
 uv run "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$BOARD"
+uv run "$REPO/scripts/hub_build_pack.py" --dir "$BOARD" --repo "$REPO"
 
 if [[ "${HUB_DEPLOY_DRY_RUN:-}" == "1" ]]; then
   echo "HUB_DEPLOY_DRY_RUN=1 — not starting uvicorn"

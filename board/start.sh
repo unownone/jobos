@@ -15,6 +15,7 @@ else
 fi
 
 uv run "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$ROOT"
+uv run "$REPO/scripts/hub_build_pack.py" --dir "$ROOT" --repo "$REPO"
 
 if [[ -f "$ROOT/.env" ]]; then
   set -a
