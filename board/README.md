@@ -6,6 +6,8 @@ Private **live coordination plane** for a multi-agent job hunt. FastAPI + SQLite
 
 This is not a replacement for the git ledger in `ledger/`. See [Architecture](#architecture).
 
+**Job Hub docs:** operator [`docs/job-hub/human.md`](../docs/job-hub/human.md) (deploy, signup, invites, export); agents [`docs/job-hub/agent.md`](../docs/job-hub/agent.md) (`$HUB_KEY`, join, onboarding, heartbeat, queue). Maintainer owns this process; maintainer is not discovery.
+
 ![Admin dashboard — job list](docs/01-dashboard.png)
 
 The admin UI after **Connect**: one shared list, status pills, filter bar, stats (`N shown · N total · role …`). Open a row to edit, **Pause** (freeze, keep status), or **Stop** (withdraw). Tokens stay in the header password field and are never committed.

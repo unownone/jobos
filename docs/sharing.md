@@ -2,7 +2,7 @@
 
 The **git repo is the airgap protocol**. Hosting is optional. Discovery owner is the git-ledger portal owner.
 
-When agents share a machine, **maintainer** runs the live hunt board in [`board/`](../board/README.md). That board is the practical coordination UI/API for the hunt. It does not delete or replace `ledger/`.
+When agents share a machine, **maintainer** runs the live hunt board in [`board/`](../board/README.md). That board is the practical coordination UI/API for the hunt. It does not delete or replace `ledger/`. Hub operator/agent runbooks: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md).
 
 ## Why git
 

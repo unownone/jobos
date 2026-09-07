@@ -170,7 +170,7 @@ Every send is a touch on the job YAML and a people file under `ledger/people/`. 
 - Events are append-only (`ledger/events.jsonl`, and `board` events when the live board is up).
 - Discovery owner resolves **git** merge conflicts.
 - Never delete another role’s packet to “clean up.”
-- If the live hunt board is running: discovery creates rows only; apply/outreach only advance their fields; admin stops/edits. **Maintainer** owns tokens, schema, and hygiene — see [`board/README.md`](../board/README.md). Git ledger remains the airgap protocol.
+- If the live hunt board / Job Hub is running (`HUB_URL` / `BOARD_URL`): discovery creates rows only; apply/outreach only advance their fields; admin stops/edits. **Maintainer** owns tokens, schema, and hygiene — see [`board/README.md`](../board/README.md). Operator/agent Hub docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). Git ledger remains the airgap protocol.
 
 ## 7. Quality gates
 

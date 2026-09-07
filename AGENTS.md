@@ -52,3 +52,7 @@ Applications and outreach should be specific, short, and worth reading. No “pa
 ## When blocked
 
 Write `apply_blocked` or a `blocked` note with the exact missing thing (login, work auth question, missing PDF, captcha, portal down). Do not pretend you submitted.
+
+## Job Hub (if `HUB_URL` or `BOARD_URL` is set)
+
+Use the Hub as the **live** job list (heartbeat, queue claim/ack, board APIs). Do not treat git `ledger/` as a second live board for that run. Do not clone the hunt repo for skills — fetch `/api/onboarding` and the pack zip. Operator: [`docs/job-hub/human.md`](docs/job-hub/human.md). Agent: [`docs/job-hub/agent.md`](docs/job-hub/agent.md). **Maintainer ≠ discovery.** Never Easy Apply on the discovery track. If `profiles/candidate.yaml` is missing, stop for the human; do not invent a candidate.
