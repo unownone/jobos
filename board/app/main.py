@@ -41,6 +41,8 @@ from app.identity import (
     verify_invite_secret,
 )
 from app.metrics import MetricsStore
+from app.onboarding import create_onboarding_router
+from app.pack import PackStore
 from app.permissions import (
     authorize_create,
     authorize_patch,
@@ -260,16 +262,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.db_path.parent / "metrics.jsonl",
     )
     principal_dep = require_principal(settings, db)
+    pack = PackStore(settings)
+    pack.ensure_current()
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
         title="Job Hub",
         description="Private live coordination plane. Maintainer owns tokens, schema, and uptime.",
-        version="0.3.0",
+        version="0.4.0",
     )
     app.state.settings = settings
     app.state.db = db
     app.state.metrics = metrics
+    app.state.pack = pack
     app.state.bootstrap_token = minted
     if minted:
         print(format_signup_line(settings, minted), flush=True)
@@ -281,6 +286,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    app.include_router(create_onboarding_router(settings, db, pack, principal_dep))
 
     @app.get("/")
     def index() -> FileResponse:

@@ -62,6 +62,8 @@ class Settings:
     bootstrap_token: str = ""
     env_path: Path | None = None
     tokens_json_path: Path | None = None
+    repo_root: Path | None = None
+    packs_dir: Path | None = None
 
 
 def load_settings() -> Settings:
@@ -75,6 +77,15 @@ def load_settings() -> Settings:
     port_raw = merged.get("BOARD_PORT", "8787") or "8787"
     public_url = (merged.get("HUB_PUBLIC_URL") or "").strip().rstrip("/")
     bootstrap_token = (merged.get("HUB_BOOTSTRAP_TOKEN") or "").strip()
+    repo_raw = (merged.get("HUB_REPO_ROOT") or "").strip()
+    packs_raw = (merged.get("HUB_PACKS_DIR") or "").strip()
+    repo_root = Path(repo_raw) if repo_raw else BOARD_DIR.parent
+    if packs_raw:
+        packs_dir = Path(packs_raw)
+        if not packs_dir.is_absolute():
+            packs_dir = BOARD_DIR / packs_dir
+    else:
+        packs_dir = db_path.parent / "packs"
     return Settings(
         board_dir=BOARD_DIR,
         db_path=db_path,
@@ -85,4 +96,6 @@ def load_settings() -> Settings:
         bootstrap_token=bootstrap_token,
         env_path=ENV_PATH,
         tokens_json_path=TOKENS_JSON_PATH,
+        repo_root=repo_root,
+        packs_dir=packs_dir,
     )
