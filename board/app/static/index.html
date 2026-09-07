@@ -127,7 +127,13 @@
       <div class="logo">GTJ</div>
       <div>
         <h1>Job Hunt Board</h1>
-        <div class="sub">Get That Job 2.0 · local coordination</div>
+        <div class="sub">Get That Job 2.0 · humans and agents share <code>/api/jobs</code></div>
+        <div class="sub" id="hubLinks">
+          <a href="/login">Login</a> ·
+          <a href="/admin">Admin</a> ·
+          <a href="/admin/users">Presence</a> ·
+          <a href="/api/onboarding">Onboarding JSON</a>
+        </div>
       </div>
     </div>
     <form id="connectForm" class="connect">
@@ -161,10 +167,15 @@
     <button class="secondary" id="refresh" type="button">Refresh</button>
     <span class="stats" id="stats">0 shown · 0 total · not connected</span>
   </div>
+  <div id="compatBanner" class="warnbox" hidden style="margin:0 18px">Compat X-Role tokens are deprecated. Paste a Hub Bearer key (<code>jh_own_</code> / <code>jh_agt_</code>) or log in.</div>
+  <div id="queueRail" class="filters" hidden>
+    <span class="sub" id="queueLabel">Queue</span>
+    <span class="stats" id="queueStats"></span>
+  </div>
   <main>
     <aside id="presenceRail">
       <h2>Presence</h2>
-      <div class="muted" id="presenceEmpty">Connect to see who is logged in and heartbeating.</div>
+      <div class="muted" id="presenceEmpty">Connect to see who is logged in and heartbeating. Join via an admin invite URL.</div>
       <div id="presenceList"></div>
     </aside>
     <section id="list"><div class="empty">Connect with a role token or paste a Hub API key to load the shared board.</div></section>
@@ -193,7 +204,7 @@
     let connected = false;
 
     let heartbeatTimer = null;
-    let presenceTimer = null;
+    let queueTimer = null;
 
     function csrfToken() {
       const hit = document.cookie.split("; ").find((c) => c.startsWith("hub_csrf="));
@@ -284,6 +295,7 @@
     function stopPresenceLoop() {
       if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
       if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
+      if (queueTimer) { clearInterval(queueTimer); queueTimer = null; }
     }
 
     async function sendHeartbeat() {
@@ -341,6 +353,29 @@
       presenceTimer = setInterval(loadPresence, 10000);
     }
 
+    async function loadQueue() {
+      const rail = document.getElementById("queueRail");
+      if (!caps || !(caps.can_hygiene || caps.kind === "owner" || caps.role === "admin")) {
+        rail.hidden = true;
+        return;
+      }
+      try {
+        const data = await api("/api/queue?limit=20");
+        rail.hidden = false;
+        const items = data.items || [];
+        document.getElementById("queueStats").textContent =
+          items.slice(0, 8).map((it) => it.kind + ":" + it.status).join(" · ") || "empty";
+      } catch (_err) {
+        rail.hidden = true;
+      }
+    }
+
+    function startQueueLoop(me) {
+      if (!(me.can_hygiene || me.kind === "owner" || me.role === "admin")) return;
+      loadQueue();
+      queueTimer = setInterval(loadQueue, 10000);
+    }
+
     async function boot() {
       const hasCreds = Boolean(store.role && store.token) || Boolean(csrfToken());
       if (!hasCreds) {
@@ -354,9 +389,13 @@
         const meta = await api("/api/meta");
         statuses = meta.statuses;
         if (me.role) document.getElementById("role").value = me.role;
+        const compatBanner = document.getElementById("compatBanner");
+        const usingBearer = Boolean(store.token && store.token.startsWith("jh_"));
+        compatBanner.hidden = !(me.compat && !usingBearer);
         setConnected(true, "connected");
         renderStatusMenu();
         startPresenceLoop();
+        startQueueLoop(me);
         await loadJobs();
         if (!selectedId) emptySide();
       } catch (err) {
@@ -396,10 +435,11 @@
           <td>${escapeHtml(j.company)}</td>
           <td>${escapeHtml(j.title)}</td>
           <td>${pill(j.status, j.stopped)}</td>
+          <td class="muted">${escapeHtml((j.claim && (j.claim.claimed_by || j.claim.kind)) || "")}</td>
         </tr>`).join("");
       document.getElementById("list").innerHTML = `
         <table>
-          <thead><tr><th>ID</th><th>Company</th><th>Title</th><th>Status</th></tr></thead>
+          <thead><tr><th>ID</th><th>Company</th><th>Title</th><th>Status</th><th>Claim</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       document.querySelectorAll("#list tbody tr").forEach(tr => {
@@ -422,7 +462,7 @@
           <h2>#${escapeHtml(job.id)} · ${escapeHtml(job.company)}</h2>
           <button class="iconx" id="closeSide" type="button" aria-label="Close">X</button>
         </div>
-        ${job.stopped ? `<div class="warnbox">${job.status === "closed_withdrawn" ? "Stopped" : "Paused"}: ${escapeHtml(job.stop_reason || "")}</div>` : ""}
+        ${job.claim ? `<div class="warnbox">Claimed: ${escapeHtml(job.claim.kind)} by ${escapeHtml(job.claim.claimed_by || "")} until ${escapeHtml(job.claim.lease_until || "")}</div>` : ""}
         <label>Company</label>
         <input id="f_company" value="${escapeAttr(job.company)}" />
         <label>Title</label>

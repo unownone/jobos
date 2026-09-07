@@ -21,8 +21,10 @@ from app.bootstrap import (
     tokens_json_path_for,
     verify_password,
 )
+from app.candidate import create_candidate_router
 from app.constants import METADATA_KNOWN_KEYS, ROLES, STATUSES, TRACKS
 from app.db import BoardDB, public_user
+from app.export import create_export_router
 from app.identity import (
     COOKIE_SESSION,
     clear_session_cookies,
@@ -44,6 +46,7 @@ from app.messages import create_messages_router
 from app.metrics import MetricsStore
 from app.onboarding import create_onboarding_router
 from app.pack import PackStore
+from app.people import create_people_router
 from app.permissions import (
     authorize_create,
     authorize_patch,
@@ -265,9 +268,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.db_path.parent / "metrics.jsonl",
     )
     principal_dep = require_principal(settings, db)
-    queue = QueueService(db)
     pack = PackStore(settings)
     pack.ensure_current()
+    queue = QueueService(db, pack=pack)
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
@@ -283,6 +286,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.bootstrap_token = minted
     register_queue_routes(app, queue=queue, principal_dep=principal_dep)
     app.include_router(create_messages_router(principal_dep))
+    app.include_router(create_people_router(principal_dep))
+    app.include_router(create_export_router(principal_dep))
+    app.include_router(create_candidate_router(settings, principal_dep))
     if minted:
         print(format_signup_line(settings, minted), flush=True)
         print(
@@ -386,12 +392,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "kind": principal.kind,
             "auth": principal.auth,
             "compat": principal.auth == "compat_role",
+            "compat_deprecated": principal.auth == "compat_role",
             **capabilities(principal.role),
         }
         if principal.user_id:
             user = db.get_user(principal.user_id)
             if user:
                 payload["user"] = public_user(user)
+        if principal.auth == "compat_role":
+            payload["deprecation"] = (
+                "X-Role + X-Token compat keys are deprecated; use Authorization: Bearer owner/agent keys"
+            )
         return payload
 
     @app.post("/api/auth/login")
@@ -612,6 +623,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "heartbeat_s": 10,
             "queue_kinds": list(QUEUE_KINDS),
             "queue_lease_m": 15,
+            "catalog_updated_at": pack.meta_without_ensure().catalog_updated_at,
+            "catalog_max_age_days": 7,
         }
 
     @app.get("/api/whoami")
@@ -628,6 +641,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if status_filter:
             validate_status(status_filter)
         jobs = db.list_jobs(status=status_filter, q=q, stopped=stopped)
+        claims = queue.claims_for_jobs([job["id"] for job in jobs])
+        for job in jobs:
+            job["claim"] = claims.get(job["id"])
         total = len(db.list_jobs())
         return {
             "jobs": jobs,
@@ -644,6 +660,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         job = db.get_job(job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="job not found")
+        claims = queue.claims_for_jobs([job_id])
+        job["claim"] = claims.get(job_id)
         return {"job": job, "role": principal.role}
 
     @app.post("/api/jobs", status_code=201)

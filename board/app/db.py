@@ -10,6 +10,7 @@ from typing import Any
 
 from app.constants import JSON_FIELDS, STATUSES
 from app.message_store import ensure_messages_schema
+from app.people import ensure_people_schema
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -186,6 +187,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE invites ADD COLUMN allow_multiple_owners INTEGER NOT NULL DEFAULT 0"
         )
     ensure_messages_schema(conn)
+    ensure_people_schema(conn)
 
 
 def _dump(value: Any) -> str | None:
@@ -449,7 +451,7 @@ class BoardDB:
         }
 
     def list_events(self, *, job_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
-        limit = max(1, min(limit, 500))
+        limit = max(1, min(limit, 10000))
         if job_id:
             cur = self.conn.execute(
                 "SELECT * FROM events WHERE job_id = ? ORDER BY id DESC LIMIT ?",

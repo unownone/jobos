@@ -288,6 +288,10 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 | GET | `/api/hygiene` | admin, maintenance |
 | POST | `/api/hygiene/vacuum` | admin, maintenance |
 | POST | `/api/import` | admin, maintenance (`replace` is admin-only) |
+| GET | `/api/export/ledger` | admin, maintenance — yaml+jsonl tarball or `?format=json`; strips tokens |
+| GET/POST/PATCH | `/api/people` `/api/people/{id}` | outreach, admin — hiring contacts, no secrets |
+| GET | `/api/candidate/public` | any user — `{present:false}` until admin supplies yaml |
+| GET | `/api/candidate/resume` | apply, outreach, admin |
 | POST | `/api/metrics/token_burn` | any authenticated role |
 | GET | `/api/metrics/token_burn` `/api/metrics/summary` | admin, maintenance |
 

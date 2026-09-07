@@ -9,5 +9,7 @@ data/*.db-wal
 data/*.db-shm
 .venv/
 __pycache__/
-.pytest_cache/
+data/packs/
+data/profiles/
+data/candidate-resume.pdf
 data/packs/

@@ -13,9 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.auth import Principal
 from app.bootstrap import new_id
 from app.db import BoardDB, utc_now
+from app.pack import catalog_updated_at
+from app.settings import BOARD_DIR
 
 LEASE_MINUTES = 15
 NACK_DEAD_AFTER = 5
+CATALOG_MAX_AGE_DAYS = 7
 QUEUE_STATUSES = ("open", "claimed", "acked", "dead")
 
 QUEUE_SCHEMA = """
@@ -156,9 +159,73 @@ def packet_complete(job: dict[str, Any]) -> bool:
     return bool(url) or bool(steps)
 
 
-def catalog_fresh_enough(_db: BoardDB) -> bool:
-    """Phase F reads pack catalog_updated_at. D always allows discovery.search."""
-    return True
+def catalog_date_is_fresh(iso_date: str | None, now: datetime | None = None) -> bool:
+    now = now or datetime.now(timezone.utc)
+    if not iso_date:
+        return False
+    try:
+        parsed = datetime.strptime(str(iso_date)[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return False
+    age_days = (now.date() - parsed.date()).days
+    return age_days <= CATALOG_MAX_AGE_DAYS
+
+
+def catalog_refresh_acked_recent(db: BoardDB, now: datetime | None = None) -> bool:
+    now = now or datetime.now(timezone.utc)
+    cur = db.conn.execute(
+        """
+        SELECT ts FROM events
+        WHERE action = 'queue_ack' AND (note = 'catalog.refresh' OR fields_json LIKE '%catalog.refresh%')
+        ORDER BY id DESC LIMIT 1
+        """
+    )
+    row = cur.fetchone()
+    if row is None:
+        cur = db.conn.execute(
+            """
+            SELECT created_at FROM queue_items
+            WHERE kind = 'catalog.refresh' AND status = 'acked'
+            ORDER BY created_at DESC LIMIT 1
+            """
+        )
+        row = cur.fetchone()
+        if row is None:
+            return False
+        stamp = row["created_at"]
+    else:
+        stamp = row["ts"]
+    try:
+        parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return (now - parsed) <= timedelta(days=CATALOG_MAX_AGE_DAYS)
+
+
+def catalog_fresh_enough(db: BoardDB, pack: Any | None = None, now: datetime | None = None) -> bool:
+    """Block discovery.search when catalog is older than 7 days unless catalog.refresh was acked."""
+    now = now or datetime.now(timezone.utc)
+    if catalog_refresh_acked_recent(db, now):
+        return True
+    date = None
+    if pack is not None:
+        try:
+            date = pack.meta_without_ensure().catalog_updated_at
+        except Exception:
+            date = None
+        if not date:
+            try:
+                date = catalog_updated_at(pack.repo_root)
+            except Exception:
+                date = None
+    if not date:
+        try:
+            date = catalog_updated_at(BOARD_DIR.parent)
+        except Exception:
+            date = None
+    return catalog_date_is_fresh(date, now)
 
 
 def dedupe_key_for(kind: str, job_id: str | None, payload: dict[str, Any] | None) -> str:
@@ -253,9 +320,10 @@ class Clock:
 
 
 class QueueService:
-    def __init__(self, db: BoardDB, clock: Clock | None = None) -> None:
+    def __init__(self, db: BoardDB, clock: Clock | None = None, pack: Any | None = None) -> None:
         self.db = db
         self.clock = clock or Clock()
+        self.pack = pack
         self._claim_lock = threading.Lock()
         ensure_queue_schema(self.db.conn)
         self.db.conn.commit()
@@ -300,6 +368,31 @@ class QueueService:
             [*args, limit],
         )
         return [_row_to_item(r) for r in cur.fetchall()]
+
+    def claims_for_jobs(self, job_ids: list[str]) -> dict[str, dict[str, Any]]:
+        ids = [jid for jid in job_ids if jid]
+        if not ids:
+            return {}
+        placeholders = ",".join("?" for _ in ids)
+        cur = self.db.conn.execute(
+            f"""
+            SELECT * FROM queue_items
+            WHERE status = 'claimed' AND job_id IN ({placeholders})
+            """,
+            ids,
+        )
+        out: dict[str, dict[str, Any]] = {}
+        for row in cur.fetchall():
+            item = public_item(_row_to_item(row))
+            job_id = item.get("job_id")
+            if job_id:
+                out[str(job_id)] = {
+                    "queue_id": item["id"],
+                    "kind": item["kind"],
+                    "claimed_by": item.get("claimed_by"),
+                    "lease_until": item.get("lease_until"),
+                }
+        return out
 
     def upsert(
         self,
@@ -428,11 +521,11 @@ class QueueService:
             claim_kinds = [k for k in requested if k in allowed]
         else:
             claim_kinds = sorted(allowed)
-        if "discovery.search" in claim_kinds and not catalog_fresh_enough(self.db):
+        if "discovery.search" in claim_kinds and not catalog_fresh_enough(self.db, pack=self.pack):
             if requested == ["discovery.search"]:
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="catalog stale; discovery.search claims blocked (phase F)",
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="catalog stale; discovery.search blocked until catalog.refresh is acked or Last catalog pass is within 7 days",
                 )
             claim_kinds = [k for k in claim_kinds if k != "discovery.search"]
         if not claim_kinds:
