@@ -86,8 +86,42 @@ CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT NOT NULL,
     expires_at TEXT NOT NULL,
     last_seen TEXT,
+    csrf_hash TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    prefix TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    revoked_at TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
+
+CREATE TABLE IF NOT EXISTS invites (
+    id TEXT PRIMARY KEY,
+    track TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    secret_hash TEXT NOT NULL,
+    max_redemptions INTEGER NOT NULL,
+    redemptions INTEGER NOT NULL DEFAULT 0,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT,
+    created_by TEXT,
+    allow_multiple_owners INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_invites_track ON invites(track);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_track_display
+    ON users(track, display_name)
+    WHERE track IS NOT NULL AND display_name IS NOT NULL
+      AND (disabled_at IS NULL OR disabled_at = '');
 """
 
 COLUMN_TO_FIELD = {
@@ -114,8 +148,20 @@ def connect(db_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA)
+    _migrate(conn)
     conn.commit()
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    session_cols = {row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+    if "csrf_hash" not in session_cols:
+        conn.execute("ALTER TABLE sessions ADD COLUMN csrf_hash TEXT")
+    invite_cols = {row[1] for row in conn.execute("PRAGMA table_info(invites)").fetchall()}
+    if invite_cols and "allow_multiple_owners" not in invite_cols:
+        conn.execute(
+            "ALTER TABLE invites ADD COLUMN allow_multiple_owners INTEGER NOT NULL DEFAULT 0"
+        )
 
 
 def _dump(value: Any) -> str | None:
@@ -526,14 +572,15 @@ class BoardDB:
         user_id: str,
         token_hash: str,
         expires_at: str,
+        csrf_hash: str | None = None,
     ) -> dict[str, Any]:
         now = utc_now()
         self.conn.execute(
             """
-            INSERT INTO sessions (id, user_id, token_hash, expires_at, last_seen)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO sessions (id, user_id, token_hash, expires_at, last_seen, csrf_hash)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (session_id, user_id, token_hash, expires_at, now),
+            (session_id, user_id, token_hash, expires_at, now, csrf_hash),
         )
         self.conn.commit()
         return {
@@ -542,6 +589,361 @@ class BoardDB:
             "expires_at": expires_at,
             "last_seen": now,
         }
+
+    def get_user(self, user_id: str) -> dict[str, Any] | None:
+        cur = self.conn.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        row = cur.fetchone()
+        return _row_to_user(row) if row else None
+
+    def get_user_by_email(self, email: str) -> dict[str, Any] | None:
+        cur = self.conn.execute(
+            "SELECT * FROM users WHERE lower(email) = lower(?) AND email IS NOT NULL AND email != ''",
+            (email.strip(),),
+        )
+        row = cur.fetchone()
+        return _row_to_user(row) if row else None
+
+    def list_users(
+        self,
+        *,
+        track: str | None = None,
+        kind: str | None = None,
+        include_disabled: bool = False,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        args: list[Any] = []
+        if track:
+            clauses.append("track = ?")
+            args.append(track)
+        if kind:
+            clauses.append("kind = ?")
+            args.append(kind)
+        if not include_disabled:
+            clauses.append("(disabled_at IS NULL OR disabled_at = '')")
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        cur = self.conn.execute(f"SELECT * FROM users {where} ORDER BY created_at", args)
+        return [_row_to_user(r) for r in cur.fetchall()]
+
+    def count_owners(self, track: str) -> int:
+        cur = self.conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM users
+            WHERE track = ? AND kind = 'owner' AND (disabled_at IS NULL OR disabled_at = '')
+            """,
+            (track,),
+        )
+        row = cur.fetchone()
+        return int(row["n"]) if row else 0
+
+    def display_name_taken(self, track: str, display_name: str, exclude_id: str | None = None) -> bool:
+        cur = self.conn.execute(
+            """
+            SELECT id FROM users
+            WHERE track = ? AND lower(display_name) = lower(?)
+              AND (disabled_at IS NULL OR disabled_at = '')
+            """,
+            (track, display_name.strip()),
+        )
+        row = cur.fetchone()
+        if not row:
+            return False
+        return row["id"] != exclude_id
+
+    def insert_user(
+        self,
+        *,
+        user_id: str,
+        kind: str,
+        track: str | None,
+        email: str | None,
+        password_hash: str | None,
+        display_name: str,
+        metadata: dict[str, Any] | None,
+        created_by: str | None,
+        commit: bool = True,
+    ) -> dict[str, Any]:
+        now = utc_now()
+        self.conn.execute(
+            """
+            INSERT INTO users (
+                id, kind, track, email, password_hash, display_name,
+                metadata_json, created_by, disabled_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+            """,
+            (
+                user_id,
+                kind,
+                track,
+                (email or "").strip().lower() or None,
+                password_hash,
+                display_name.strip(),
+                _dump(metadata or {}),
+                created_by,
+                now,
+            ),
+        )
+        if commit:
+            self.conn.commit()
+        stored = self.get_user(user_id)
+        if stored is None:
+            raise RuntimeError("user insert did not persist")
+        return stored
+
+    def disable_user(self, user_id: str) -> dict[str, Any]:
+        now = utc_now()
+        self.conn.execute(
+            "UPDATE users SET disabled_at = ? WHERE id = ?",
+            (now, user_id),
+        )
+        self.conn.commit()
+        stored = self.get_user(user_id)
+        if stored is None:
+            raise KeyError(user_id)
+        return stored
+
+    def update_user_metadata(self, user_id: str, metadata: dict[str, Any]) -> dict[str, Any]:
+        self.conn.execute(
+            "UPDATE users SET metadata_json = ? WHERE id = ?",
+            (_dump(metadata), user_id),
+        )
+        self.conn.commit()
+        stored = self.get_user(user_id)
+        if stored is None:
+            raise KeyError(user_id)
+        return stored
+
+    def get_session_by_token_hash(self, token_hash: str) -> dict[str, Any] | None:
+        cur = self.conn.execute(
+            "SELECT * FROM sessions WHERE token_hash = ?",
+            (token_hash,),
+        )
+        row = cur.fetchone()
+        return _row_to_session(row) if row else None
+
+    def delete_session(self, session_id: str) -> None:
+        self.conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        self.conn.commit()
+
+    def touch_session(self, session_id: str, expires_at: str) -> None:
+        self.conn.execute(
+            "UPDATE sessions SET last_seen = ?, expires_at = ? WHERE id = ?",
+            (utc_now(), expires_at, session_id),
+        )
+        self.conn.commit()
+
+    def insert_api_key(
+        self,
+        *,
+        key_id: str,
+        user_id: str,
+        prefix: str,
+        key_hash: str,
+        commit: bool = True,
+    ) -> dict[str, Any]:
+        now = utc_now()
+        self.conn.execute(
+            """
+            INSERT INTO api_keys (id, user_id, prefix, key_hash, created_at, revoked_at)
+            VALUES (?, ?, ?, ?, ?, NULL)
+            """,
+            (key_id, user_id, prefix, key_hash, now),
+        )
+        if commit:
+            self.conn.commit()
+        return {
+            "id": key_id,
+            "user_id": user_id,
+            "prefix": prefix,
+            "created_at": now,
+        }
+
+    def get_api_key_by_hash(self, key_hash: str) -> dict[str, Any] | None:
+        cur = self.conn.execute("SELECT * FROM api_keys WHERE key_hash = ?", (key_hash,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "user_id": row["user_id"],
+            "prefix": row["prefix"],
+            "key_hash": row["key_hash"],
+            "created_at": row["created_at"],
+            "revoked_at": row["revoked_at"],
+        }
+
+    def revoke_api_key(self, key_id: str) -> None:
+        self.conn.execute(
+            "UPDATE api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+            (utc_now(), key_id),
+        )
+        self.conn.commit()
+
+    def revoke_user_keys(self, user_id: str) -> None:
+        self.conn.execute(
+            "UPDATE api_keys SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
+            (utc_now(), user_id),
+        )
+        self.conn.commit()
+
+    def active_key_for_user(self, user_id: str) -> dict[str, Any] | None:
+        cur = self.conn.execute(
+            """
+            SELECT * FROM api_keys
+            WHERE user_id = ? AND revoked_at IS NULL
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "user_id": row["user_id"],
+            "prefix": row["prefix"],
+            "created_at": row["created_at"],
+        }
+
+    def insert_invite(
+        self,
+        *,
+        invite_id: str,
+        track: str,
+        mode: str,
+        secret_hash: str,
+        max_redemptions: int,
+        expires_at: str,
+        created_by: str | None,
+        allow_multiple_owners: bool,
+    ) -> dict[str, Any]:
+        now = utc_now()
+        self.conn.execute(
+            """
+            INSERT INTO invites (
+                id, track, mode, secret_hash, max_redemptions, redemptions,
+                expires_at, revoked_at, created_by, allow_multiple_owners, created_at
+            ) VALUES (?, ?, ?, ?, ?, 0, ?, NULL, ?, ?, ?)
+            """,
+            (
+                invite_id,
+                track,
+                mode,
+                secret_hash,
+                max_redemptions,
+                expires_at,
+                created_by,
+                1 if allow_multiple_owners else 0,
+                now,
+            ),
+        )
+        self.conn.commit()
+        stored = self.get_invite(invite_id)
+        if stored is None:
+            raise RuntimeError("invite insert did not persist")
+        return stored
+
+    def get_invite(self, invite_id: str) -> dict[str, Any] | None:
+        cur = self.conn.execute("SELECT * FROM invites WHERE id = ?", (invite_id,))
+        row = cur.fetchone()
+        return _row_to_invite(row) if row else None
+
+    def list_invites(self) -> list[dict[str, Any]]:
+        cur = self.conn.execute("SELECT * FROM invites ORDER BY created_at DESC")
+        return [_row_to_invite(r) for r in cur.fetchall()]
+
+    def revoke_invite(self, invite_id: str) -> dict[str, Any]:
+        self.conn.execute(
+            "UPDATE invites SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+            (utc_now(), invite_id),
+        )
+        self.conn.commit()
+        stored = self.get_invite(invite_id)
+        if stored is None:
+            raise KeyError(invite_id)
+        return stored
+
+    def expire_invite(self, invite_id: str, expires_at: str) -> None:
+        self.conn.execute(
+            "UPDATE invites SET expires_at = ? WHERE id = ?",
+            (expires_at, invite_id),
+        )
+        self.conn.commit()
+
+    def redeem_invite(self, invite_id: str, *, commit: bool = True) -> dict[str, Any]:
+        self.conn.execute(
+            "UPDATE invites SET redemptions = redemptions + 1 WHERE id = ?",
+            (invite_id,),
+        )
+        if commit:
+            self.conn.commit()
+        stored = self.get_invite(invite_id)
+        if stored is None:
+            raise KeyError(invite_id)
+        return stored
+
+    def begin_immediate(self) -> None:
+        self.conn.commit()
+        self.conn.execute("BEGIN IMMEDIATE")
+
+    def rollback(self) -> None:
+        self.conn.rollback()
+
+
+def _row_to_user(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "kind": row["kind"],
+        "track": row["track"],
+        "email": row["email"],
+        "password_hash": row["password_hash"],
+        "display_name": row["display_name"] or "",
+        "metadata": _load(row["metadata_json"], {}),
+        "created_by": row["created_by"],
+        "disabled_at": row["disabled_at"],
+        "created_at": row["created_at"],
+    }
+
+
+def public_user(user: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": user["id"],
+        "kind": user["kind"],
+        "track": user.get("track"),
+        "email": user.get("email"),
+        "display_name": user.get("display_name") or "",
+        "metadata": user.get("metadata") or {},
+        "created_by": user.get("created_by"),
+        "disabled_at": user.get("disabled_at"),
+        "created_at": user.get("created_at"),
+    }
+
+
+def _row_to_session(row: sqlite3.Row) -> dict[str, Any]:
+    keys = row.keys()
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "token_hash": row["token_hash"],
+        "expires_at": row["expires_at"],
+        "last_seen": row["last_seen"],
+        "csrf_hash": row["csrf_hash"] if "csrf_hash" in keys else None,
+    }
+
+
+def _row_to_invite(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "track": row["track"],
+        "mode": row["mode"],
+        "secret_hash": row["secret_hash"],
+        "max_redemptions": int(row["max_redemptions"]),
+        "redemptions": int(row["redemptions"]),
+        "expires_at": row["expires_at"],
+        "revoked_at": row["revoked_at"],
+        "created_by": row["created_by"],
+        "allow_multiple_owners": bool(row["allow_multiple_owners"]),
+        "created_at": row["created_at"],
+    }
 
 
 def _owners(raw: Any) -> dict[str, str]:

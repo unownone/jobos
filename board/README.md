@@ -268,8 +268,16 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 | GET | `/health` `/ready` | public (no secrets; `admin_bootstrapped` bool) |
 | GET | `/` | Board UI (compat role token in the browser, not in git) |
 | GET | `/admin/signup` | one-time admin bootstrap form |
+| GET | `/login` `/admin/invites` `/join/{id}` | login + invite UI; join is public with `?s=` |
 | POST | `/api/auth/bootstrap` | bootstrap token → first admin (cookie) |
-| GET | `/api/whoami` `/api/meta` `/api/jobs` `/api/jobs/{id}` `/api/events` | any valid role |
+| POST | `/api/auth/login` `/api/auth/logout` | session cookie `hub_session` (12h idle) |
+| GET | `/api/auth/me` | session, Bearer, X-Hub-Key, or compat headers |
+| POST/GET | `/api/invites` | admin: create (secret once) / list (no secrets) |
+| POST | `/api/invites/{id}/revoke` | admin |
+| GET | `/api/join/{id}?s=` | invite signup payload (no pack zip yet) |
+| POST | `/api/auth/join` | owner or agent + one-time `jh_own_*` / `jh_agt_*` |
+| POST | `/api/agents` `/api/agents/{id}/rotate_key` `/disable` | owner or admin |
+| GET | `/api/whoami` `/api/meta` `/api/jobs` `/api/jobs/{id}` `/api/events` | any valid role / key |
 | POST | `/api/jobs` | discovery, admin |
 | PATCH | `/api/jobs/{id}` | discovery (lane only), apply, outreach, admin |
 | POST | `/api/jobs/{id}/pause` `/resume` `/stop` | admin |

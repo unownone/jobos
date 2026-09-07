@@ -11,16 +11,35 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.auth import Principal, require_principal
+from app.auth import Principal, require_admin, require_owner_or_admin, require_principal
 from app.bootstrap import (
     consume_bootstrap,
     ensure_bootstrap,
     env_path_for,
     format_signup_line,
+    sha256_hex,
     tokens_json_path_for,
+    verify_password,
 )
-from app.constants import ROLES, STATUSES
-from app.db import BoardDB
+from app.constants import METADATA_KNOWN_KEYS, ROLES, STATUSES, TRACKS
+from app.db import BoardDB, public_user
+from app.identity import (
+    COOKIE_SESSION,
+    clear_session_cookies,
+    create_invite,
+    create_user_session,
+    disable_agent,
+    invite_status_error,
+    join_payload,
+    join_url,
+    join_with_invite,
+    mint_agent_for_owner,
+    parse_invite_token,
+    public_invite,
+    rotate_user_key,
+    set_session_cookies,
+    verify_invite_secret,
+)
 from app.metrics import MetricsStore
 from app.permissions import (
     authorize_create,
@@ -147,6 +166,70 @@ def _normalize_id(raw: str) -> str:
     return job_id
 
 
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class InviteIn(BaseModel):
+    track: str
+    max_redemptions: int | None = 8
+    ttl_hours: float | None = 72
+    mode: str | None = "owner_then_agents"
+    allow_multiple_owners: bool = False
+
+
+class JoinIn(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    invite_id: str | None = None
+    s: str | None = None
+    secret: str | None = None
+    token: str | None = None
+    display_name: str
+    metadata: dict[str, Any] | None = None
+    model: str | None = None
+    harness: str | None = None
+    bed: str | None = None
+    provider: str | None = None
+    capabilities: list[str] | Any | None = None
+
+
+class AgentIn(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    display_name: str
+    track: str | None = None
+    metadata: dict[str, Any] | None = None
+    model: str | None = None
+    harness: str | None = None
+    bed: str | None = None
+    provider: str | None = None
+    capabilities: list[str] | Any | None = None
+
+
+def _merge_signup_metadata(body: JoinIn | AgentIn) -> dict[str, Any]:
+    meta = dict(body.metadata or {})
+    for key in METADATA_KNOWN_KEYS:
+        value = getattr(body, key, None)
+        if value is not None and key not in meta:
+            meta[key] = value
+    extra = body.model_dump(exclude_none=True)
+    skip = {
+        "invite_id",
+        "s",
+        "secret",
+        "token",
+        "display_name",
+        "metadata",
+        "track",
+    }
+    for key, value in extra.items():
+        if key not in skip and key not in meta:
+            meta[key] = value
+    return meta
+
+
 def _extract_bootstrap_token(request: Request, body: BootstrapIn) -> str:
     auth = request.headers.get("authorization") or ""
     if auth.lower().startswith("bearer "):
@@ -176,13 +259,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.db_path.parent / "metrics.sqlite",
         settings.db_path.parent / "metrics.jsonl",
     )
-    principal_dep = require_principal(settings)
+    principal_dep = require_principal(settings, db)
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
         title="Job Hub",
         description="Private live coordination plane. Maintainer owns tokens, schema, and uptime.",
-        version="0.2.0",
+        version="0.3.0",
     )
     app.state.settings = settings
     app.state.db = db
@@ -212,6 +295,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if db.admin_bootstrapped():
             return FileResponse(STATIC_DIR / "admin.html")
         return FileResponse(STATIC_DIR / "signup.html")
+
+    @app.get("/admin/invites")
+    def admin_invites() -> FileResponse:
+        if db.admin_bootstrapped():
+            return FileResponse(STATIC_DIR / "admin.html")
+        return FileResponse(STATIC_DIR / "signup.html")
+
+    @app.get("/login")
+    def login_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "login.html")
+
+    @app.get("/join/{invite_id}")
+    def join_page(invite_id: str) -> FileResponse:
+        return FileResponse(STATIC_DIR / "join.html")
 
     @app.get("/favicon.ico")
     def favicon() -> Response:
@@ -263,32 +360,247 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 },
             }
         )
-        response.set_cookie(
-            key="hub_session",
-            value=result["session_token"],
-            httponly=True,
-            samesite="lax",
-            max_age=12 * 3600,
-            path="/",
-        )
+        set_session_cookies(response, result["session_token"], result["csrf_token"])
         return response
+
+    def _principal_payload(principal: Principal) -> dict[str, Any]:
+        payload = {
+            "role": principal.role,
+            "actor": principal.actor,
+            "user_id": principal.user_id,
+            "track": principal.track,
+            "kind": principal.kind,
+            "auth": principal.auth,
+            "compat": principal.auth == "compat_role",
+            **capabilities(principal.role),
+        }
+        if principal.user_id:
+            user = db.get_user(principal.user_id)
+            if user:
+                payload["user"] = public_user(user)
+        return payload
+
+    @app.post("/api/auth/login")
+    def auth_login(body: LoginIn) -> JSONResponse:
+        user = db.get_user_by_email(body.email)
+        if user is None or not user.get("password_hash"):
+            raise HTTPException(status_code=401, detail="invalid email or password")
+        if user.get("disabled_at"):
+            raise HTTPException(status_code=401, detail="user disabled")
+        if not verify_password(user["password_hash"], body.password):
+            raise HTTPException(status_code=401, detail="invalid email or password")
+        session_token, csrf_token = create_user_session(db, user["id"])
+        db.add_event(
+            job_id=None,
+            actor_role="admin",
+            actor=user.get("email") or user["id"],
+            action="login",
+            fields={"user_id": user["id"]},
+        )
+        response = JSONResponse({"ok": True, "user": public_user(user)})
+        set_session_cookies(response, session_token, csrf_token)
+        return response
+
+    @app.post("/api/auth/logout")
+    def auth_logout(
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+    ) -> JSONResponse:
+        raw = request.cookies.get(COOKIE_SESSION) or ""
+        if raw:
+            sess = db.get_session_by_token_hash(sha256_hex(raw))
+            if sess:
+                db.delete_session(sess["id"])
+        response = JSONResponse({"ok": True, "role": principal.role})
+        clear_session_cookies(response)
+        return response
+
+    @app.get("/api/auth/me")
+    def auth_me(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
+        return _principal_payload(principal)
+
+    @app.post("/api/invites")
+    def create_invite_endpoint(
+        body: InviteIn,
+        principal: Principal = Depends(principal_dep),
+    ) -> dict[str, Any]:
+        require_admin(principal)
+        row, secret = create_invite(
+            db,
+            track=body.track,
+            mode=body.mode,
+            max_redemptions=body.max_redemptions,
+            ttl_hours=body.ttl_hours,
+            allow_multiple_owners=body.allow_multiple_owners,
+            created_by=principal.user_id or principal.actor,
+        )
+        url = join_url(settings, row["id"], secret)
+        db.add_event(
+            job_id=None,
+            actor_role=principal.role,
+            actor=principal.actor,
+            action="invite_create",
+            fields={"invite_id": row["id"], "track": row["track"], "mode": row["mode"]},
+        )
+        return {
+            "invite": public_invite(row),
+            "secret": secret,
+            "join_url": url,
+            "token": f"jh_inv_{row['id']}.{secret}",
+            "shown_once": True,
+        }
+
+    @app.get("/api/invites")
+    def list_invites_endpoint(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
+        require_admin(principal)
+        return {"invites": [public_invite(row) for row in db.list_invites()]}
+
+    @app.post("/api/invites/{invite_id}/revoke")
+    def revoke_invite_endpoint(
+        invite_id: str,
+        principal: Principal = Depends(principal_dep),
+    ) -> dict[str, Any]:
+        require_admin(principal)
+        row = db.get_invite(invite_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="invite not found")
+        stored = db.revoke_invite(invite_id)
+        db.add_event(
+            job_id=None,
+            actor_role=principal.role,
+            actor=principal.actor,
+            action="invite_revoke",
+            fields={"invite_id": invite_id},
+        )
+        return {"invite": public_invite(stored)}
+
+    def _load_invite_for_join(invite_id: str, secret: str) -> dict[str, Any]:
+        row = db.get_invite(invite_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="invite not found")
+        if not verify_invite_secret(row, secret):
+            raise HTTPException(status_code=401, detail="invalid invite secret")
+        err = invite_status_error(row)
+        if err:
+            raise err
+        return row
+
+    @app.get("/api/join/{invite_id}")
+    def join_payload_endpoint(invite_id: str, s: str | None = None) -> dict[str, Any]:
+        if not s:
+            raise HTTPException(status_code=401, detail="missing invite secret")
+        row = _load_invite_for_join(invite_id, s)
+        return join_payload(settings, row)
+
+    @app.post("/api/auth/join")
+    def auth_join(request: Request, body: JoinIn) -> dict[str, Any]:
+        invite_id = (body.invite_id or "").strip()
+        secret = (body.s or body.secret or "").strip()
+        token = (body.token or "").strip()
+        auth = request.headers.get("authorization") or ""
+        if not token and auth.lower().startswith("bearer "):
+            token = auth.split(" ", 1)[1].strip()
+        if token.startswith("jh_inv_"):
+            parsed_id, parsed_secret = parse_invite_token(token)
+            invite_id = invite_id or (parsed_id or "")
+            secret = secret or (parsed_secret or "")
+        if not invite_id or not secret:
+            raise HTTPException(status_code=401, detail="missing invite_id or secret")
+        return join_with_invite(
+            db,
+            invite_id=invite_id,
+            secret=secret,
+            display_name=body.display_name,
+            metadata=_merge_signup_metadata(body),
+        )
+
+    @app.get("/api/agents")
+    def list_agents(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
+        require_owner_or_admin(principal)
+        track = None if principal.kind == "admin" or principal.role == "admin" else principal.track
+        users = db.list_users(track=track, kind="agent")
+        if principal.kind == "admin" or principal.role == "admin":
+            users = db.list_users(kind="agent") + db.list_users(kind="owner")
+        return {"users": [public_user(u) for u in users]}
+
+    @app.post("/api/agents")
+    def create_agent(
+        body: AgentIn,
+        principal: Principal = Depends(principal_dep),
+    ) -> dict[str, Any]:
+        require_owner_or_admin(principal)
+        if principal.kind == "agent":
+            raise HTTPException(status_code=403, detail="agents cannot mint sibling agents")
+        if principal.auth == "compat_role" and principal.role == "admin":
+            actor = {
+                "id": principal.actor or "compat-admin",
+                "kind": "admin",
+                "track": None,
+                "display_name": principal.actor or "admin",
+                "email": None,
+            }
+        elif principal.user_id:
+            stored = db.get_user(principal.user_id)
+            if stored is None:
+                raise HTTPException(status_code=401, detail="user not found")
+            actor = stored
+        else:
+            raise HTTPException(status_code=403, detail="only a track owner or admin can mint agents")
+        return mint_agent_for_owner(
+            db,
+            owner=actor,
+            display_name=body.display_name,
+            metadata=_merge_signup_metadata(body),
+            track=body.track,
+        )
+
+    def _agent_target(principal: Principal, user_id: str) -> dict[str, Any]:
+        target = db.get_user(user_id)
+        if target is None:
+            raise HTTPException(status_code=404, detail="user not found")
+        if principal.kind == "admin" or principal.role == "admin":
+            return target
+        if principal.user_id == user_id:
+            return target
+        if principal.kind == "owner" and target.get("track") == principal.track:
+            return target
+        raise HTTPException(status_code=403, detail="cannot manage this user")
+
+    @app.post("/api/agents/{user_id}/rotate_key")
+    def rotate_agent_key(
+        user_id: str,
+        principal: Principal = Depends(principal_dep),
+    ) -> dict[str, Any]:
+        target = _agent_target(principal, user_id)
+        if target["kind"] not in {"owner", "agent"}:
+            raise HTTPException(status_code=403, detail="only owner/agent keys rotate here")
+        return rotate_user_key(db, target)
+
+    @app.post("/api/agents/{user_id}/disable")
+    def disable_agent_endpoint(
+        user_id: str,
+        principal: Principal = Depends(principal_dep),
+    ) -> dict[str, Any]:
+        require_owner_or_admin(principal)
+        target = _agent_target(principal, user_id)
+        if target["kind"] == "admin":
+            raise HTTPException(status_code=403, detail="cannot disable admin")
+        return {"user": disable_agent(db, target)}
 
     @app.get("/api/meta")
     def meta(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
         return {
             "statuses": list(STATUSES),
             "roles": list(ROLES),
+            "tracks": list(TRACKS),
             "capabilities": capabilities(principal.role),
             "owner": "maintainer",
+            "heartbeat_s": 10,
         }
 
     @app.get("/api/whoami")
     def whoami(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
-        return {
-            "role": principal.role,
-            "actor": principal.actor,
-            **capabilities(principal.role),
-        }
+        return _principal_payload(principal)
 
     @app.get("/api/jobs")
     def list_jobs(

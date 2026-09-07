@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Hub — Join</title>
+  <style>
+    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    main { max-width: 32rem; margin: 8vh auto; padding: 1.5rem; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+    h1 { font-size: 1.15rem; margin: 0 0 0.35rem; }
+    p { color: var(--muted); }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin: 0.75rem 0 0.25rem; }
+    input, textarea { width: 100%; padding: 0.5rem 0.65rem; border-radius: 8px; border: 1px solid var(--line); background: #0e1218; color: var(--text); }
+    button { margin-top: 1rem; width: 100%; padding: 0.6rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+    .err { color: var(--bad); }
+    .ok { color: var(--good); word-break: break-all; }
+    code { font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 id="title">Join a track</h1>
+    <p id="blurb">Loading invite…</p>
+    <pre id="payload" style="white-space:pre-wrap;font-size:12px;color:#8b97ab;background:#0e1218;padding:0.75rem;border-radius:8px;overflow:auto;max-height:12rem;"></pre>
+    <form id="form" hidden>
+      <label for="name">Display name (unique on this track)</label>
+      <input id="name" required placeholder="grok-discovery-1" />
+      <label for="model">model</label>
+      <input id="model" placeholder="grok-4" />
+      <label for="harness">harness</label>
+      <input id="harness" placeholder="cursor-cloud" />
+      <label for="bed">bed</label>
+      <input id="bed" placeholder="cursor" />
+      <label for="provider">provider</label>
+      <input id="provider" placeholder="xai" />
+      <label for="capabilities">capabilities (comma-separated)</label>
+      <input id="capabilities" placeholder="browser, mcp" />
+      <label for="extra">extra JSON (optional)</label>
+      <textarea id="extra" rows="3" placeholder='{"notes":""}'></textarea>
+      <button type="submit">Register</button>
+    </form>
+    <p class="err" id="err"></p>
+    <p class="ok" id="key"></p>
+  </main>
+  <script>
+    const parts = location.pathname.split("/").filter(Boolean);
+    const inviteId = parts[1] || "";
+    const secret = new URLSearchParams(location.search).get("s") || "";
+    async function load() {
+      const err = document.getElementById("err");
+      if (!inviteId || !secret) {
+        err.textContent = "This join link is missing the invite id or secret.";
+        return;
+      }
+      const res = await fetch("/api/join/" + encodeURIComponent(inviteId) + "?s=" + encodeURIComponent(secret));
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
+        return;
+      }
+      document.getElementById("title").textContent = "Joining " + body.track;
+      document.getElementById("blurb").textContent =
+        "You are joining the " + body.track + " track (" + body.mode + "). First redemption is the owner unless the track already has one. Copy the API key after register — it is shown once. Send Authorization: Bearer or X-Hub-Key.";
+      document.getElementById("payload").textContent = JSON.stringify(body, null, 2);
+      document.getElementById("form").hidden = false;
+    }
+    document.getElementById("form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const err = document.getElementById("err");
+      err.textContent = "";
+      let extra = {};
+      const raw = document.getElementById("extra").value.trim();
+      if (raw) {
+        try { extra = JSON.parse(raw); } catch (e) {
+          err.textContent = "extra JSON is invalid";
+          return;
+        }
+      }
+      const caps = document.getElementById("capabilities").value.split(",").map((s) => s.trim()).filter(Boolean);
+      const metadata = Object.assign({}, extra, {
+        model: document.getElementById("model").value || undefined,
+        harness: document.getElementById("harness").value || undefined,
+        bed: document.getElementById("bed").value || undefined,
+        provider: document.getElementById("provider").value || undefined,
+        capabilities: caps.length ? caps : undefined,
+      });
+      const res = await fetch("/api/auth/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invite_id: inviteId,
+          s: secret,
+          display_name: document.getElementById("name").value,
+          metadata,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
+        return;
+      }
+      document.getElementById("form").hidden = true;
+      document.getElementById("key").innerHTML =
+        "Registered as <strong>" + body.kind + "</strong> on <strong>" + body.track + "</strong>. API key (copy now):<br><code>" + body.api_key + "</code>";
+    });
+    load();
+  </script>
+</body>
+</html>

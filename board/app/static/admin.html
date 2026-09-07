@@ -5,18 +5,165 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Job Hub — Admin</title>
   <style>
-    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; }
+    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
+    * { box-sizing: border-box; }
     body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
-    main { max-width: 36rem; margin: 10vh auto; padding: 1.5rem; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
+    main { max-width: 52rem; margin: 1.5rem auto; padding: 0 1rem 3rem; }
     a { color: var(--accent); }
-    p { color: var(--muted); }
+    h1 { font-size: 1.15rem; margin: 0; }
+    h2 { font-size: 1rem; margin: 1.5rem 0 0.75rem; }
+    p, label { color: var(--muted); }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1rem; }
+    label { display: block; font-size: 0.8rem; margin: 0.65rem 0 0.25rem; }
+    input, select { width: 100%; padding: 0.5rem 0.65rem; border-radius: 8px; border: 1px solid var(--line); background: #0e1218; color: var(--text); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    button { margin-top: 0.85rem; padding: 0.55rem 0.9rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #1c2430; border: 1px solid var(--line); }
+    .err { color: var(--bad); min-height: 1.2em; }
+    .ok { color: var(--good); word-break: break-all; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.4rem 0.35rem; border-bottom: 1px solid var(--line); }
+    code { font-size: 0.78rem; }
   </style>
 </head>
 <body>
+  <header>
+    <h1>Job Hub — Invites</h1>
+    <div>
+      <a href="/">Board</a>
+      &nbsp;·&nbsp;
+      <a href="#" id="logout">Log out</a>
+    </div>
+  </header>
   <main>
-    <h1>Job Hub admin</h1>
-    <p>Bootstrap is complete. Invites, owners, and agent keys ship in a later phase.</p>
-    <p><a href="/">Open the Board</a> (compat role tokens still work: <code>X-Role</code> + <code>X-Token</code>).</p>
+    <p id="who">Checking session…</p>
+    <div class="panel">
+      <h2>Create track invite</h2>
+      <p>Shareable URL: <code>{HUB}/join/{id}?s=</code>. Default reusable, max 8, 72h, first join is the track owner.</p>
+      <form id="form">
+        <div class="row">
+          <div>
+            <label for="track">Track</label>
+            <select id="track">
+              <option value="discovery">discovery</option>
+              <option value="application">application</option>
+              <option value="outreach">outreach</option>
+              <option value="maintenance">maintenance</option>
+            </select>
+          </div>
+          <div>
+            <label for="mode">Mode</label>
+            <select id="mode">
+              <option value="owner_then_agents">owner_then_agents</option>
+              <option value="owner_only">owner_only</option>
+              <option value="agents_only">agents_only</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="max">Max redemptions</label>
+            <input id="max" type="number" min="1" max="64" value="8" />
+          </div>
+          <div>
+            <label for="ttl">TTL hours</label>
+            <input id="ttl" type="number" min="1" max="720" value="72" />
+          </div>
+        </div>
+        <label><input id="multi" type="checkbox" style="width:auto" /> Allow multiple owners on this track</label>
+        <button type="submit">Create invite</button>
+      </form>
+      <p class="err" id="err"></p>
+      <p class="ok" id="created"></p>
+    </div>
+    <div class="panel">
+      <h2>Existing invites</h2>
+      <p>Secrets are shown only at create time. Revoke if a link leaked.</p>
+      <table>
+        <thead>
+          <tr><th>Track</th><th>Mode</th><th>Uses</th><th>Expires</th><th></th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
   </main>
+  <script>
+    function csrfHeaders(extra) {
+      const hit = document.cookie.split("; ").find((c) => c.startsWith("hub_csrf="));
+      const val = hit ? decodeURIComponent(hit.split("=").slice(1).join("=")) : "";
+      return Object.assign({ "Content-Type": "application/json", "X-CSRF": val }, extra || {});
+    }
+    async function me() {
+      const res = await fetch("/api/auth/me");
+      if (res.status === 401) {
+        location.href = "/login?next=/admin/invites";
+        return null;
+      }
+      const body = await res.json();
+      if (body.kind !== "admin" && body.role !== "admin") {
+        document.getElementById("who").textContent = "Admin session required.";
+        return null;
+      }
+      document.getElementById("who").textContent = "Signed in as " + (body.user && body.user.email || body.actor) + " (human admin, not a track).";
+      return body;
+    }
+    async function loadInvites() {
+      const res = await fetch("/api/invites");
+      const body = await res.json();
+      const tb = document.getElementById("rows");
+      tb.innerHTML = "";
+      (body.invites || []).forEach((inv) => {
+        const tr = document.createElement("tr");
+        const uses = inv.redemptions + " / " + inv.max_redemptions;
+        const status = inv.revoked_at ? "revoked" : uses;
+        tr.innerHTML = "<td>" + inv.track + "</td><td>" + inv.mode + "</td><td>" + status + "</td><td>" + (inv.expires_at || "") + "</td>";
+        const td = document.createElement("td");
+        if (!inv.revoked_at) {
+          const btn = document.createElement("button");
+          btn.className = "secondary";
+          btn.textContent = "Revoke";
+          btn.onclick = async () => {
+            await fetch("/api/invites/" + inv.id + "/revoke", { method: "POST", headers: csrfHeaders() });
+            loadInvites();
+          };
+          td.appendChild(btn);
+        }
+        tr.appendChild(td);
+        tb.appendChild(tr);
+      });
+    }
+    document.getElementById("form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      document.getElementById("err").textContent = "";
+      document.getElementById("created").textContent = "";
+      const res = await fetch("/api/invites", {
+        method: "POST",
+        headers: csrfHeaders(),
+        body: JSON.stringify({
+          track: document.getElementById("track").value,
+          mode: document.getElementById("mode").value,
+          max_redemptions: Number(document.getElementById("max").value),
+          ttl_hours: Number(document.getElementById("ttl").value),
+          allow_multiple_owners: document.getElementById("multi").checked,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        document.getElementById("err").textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
+        return;
+      }
+      const url = body.join_url;
+      document.getElementById("created").innerHTML = "Copy this join link (secret shown once):<br><code id='url'>" + url + "</code>";
+      try { await navigator.clipboard.writeText(url); } catch (e) {}
+      loadInvites();
+    });
+    document.getElementById("logout").addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      await fetch("/api/auth/logout", { method: "POST", headers: csrfHeaders() });
+      location.href = "/login";
+    });
+    me().then((ok) => { if (ok) loadInvites(); });
+  </script>
 </body>
 </html>

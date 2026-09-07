@@ -267,12 +267,14 @@ def consume_bootstrap(
     )
     db.mark_secret_used(BOOTSTRAP_META_KEY)
     session_plain = secrets.token_urlsafe(32)
+    csrf_plain = secrets.token_urlsafe(32)
     expires = datetime.now(timezone.utc) + SESSION_IDLE
     db.create_session(
         session_id=new_id("ses_"),
         user_id=user["id"],
         token_hash=sha256_hex(session_plain),
         expires_at=expires.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        csrf_hash=sha256_hex(csrf_plain),
     )
     wipe_bootstrap_plaintext(settings)
     db.add_event(
@@ -283,4 +285,4 @@ def consume_bootstrap(
         note="admin user created; bootstrap token consumed",
         fields={"user_id": user["id"]},
     )
-    return {"user": user, "session_token": session_plain, "now": utc_now()}
+    return {"user": user, "session_token": session_plain, "csrf_token": csrf_plain, "now": utc_now()}
