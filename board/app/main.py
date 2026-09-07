@@ -41,6 +41,7 @@ from app.identity import (
     verify_invite_secret,
 )
 from app.metrics import MetricsStore
+from app.queue import QUEUE_KINDS, QueueService, register_queue_routes
 from app.permissions import (
     authorize_create,
     authorize_patch,
@@ -260,17 +261,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.db_path.parent / "metrics.jsonl",
     )
     principal_dep = require_principal(settings, db)
+    queue = QueueService(db)
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
         title="Job Hub",
         description="Private live coordination plane. Maintainer owns tokens, schema, and uptime.",
-        version="0.3.0",
+        version="0.4.0",
     )
     app.state.settings = settings
     app.state.db = db
     app.state.metrics = metrics
+    app.state.queue = queue
     app.state.bootstrap_token = minted
+    register_queue_routes(app, queue=queue, principal_dep=principal_dep)
     if minted:
         print(format_signup_line(settings, minted), flush=True)
         print(
@@ -596,6 +600,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "capabilities": capabilities(principal.role),
             "owner": "maintainer",
             "heartbeat_s": 10,
+            "queue_kinds": list(QUEUE_KINDS),
+            "queue_lease_m": 15,
         }
 
     @app.get("/api/whoami")
@@ -670,6 +676,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             note="created",
             fields={"company": stored["company"], "title": stored["title"]},
         )
+        queue.sync_system_items(stored, actor_role=principal.role, actor=principal.actor)
         return {"job": stored, "event": event}
 
     @app.patch("/api/jobs/{job_id}")
@@ -696,6 +703,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             note="patched " + ", ".join(sorted(patch)),
             fields=patch,
         )
+        queue.sync_system_items(stored, actor_role=principal.role, actor=principal.actor)
         return {"job": stored, "event": event}
 
     @app.post("/api/jobs/{job_id}/stop")
