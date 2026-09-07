@@ -155,11 +155,12 @@ def main() -> int:
     if not created and not rotated and not args.print_tokens:
         print("tokens already present; pass --print to issue, --rotate ROLE to rotate", file=sys.stderr)
 
-    if args.print_tokens or created or rotated:
+    if args.print_tokens:
         print("Give each bot only its own role token. Do not commit these values.")
         for role in ROLES:
-            if args.print_tokens or role in created or role in rotated:
-                print(f"{role}={tokens[role]}")
+            print(f"{role}={tokens[role]}")
+    elif created or rotated:
+        print("Pass --print to issue token values to bots (not printed by default).", file=sys.stderr)
     return 0
 
 
