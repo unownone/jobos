@@ -21,7 +21,7 @@ from app.settings import Settings
 PACK_VERSION = "1"
 CURRENT_NAME = "CURRENT"
 TREE_NAME = "tree"
-CATALOG_DATE_RE = re.compile(r"Last catalog pass:\s*(\d{4}-\d{2}-\d{2})")
+CATALOG_DATE_RE = re.compile(r"Last catalog pass[:\s\*]*(\d{4}-\d{2}-\d{2})")
 SKILL_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
 SAFE_FILE_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
