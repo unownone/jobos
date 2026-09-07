@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Hub — Presence</title>
+  <style>
+    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
+    main { max-width: 72rem; margin: 1.5rem auto; padding: 0 1rem 3rem; }
+    a { color: var(--accent); }
+    h1 { font-size: 1.15rem; margin: 0; }
+    p { color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--line); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 650; background: #2a3344; }
+    .pill.logged_in, .pill.idle { color: var(--good); }
+    .pill.working, .pill.producing { color: #e0b25c; }
+    .pill.stale, .pill.offline { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Job Hub — Directory</h1>
+    <div>
+      <a href="/">Board</a>
+      &nbsp;·&nbsp;
+      <a href="/admin">Invites</a>
+      &nbsp;·&nbsp;
+      <a href="#" id="logout">Log out</a>
+    </div>
+  </header>
+  <main>
+    <p id="who">Checking session…</p>
+    <p>Logged in and heartbeating operators. API keys are never shown.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Kind</th><th>Track / role</th><th>Status</th>
+          <th>Model</th><th>Harness</th><th>Bed</th>
+          <th>Last seen</th><th>Task</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </main>
+  <script>
+    function csrfHeaders(extra) {
+      const hit = document.cookie.split("; ").find((c) => c.startsWith("hub_csrf="));
+      const val = hit ? decodeURIComponent(hit.split("=").slice(1).join("=")) : "";
+      return Object.assign({ "Content-Type": "application/json", "X-CSRF": val }, extra || {});
+    }
+    async function ping() {
+      await fetch("/api/presence/heartbeat", {
+        method: "POST",
+        headers: csrfHeaders(),
+        body: JSON.stringify({ status_hint: "logged_in" }),
+      });
+    }
+    async function load() {
+      const res = await fetch("/api/presence");
+      if (res.status === 401) {
+        location.href = "/login?next=/admin/users";
+        return;
+      }
+      if (res.status === 403) {
+        document.getElementById("who").textContent = "Admin or maintenance session required.";
+        return;
+      }
+      const body = await res.json();
+      const tb = document.getElementById("rows");
+      tb.innerHTML = "";
+      (body.users || []).forEach((u) => {
+        const tr = document.createElement("tr");
+        const task = u.current_task && u.current_task.id ? u.current_task.id : "";
+        tr.innerHTML =
+          "<td>" + (u.display_name || u.user_id) + "</td>" +
+          "<td>" + (u.kind || "") + "</td>" +
+          "<td>" + (u.track || "") + " / " + (u.role || "") + "</td>" +
+          "<td><span class='pill " + (u.status || "") + "'>" + (u.status || "") + "</span></td>" +
+          "<td>" + (u.model || "") + "</td>" +
+          "<td>" + (u.harness || "") + "</td>" +
+          "<td>" + (u.bed || "") + "</td>" +
+          "<td>" + (u.last_seen || "") + "</td>" +
+          "<td>" + task + "</td>";
+        tb.appendChild(tr);
+      });
+    }
+    document.getElementById("logout").addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      await fetch("/api/auth/logout", { method: "POST", headers: csrfHeaders() });
+      location.href = "/login";
+    });
+    fetch("/api/auth/me").then(async (res) => {
+      if (res.status === 401) {
+        location.href = "/login?next=/admin/users";
+        return;
+      }
+      const body = await res.json();
+      document.getElementById("who").textContent =
+        "Signed in as " + ((body.user && (body.user.display_name || body.user.email)) || body.actor);
+      await ping();
+      await load();
+      setInterval(async () => { await ping(); await load(); }, 10000);
+    });
+  </script>
+</body>
+</html>

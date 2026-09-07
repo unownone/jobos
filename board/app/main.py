@@ -41,6 +41,7 @@ from app.identity import (
     verify_invite_secret,
 )
 from app.metrics import MetricsStore
+from app.presence import mount_presence
 from app.permissions import (
     authorize_create,
     authorize_patch,
@@ -997,4 +998,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def http_exc(_request: Request, exc: HTTPException) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
+    mount_presence(app, db, principal_dep)
     return app
