@@ -1,6 +1,7 @@
 """Heartbeat, live presence, and admin/owner directory. Phase C.
 
-Queue claims (Phase D) and inbox `pending_messages` (Phase G) are hooks only.
+`POST /api/presence/heartbeat` is the only heartbeat route. Inbox
+`pending_messages` is the unread count from the messages store (Phase G).
 Never return API keys, hashes, or secrets in directory payloads.
 """
 
@@ -17,6 +18,7 @@ from pydantic import BaseModel, ConfigDict
 from app.auth import Principal
 from app.constants import ROLE_TO_TRACK, role_for_track
 from app.db import BoardDB
+from app.message_store import count_unread
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -545,7 +547,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             "heartbeat_s": HEARTBEAT_S,
             "stale_after_s": STALE_AFTER_S,
             "last_seen": now_iso,
-            "pending_messages": [],
+            "pending_messages": count_unread(db, principal),
             "self": self_row,
         }
 

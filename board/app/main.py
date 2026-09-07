@@ -40,6 +40,7 @@ from app.identity import (
     set_session_cookies,
     verify_invite_secret,
 )
+from app.messages import create_messages_router
 from app.metrics import MetricsStore
 from app.onboarding import create_onboarding_router
 from app.pack import PackStore
@@ -281,6 +282,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.pack = pack
     app.state.bootstrap_token = minted
     register_queue_routes(app, queue=queue, principal_dep=principal_dep)
+    app.include_router(create_messages_router(principal_dep))
     if minted:
         print(format_signup_line(settings, minted), flush=True)
         print(

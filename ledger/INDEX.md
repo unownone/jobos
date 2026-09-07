@@ -15,6 +15,7 @@ Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts
 | maintainer | cursor-cloud-agent (job-hub-presence) | Job Hub phase C: heartbeat, presence, admin directory (no discovery/apply/outreach) | 2026-09-07 |
 | maintainer | cursor-cloud-agent (job-hub-queue) | Job Hub phase D: queue claim/ack/leases (no discovery/apply/outreach) | 2026-09-07 |
 | maintainer | cursor-cloud-agent (job-hub-onboarding) | Job Hub phase E: /api/onboarding + skill/MCP/script packs (no discovery/apply/outreach) | 2026-09-07 |
+| maintainer | cursor-cloud-agent (job-hub-messages) | Job Hub phase G: inter-agent inbox APIs (no discovery/apply/outreach) | 2026-09-07 |
 
 ## Jobs
 

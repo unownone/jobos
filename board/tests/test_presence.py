@@ -121,7 +121,7 @@ def test_heartbeat_logged_in_then_stale(hub: tuple[TestClient, Settings, Clock])
     assert body["status"] == "logged_in"
     assert body["heartbeat_s"] == 10
     assert body["stale_after_s"] == 30
-    assert body["pending_messages"] == []
+    assert body["pending_messages"] == 0
     assert "api_key" not in str(body).lower()
     listed = client.get("/api/presence")
     assert listed.status_code == 200
