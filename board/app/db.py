@@ -122,28 +122,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_track_display
     ON users(track, display_name)
     WHERE track IS NOT NULL AND display_name IS NOT NULL
       AND (disabled_at IS NULL OR disabled_at = '');
-
-CREATE TABLE IF NOT EXISTS queue_items (
-    id TEXT PRIMARY KEY,
-    kind TEXT NOT NULL,
-    track TEXT,
-    job_id TEXT,
-    payload_json TEXT,
-    status TEXT NOT NULL,
-    claimed_by TEXT,
-    lease_until TEXT,
-    attempts INTEGER NOT NULL DEFAULT 0,
-    dedupe_key TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_queue_status_kind ON queue_items(status, kind);
-CREATE INDEX IF NOT EXISTS idx_queue_claimed_by ON queue_items(claimed_by);
-CREATE INDEX IF NOT EXISTS idx_queue_job ON queue_items(job_id);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_kind_job
-    ON queue_items(kind, job_id)
-    WHERE job_id IS NOT NULL AND job_id != '';
 """
 
 COLUMN_TO_FIELD = {
