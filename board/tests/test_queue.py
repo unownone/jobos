@@ -383,6 +383,8 @@ def test_compat_apply_still_cannot_create_jobs(hub: tuple[TestClient, Settings])
 
 def test_discovery_agent_cannot_inspect_full_queue(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
-    disc = mint_track_agents(client, "discovery", ["nosy"])[0]
-    denied = client.get("/api/queue", headers=bearer(disc))
+    keys = mint_track_agents(client, "discovery", ["owner-d", "nosy"])
+    denied = client.get("/api/queue", headers=bearer(keys[1]))
     assert denied.status_code == 403
+    owner_ok = client.get("/api/queue", headers=bearer(keys[0]))
+    assert owner_ok.status_code == 200

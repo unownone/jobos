@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Callable
 
@@ -255,6 +256,7 @@ class QueueService:
     def __init__(self, db: BoardDB, clock: Clock | None = None) -> None:
         self.db = db
         self.clock = clock or Clock()
+        self._claim_lock = threading.Lock()
         ensure_queue_schema(self.db.conn)
         self.db.conn.commit()
 
@@ -439,81 +441,82 @@ class QueueService:
         now = self.clock.now()
         lease_until = add_minutes(now, LEASE_MINUTES)
         claimed: list[dict[str, Any]] = []
-        placeholders = ",".join("?" for _ in claim_kinds)
-        for _ in range(max(1, min(limit, 8))):
-            self.db.begin_immediate()
-            try:
-                cur = self.db.conn.execute(
-                    f"""
-                    SELECT * FROM queue_items
-                     WHERE status IN ('open', 'claimed')
-                       AND kind IN ({placeholders})
-                       AND (
-                            status = 'open'
-                            OR lease_until IS NULL
-                            OR lease_until = ''
-                            OR lease_until < ?
-                       )
-                     ORDER BY id
-                     LIMIT 1
-                    """,
-                    [*claim_kinds, now],
-                )
-                row = cur.fetchone()
-                if row is None:
+        with self._claim_lock:
+            placeholders = ",".join("?" for _ in claim_kinds)
+            for _ in range(max(1, min(limit, 8))):
+                self.db.begin_immediate()
+                try:
+                    cur = self.db.conn.execute(
+                        f"""
+                        SELECT * FROM queue_items
+                         WHERE status IN ('open', 'claimed')
+                           AND kind IN ({placeholders})
+                           AND (
+                                status = 'open'
+                                OR lease_until IS NULL
+                                OR lease_until = ''
+                                OR lease_until < ?
+                           )
+                         ORDER BY id
+                         LIMIT 1
+                        """,
+                        [*claim_kinds, now],
+                    )
+                    row = cur.fetchone()
+                    if row is None:
+                        self.db.conn.commit()
+                        break
+                    item = _row_to_item(row)
+                    stolen = (
+                        item["status"] == "claimed"
+                        and item.get("claimed_by")
+                        and item["claimed_by"] != who
+                    )
+                    prev_owner = item.get("claimed_by")
+                    self.db.conn.execute(
+                        """
+                        UPDATE queue_items
+                        SET status = 'claimed', claimed_by = ?, lease_until = ?
+                        WHERE id = ?
+                        """,
+                        (who, lease_until, item["id"]),
+                    )
                     self.db.conn.commit()
-                    break
-                item = _row_to_item(row)
-                stolen = (
-                    item["status"] == "claimed"
-                    and item.get("claimed_by")
-                    and item["claimed_by"] != who
-                )
-                prev_owner = item.get("claimed_by")
-                self.db.conn.execute(
-                    """
-                    UPDATE queue_items
-                    SET status = 'claimed', claimed_by = ?, lease_until = ?
-                    WHERE id = ?
-                    """,
-                    (who, lease_until, item["id"]),
-                )
-                self.db.conn.commit()
-            except Exception:
-                self.db.rollback()
-                raise
-            stored = self.get(item["id"])
-            if stored is None:
-                continue
-            if stolen:
+                except Exception:
+                    self.db.rollback()
+                    raise
+                stored = self.get(item["id"])
+                if stored is None:
+                    continue
+                if stolen:
+                    self.db.add_event(
+                        job_id=stored.get("job_id") or None,
+                        actor_role=principal.role,
+                        actor=principal.actor,
+                        action="claim_expired",
+                        note="lease stolen",
+                        fields={
+                            "queue_id": stored["id"],
+                            "kind": stored["kind"],
+                            "previous_claimed_by": prev_owner,
+                            "claimed_by": who,
+                        },
+                    )
                 self.db.add_event(
                     job_id=stored.get("job_id") or None,
                     actor_role=principal.role,
                     actor=principal.actor,
-                    action="claim_expired",
-                    note="lease stolen",
-                    fields={
-                        "queue_id": stored["id"],
-                        "kind": stored["kind"],
-                        "previous_claimed_by": prev_owner,
-                        "claimed_by": who,
-                    },
+                    action="queue_claim",
+                    note=stored["kind"],
+                    fields={"queue_id": stored["id"], "kind": stored["kind"], "claimed_by": who},
                 )
-            self.db.add_event(
-                job_id=stored.get("job_id") or None,
-                actor_role=principal.role,
-                actor=principal.actor,
-                action="queue_claim",
-                note=stored["kind"],
-                fields={"queue_id": stored["id"], "kind": stored["kind"], "claimed_by": who},
-            )
-            if stored["kind"] in {"apply.ready", "apply.blocked_retry"} and stored.get("job_id"):
-                job = self.db.get_job(stored["job_id"])
-                if job is not None:
-                    owners = dict(job.get("owners") or {})
-                    owners["apply"] = principal.actor or who
-                    self.db.update_job(stored["job_id"], {"owners": owners})
-            claimed.append(stored)
+                if stored["kind"] in {"apply.ready", "apply.blocked_retry"} and stored.get("job_id"):
+                    job = self.db.get_job(stored["job_id"])
+                    if job is not None:
+                        owners = dict(job.get("owners") or {})
+                        owners["apply"] = principal.actor or who
+                        self.db.update_job(stored["job_id"], {"owners": owners})
+                claimed.append(stored)
         return claimed
 
     def ack(self, principal: Principal, item_id: str) -> dict[str, Any]:
