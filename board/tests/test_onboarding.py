@@ -213,7 +213,7 @@ def test_compat_role_and_rebuild(hub: tuple[TestClient, Settings]) -> None:
     )
     assert maint.status_code == 200
     assert any(s["name"] == "skill-maintainer" for s in maint.json()["skills"])
-    assert maint.json()["catalog_updated_at"]
+    assert maint.json()["catalog_updated_at"] == "2026-09-06"
 
 
 def test_public_candidate_omits_phone(tmp_path: Path) -> None:

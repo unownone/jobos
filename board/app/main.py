@@ -41,8 +41,7 @@ from app.identity import (
     verify_invite_secret,
 )
 from app.metrics import MetricsStore
-from app.onboarding import create_onboarding_router
-from app.pack import PackStore
+from app.queue import QUEUE_KINDS, QueueService, register_queue_routes
 from app.permissions import (
     authorize_create,
     authorize_patch,
@@ -262,8 +261,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.db_path.parent / "metrics.jsonl",
     )
     principal_dep = require_principal(settings, db)
-    pack = PackStore(settings)
-    pack.ensure_current()
+    queue = QueueService(db)
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
@@ -274,8 +272,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.db = db
     app.state.metrics = metrics
-    app.state.pack = pack
+    app.state.queue = queue
     app.state.bootstrap_token = minted
+    register_queue_routes(app, queue=queue, principal_dep=principal_dep)
     if minted:
         print(format_signup_line(settings, minted), flush=True)
         print(
@@ -286,8 +285,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-    app.include_router(create_onboarding_router(settings, db, pack, principal_dep))
 
     @app.get("/")
     def index() -> FileResponse:
@@ -603,6 +600,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "capabilities": capabilities(principal.role),
             "owner": "maintainer",
             "heartbeat_s": 10,
+            "queue_kinds": list(QUEUE_KINDS),
+            "queue_lease_m": 15,
         }
 
     @app.get("/api/whoami")
@@ -677,6 +676,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             note="created",
             fields={"company": stored["company"], "title": stored["title"]},
         )
+        queue.sync_system_items(stored, actor_role=principal.role, actor=principal.actor)
         return {"job": stored, "event": event}
 
     @app.patch("/api/jobs/{job_id}")
@@ -703,6 +703,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             note="patched " + ", ".join(sorted(patch)),
             fields=patch,
         )
+        queue.sync_system_items(stored, actor_role=principal.role, actor=principal.actor)
         return {"job": stored, "event": event}
 
     @app.post("/api/jobs/{job_id}/stop")
