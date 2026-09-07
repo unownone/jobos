@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Get That Job 2.0 — Board</title>
+  <style>
+    :root {
+      --bg: #0e1218;
+      --panel: #151b24;
+      --panel-2: #1c2430;
+      --line: #2a3444;
+      --text: #e7edf6;
+      --muted: #8b97ab;
+      --accent: #3b82f6;
+      --accent-text: #f8fbff;
+      --good: #5dcea6;
+      --warn: #e0b25c;
+      --bad: #e07a7a;
+      --stop: #c45c5c;
+      --orange: #f0a05a;
+      --teal: #3dbeb0;
+      --grey: #7f8ea3;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 14px/1.45 ui-sans-serif, system-ui, sans-serif; }
+    a { color: #7cb4ff; }
+    button, input, select, textarea { font: inherit; }
+    header.app {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--panel);
+      position: sticky; top: 0; z-index: 5;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .logo {
+      width: 36px; height: 36px; border-radius: 8px; flex: none;
+      display: grid; place-items: center; font-weight: 800; letter-spacing: .04em;
+      background: #1d4ed8; color: #fff; font-size: 12px;
+    }
+    header.app h1 { margin: 0; font-size: 16px; font-weight: 700; }
+    header.app .sub { color: var(--muted); font-size: 12px; }
+    .connect { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .connect label { margin: 0; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 6px; }
+    input, select, textarea {
+      background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+      border-radius: 6px; padding: 7px 10px;
+    }
+    button {
+      background: var(--accent); color: var(--accent-text); border: 0; border-radius: 6px;
+      padding: 7px 12px; font-weight: 650; cursor: pointer;
+    }
+    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    button.danger { background: var(--bad); color: #1a0b0b; }
+    button.warn { background: #8b5cf6; color: #f5f3ff; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .status {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted);
+    }
+    .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #5a6578; }
+    .status.on { color: var(--good); }
+    .status.on .dot { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.18); }
+    .filters {
+      padding: 10px 18px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      border-bottom: 1px solid var(--line); background: var(--bg);
+    }
+    .filters .grow { flex: 1; min-width: 180px; }
+    .stats { margin-left: auto; color: var(--muted); font-size: 12px; }
+    .drop { position: relative; }
+    .drop .menu {
+      position: absolute; top: calc(100% + 4px); left: 0; z-index: 8;
+      min-width: 240px; max-height: min(70vh, 560px); overflow: auto;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.35); padding: 6px;
+    }
+    .drop .menu button {
+      display: block; width: 100%; text-align: left; background: transparent; color: var(--text);
+      font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px;
+    }
+    .drop .menu button:hover, .drop .menu button.active { background: var(--panel-2); }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; height: calc(100vh - 109px); }
+    #list { overflow: auto; }
+    .side { border-left: 1px solid var(--line); background: var(--panel); padding: 16px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 650; position: sticky; top: 0; background: var(--bg); }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover, tbody tr.active { background: var(--panel-2); }
+    .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 650; background: #2a3344; color: #c9d4e4; }
+    .pill.discovered, .pill.enriching, .pill.shortlisted { background: #243044; color: #9db4d4; }
+    .pill.apply_ready, .pill.applied, .pill.offer, .pill.outreach_ready { background: #163832; color: var(--teal); }
+    .pill.applying, .pill.waiting, .pill.chatting, .pill.interview { background: #3a2e14; color: var(--warn); }
+    .pill.outreaching { background: #3a2814; color: var(--orange); }
+    .pill.apply_blocked { background: #2a3344; color: var(--grey); }
+    .pill.skipped, .pill.closed_rejected, .pill.closed_expired { background: #3a2228; color: var(--bad); }
+    .pill.stopped, .pill.closed_withdrawn { background: #3a1d1d; color: var(--stop); }
+    .side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .side h2 { margin: 0; font-size: 15px; }
+    .iconx { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); width: 28px; height: 28px; padding: 0; }
+    label { display: block; color: var(--muted); font-size: 11px; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
+    textarea, input[type="text"], input[type="number"], input[type="url"], .side select { width: 100%; }
+    textarea { min-height: 72px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .events { margin-top: 18px; }
+    .event { font-size: 12px; color: var(--muted); padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .warnbox { background: #3a2e14; color: var(--warn); padding: 8px 10px; border-radius: 6px; font-size: 12px; margin: 8px 0; }
+    .empty { color: var(--muted); padding: 40px 20px; }
+    .err { color: var(--bad); font-size: 12px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    @media (max-width: 960px) {
+      main { grid-template-columns: 1fr; height: auto; }
+      .side { border-left: 0; border-top: 1px solid var(--line); min-height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app">
+    <div class="brand">
+      <div class="logo">GTJ</div>
+      <div>
+        <h1>Job Hunt Board</h1>
+        <div class="sub">Get That Job 2.0 · local coordination</div>
+      </div>
+    </div>
+    <form id="connectForm" class="connect">
+      <label for="role">Role
+        <select id="role">
+          <option value="admin">admin</option>
+          <option value="maintenance">maintenance</option>
+          <option value="discovery">discovery</option>
+          <option value="apply">apply</option>
+          <option value="outreach">outreach</option>
+        </select>
+      </label>
+      <label for="token">Token
+        <input id="token" type="password" autocomplete="off" placeholder="role token" />
+      </label>
+      <button id="connectBtn" type="submit">Connect</button>
+      <span id="connStatus" class="status"><span class="dot"></span><span id="connLabel">disconnected</span></span>
+    </form>
+  </header>
+  <div class="filters">
+    <input id="q" class="grow" placeholder="Search company / title / not" />
+    <div class="drop" id="statusDrop">
+      <button class="secondary" id="statusBtn" type="button">All statuses</button>
+      <div class="menu" id="statusMenu" hidden></div>
+    </div>
+    <select id="stopped">
+      <option value="">Stopped: any</option>
+      <option value="false">Stopped: active</option>
+      <option value="true">Stopped: only</option>
+    </select>
+    <button class="secondary" id="refresh" type="button">Refresh</button>
+    <span class="stats" id="stats">0 shown · 0 total · not connected</span>
+  </div>
+  <main>
+    <section id="list"><div class="empty">Connect with a role token to load the shared board.</div></section>
+    <aside class="side" id="side"></aside>
+  </main>
+
+  <script>
+    const store = {
+      get role() { return sessionStorage.getItem("board_role") || ""; },
+      get token() { return sessionStorage.getItem("board_token") || ""; },
+      get actor() { return sessionStorage.getItem("board_actor") || ""; },
+      set(role, token, actor) {
+        sessionStorage.setItem("board_role", role);
+        sessionStorage.setItem("board_token", token);
+        sessionStorage.setItem("board_actor", actor || "");
+      },
+      clear() { sessionStorage.clear(); }
+    };
+
+    let caps = null;
+    let jobs = [];
+    let listMeta = { count: 0, total: 0, role: "" };
+    let selectedId = null;
+    let statuses = [];
+    let statusFilter = "";
+    let connected = false;
+
+    function headers() {
+      const h = { "X-Role": store.role, "X-Token": store.token, "Content-Type": "application/json" };
+      if (store.actor) h["X-Actor"] = store.actor;
+      return h;
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = data.detail;
+        const msg = typeof detail === "string" ? detail : JSON.stringify(detail || data);
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    function pill(status, stopped) {
+      const cls = stopped ? "stopped" : status;
+      const label = stopped && status !== "closed_withdrawn" ? "stopped" : (stopped ? "stopped" : status);
+      return `<span class="pill ${cls}">${label}</span>`;
+    }
+
+    function setConnected(on, label) {
+      connected = on;
+      const el = document.getElementById("connStatus");
+      const lab = document.getElementById("connLabel");
+      el.classList.toggle("on", on);
+      lab.textContent = label;
+    }
+
+    function closeMenus() {
+      document.getElementById("statusMenu").hidden = true;
+    }
+
+    function renderStatusMenu() {
+      const menu = document.getElementById("statusMenu");
+      const items = [{ value: "", label: "All statuses" }, ...statuses.map(s => ({ value: s, label: s }))];
+      menu.innerHTML = items.map(it =>
+        `<button type="button" data-value="${escapeAttr(it.value)}" class="${it.value === statusFilter ? "active" : ""}">${escapeHtml(it.label)}</button>`
+      ).join("");
+      menu.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", () => {
+          statusFilter = btn.dataset.value;
+          document.getElementById("statusBtn").textContent = statusFilter || "All statuses";
+          closeMenus();
+          loadJobs();
+        });
+      });
+    }
+
+    function emptySide() {
+      document.getElementById("side").innerHTML = `
+        <div class="side-head">
+          <h2>Select a job</h2>
+          <button class="iconx" id="closeSide" type="button" aria-label="Close">X</button>
+        </div>
+        <label>Company</label><input disabled placeholder="" />
+        <label>Title</label><input disabled placeholder="" />
+        <label>Source</label><input disabled placeholder="" />
+        <label>Status</label>
+        <select disabled><option>discovered</option></select>
+        <div class="grid2">
+          <div><label>Score</label><input disabled /></div>
+          <div><label>Location</label><input disabled /></div>
+        </div>
+        <label>Apply URL</label><input disabled />
+      `;
+      document.getElementById("closeSide").onclick = () => { selectedId = null; emptySide(); renderTable(); };
+    }
+
+    async function boot() {
+      if (!store.role || !store.token) {
+        setConnected(false, "disconnected");
+        emptySide();
+        return;
+      }
+      try {
+        const me = await api("/api/whoami");
+        caps = me;
+        const meta = await api("/api/meta");
+        statuses = meta.statuses;
+        document.getElementById("role").value = me.role;
+        setConnected(true, "connected");
+        renderStatusMenu();
+        await loadJobs();
+        if (!selectedId) emptySide();
+      } catch (err) {
+        setConnected(false, "auth failed");
+        caps = null;
+        document.getElementById("stats").textContent = err.message;
+        emptySide();
+      }
+    }
+
+    async function loadJobs() {
+      if (!connected) return;
+      const params = new URLSearchParams();
+      const q = document.getElementById("q").value.trim();
+      const stopped = document.getElementById("stopped").value;
+      if (q) params.set("q", q);
+      if (statusFilter) params.set("status", statusFilter);
+      if (stopped) params.set("stopped", stopped);
+      const data = await api("/api/jobs?" + params.toString());
+      jobs = data.jobs;
+      listMeta = { count: data.count, total: data.total ?? data.count, role: data.role };
+      document.getElementById("stats").textContent =
+        `${listMeta.count} shown · ${listMeta.total} total · role ${listMeta.role}`;
+      renderTable();
+      if (selectedId) await selectJob(selectedId, false);
+    }
+
+    function renderTable() {
+      if (!jobs.length) {
+        document.getElementById("list").innerHTML = `<div class="empty">No jobs match. Discovery POSTs rows; admin can import ledger history.</div>`;
+        return;
+      }
+      const rows = jobs.map(j => `
+        <tr data-id="${escapeAttr(j.id)}" class="${j.id === selectedId ? "active" : ""}">
+          <td><code>${escapeHtml(j.id)}</code></td>
+          <td>${escapeHtml(j.company)}</td>
+          <td>${escapeHtml(j.title)}</td>
+          <td>${pill(j.status, j.stopped)}</td>
+        </tr>`).join("");
+      document.getElementById("list").innerHTML = `
+        <table>
+          <thead><tr><th>ID</th><th>Company</th><th>Title</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      document.querySelectorAll("#list tbody tr").forEach(tr => {
+        tr.addEventListener("click", () => selectJob(tr.dataset.id, true));
+      });
+    }
+
+    async function selectJob(id, fromClick) {
+      selectedId = id;
+      if (fromClick) renderTable();
+      const { job } = await api("/api/jobs/" + encodeURIComponent(id));
+      const { events } = await api("/api/events?job_id=" + encodeURIComponent(id) + "&limit=30");
+      const canPatch = caps.can_patch;
+      const canStop = caps.can_stop;
+      const canDelete = caps.can_delete;
+      const statusOpts = statuses.map(s => `<option ${s === job.status ? "selected" : ""}>${s}</option>`).join("");
+      const source = (job.sources || []).join(", ");
+      document.getElementById("side").innerHTML = `
+        <div class="side-head">
+          <h2>#${escapeHtml(job.id)} · ${escapeHtml(job.company)}</h2>
+          <button class="iconx" id="closeSide" type="button" aria-label="Close">X</button>
+        </div>
+        ${job.stopped ? `<div class="warnbox">${job.status === "closed_withdrawn" ? "Stopped" : "Paused"}: ${escapeHtml(job.stop_reason || "")}</div>` : ""}
+        <label>Company</label>
+        <input id="f_company" value="${escapeAttr(job.company)}" />
+        <label>Title</label>
+        <input id="f_title" value="${escapeAttr(job.title)}" />
+        <label>Source</label>
+        <input id="f_source" value="${escapeAttr(source)}" />
+        <label>Status</label>
+        <select id="f_status">${statusOpts}</select>
+        <div class="grid2">
+          <div><label>Score</label><input id="f_score" type="number" min="1" max="5" step="1" value="${job.score ?? ""}" /></div>
+          <div><label>Location</label><input id="f_location" value="${escapeAttr(job.location || "")}" /></div>
+        </div>
+        <label>Apply URL</label>
+        <input id="f_apply_url" value="${escapeAttr(job.apply_url || "")}" />
+        <label>Notes</label>
+        <textarea id="f_notes">${escapeHtml(job.notes || "")}</textarea>
+        <label>Owners JSON</label>
+        <textarea id="f_owners">${escapeHtml(JSON.stringify(job.owners || {}, null, 2))}</textarea>
+        <label>Apply packet JSON</label>
+        <textarea id="f_apply_packet">${escapeHtml(JSON.stringify(job.apply_packet || {}, null, 2))}</textarea>
+        <label>Outreach packet JSON</label>
+        <textarea id="f_outreach_packet">${escapeHtml(JSON.stringify(job.outreach_packet || {}, null, 2))}</textarea>
+        <label>Proof JSON</label>
+        <textarea id="f_proof">${escapeHtml(JSON.stringify(job.proof || {}, null, 2))}</textarea>
+        <p class="row" style="margin-top:12px">
+          <button id="saveBtn" type="button" ${canPatch ? "" : "disabled"}>Save patch</button>
+          <button class="warn" id="pauseBtn" type="button" ${canStop && !job.stopped ? "" : "disabled"}>Pause</button>
+          <button class="warn" id="stopBtn" type="button" ${canStop && !job.stopped ? "" : "disabled"}>Stop</button>
+          <button class="secondary" id="resumeBtn" type="button" ${canStop && job.stopped ? "" : "disabled"}>Resume</button>
+          <button class="danger" id="delBtn" type="button" ${canDelete ? "" : "disabled"}>Delete</button>
+        </p>
+        <p id="sideErr" class="err"></p>
+        ${caps.can_hygiene ? `<p class="row"><button class="secondary" id="hygieneBtn" type="button">Hygiene</button></p>` : ""}
+        <div class="events">
+          <h2>Events</h2>
+          ${events.map(e => `<div class="event">${escapeHtml(e.ts)} · ${escapeHtml(e.actor_role)} · ${escapeHtml(e.action)}${e.from_status ? " · " + e.from_status + " → " + (e.to_status || "") : ""}<br>${escapeHtml(e.note || "")}</div>`).join("") || "<div class='sub'>No events</div>"}
+        </div>
+      `;
+      document.getElementById("closeSide").onclick = () => { selectedId = null; emptySide(); renderTable(); };
+      document.getElementById("saveBtn").onclick = () => saveJob(job.id);
+      document.getElementById("pauseBtn").onclick = () => pauseJob(job.id);
+      document.getElementById("stopBtn").onclick = () => stopJob(job.id);
+      document.getElementById("resumeBtn").onclick = () => resumeJob(job.id);
+      document.getElementById("delBtn").onclick = () => deleteJob(job.id);
+    }
+
+    function parseJSONField(id, fallback) {
+      const raw = document.getElementById(id).value.trim();
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    }
+
+    async function saveJob(id) {
+      const err = document.getElementById("sideErr");
+      try {
+        const source = document.getElementById("f_source").value.split(",").map(s => s.trim()).filter(Boolean);
+        const body = {
+          status: document.getElementById("f_status").value,
+          company: document.getElementById("f_company").value,
+          title: document.getElementById("f_title").value,
+          apply_url: document.getElementById("f_apply_url").value,
+          location: document.getElementById("f_location").value,
+          notes: document.getElementById("f_notes").value,
+          sources: source,
+          owners: parseJSONField("f_owners", {}),
+          apply_packet: parseJSONField("f_apply_packet", {}),
+          outreach_packet: parseJSONField("f_outreach_packet", {}),
+          proof: parseJSONField("f_proof", {}),
+        };
+        const score = document.getElementById("f_score").value;
+        if (score) body.score = Number(score);
+        const allowed = new Set(caps.patch_fields || []);
+        Object.keys(body).forEach(k => { if (!allowed.has(k)) delete body[k]; });
+        await api("/api/jobs/" + encodeURIComponent(id), { method: "PATCH", body: JSON.stringify(body) });
+        err.textContent = "Saved.";
+        await loadJobs();
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    }
+
+    async function pauseJob(id) {
+      const reason = prompt("Pause reason (required). Status stays; lanes cannot patch until Resume.");
+      if (!reason) return;
+      try {
+        await api("/api/jobs/" + encodeURIComponent(id) + "/pause", { method: "POST", body: JSON.stringify({ reason }) });
+        await loadJobs();
+      } catch (e) {
+        document.getElementById("sideErr").textContent = e.message;
+      }
+    }
+
+    async function stopJob(id) {
+      const reason = prompt("Stop reason (required). Sets closed_withdrawn and freezes the row.");
+      if (!reason) return;
+      try {
+        await api("/api/jobs/" + encodeURIComponent(id) + "/stop", { method: "POST", body: JSON.stringify({ reason }) });
+        await loadJobs();
+      } catch (e) {
+        document.getElementById("sideErr").textContent = e.message;
+      }
+    }
+
+    async function resumeJob(id) {
+      try {
+        await api("/api/jobs/" + encodeURIComponent(id) + "/resume", { method: "POST" });
+        await loadJobs();
+      } catch (e) {
+        document.getElementById("sideErr").textContent = e.message;
+      }
+    }
+
+    async function deleteJob(id) {
+      if (!confirm("Delete " + id + "? This cannot be undone.")) return;
+      try {
+        await api("/api/jobs/" + encodeURIComponent(id), { method: "DELETE" });
+        selectedId = null;
+        emptySide();
+        await loadJobs();
+      } catch (e) {
+        document.getElementById("sideErr").textContent = e.message;
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"'`]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;","`":"&#96;" }[c]));
+    }
+    function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
+
+    document.getElementById("connectForm").addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      store.set(
+        document.getElementById("role").value,
+        document.getElementById("token").value.trim(),
+        ""
+      );
+      boot();
+    });
+    document.getElementById("refresh").onclick = loadJobs;
+    document.getElementById("q").addEventListener("change", loadJobs);
+    document.getElementById("q").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); loadJobs(); }
+    });
+    document.getElementById("stopped").addEventListener("change", loadJobs);
+    document.getElementById("statusBtn").addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const menu = document.getElementById("statusMenu");
+      menu.hidden = !menu.hidden;
+    });
+    document.addEventListener("click", (ev) => {
+      if (!document.getElementById("statusDrop").contains(ev.target)) closeMenus();
+    });
+    document.getElementById("side").addEventListener("click", async (ev) => {
+      if (ev.target.id !== "hygieneBtn") return;
+      try {
+        const report = await api("/api/hygiene");
+        alert(JSON.stringify(report, null, 2));
+      } catch (e) { alert(e.message); }
+    });
+    emptySide();
+    if (store.role) document.getElementById("role").value = store.role;
+    if (store.token) document.getElementById("token").value = store.token;
+    boot();
+  </script>
+</body>
+</html>

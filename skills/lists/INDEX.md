@@ -49,6 +49,7 @@ Narrative inventory: [`docs/catalogs/skills-and-mcps.md`](../../docs/catalogs/sk
 | `hunter-mcp` | Hunter MCP | mcp | research, outreach | outreach | use | https://mcp.hunter.io/mcp with X-API-Key |
 | `playwright-mcp` | Playwright MCP | mcp | apply, outreach | apply, outreach | use | npx @playwright/mcp@latest |
 | `cursor-gmail-this-agent` | Cursor Gmail (this cloud agent) | mcp | mail, outreach | outreach | use | already attached |
+| `jobos-hunt-board` | Get That Job hunt board | local | maintain | maintainer | use | bash board/start.sh |
 
 ## Wanted (next attach / fork / gap)
 
@@ -91,7 +92,7 @@ Narrative inventory: [`docs/catalogs/skills-and-mcps.md`](../../docs/catalogs/sk
 | `indeed-lead-scraper` | sam6dvpte34/lead-generation-skill@indeed-job-lead-scraper | skill | discovery | Lead-gen scraper. Prefer official Indeed MCP. | Lead-gen scraper. Prefer official Indeed MCP. | skills.sh |
 | `regional-job-boards` | daangn-jobs-search / jobkorea / boss-job-search / proficientlyjobs | skill | discovery | Regional boards (Korea etc.) not in platforms.md. Add a platform row first if the human wants them. | Regional boards (Korea etc.) not in platforms.md. Add a platform row first if the human wants them. | skills.sh |
 | `theirstack` | TheirStack jobs MCP | mcp | discovery | Paid aggregator. Template prefers public ATS JSON + official Indeed. Revisit only if the human pays. | Paid aggregator. Template prefers public ATS JSON + official Indeed. Revisit only if the human pays. | https://theirstack.com/en/blog/best-jobs-mcp |
-| `job-tracker-sqlite` | kurkul608/job-tracker-mcp | mcp | maintain | Parallel ledger in SQLite. Git YAML is the live list. | Parallel ledger in SQLite. Git YAML is the live list. | https://github.com/kurkul608/job-tracker-mcp |
+| `job-tracker-sqlite` | kurkul608/job-tracker-mcp | mcp | maintain | Third-party SQLite tracker MCP. Job Apply OS uses git YAML as the airgap ledger and the first-party hunt board (board/) as the live overlay. Do not install this MCP alongside board/.  | Third-party SQLite tracker MCP. Job Apply OS uses git YAML as the airgap ledger and the first-party hunt board (board/) as the live overlay. Do not install this MCP alongside board/.  | https://github.com/kurkul608/job-tracker-mcp |
 | `skills-hub-false-positives` | azure-microsoft-discovery / customer-discovery | skill | discovery | Name collision. Not job-board discovery. | Name collision. Not job-board discovery. | npx @skills-hub-ai/cli search "job discovery" |
 | `contact-hunter-skill` | onewave-ai/claude-skills@contact-hunter | skill | outreach | Not Hunter.io. Use official Hunter MCP for verify-before-send. | Not Hunter.io. Use official Hunter MCP for verify-before-send. | skills.sh |
 

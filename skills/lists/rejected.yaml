@@ -157,7 +157,10 @@ items:
     name: kurkul608/job-tracker-mcp
     capability: [maintain]
     source: https://github.com/kurkul608/job-tracker-mcp
-    reason: Parallel ledger in SQLite. Git YAML is the live list.
+    reason: >
+      Third-party SQLite tracker MCP. Job Apply OS uses git YAML as the airgap
+      ledger and the first-party hunt board (board/) as the live overlay.
+      Do not install this MCP alongside board/.
 
   - id: skills-hub-false-positives
     kind: skill

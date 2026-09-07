@@ -26,6 +26,7 @@ For each platform in scope (user list, else the minimum viable set in process.md
 6. If shortlisted, fill `apply_packet` using `handoffs/apply-packet.md` until another bot could apply tomorrow.
 7. Set status `apply_ready` or `shortlisted` (if the user wants a manual gate) or `skipped` with a reason.
 8. Append `ledger/events.jsonl` and refresh INDEX.
+9. If maintainer published `BOARD_URL` and your discovery token: POST the row to the hunt board as well (`board/README.md`). You consume the board; you do not issue tokens or change schema.
 
 Stop at `max_shortlist_per_cycle`. Prefer a tight list.
 

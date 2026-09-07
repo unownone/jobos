@@ -9,7 +9,7 @@ Agent Skills for this template.
 | Skill | Role |
 | --- | --- |
 | [skill-and-mcp-catalog](skill-and-mcp-catalog/SKILL.md) | Procurement: find and vet skills/MCPs from any registry |
-| [skill-maintainer](skill-maintainer/SKILL.md) | Seldom-used owner: write `skills/lists/`, prune, patch example MCP config |
+| [skill-maintainer](skill-maintainer/SKILL.md) | Seldom-used owner: write `skills/lists/`, prune, patch example MCP config, own `board/` |
 | [deep-research](deep-research/SKILL.md) | Shared research via Exa (preferred), local dzhng/open-deep-research, or Firecrawl/Tavily/Parallel/search |
 | [job-discovery](job-discovery/SKILL.md) | Source and shortlist only |
 | [job-apply](job-apply/SKILL.md) | Submit with writing worth reading |

@@ -52,6 +52,8 @@ Start from `assets/templates/email.md` and `assets/templates/linkedin-dm.md`, th
 - Reply: `chatting` (or `interview` if they propose a loop)
 - No reply after the cap: note `exhausted` on the person, move on
 
+If the hunt board is up (`BOARD_URL` + outreach token from maintainer): PATCH only outreach fields. Do not own the board. See [`board/README.md`](../../board/README.md).
+
 ## Failure mode you must not repeat
 
 “Messages currently failing to attach PDFs.” Treat a sent email without the resume as a failed touch. Fix the draft tool call, then retry.

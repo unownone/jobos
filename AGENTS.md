@@ -19,16 +19,16 @@ If the user says you own everything, you still run the three roles **in order**:
 | outreach, email, LinkedIn DM, referral, hiring manager | `skills/job-outreach/SKILL.md` |
 | find skills, find MCPs, skillhub, skills.sh | `skills/skill-and-mcp-catalog/SKILL.md` |
 | research the company, find the hiring manager, deep research | `skills/deep-research/SKILL.md` |
-| maintain, update skills, manage catalog, skill lists | `skills/skill-maintainer/SKILL.md` |
+| maintain, update skills, manage catalog, skill lists, hunt board | `skills/skill-maintainer/SKILL.md` |
 
-Discovery **starts** with the catalog skill unless `docs/catalogs/skills-and-mcps.md` was updated this week. If the work is **updating the skill tree itself** (lists, mcp.example.json, pruning dead tools), that is the seldom-used **maintainer** role, not discovery.
+Discovery **starts** with the catalog skill unless `docs/catalogs/skills-and-mcps.md` was updated this week. If the work is **updating the skill tree itself** (lists, mcp.example.json, pruning dead tools) **or operating the hunt board**, that is the seldom-used **maintainer** role, not discovery.
 
 ## Hard rules
 
 - Do not fabricate experience, employers, dates, or metrics.
 - Do not apply during discovery. Easy Apply counts as applying.
 - Do not send SMS, WhatsApp, or InMail sequences unless the user explicitly adds that channel later. Default channels are **email** and **LinkedIn DMs**.
-- Do not dump credentials into the ledger. Put secrets in gitignored files.
+- Do not dump credentials into the ledger or the hunt board repo files. Put secrets in gitignored files (`board/.env`, `board/tokens.local.json`).
 - Do not scrape authenticated pages you do not have an account for.
 - Prefer official APIs, public JSON feeds, and public career pages.
 - Attach PDFs on **email**. LinkedIn DMs usually cannot take a PDF; send a short note and ask for a chat, and point at a resume link if you have one.

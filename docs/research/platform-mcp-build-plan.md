@@ -19,6 +19,7 @@ These are done; do not redo them.
 3. **Pinned local MCPs** (`uvx` / `agent-tools` clone) plus `mcp/hosted/` copy-paste configs and `mcp/SETUP.md`. Do not commit upstream trees (ats-jobs directory.json is ~50k lines in the wheel).
 4. **Maintainer role** (`skills/skill-maintainer/SKILL.md`) plus machine-readable `skills/lists/` from a live registry pass. Parallel Search MCP adopted in `mcp.example.json`.
 5. Hiring Cafe (`hiring.cafe` / r/hiringcafe) as a discovery board with `scripts/fetch_hiringcafe.py`.
+6. **Get That Job hunt board** (`board/`): maintainer-owned FastAPI + SQLite live overlay. Tokens gitignored. Git ledger remains the airgap protocol.
 
 Still missing for a live cycle: a truthful `profiles/candidate.yaml` (only the gitignored example copy exists), resume PDFs, and research API keys.
 

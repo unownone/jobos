@@ -1,6 +1,8 @@
 # Sharing (airgapped-first)
 
-The live list is the git repo. Hosting is optional. Discovery owner is the portal owner.
+The **git repo is the airgap protocol**. Hosting is optional. Discovery owner is the git-ledger portal owner.
+
+When agents share a machine, **maintainer** runs the live hunt board in [`board/`](../board/README.md). That board is the practical coordination UI/API for the hunt. It does not delete or replace `ledger/`.
 
 ## Why git
 
@@ -75,6 +77,18 @@ conflicts:
   - ts: "..."
     note: "apply bot could not push; packet is in this file"
 ```
+
+## Optional live hunt board (maintainer-owned)
+
+Use [`board/`](../board/README.md) when several bots share a host and need a single live list without waiting on git push.
+
+**Maintainer owns it:** token generation/rotation, process hygiene, schema, uptime, and any tunnel. Discovery/apply/outreach get a role token from the maintainer and only write their lane.
+
+- Local: `http://127.0.0.1:8787/` on the shared machine (server binds `0.0.0.0`).
+- Sibling agents: same host, `X-Role` + `X-Token`.
+- Optional temporary public tunnel (`localtunnel` / `cloudflared`): exposes the board. Prefer admin auth always. Tear it down after. **Group chats cannot host connect cards** or live iframes; do not paste tokens there.
+
+Write rules: discovery creates rows; later lanes only advance their fields; admin can stop/edit. Details and curl examples: [`board/README.md`](../board/README.md).
 
 ## Optional overlays
 

@@ -1,24 +1,25 @@
 ---
 name: skill-maintainer
-description: Seldom-used owner that maintains Job Apply OS skills, MCP lists, and catalog files. Use when the user says maintain, update skills, manage the catalog, find MCPs, refresh skill lists, or prune dead tools. Searches registries, vets, and writes skills/lists. Does not discover jobs, apply, or send outreach.
+description: Seldom-used owner that maintains Job Apply OS skills, MCP lists, catalog files, and the live hunt board. Use when the user says maintain, update skills, manage the catalog, find MCPs, refresh skill lists, prune dead tools, or operate the Get That Job board (tokens, uptime, hygiene). Searches registries, vets, and writes skills/lists. Does not discover jobs, apply, or send outreach.
 ---
 
 # Skill maintainer
 
-You own the **skill tree**. You do not own jobs.
+You own the **skill tree** and the **live hunt board**. You do not own jobs.
 
 This role is **seldom used**. Discovery still runs a catalog pass at the start of a cycle. Maintainer is who refreshes, prunes, and writes the lists when the inventory itself is the work.
 
 ## When
 
 - User asks to maintain / update / manage skills or MCPs
+- User asks to run, token-rotate, import into, or hygiene the hunt board
 - `docs/catalogs/skills-and-mcps.md` or `skills/lists/` is stale (not this week) and nobody is mid-discovery
 - An MCP auth failed or a listed tool is dead
 - A research pass found tools that are not yet in `skills/lists/`
 
 ## Claim
 
-Write yourself under **Active operators** in `ledger/INDEX.md` as `maintainer`. Scope example: `skills + lists`. Do not steal `discovery` / `apply` / `outreach` claims.
+Write yourself under **Active operators** in `ledger/INDEX.md` as `maintainer`. Scope example: `skills + lists + hunt board`. Do not steal `discovery` / `apply` / `outreach` claims.
 
 ## Do
 
@@ -39,13 +40,14 @@ Write yourself under **Active operators** in `ledger/INDEX.md` as `maintainer`. 
 6. Append a row to the catalog workspace log. If coverage changed, update `docs/research/platform-mcp-build-plan.md`.
 7. If a tool is clearly adopted, **pin it** (`uvx package==version`, or a SHA clone into gitignored `agent-tools/`). Do not copy 50k-line data files or upstream trees into git. Hosted tools get a snippet in `mcp/hosted/`. Third-party skills go in `.agents/skills/` via `npx skills add`.
 8. Append `ledger/events.jsonl`. No job YAML.
+9. If this hunt uses the live board: follow [`board/README.md`](../../board/README.md). Generate/rotate gitignored tokens, start `board/start.sh`, import ledger history, run hygiene. Discovery/apply/outreach consume the board; they do not own it.
 
 ## Do not
 
 - Discover, shortlist, or invent jobs
 - Easy Apply, submit, or send email / LinkedIn DMs
 - Copy third-party `SKILL.md` files into `skills/` next to OS skills (use `.agents/skills/` + `scripts/link_agent_skills.sh`)
-- Put API keys or cookies in lists or the catalog
+- Put API keys, cookies, or board tokens in lists, the catalog, or git
 - Enable a combined search-and-apply tool on discovery
 - Resume / LinkedIn-profile curation skills (user does not want that)
 

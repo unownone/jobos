@@ -202,6 +202,14 @@ Drive: optional overlay. Folder id in `.env` as `GOOGLE_DRIVE_LEDGER_FOLDER_ID`.
 
 Calendar: after status `interview` (or when a recruiter proposes times). Use `suggest_time` across calendars. Do not silently create events on the candidate's calendar without the human's ask.
 
+## Hunt board (maintainer-owned adopted infra)
+
+First-party live coordination plane: [`board/README.md`](../../board/README.md). FastAPI + SQLite + admin UI. **Maintainer owns it** (tokens, uptime, schema, hygiene, tunnels). Discovery/apply/outreach consume it.
+
+Not a marketplace MCP. Do not confuse with rejected `job-tracker-sqlite` (third-party MCP). Git `ledger/` remains the airgap protocol.
+
+Install: `bash board/start.sh`. Tokens: `uv run scripts/board_gen_tokens.py --print` (gitignored).
+
 ## Hunter / Apollo notes
 
 - Hunter: verify before any email send. Confidence scores go on `ledger/people/<id>.yaml`. Low confidence → LinkedIn DM only.

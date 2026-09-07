@@ -6,6 +6,9 @@ note: >
   Pinned uvx/git MCPs (no source trees in git). Installed compose-outreach /
   draft-outreach / playwright-cli via npx skills add. Added Hiring Cafe public
   fetcher. Hosted MCP snippets in mcp/hosted/.
+  2026-09-06 later: adopted first-party Get That Job hunt board (board/) as
+  maintainer-owned infra. Not a registry search. Tokens are generated locally
+  and gitignored.
 
 registries:
   - name: skills.sh

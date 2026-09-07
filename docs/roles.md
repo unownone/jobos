@@ -2,7 +2,7 @@
 
 A role is a **permission set** plus a **skill**. People or bots pick one, several, or all. Combined ownership is allowed. Skipping the process order is not.
 
-Job search has **three owners**. A fourth owner, **maintainer**, exists and is **seldom used**: it owns the skill/MCP tree, not jobs.
+Job search has **three owners**. A fourth owner, **maintainer**, exists and is **seldom used**: it owns the skill/MCP tree **and** the live hunt board, not job sourcing.
 
 ## The three owners
 
@@ -66,15 +66,17 @@ LinkedIn Easy Apply is an **apply** subdivision, not a discovery shortcut.
 
 **Also runs:** catalog skill as a subroutine (search registries, vet). Writes [`skills/lists/`](../skills/lists/).
 
-**Owns:** `skills/` (in-repo SKILL.md files), `skills/lists/`, `docs/catalogs/` inventory, `mcp/mcp.example.json`, cloud-agent tool wiring in `.cursor/environment.json`.
+**Owns:** `skills/` (in-repo SKILL.md files), `skills/lists/`, `docs/catalogs/` inventory, `mcp/mcp.example.json`, cloud-agent tool wiring in `.cursor/environment.json`, and the **live hunt board** in [`board/`](../board/README.md) (tokens, schema, uptime, hygiene, share/tunnel setup).
 
-**Writes:** adopted / wanted / rejected lists, catalog workspace log, example MCP config, environment install/egress. Rebuilds `skills/lists/INDEX.md`.
+**Writes:** adopted / wanted / rejected lists, catalog workspace log, example MCP config, environment install/egress. Rebuilds `skills/lists/INDEX.md`. Issues board role tokens out of band (never committed).
 
-**Must never:** discover jobs, Easy Apply, submit, send outreach, invent an MCP, put secrets in lists.
+**Must never:** discover jobs, Easy Apply, submit, send outreach, invent an MCP, put secrets in lists or in git.
 
-**When to claim:** the user asks to maintain skills; the catalog is stale and nobody is mid-cycle; an MCP died; a research pass needs to be written into lists. Not part of the daily discover → apply → outreach loop.
+**When to claim:** the user asks to maintain skills; the catalog is stale and nobody is mid-cycle; an MCP died; a research pass needs to be written into lists; the hunt board needs start/rotate/import. Not part of the daily discover → apply → outreach loop.
 
-**Claim name:** `maintainer` (optionally `maintainer/lists`).
+**Claim name:** `maintainer` (optionally `maintainer/lists` or `maintainer/board`).
+
+Discovery, apply, and outreach **consume** the board when it is running. They do not own tokens, schema, or uptime.
 
 ## Combining roles
 
@@ -109,7 +111,7 @@ If `owners.apply` is set by someone else and status is `applying`, do not steal 
 | Skill/MCP discovery | `skill-and-mcp-catalog` | Discovery first; maintainer as a subroutine; anyone when blocked |
 | Deep research | `deep-research` | All three job owners |
 
-Do not create a fourth “research bot.” Research stays a tool the owners call. **Maintainer** is the fourth owner, and it is for the skill tree, not for company research.
+Do not create a fourth “research bot.” Research stays a tool the owners call. **Maintainer** is the fourth owner, and it is for the skill tree **and the hunt board**, not for company research.
 
 ## Marketplace vs posting
 

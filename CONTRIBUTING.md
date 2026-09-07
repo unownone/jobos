@@ -22,11 +22,11 @@ MCP pins (`uvx` / git SHA, no source trees): `vendor/mcp/PINNED.txt`. Refresh ca
 
 ## Add a subdivision
 
-Document the claim name in `docs/roles.md`. Do not add another job-search owner. Maintainer already exists as the seldom-used fourth owner for the skill tree.
+Document the claim name in `docs/roles.md`. Do not add another job-search owner. Maintainer already exists as the seldom-used fourth owner for the skill tree and hunt board.
 
 ## Tests
 
-There is no product runtime. Sanity:
+Ledger sanity:
 
 ```bash
 uv run scripts/rebuild_index.py
@@ -34,3 +34,11 @@ uv run scripts/rebuild_skill_index.py
 ```
 
 YAML in `ledger/jobs/` must parse and include `id`.
+
+Hunt board (maintainer-owned):
+
+```bash
+make -C board test
+```
+
+Do not commit `board/.env`, `*.local.json`, or `board/data/*.db`.

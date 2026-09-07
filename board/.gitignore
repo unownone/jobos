@@ -1,0 +1,12 @@
+# Hunt board runtime (never commit tokens or live SQLite)
+.env
+tokens.local.json
+data/*.db
+data/*.db-*
+data/*.jsonl
+data/metrics.sqlite
+data/*.db-wal
+data/*.db-shm
+.venv/
+__pycache__/
+.pytest_cache/

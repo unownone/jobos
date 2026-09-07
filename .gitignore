@@ -2,6 +2,12 @@
 .env
 .env.*
 !.env.example
+!board/.env.example
+*.local.json
+
+# Hunt board live DB (schema is in board/app/db.py)
+board/data/*.db
+board/data/*.db-*
 profiles/candidate.yaml
 profiles/secrets.yaml
 mcp/mcp.local.json
@@ -21,6 +27,7 @@ __pycache__/
 # Cloud agent scratch (not part of the template)
 agent-tools/
 agent-transcripts/
+.playwright-mcp/
 
 # Vendored MCP runtimes used to live here; they bloated the PR.
 # Source trees stay out of git. Cache clones go in agent-tools/.

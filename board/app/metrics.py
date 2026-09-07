@@ -1,0 +1,181 @@
+"""Token-burn and latency metrics. Separate from the job board DB. Gitignored."""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS token_burn (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT NOT NULL,
+    tool_name TEXT NOT NULL,
+    skill TEXT,
+    lane TEXT,
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL,
+    duration_ms REAL,
+    job_id TEXT,
+    actor_role TEXT,
+    actor TEXT,
+    extra_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_burn_tool ON token_burn(tool_name);
+CREATE INDEX IF NOT EXISTS idx_burn_skill ON token_burn(skill);
+CREATE INDEX IF NOT EXISTS idx_burn_ts ON token_burn(ts);
+"""
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def percentile(values: list[float], p: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    rank = (p / 100.0) * (len(ordered) - 1)
+    low = int(rank)
+    high = min(low + 1, len(ordered) - 1)
+    frac = rank - low
+    return ordered[low] * (1 - frac) + ordered[high] * frac
+
+
+class MetricsStore:
+    def __init__(self, sqlite_path: Path, jsonl_path: Path | None = None) -> None:
+        self.sqlite_path = sqlite_path
+        self.jsonl_path = jsonl_path
+        sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+        self.conn = sqlite3.connect(sqlite_path, check_same_thread=False)
+        self.conn.row_factory = sqlite3.Row
+        self.conn.executescript(SCHEMA)
+        self.conn.commit()
+
+    def close(self) -> None:
+        self.conn.close()
+
+    def record_token_burn(self, row: dict[str, Any]) -> dict[str, Any]:
+        ts = row.get("timestamp") or utc_now()
+        prompt = int(row.get("prompt_tokens") or 0)
+        completion = int(row.get("completion_tokens") or 0)
+        total = row.get("total_tokens")
+        total_i = int(total) if total is not None else prompt + completion
+        skill = str(row.get("skill") or row.get("lane") or "")
+        lane = str(row.get("lane") or row.get("skill") or "")
+        stored = {
+            "ts": ts,
+            "tool_name": str(row["tool_name"]),
+            "skill": skill,
+            "lane": lane,
+            "prompt_tokens": prompt,
+            "completion_tokens": completion,
+            "total_tokens": total_i,
+            "cost_usd": row.get("cost_usd"),
+            "duration_ms": row.get("duration_ms"),
+            "job_id": row.get("job_id") or "",
+            "actor_role": row.get("actor_role") or "",
+            "actor": row.get("actor") or "",
+            "extra": row.get("extra") or {},
+        }
+        cur = self.conn.execute(
+            """
+            INSERT INTO token_burn (
+                ts, tool_name, skill, lane, prompt_tokens, completion_tokens, total_tokens,
+                cost_usd, duration_ms, job_id, actor_role, actor, extra_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                stored["ts"],
+                stored["tool_name"],
+                stored["skill"],
+                stored["lane"],
+                stored["prompt_tokens"],
+                stored["completion_tokens"],
+                stored["total_tokens"],
+                stored["cost_usd"],
+                stored["duration_ms"],
+                stored["job_id"],
+                stored["actor_role"],
+                stored["actor"],
+                json.dumps(stored["extra"], ensure_ascii=False) if stored["extra"] else None,
+            ),
+        )
+        self.conn.commit()
+        stored["id"] = cur.lastrowid
+        if self.jsonl_path is not None:
+            self.jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.jsonl_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(stored, ensure_ascii=False) + "\n")
+        return stored
+
+    def list_burns(self, limit: int = 100) -> list[dict[str, Any]]:
+        limit = max(1, min(limit, 1000))
+        cur = self.conn.execute(
+            "SELECT * FROM token_burn ORDER BY id DESC LIMIT ?",
+            (limit,),
+        )
+        return [self._row(r) for r in cur.fetchall()]
+
+    def summary(self) -> dict[str, Any]:
+        cur = self.conn.execute("SELECT * FROM token_burn")
+        rows = [self._row(r) for r in cur.fetchall()]
+        return {
+            "n": len(rows),
+            "totals": _totals(rows),
+            "by_tool": _group(rows, "tool_name"),
+            "by_skill": _group(rows, "skill"),
+            "by_role": _group(rows, "actor_role"),
+        }
+
+    def _row(self, row: sqlite3.Row) -> dict[str, Any]:
+        extra = {}
+        raw = row["extra_json"]
+        if raw:
+            extra = json.loads(raw)
+        return {
+            "id": row["id"],
+            "ts": row["ts"],
+            "tool_name": row["tool_name"],
+            "skill": row["skill"] or "",
+            "lane": row["lane"] or "",
+            "prompt_tokens": row["prompt_tokens"],
+            "completion_tokens": row["completion_tokens"],
+            "total_tokens": row["total_tokens"],
+            "cost_usd": row["cost_usd"],
+            "duration_ms": row["duration_ms"],
+            "job_id": row["job_id"] or "",
+            "actor_role": row["actor_role"] or "",
+            "actor": row["actor"] or "",
+            "extra": extra,
+        }
+
+
+def _totals(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    durations = [float(r["duration_ms"]) for r in rows if r.get("duration_ms") is not None]
+    return {
+        "prompt_tokens": sum(int(r["prompt_tokens"]) for r in rows),
+        "completion_tokens": sum(int(r["completion_tokens"]) for r in rows),
+        "total_tokens": sum(int(r["total_tokens"]) for r in rows),
+        "cost_usd": round(sum(float(r["cost_usd"] or 0) for r in rows), 6),
+        "duration_ms_p50": percentile(durations, 50),
+        "duration_ms_p95": percentile(durations, 95),
+        "n_with_duration": len(durations),
+    }
+
+
+def _group(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    buckets: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        buckets.setdefault(str(row.get(key) or "(none)"), []).append(row)
+    out = []
+    for name, group in sorted(buckets.items(), key=lambda kv: -sum(int(r["total_tokens"]) for r in kv[1])):
+        out.append({"name": name, "n": len(group), **_totals(group)})
+    return out

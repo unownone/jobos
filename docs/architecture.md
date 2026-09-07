@@ -1,13 +1,13 @@
 # Architecture
 
-Job Apply OS is a **multi-agent workflow with a file-backed bus**. There is no required server. The repo is the coordination plane.
+Job Apply OS is a **multi-agent workflow with a file-backed bus**. The repo is the airgap coordination plane. When a hunt has a shared machine, maintainer also runs an optional live board (`board/`) as the practical overlay. The git ledger is not deleted.
 
 ## Goals
 
 - One discovery lane that only finds and shortlists.
 - One apply lane that only submits from a packet, with writing that is worth reading.
 - One outreach lane that only emails and LinkedIn-DMs after a handoff.
-- A shared live list that airgapped bots can still update.
+- A shared live list that airgapped bots can still update (git), plus an optional maintainer-owned hunt board when agents share a host.
 - Skills and MCPs that are discovered, vetted, listed, and maintained — not hardcoded forever.
 
 ## Components
@@ -30,6 +30,7 @@ flowchart LR
   subgraph shared [Shared]
     research[Deep research]
     ledger[ledger/jobs + INDEX + events]
+    board[board/ live API + UI]
   end
 
   subgraph outputs [Outputs]
@@ -44,14 +45,20 @@ flowchart LR
   catalog --> d
   catalog --> m
   m --> catalog
+  m --> board
   research --> d
   research --> a
   research --> o
   d --> ledger
+  d --> board
   ledger --> a
+  board --> a
   a --> ledger
+  a --> board
   ledger --> o
+  board --> o
   o --> ledger
+  o --> board
   d --> packets
   a --> proof
   o --> touches
@@ -76,11 +83,15 @@ A shared capability, not a fourth owner. Used to:
 
 Preferred MCP: Exa. Local fallback the cloud agent can run: [dzhng/deep-research](https://github.com/dzhng/deep-research) via `scripts/run_deep_research.py` (Firecrawl + OpenAI). Other fallbacks: Firecrawl MCP, Tavily, Parallel Search MCP, built-in search. See [`docs/catalogs/deep-research.md`](catalogs/deep-research.md). Build plan: [`docs/research/platform-mcp-build-plan.md`](research/platform-mcp-build-plan.md).
 
-The **maintainer** owner is for the skill tree, not for company research.
+The **maintainer** owner is for the skill tree **and** the hunt board (tokens, uptime, schema), not for company research.
 
-### Ledger
+### Ledger (airgap protocol)
 
-Source of truth for jobs, people, and events. Git is the sync protocol. Optional Drive/Sheet is a mirror owned by discovery. See [`sharing.md`](sharing.md).
+Source of truth for git-based hunts: jobs, people, and events as files. Git is the sync protocol. Optional Drive/Sheet is a mirror owned by discovery. See [`sharing.md`](sharing.md).
+
+### Hunt board (live overlay)
+
+[`board/`](../board/README.md) is a FastAPI + SQLite private board with role auth (`X-Role` + `X-Token`) and an admin UI. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. It does not replace the ledger schema. Import history with `scripts/board_import_ledger.py`.
 
 ## Data flow for one job
 
@@ -134,7 +145,8 @@ Outreach
   └─ linkedin_dm (ask for a chat)
 
 Maintainer (seldom, repo-wide)
-  └─ skills/lists + catalog + mcp.example.json
+  ├─ skills/lists + catalog + mcp.example.json
+  └─ hunt board (board/): tokens, schema, uptime, hygiene, tunnels
 ```
 
 Each subdivision still writes the same job file. If two discovery bots find the same posting, they merge onto one `id` (see sharing rules).
@@ -147,14 +159,13 @@ Each subdivision still writes the same job file. If two discovery bots find the 
 
 **Many bots.** Split by portal or channel. Claim work in the job YAML (`owners.discovery`, `owners.apply`, `owners.outreach`) before mutating.
 
-**Maintainer bot (rare).** Separate turn. Writes lists. Does not search jobs.
+**Maintainer bot (rare).** Separate turn. Writes lists. Owns the hunt board. Does not search jobs.
 
-## What we deliberately do not build in v1
+## What we deliberately do not build into the airgap protocol
 
-- A hosted dashboard
+- A required hosted dashboard (the git ledger must work with no server)
 - A scraper farm
 - Auto Easy Apply from discovery
 - SMS / WhatsApp
-- A shared database
 
-Those can be added later if the ledger protocol is stable. The ledger protocol is the product.
+The optional **hunt board** in `board/` is maintainer-owned live infra for a shared host. It is an overlay, not a substitute for `ledger/`. Tokens stay gitignored. The ledger protocol remains the product for airgapped bots.

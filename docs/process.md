@@ -165,11 +165,12 @@ Every send is a touch on the job YAML and a people file under `ledger/people/`. 
 
 ## 6. Shared list hygiene
 
-- One job file per posting.
-- INDEX.md is the human board. Rebuild it if it drifts.
-- Events are append-only.
-- Discovery owner resolves merge conflicts.
+- One job file per posting in git (`ledger/jobs/`).
+- INDEX.md is the human git board. Rebuild it if it drifts.
+- Events are append-only (`ledger/events.jsonl`, and `board` events when the live board is up).
+- Discovery owner resolves **git** merge conflicts.
 - Never delete another role’s packet to “clean up.”
+- If the live hunt board is running: discovery creates rows only; apply/outreach only advance their fields; admin stops/edits. **Maintainer** owns tokens, schema, and hygiene — see [`board/README.md`](../board/README.md). Git ledger remains the airgap protocol.
 
 ## 7. Quality gates
 
@@ -198,7 +199,7 @@ Suggested, not mandatory:
 
 ## 10. Maintainer pass (seldom)
 
-Goal: keep the skill/MCP inventory true. **No jobs.**
+Goal: keep the skill/MCP inventory true, and keep the hunt board honest. **No job sourcing.**
 
 1. Claim `maintainer` on `ledger/INDEX.md`.
 2. Load [`skills/skill-maintainer`](../skills/skill-maintainer/SKILL.md).
@@ -206,5 +207,6 @@ Goal: keep the skill/MCP inventory true. **No jobs.**
 4. `uv run scripts/rebuild_skill_index.py`.
 5. Patch `mcp/mcp.example.json` / `.cursor/environment.json` only for tools that moved to **adopted**.
 6. Append catalog workspace log + `ledger/events.jsonl`.
+7. Hunt board (when this hunt uses one): generate/rotate tokens with `scripts/board_gen_tokens.py`, keep `board/start.sh` up, import ledger history if needed, run hygiene. Tokens stay gitignored.
 
 Do not start a discovery search from this pass.

@@ -14,6 +14,8 @@ Nobody jumps the queue.
 
 This is the agent-facing operating system: how to pick a role, which skills and MCPs to attach, how to share work without hosting a server, and how to hand off a job so another bot can finish it.
 
+For a live multi-agent hunt on a shared machine, maintainer also runs the private **Get That Job** board (`board/`): FastAPI + SQLite + admin UI. That board is the live coordination plane. The git ledger remains the template and airgap protocol. See [`board/README.md`](board/README.md).
+
 ## Start here
 
 1. Copy [`profiles/candidate.example.yaml`](profiles/candidate.example.yaml) to `profiles/candidate.yaml` and tell the truth.
@@ -33,7 +35,7 @@ Combined “search and Easy Apply” agents optimize for volume. This template o
 | Discovery | Find, enrich, score, shortlist, write an apply packet | Easy Apply, form submit, outreach |
 | Apply | Submit using the packet, write the message, log proof | Inventing jobs, cold outreach, skipping the packet |
 | Outreach | Email + LinkedIn DM after apply (or when there is no portal) | SMS, WhatsApp, spam, applying |
-| Maintainer (seldom) | Search registries, vet, write `skills/lists/`, patch example MCP config | Discovering jobs, applying, sending mail |
+| Maintainer (seldom) | Search registries, vet, write `skills/lists/`, patch example MCP config, **own the hunt board** (tokens, uptime, schema, hygiene) | Discovering jobs, applying, sending mail |
 
 Roles can be subdivided:
 
@@ -52,7 +54,8 @@ flowchart TD
   catalog[Skill and MCP catalog]
   research[Deep research]
   discovery[Discovery role]
-  ledger[Git ledger]
+  ledger[Git ledger airgap]
+  board[Hunt board live]
   apply[Apply role]
   outreach[Outreach role]
   maintainer[Maintainer seldom]
@@ -61,37 +64,46 @@ flowchart TD
   catalog --> discovery
   catalog --> maintainer
   maintainer -->|"skills/lists"| catalog
+  maintainer -->|"tokens + uptime"| board
   research --> discovery
   research --> apply
   research --> outreach
   discovery -->|"shortlist + apply packet"| ledger
+  discovery --> board
   ledger --> apply
+  board --> apply
   apply -->|"applied + outreach packet"| ledger
+  apply --> board
   ledger --> outreach
+  board --> outreach
   outreach -->|"touches + replies"| ledger
+  outreach --> board
 ```
 
 Full writeup: [`docs/architecture.md`](docs/architecture.md).
 
-## Shared list without hosting
+## Shared list: git ledger vs live board
 
-Bots may have no shared network except git.
+Bots may have no shared network except git. The **git ledger is the airgap protocol** (YAML per job). It stays.
+
+When several agents share a host, maintainer runs the **hunt board** as the live coordination UI/API. Discovery/apply/outreach consume it; they do not own it.
 
 | Layer | What it is | When to use |
 | --- | --- | --- |
-| Canonical | One YAML file per job under `ledger/jobs/` | Always |
-| Human view | [`ledger/INDEX.md`](ledger/INDEX.md) | Always |
-| Audit | Append-only `ledger/events.jsonl` | Always |
-| Optional overlay | Google Drive / Sheet owned by discovery | Only if someone is online and wants a spreadsheet |
+| Airgap / template | One YAML file per job under `ledger/jobs/` | Always the file protocol; required if no server |
+| Human git view | [`ledger/INDEX.md`](ledger/INDEX.md) | Always in git |
+| Git audit | Append-only `ledger/events.jsonl` | Always in git |
+| **Live hunt board** | [`board/`](board/README.md) FastAPI + SQLite + admin UI | Shared machine; maintainer-owned |
+| Optional overlay | Google Drive / Sheet | Only if someone wants a spreadsheet; not source of truth |
 
-Discovery owners the ledger “portal”: they resolve conflicts, rebuild the index, and keep schema honest. Others append and update their own records. Details: [`docs/sharing.md`](docs/sharing.md).
+Discovery still owns the **git** ledger portal (conflicts, INDEX, schema). **Maintainer** owns the live board (tokens, uptime, hygiene, tunnels). Details: [`docs/sharing.md`](docs/sharing.md) and [`board/README.md`](board/README.md).
 
 ## Skills in this repo
 
 | Skill | Owner | Job |
 | --- | --- | --- |
 | [`skill-and-mcp-catalog`](skills/skill-and-mcp-catalog/SKILL.md) | Discovery first, maintainer as subroutine | Discover, vet, and add skills/MCPs from any registry |
-| [`skill-maintainer`](skills/skill-maintainer/SKILL.md) | Maintainer (seldom) | Search registries, write `skills/lists/`, prune dead tools |
+| [`skill-maintainer`](skills/skill-maintainer/SKILL.md) | Maintainer (seldom) | Search registries, write `skills/lists/`, prune dead tools, own `board/` |
 | [`deep-research`](skills/deep-research/SKILL.md) | Shared | Company, people, role, and portal research |
 | [`job-discovery`](skills/job-discovery/SKILL.md) | Discovery | Portals, career sites, dorks, shortlist, apply packets |
 | [`job-apply`](skills/job-apply/SKILL.md) | Apply | High-quality submit + proof |
@@ -160,7 +172,8 @@ skills/                   Agent Skills (SKILL.md) — canonical OS skills
 .agents/skills/           Downloaded third-party Agent Skills (npx skills add)
 .claude/skills/<name>     Per-skill symlink for Claude Code
 .cursor/skills/<name>     Per-skill symlink for Cursor
-skills/lists/             Maintainer board: adopted / wanted / rejected YAML
+skills/lists/             Maintainer lists: adopted / wanted / rejected YAML
+board/                    Live hunt board (FastAPI + SQLite). Maintainer-owned.
 vendor/mcp/PINNED.txt     uvx / git SHA pins for local MCPs (no source trees)
 mcp/hosted/               Copy-paste hosted MCP snippets
 mcp/SETUP.md              How to attach local vs hosted MCPs
@@ -182,6 +195,9 @@ scripts/run_deep_research.py    Non-interactive research API wrapper
 # optional, if uv is available
 uv run scripts/rebuild_index.py
 uv run scripts/rebuild_skill_index.py
+
+# live hunt board (maintainer): generates gitignored tokens on first start
+bash board/start.sh
 ```
 
 Then, in the agent:
@@ -189,7 +205,7 @@ Then, in the agent:
 - Discovery: “Run the discovery skill for this candidate. Do not apply.”
 - Apply: “Apply only to jobs in apply_ready. Write like a human worth reading.”
 - Outreach: “Work outreach_ready. Email + LinkedIn only. Attach the PDF on email.”
-- Maintainer (seldom): “Refresh skills/lists. Find MCPs. Do not discover jobs.”
+- Maintainer (seldom): “Refresh skills/lists. Find MCPs. Do not discover jobs.” Owns the hunt board: tokens, uptime, hygiene.
 
 ## Public template
 

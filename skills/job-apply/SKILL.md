@@ -55,3 +55,5 @@ Then `status: applied` and seed `outreach_packet` from `handoffs/outreach-packet
 ## Blocked
 
 Captcha, OTP, government ID, legal questions you cannot answer, dead link: `apply_blocked` with the exact next human action.
+
+If the hunt board is up (`BOARD_URL` + apply token from maintainer): PATCH only apply fields on that row. Do not own the board; do not rotate tokens. See [`board/README.md`](../../board/README.md).
