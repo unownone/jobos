@@ -40,6 +40,7 @@ from app.identity import (
     set_session_cookies,
     verify_invite_secret,
 )
+from app.messages import create_messages_router
 from app.metrics import MetricsStore
 from app.permissions import (
     authorize_create,
@@ -265,12 +266,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="Job Hub",
         description="Private live coordination plane. Maintainer owns tokens, schema, and uptime.",
-        version="0.3.0",
+        version="0.4.0",
     )
     app.state.settings = settings
     app.state.db = db
     app.state.metrics = metrics
     app.state.bootstrap_token = minted
+    app.include_router(create_messages_router(principal_dep))
     if minted:
         print(format_signup_line(settings, minted), flush=True)
         print(

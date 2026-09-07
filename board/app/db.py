@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.constants import JSON_FIELDS, STATUSES
+from app.message_store import ensure_messages_schema
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -162,6 +163,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE invites ADD COLUMN allow_multiple_owners INTEGER NOT NULL DEFAULT 0"
         )
+    ensure_messages_schema(conn)
 
 
 def _dump(value: Any) -> str | None:
