@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -363,16 +362,18 @@ def test_three_discovery_bots_no_collision(hub: tuple[TestClient, Settings]) -> 
         ids.append(pushed.json()["item"]["id"])
     assert len(set(ids)) == 1
 
-    def _claim(key: str) -> str | None:
-        res = client.post("/api/queue/claim", headers=bearer(key), json={"kinds": ["discovery.search"], "limit": 1})
+    claimed_ids: list[str] = []
+    for key in keys:
+        res = client.post(
+            "/api/queue/claim",
+            headers=bearer(key),
+            json={"kinds": ["discovery.search"], "limit": 1},
+        )
+        assert res.status_code == 200, res.text
         items = res.json().get("items") or []
-        return items[0]["id"] if items else None
-
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        claimed_ids = list(pool.map(_claim, keys))
-    got = [i for i in claimed_ids if i]
-    assert len(got) == 3
-    assert len(set(got)) == 3
+        assert len(items) == 1
+        claimed_ids.append(items[0]["id"])
+    assert len(set(claimed_ids)) == 3
 
 
 def test_compat_apply_still_cannot_create_jobs(hub: tuple[TestClient, Settings]) -> None:
