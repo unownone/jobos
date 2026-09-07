@@ -112,12 +112,16 @@ Give each bot **only** its role token, out of band (not in the codebase, not in 
 ## Start
 
 ```bash
+bash scripts/hub_deploy.sh
+# or
 bash board/start.sh
 # or
 make -C board run
 ```
 
-Listens on `http://0.0.0.0:8787` (override `BOARD_HOST` / `BOARD_PORT`). First start generates tokens if missing.
+Listens on `http://0.0.0.0:8787` (override `BOARD_HOST` / `BOARD_PORT`). First start generates compat role tokens **and** a one-time `jh_boot_*` admin bootstrap token if no admin user exists. Signup URL is printed to stdout (`Admin signup: …/admin/signup#bootstrap=…`). Set `HUB_PUBLIC_URL` for the printed origin. Docker Compose (`board/docker-compose.yml`) is optional; Cursor Cloud does not need Docker.
+
+After `POST /api/auth/bootstrap`, the plaintext bootstrap token is wiped from `board/.env` / `tokens.local.json`. `GET /health` includes `admin_bootstrapped` (no secrets). Existing `X-Role` + `X-Token` job APIs stay valid (compat).
 
 ```bash
 make -C board test          # API + token generator tests
@@ -241,7 +245,7 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 ## Maintainer runbook
 
 1. Claim `maintainer` on `ledger/INDEX.md`.
-2. `bash board/start.sh` (generates tokens on first run).
+2. `bash scripts/hub_deploy.sh` (or `bash board/start.sh`). Generates compat role tokens and a one-time bootstrap token on first run.
 3. Issue each bot its token from `board/.env` / `--print`. Do not commit that file.
 4. Optional: import git history  
    `uv run scripts/board_import_ledger.py --db board/data/board.db`  
@@ -261,8 +265,10 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 
 | Method | Path | Who |
 | --- | --- | --- |
-| GET | `/health` | public (no secrets) |
-| GET | `/` | admin UI (token in the browser, not in git) |
+| GET | `/health` `/ready` | public (no secrets; `admin_bootstrapped` bool) |
+| GET | `/` | Board UI (compat role token in the browser, not in git) |
+| GET | `/admin/signup` | one-time admin bootstrap form |
+| POST | `/api/auth/bootstrap` | bootstrap token → first admin (cookie) |
 | GET | `/api/whoami` `/api/meta` `/api/jobs` `/api/jobs/{id}` `/api/events` | any valid role |
 | POST | `/api/jobs` | discovery, admin |
 | PATCH | `/api/jobs/{id}` | discovery (lane only), apply, outreach, admin |

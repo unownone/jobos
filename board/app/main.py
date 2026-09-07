@@ -1,4 +1,4 @@
-"""FastAPI hunt board. Maintainer-owned. Bind 0.0.0.0 so sibling agents can reach it."""
+"""FastAPI Job Hub (hunt board). Maintainer-owned. Bind 0.0.0.0 so sibling agents can reach it."""
 
 from __future__ import annotations
 
@@ -12,6 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth import Principal, require_principal
+from app.bootstrap import (
+    consume_bootstrap,
+    ensure_bootstrap,
+    env_path_for,
+    format_signup_line,
+    tokens_json_path_for,
+)
 from app.constants import ROLES, STATUSES
 from app.db import BoardDB
 from app.metrics import MetricsStore
@@ -118,6 +125,13 @@ class ImportIn(BaseModel):
     replace: bool = False
 
 
+class BootstrapIn(BaseModel):
+    email: str
+    password: str
+    token: str | None = None
+    bootstrap: str | None = None
+
+
 def _slug_id(company: str, title: str) -> str:
     slug = SLUG_RE.sub("-", f"{company}-{title}".lower()).strip("-")[:72]
     return f"board__{slug or 'job'}"
@@ -133,6 +147,28 @@ def _normalize_id(raw: str) -> str:
     return job_id
 
 
+def _extract_bootstrap_token(request: Request, body: BootstrapIn) -> str:
+    auth = request.headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        return auth.split(" ", 1)[1].strip()
+    for header in ("x-hub-key", "x-bootstrap-token"):
+        value = request.headers.get(header)
+        if value:
+            return value.strip()
+    return (body.token or body.bootstrap or "").strip()
+
+
+def _health_payload(db: BoardDB, settings: Settings) -> dict[str, Any]:
+    configured = sorted(role for role, token in settings.tokens.items() if token)
+    bootstrapped = db.admin_bootstrapped()
+    return {
+        "ok": True,
+        "roles_configured": configured,
+        "all_roles_configured": configured == sorted(ROLES),
+        "admin_bootstrapped": bootstrapped,
+    }
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     db = BoardDB(settings.db_path)
@@ -141,15 +177,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.db_path.parent / "metrics.jsonl",
     )
     principal_dep = require_principal(settings)
+    minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
-        title="Get That Job hunt board",
+        title="Job Hub",
         description="Private live coordination plane. Maintainer owns tokens, schema, and uptime.",
-        version="0.1.0",
+        version="0.2.0",
     )
     app.state.settings = settings
     app.state.db = db
     app.state.metrics = metrics
+    app.state.bootstrap_token = minted
+    if minted:
+        print(format_signup_line(settings, minted), flush=True)
+        print(
+            "Gitignored secrets: "
+            f"{env_path_for(settings)} {tokens_json_path_for(settings)}",
+            flush=True,
+        )
 
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -158,18 +203,75 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
 
+    @app.get("/admin/signup")
+    def admin_signup() -> FileResponse:
+        return FileResponse(STATIC_DIR / "signup.html")
+
+    @app.get("/admin")
+    def admin_home() -> FileResponse:
+        if db.admin_bootstrapped():
+            return FileResponse(STATIC_DIR / "admin.html")
+        return FileResponse(STATIC_DIR / "signup.html")
+
     @app.get("/favicon.ico")
     def favicon() -> Response:
         return Response(status_code=204)
 
     @app.get("/health")
     def health() -> dict[str, Any]:
-        configured = sorted(role for role, token in settings.tokens.items() if token)
-        return {
-            "ok": True,
-            "roles_configured": configured,
-            "all_roles_configured": configured == sorted(ROLES),
-        }
+        return _health_payload(db, settings)
+
+    @app.get("/ready")
+    def ready() -> dict[str, Any]:
+        payload = _health_payload(db, settings)
+        try:
+            db.conn.execute("SELECT 1").fetchone()
+            payload["db"] = True
+        except Exception:
+            payload["ok"] = False
+            payload["db"] = False
+        payload["ready"] = bool(payload["ok"] and payload["db"])
+        return payload
+
+    @app.post("/api/auth/bootstrap")
+    def auth_bootstrap(request: Request, body: BootstrapIn) -> JSONResponse:
+        token = _extract_bootstrap_token(request, body)
+        if not token:
+            raise HTTPException(status_code=401, detail="missing bootstrap token")
+        try:
+            result = consume_bootstrap(
+                settings,
+                db,
+                token=token,
+                email=body.email,
+                password=body.password,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        user = result["user"]
+        response = JSONResponse(
+            {
+                "ok": True,
+                "admin_bootstrapped": True,
+                "user": {
+                    "id": user["id"],
+                    "kind": user["kind"],
+                    "email": user["email"],
+                    "display_name": user["display_name"],
+                },
+            }
+        )
+        response.set_cookie(
+            key="hub_session",
+            value=result["session_token"],
+            httponly=True,
+            samesite="lax",
+            max_age=12 * 3600,
+            path="/",
+        )
+        return response
 
     @app.get("/api/meta")
     def meta(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:

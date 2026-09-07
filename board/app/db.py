@@ -55,6 +55,39 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_apply_url ON jobs(apply_url);
 CREATE INDEX IF NOT EXISTS idx_events_job ON events(job_id);
+
+CREATE TABLE IF NOT EXISTS secrets_meta (
+    key TEXT PRIMARY KEY,
+    value_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    used_at TEXT,
+    extra_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    track TEXT,
+    email TEXT,
+    password_hash TEXT,
+    display_name TEXT,
+    metadata_json TEXT,
+    created_by TEXT,
+    disabled_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email
+    ON users(email) WHERE email IS NOT NULL AND email != '';
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    last_seen TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
 """
 
 COLUMN_TO_FIELD = {
@@ -384,6 +417,131 @@ class BoardDB:
 
     def vacuum(self) -> None:
         self.conn.execute("VACUUM")
+
+    def admin_bootstrapped(self) -> bool:
+        cur = self.conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM users
+            WHERE kind = 'admin' AND (disabled_at IS NULL OR disabled_at = '')
+            """
+        )
+        row = cur.fetchone()
+        return bool(row and int(row["n"]) > 0)
+
+    def get_secret_meta(self, key: str) -> dict[str, Any] | None:
+        cur = self.conn.execute("SELECT * FROM secrets_meta WHERE key = ?", (key,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "key": row["key"],
+            "value_hash": row["value_hash"],
+            "created_at": row["created_at"],
+            "used_at": row["used_at"],
+            "extra": _load(row["extra_json"], {}),
+        }
+
+    def upsert_secret_meta(self, key: str, value_hash: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+        now = utc_now()
+        existing = self.get_secret_meta(key)
+        if existing and not existing.get("used_at"):
+            self.conn.execute(
+                """
+                UPDATE secrets_meta
+                SET value_hash = ?, created_at = ?, extra_json = ?
+                WHERE key = ?
+                """,
+                (value_hash, now, _dump(extra or existing.get("extra") or {}), key),
+            )
+        else:
+            self.conn.execute(
+                """
+                INSERT INTO secrets_meta (key, value_hash, created_at, used_at, extra_json)
+                VALUES (?, ?, ?, NULL, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value_hash = excluded.value_hash,
+                    created_at = excluded.created_at,
+                    used_at = NULL,
+                    extra_json = excluded.extra_json
+                """,
+                (key, value_hash, now, _dump(extra or {})),
+            )
+        self.conn.commit()
+        stored = self.get_secret_meta(key)
+        if stored is None:
+            raise RuntimeError("secrets_meta upsert did not persist")
+        return stored
+
+    def mark_secret_used(self, key: str) -> None:
+        self.conn.execute(
+            "UPDATE secrets_meta SET used_at = ? WHERE key = ?",
+            (utc_now(), key),
+        )
+        self.conn.commit()
+
+    def create_admin(
+        self,
+        *,
+        user_id: str,
+        email: str,
+        password_hash: str,
+        display_name: str,
+    ) -> dict[str, Any]:
+        now = utc_now()
+        self.conn.commit()
+        self.conn.execute("BEGIN IMMEDIATE")
+        cur = self.conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM users
+            WHERE kind = 'admin' AND (disabled_at IS NULL OR disabled_at = '')
+            """
+        )
+        row = cur.fetchone()
+        if row and int(row["n"]) > 0:
+            self.conn.rollback()
+            raise PermissionError("admin already bootstrapped")
+        self.conn.execute(
+            """
+            INSERT INTO users (
+                id, kind, track, email, password_hash, display_name,
+                metadata_json, created_by, disabled_at, created_at
+            ) VALUES (?, 'admin', NULL, ?, ?, ?, '{}', NULL, NULL, ?)
+            """,
+            (user_id, email, password_hash, display_name, now),
+        )
+        self.conn.commit()
+        return {
+            "id": user_id,
+            "kind": "admin",
+            "track": None,
+            "email": email,
+            "display_name": display_name,
+            "created_at": now,
+        }
+
+    def create_session(
+        self,
+        *,
+        session_id: str,
+        user_id: str,
+        token_hash: str,
+        expires_at: str,
+    ) -> dict[str, Any]:
+        now = utc_now()
+        self.conn.execute(
+            """
+            INSERT INTO sessions (id, user_id, token_hash, expires_at, last_seen)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (session_id, user_id, token_hash, expires_at, now),
+        )
+        self.conn.commit()
+        return {
+            "id": session_id,
+            "user_id": user_id,
+            "expires_at": expires_at,
+            "last_seen": now,
+        }
 
 
 def _owners(raw: Any) -> dict[str, str]:

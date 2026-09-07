@@ -58,6 +58,10 @@ class Settings:
     host: str
     port: int
     tokens: dict[str, str]
+    public_url: str = ""
+    bootstrap_token: str = ""
+    env_path: Path | None = None
+    tokens_json_path: Path | None = None
 
 
 def load_settings() -> Settings:
@@ -69,10 +73,16 @@ def load_settings() -> Settings:
         db_path = BOARD_DIR / db_path
     host = merged.get("BOARD_HOST", "0.0.0.0") or "0.0.0.0"
     port_raw = merged.get("BOARD_PORT", "8787") or "8787"
+    public_url = (merged.get("HUB_PUBLIC_URL") or "").strip().rstrip("/")
+    bootstrap_token = (merged.get("HUB_BOOTSTRAP_TOKEN") or "").strip()
     return Settings(
         board_dir=BOARD_DIR,
         db_path=db_path,
         host=host,
         port=int(port_raw),
         tokens=load_token_files(),
+        public_url=public_url,
+        bootstrap_token=bootstrap_token,
+        env_path=ENV_PATH,
+        tokens_json_path=TOKENS_JSON_PATH,
     )

@@ -10,6 +10,7 @@ Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts
 | apply | _unclaimed_ | all ATS | |
 | outreach | _unclaimed_ | email + linkedin_dm | |
 | maintainer | cursor-cloud-agent | skills + lists + hunt board | 2026-09-06 |
+| maintainer | cursor-cloud-agent (job-hub-skeleton) | Job Hub phase A: deploy + admin bootstrap (no discovery/apply/outreach) | 2026-09-07 |
 
 ## Jobs
 
