@@ -1,0 +1,16 @@
+# Optional self-host. Not required for Cursor Cloud (use scripts/hub_deploy.sh, bind 0.0.0.0:8787).
+services:
+  hub:
+    image: python:3.12-slim-bookworm
+    working_dir: /repo
+    command: ["bash", "scripts/hub_deploy.sh"]
+    ports:
+      - "8787:8787"
+    environment:
+      BOARD_HOST: "0.0.0.0"
+      BOARD_PORT: "8787"
+      HUB_PUBLIC_URL: "http://127.0.0.1:8787"
+    volumes:
+      - ..:/repo
+      - ./data:/repo/board/data
+      - ./.env:/repo/board/.env

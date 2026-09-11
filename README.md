@@ -14,7 +14,7 @@ Nobody jumps the queue.
 
 This is the agent-facing operating system: how to pick a role, which skills and MCPs to attach, how to share work without hosting a server, and how to hand off a job so another bot can finish it.
 
-For a live multi-agent hunt on a shared machine, maintainer also runs the private **Get That Job** board (`board/`): FastAPI + SQLite + admin UI. That board is the live coordination plane. The git ledger remains the template and airgap protocol. See [`board/README.md`](board/README.md).
+For a live multi-agent hunt on a shared machine, maintainer also runs the private **Get That Job** board (`board/`): FastAPI + SQLite + admin UI (Job Hub). That board is the live coordination plane. The git ledger remains the template and airgap protocol. See [`board/README.md`](board/README.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md).
 
 ## Start here
 
@@ -86,7 +86,7 @@ Full writeup: [`docs/architecture.md`](docs/architecture.md).
 
 Bots may have no shared network except git. The **git ledger is the airgap protocol** (YAML per job). It stays.
 
-When several agents share a host, maintainer runs the **hunt board** as the live coordination UI/API. Discovery/apply/outreach consume it; they do not own it.
+When several agents share a host, maintainer runs the **hunt board / Job Hub** as the live coordination UI/API. Discovery/apply/outreach consume it; they do not own it. If `HUB_URL` is set, that is the live list — see [`docs/job-hub/human.md`](docs/job-hub/human.md) (operator) and [`docs/job-hub/agent.md`](docs/job-hub/agent.md) (join, pack, queue). **Maintainer ≠ discovery.**
 
 | Layer | What it is | When to use |
 | --- | --- | --- |

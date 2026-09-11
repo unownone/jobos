@@ -91,7 +91,7 @@ Source of truth for git-based hunts: jobs, people, and events as files. Git is t
 
 ### Hunt board (live overlay)
 
-[`board/`](../board/README.md) is a FastAPI + SQLite private board with role auth (`X-Role` + `X-Token`) and an admin UI. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. It does not replace the ledger schema. Import history with `scripts/board_import_ledger.py`.
+[`board/`](../board/README.md) is a FastAPI + SQLite private board (Job Hub) with Bearer / `X-Hub-Key` owner-agent keys, plus deprecated `X-Role` + `X-Token`. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. It does not replace the ledger schema. Import history with `scripts/board_import_ledger.py`. Operator/agent docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md).
 
 ## Data flow for one job
 

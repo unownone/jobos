@@ -6,6 +6,8 @@ Private **live coordination plane** for a multi-agent job hunt. FastAPI + SQLite
 
 This is not a replacement for the git ledger in `ledger/`. See [Architecture](#architecture).
 
+**Job Hub docs:** operator [`docs/job-hub/human.md`](../docs/job-hub/human.md) (deploy, signup, invites, export); agents [`docs/job-hub/agent.md`](../docs/job-hub/agent.md) (`$HUB_KEY`, join, onboarding, heartbeat, queue). Maintainer owns this process; maintainer is not discovery.
+
 ![Admin dashboard — job list](docs/01-dashboard.png)
 
 The admin UI after **Connect**: one shared list, status pills, filter bar, stats (`N shown · N total · role …`). Open a row to edit, **Pause** (freeze, keep status), or **Stop** (withdraw). Tokens stay in the header password field and are never committed.
@@ -112,12 +114,16 @@ Give each bot **only** its role token, out of band (not in the codebase, not in 
 ## Start
 
 ```bash
+bash scripts/hub_deploy.sh
+# or
 bash board/start.sh
 # or
 make -C board run
 ```
 
-Listens on `http://0.0.0.0:8787` (override `BOARD_HOST` / `BOARD_PORT`). First start generates tokens if missing.
+Listens on `http://0.0.0.0:8787` (override `BOARD_HOST` / `BOARD_PORT`). First start generates compat role tokens **and** a one-time `jh_boot_*` admin bootstrap token if no admin user exists. Signup URL is printed to stdout (`Admin signup: …/admin/signup#bootstrap=…`). Set `HUB_PUBLIC_URL` for the printed origin. Docker Compose (`board/docker-compose.yml`) is optional; Cursor Cloud does not need Docker.
+
+After `POST /api/auth/bootstrap`, the plaintext bootstrap token is wiped from `board/.env` / `tokens.local.json`. `GET /health` includes `admin_bootstrapped` (no secrets). Existing `X-Role` + `X-Token` job APIs stay valid (compat).
 
 ```bash
 make -C board test          # API + token generator tests
@@ -241,7 +247,7 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 ## Maintainer runbook
 
 1. Claim `maintainer` on `ledger/INDEX.md`.
-2. `bash board/start.sh` (generates tokens on first run).
+2. `bash scripts/hub_deploy.sh` (or `bash board/start.sh`). Generates compat role tokens and a one-time bootstrap token on first run.
 3. Issue each bot its token from `board/.env` / `--print`. Do not commit that file.
 4. Optional: import git history  
    `uv run scripts/board_import_ledger.py --db board/data/board.db`  
@@ -261,9 +267,22 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 
 | Method | Path | Who |
 | --- | --- | --- |
-| GET | `/health` | public (no secrets) |
-| GET | `/` | admin UI (token in the browser, not in git) |
-| GET | `/api/whoami` `/api/meta` `/api/jobs` `/api/jobs/{id}` `/api/events` | any valid role |
+| GET | `/health` `/ready` | public (no secrets; `admin_bootstrapped` bool) |
+| GET | `/` | Board UI (compat role token in the browser, not in git) |
+| GET | `/admin/signup` | one-time admin bootstrap form |
+| GET | `/login` `/admin/invites` `/admin/users` `/join/{id}` | login + invite UI + presence directory; join is public with `?s=` |
+| POST | `/api/auth/bootstrap` | bootstrap token → first admin (cookie) |
+| POST | `/api/auth/login` `/api/auth/logout` | session cookie `hub_session` (12h idle) |
+| GET | `/api/auth/me` | session, Bearer, X-Hub-Key, or compat headers |
+| POST/GET | `/api/invites` | admin: create (secret once) / list (no secrets) |
+| POST | `/api/invites/{id}/revoke` | admin |
+| GET | `/api/join/{id}?s=` | invite signup payload (no pack zip yet) |
+| POST | `/api/auth/join` | owner or agent + one-time `jh_own_*` / `jh_agt_*` |
+| POST | `/api/agents` `/api/agents/{id}/rotate_key` `/disable` | owner or admin |
+| POST | `/api/presence/heartbeat` | session, Bearer, or Connect token; every 10s |
+| GET | `/api/presence` | admin, maintenance; owners see own track. No API keys. |
+| GET | `/api/users` | admin directory including disabled. No API keys. |
+| GET | `/api/whoami` `/api/meta` `/api/jobs` `/api/jobs/{id}` `/api/events` | any valid role / key |
 | POST | `/api/jobs` | discovery, admin |
 | PATCH | `/api/jobs/{id}` | discovery (lane only), apply, outreach, admin |
 | POST | `/api/jobs/{id}/pause` `/resume` `/stop` | admin |
@@ -271,6 +290,10 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 | GET | `/api/hygiene` | admin, maintenance |
 | POST | `/api/hygiene/vacuum` | admin, maintenance |
 | POST | `/api/import` | admin, maintenance (`replace` is admin-only) |
+| GET | `/api/export/ledger` | admin, maintenance — yaml+jsonl tarball or `?format=json`; strips tokens |
+| GET/POST/PATCH | `/api/people` `/api/people/{id}` | outreach, admin — hiring contacts, no secrets |
+| GET | `/api/candidate/public` | any user — `{present:false}` until admin supplies yaml |
+| GET | `/api/candidate/resume` | apply, outreach, admin |
 | POST | `/api/metrics/token_burn` | any authenticated role |
 | GET | `/api/metrics/token_burn` `/api/metrics/summary` | admin, maintenance |
 

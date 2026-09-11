@@ -33,7 +33,9 @@ def h(role: str, actor: str = "pytest") -> dict[str, str]:
 def test_health_is_public(client: TestClient) -> None:
     res = client.get("/health")
     assert res.status_code == 200
-    assert res.json()["ok"] is True
+    body = res.json()
+    assert body["ok"] is True
+    assert "admin_bootstrapped" in body
 
 
 def test_api_requires_headers(client: TestClient) -> None:

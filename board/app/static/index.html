@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Get That Job 2.0 — Board</title>
+  <title>Job Hub — Board</title>
   <style>
     :root {
       --bg: #0e1218;
@@ -77,7 +77,12 @@
       font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px;
     }
     .drop .menu button:hover, .drop .menu button.active { background: var(--panel-2); }
-    main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; height: calc(100vh - 109px); }
+    main { display: grid; grid-template-columns: 220px minmax(0, 1fr) 380px; height: calc(100vh - 109px); }
+    #presenceRail { border-right: 1px solid var(--line); background: var(--panel); padding: 12px; overflow: auto; }
+    #presenceRail h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    #presenceRail .who { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+    #presenceRail .who .name { font-weight: 650; }
+    #presenceRail .muted { color: var(--muted); font-size: 11px; }
     #list { overflow: auto; }
     .side { border-left: 1px solid var(--line); background: var(--panel); padding: 16px; overflow: auto; }
     table { width: 100%; border-collapse: collapse; }
@@ -93,6 +98,9 @@
     .pill.apply_blocked { background: #2a3344; color: var(--grey); }
     .pill.skipped, .pill.closed_rejected, .pill.closed_expired { background: #3a2228; color: var(--bad); }
     .pill.stopped, .pill.closed_withdrawn { background: #3a1d1d; color: var(--stop); }
+    .pill.logged_in, .pill.idle { background: #163832; color: var(--teal); }
+    .pill.working, .pill.producing { background: #3a2e14; color: var(--warn); }
+    .pill.stale, .pill.offline { background: #2a3344; color: var(--grey); }
     .side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
     .side h2 { margin: 0; font-size: 15px; }
     .iconx { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); width: 28px; height: 28px; padding: 0; }
@@ -108,6 +116,7 @@
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     @media (max-width: 960px) {
       main { grid-template-columns: 1fr; height: auto; }
+      #presenceRail { border-right: 0; border-bottom: 1px solid var(--line); max-height: 28vh; }
       .side { border-left: 0; border-top: 1px solid var(--line); min-height: 50vh; }
     }
   </style>
@@ -118,7 +127,13 @@
       <div class="logo">GTJ</div>
       <div>
         <h1>Job Hunt Board</h1>
-        <div class="sub">Get That Job 2.0 · local coordination</div>
+        <div class="sub">Get That Job 2.0 · humans and agents share <code>/api/jobs</code></div>
+        <div class="sub" id="hubLinks">
+          <a href="/login">Login</a> ·
+          <a href="/admin">Admin</a> ·
+          <a href="/admin/users">Presence</a> ·
+          <a href="/api/onboarding">Onboarding JSON</a>
+        </div>
       </div>
     </div>
     <form id="connectForm" class="connect">
@@ -132,7 +147,7 @@
         </select>
       </label>
       <label for="token">Token
-        <input id="token" type="password" autocomplete="off" placeholder="role token" />
+        <input id="token" type="password" autocomplete="off" placeholder="role token or agent key" />
       </label>
       <button id="connectBtn" type="submit">Connect</button>
       <span id="connStatus" class="status"><span class="dot"></span><span id="connLabel">disconnected</span></span>
@@ -152,8 +167,18 @@
     <button class="secondary" id="refresh" type="button">Refresh</button>
     <span class="stats" id="stats">0 shown · 0 total · not connected</span>
   </div>
+  <div id="compatBanner" class="warnbox" hidden style="margin:0 18px">Compat X-Role tokens are deprecated. Paste a Hub Bearer key (<code>jh_own_</code> / <code>jh_agt_</code>) or log in.</div>
+  <div id="queueRail" class="filters" hidden>
+    <span class="sub" id="queueLabel">Queue</span>
+    <span class="stats" id="queueStats"></span>
+  </div>
   <main>
-    <section id="list"><div class="empty">Connect with a role token to load the shared board.</div></section>
+    <aside id="presenceRail">
+      <h2>Presence</h2>
+      <div class="muted" id="presenceEmpty">Connect to see who is logged in and heartbeating. Join via an admin invite URL.</div>
+      <div id="presenceList"></div>
+    </aside>
+    <section id="list"><div class="empty">Connect with a role token or paste a Hub API key to load the shared board.</div></section>
     <aside class="side" id="side"></aside>
   </main>
 
@@ -178,9 +203,27 @@
     let statusFilter = "";
     let connected = false;
 
+    let heartbeatTimer = null;
+    let queueTimer = null;
+
+    function csrfToken() {
+      const hit = document.cookie.split("; ").find((c) => c.startsWith("hub_csrf="));
+      return hit ? decodeURIComponent(hit.split("=").slice(1).join("=")) : "";
+    }
+
     function headers() {
-      const h = { "X-Role": store.role, "X-Token": store.token, "Content-Type": "application/json" };
+      const h = { "Content-Type": "application/json" };
+      const token = store.token;
+      if (token && token.startsWith("jh_")) {
+        h["Authorization"] = "Bearer " + token;
+        h["X-Hub-Key"] = token;
+      } else if (store.role && token) {
+        h["X-Role"] = store.role;
+        h["X-Token"] = token;
+      }
       if (store.actor) h["X-Actor"] = store.actor;
+      const csrf = csrfToken();
+      if (csrf) h["X-CSRF"] = csrf;
       return h;
     }
 
@@ -249,8 +292,93 @@
       document.getElementById("closeSide").onclick = () => { selectedId = null; emptySide(); renderTable(); };
     }
 
+    function stopPresenceLoop() {
+      if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+      if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
+      if (queueTimer) { clearInterval(queueTimer); queueTimer = null; }
+    }
+
+    async function sendHeartbeat() {
+      if (!connected) return;
+      const body = { status_hint: selectedId ? "working" : "logged_in" };
+      if (selectedId) {
+        body.task_id = selectedId;
+        body.task_kind = "job";
+        body.job_id = selectedId;
+      }
+      try {
+        await api("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(body) });
+      } catch (_err) {
+        /* directory is best-effort; board still works */
+      }
+    }
+
+    function renderPresence(users) {
+      const empty = document.getElementById("presenceEmpty");
+      const list = document.getElementById("presenceList");
+      if (!users || !users.length) {
+        empty.hidden = false;
+        empty.textContent = "No heartbeats yet. Stay connected.";
+        list.innerHTML = "";
+        return;
+      }
+      empty.hidden = true;
+      list.innerHTML = users.map((u) => {
+        const task = u.current_task && u.current_task.id ? u.current_task.id : "";
+        return `<div class="who">
+          <div class="name">${escapeHtml(u.display_name || u.user_id)}</div>
+          <div>${pill(u.status || "offline")} <span class="muted">${escapeHtml(u.kind || "")} · ${escapeHtml(u.track || u.role || "")}</span></div>
+          <div class="muted">${escapeHtml([u.model, u.harness, u.bed].filter(Boolean).join(" · "))}</div>
+          <div class="muted">${escapeHtml(u.last_seen || "")}${task ? " · " + escapeHtml(task) : ""}</div>
+        </div>`;
+      }).join("");
+    }
+
+    async function loadPresence() {
+      if (!connected) return;
+      try {
+        const data = await api("/api/presence");
+        renderPresence(data.users || []);
+      } catch (_err) {
+        document.getElementById("presenceEmpty").hidden = false;
+        document.getElementById("presenceEmpty").textContent = "Directory is admin, maintenance, or track-owner only.";
+        document.getElementById("presenceList").innerHTML = "";
+      }
+    }
+
+    function startPresenceLoop() {
+      stopPresenceLoop();
+      sendHeartbeat().then(loadPresence);
+      heartbeatTimer = setInterval(sendHeartbeat, 10000);
+      presenceTimer = setInterval(loadPresence, 10000);
+    }
+
+    async function loadQueue() {
+      const rail = document.getElementById("queueRail");
+      if (!caps || !(caps.can_hygiene || caps.kind === "owner" || caps.role === "admin")) {
+        rail.hidden = true;
+        return;
+      }
+      try {
+        const data = await api("/api/queue?limit=20");
+        rail.hidden = false;
+        const items = data.items || [];
+        document.getElementById("queueStats").textContent =
+          items.slice(0, 8).map((it) => it.kind + ":" + it.status).join(" · ") || "empty";
+      } catch (_err) {
+        rail.hidden = true;
+      }
+    }
+
+    function startQueueLoop(me) {
+      if (!(me.can_hygiene || me.kind === "owner" || me.role === "admin")) return;
+      loadQueue();
+      queueTimer = setInterval(loadQueue, 10000);
+    }
+
     async function boot() {
-      if (!store.role || !store.token) {
+      const hasCreds = Boolean(store.role && store.token) || Boolean(csrfToken());
+      if (!hasCreds) {
         setConnected(false, "disconnected");
         emptySide();
         return;
@@ -260,12 +388,18 @@
         caps = me;
         const meta = await api("/api/meta");
         statuses = meta.statuses;
-        document.getElementById("role").value = me.role;
+        if (me.role) document.getElementById("role").value = me.role;
+        const compatBanner = document.getElementById("compatBanner");
+        const usingBearer = Boolean(store.token && store.token.startsWith("jh_"));
+        compatBanner.hidden = !(me.compat && !usingBearer);
         setConnected(true, "connected");
         renderStatusMenu();
+        startPresenceLoop();
+        startQueueLoop(me);
         await loadJobs();
         if (!selectedId) emptySide();
       } catch (err) {
+        stopPresenceLoop();
         setConnected(false, "auth failed");
         caps = null;
         document.getElementById("stats").textContent = err.message;
@@ -301,10 +435,11 @@
           <td>${escapeHtml(j.company)}</td>
           <td>${escapeHtml(j.title)}</td>
           <td>${pill(j.status, j.stopped)}</td>
+          <td class="muted">${escapeHtml((j.claim && (j.claim.claimed_by || j.claim.kind)) || "")}</td>
         </tr>`).join("");
       document.getElementById("list").innerHTML = `
         <table>
-          <thead><tr><th>ID</th><th>Company</th><th>Title</th><th>Status</th></tr></thead>
+          <thead><tr><th>ID</th><th>Company</th><th>Title</th><th>Status</th><th>Claim</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       document.querySelectorAll("#list tbody tr").forEach(tr => {
@@ -327,7 +462,7 @@
           <h2>#${escapeHtml(job.id)} · ${escapeHtml(job.company)}</h2>
           <button class="iconx" id="closeSide" type="button" aria-label="Close">X</button>
         </div>
-        ${job.stopped ? `<div class="warnbox">${job.status === "closed_withdrawn" ? "Stopped" : "Paused"}: ${escapeHtml(job.stop_reason || "")}</div>` : ""}
+        ${job.claim ? `<div class="warnbox">Claimed: ${escapeHtml(job.claim.kind)} by ${escapeHtml(job.claim.claimed_by || "")} until ${escapeHtml(job.claim.lease_until || "")}</div>` : ""}
         <label>Company</label>
         <input id="f_company" value="${escapeAttr(job.company)}" />
         <label>Title</label>

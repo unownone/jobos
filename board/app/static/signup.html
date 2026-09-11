@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Hub — Admin</title>
+  <style>
+    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    main { max-width: 28rem; margin: 12vh auto; padding: 1.5rem; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+    h1 { font-size: 1.15rem; margin: 0 0 0.35rem; }
+    p { color: var(--muted); margin: 0 0 1rem; }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin: 0.75rem 0 0.25rem; }
+    input { width: 100%; padding: 0.5rem 0.65rem; border-radius: 8px; border: 1px solid var(--line); background: #0e1218; color: var(--text); }
+    button { margin-top: 1rem; width: 100%; padding: 0.6rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+    .err { color: var(--bad); min-height: 1.2em; margin-top: 0.75rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Create the Hub admin</h1>
+    <p>One-time bootstrap. Admin is a human owner, not a job-search track. Token is not stored after signup.</p>
+    <form id="form">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="username" required />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required />
+      <label for="token">Bootstrap token</label>
+      <input id="token" name="token" type="password" autocomplete="off" required />
+      <button type="submit">Create admin</button>
+      <div class="err" id="err"></div>
+    </form>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+    const fromHash = params.get("bootstrap");
+    if (fromHash) document.getElementById("token").value = fromHash;
+    document.getElementById("form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const err = document.getElementById("err");
+      err.textContent = "";
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const token = document.getElementById("token").value;
+      const res = await fetch("/api/auth/bootstrap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify({ email, password, token }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
+        return;
+      }
+      location.href = "/admin";
+    });
+  </script>
+</body>
+</html>

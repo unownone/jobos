@@ -10,6 +10,14 @@ Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts
 | apply | _unclaimed_ | all ATS | |
 | outreach | _unclaimed_ | email + linkedin_dm | |
 | maintainer | cursor-cloud-agent | skills + lists + hunt board | 2026-09-06 |
+| maintainer | cursor-cloud-agent (job-hub-skeleton) | Job Hub phase A: deploy + admin bootstrap (no discovery/apply/outreach) | 2026-09-07 |
+| maintainer | cursor-cloud-agent (job-hub-auth) | Job Hub phase B: invites, owners, agent keys, admin login (no discovery/apply/outreach) | 2026-09-07 |
+| maintainer | cursor-cloud-agent (job-hub-presence) | Job Hub phase C: heartbeat, presence, admin directory (no discovery/apply/outreach) | 2026-09-07 |
+| maintainer | cursor-cloud-agent (job-hub-queue) | Job Hub phase D: queue claim/ack/leases (no discovery/apply/outreach) | 2026-09-07 |
+| maintainer | cursor-cloud-agent (job-hub-onboarding) | Job Hub phase E: /api/onboarding + skill/MCP/script packs (no discovery/apply/outreach) | 2026-09-07 |
+| maintainer | cursor-cloud-agent (job-hub-messages) | Job Hub phase G: inter-agent inbox APIs (no discovery/apply/outreach) | 2026-09-07 |
+| maintainer | cursor-cloud-agent (job-hub-board-api) | Job Hub phase F: people + ledger export + catalog gate + board UI hub (no discovery/apply/outreach) | 2026-09-07 |
+| maintainer | cursor-cloud-agent (job-hub-docs) | Job Hub phase H: operator + agent docs (no discovery/apply/outreach) | 2026-09-07 |
 
 ## Jobs
 

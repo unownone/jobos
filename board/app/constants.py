@@ -10,6 +10,62 @@ ROLES = (
     "maintenance",
 )
 
+# Hub API track names. Process role `apply` / `maintainer` are aliases.
+TRACKS = (
+    "discovery",
+    "application",
+    "outreach",
+    "maintenance",
+)
+
+TRACK_ALIASES = {
+    "discovery": "discovery",
+    "application": "application",
+    "apply": "application",
+    "outreach": "outreach",
+    "maintenance": "maintenance",
+    "maintainer": "maintenance",
+}
+
+TRACK_TO_ROLE = {
+    "discovery": "discovery",
+    "application": "apply",
+    "outreach": "outreach",
+    "maintenance": "maintenance",
+}
+
+ROLE_TO_TRACK = {
+    "discovery": "discovery",
+    "apply": "application",
+    "outreach": "outreach",
+    "maintenance": "maintenance",
+    "admin": None,
+}
+
+INVITE_MODES = (
+    "owner_then_agents",
+    "agents_only",
+    "owner_only",
+)
+
+USER_KINDS = (
+    "admin",
+    "viewer",
+    "owner",
+    "agent",
+)
+
+METADATA_KNOWN_KEYS = (
+    "model",
+    "harness",
+    "bed",
+    "provider",
+    "runtime",
+    "version",
+    "capabilities",
+    "notes",
+)
+
 STATUSES = (
     "discovered",
     "enriching",
@@ -139,10 +195,26 @@ TOKEN_ENV = {
     "maintenance": "BOARD_TOKEN_MAINTENANCE",
 }
 
+def canonical_track(value: str | None) -> str | None:
+    if value is None:
+        return None
+    key = value.strip().lower()
+    return TRACK_ALIASES.get(key)
+
+
+def role_for_track(track: str | None) -> str | None:
+    if not track:
+        return None
+    return TRACK_TO_ROLE.get(track)
+
+
 CREATE_ROLES = frozenset({"discovery", "admin"})
 STOP_ROLES = frozenset({"admin"})
 DELETE_ROLES = frozenset({"admin"})
 HYGIENE_ROLES = frozenset({"admin", "maintenance"})
 IMPORT_ROLES = frozenset({"admin", "maintenance"})
+EXPORT_ROLES = IMPORT_ROLES
 METRICS_READ_ROLES = frozenset({"admin", "maintenance"})
 PATCH_ROLES = frozenset({"discovery", "apply", "outreach", "admin"})
+PEOPLE_ROLES = frozenset({"outreach", "admin"})
+RESUME_ROLES = frozenset({"apply", "outreach", "admin"})

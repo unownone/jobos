@@ -14,12 +14,15 @@ from app.constants import (
     DELETE_ROLES,
     DISCOVERY_FIELDS,
     DISCOVERY_LANE,
+    EXPORT_ROLES,
     HYGIENE_ROLES,
     IMPORT_ROLES,
     METRICS_READ_ROLES,
     OUTREACH_FIELDS,
     OUTREACH_LANE,
     PATCH_ROLES,
+    PEOPLE_ROLES,
+    RESUME_ROLES,
     STATUSES,
     STOP_ROLES,
 )
@@ -36,6 +39,9 @@ def capabilities(role: str) -> dict[str, Any]:
         "can_delete": role in DELETE_ROLES,
         "can_hygiene": role in HYGIENE_ROLES,
         "can_import": role in IMPORT_ROLES,
+        "can_export": role in EXPORT_ROLES,
+        "can_people": role in PEOPLE_ROLES,
+        "can_resume": role in RESUME_ROLES,
         "can_log_metrics": True,
         "can_read_metrics": role in METRICS_READ_ROLES,
         "patch_fields": sorted(_patch_fields_for(role)),
@@ -80,6 +86,30 @@ def ensure_can_import(role: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="only admin or maintenance can import history",
+        )
+
+
+def ensure_can_export(role: str) -> None:
+    if role not in EXPORT_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="only admin or maintenance can export the ledger",
+        )
+
+
+def ensure_can_people(role: str) -> None:
+    if role not in PEOPLE_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="only outreach or admin can read or write people",
+        )
+
+
+def ensure_can_resume(role: str) -> None:
+    if role not in RESUME_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="discovery cannot download the resume PDF",
         )
 
 
