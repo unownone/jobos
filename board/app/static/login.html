@@ -33,7 +33,7 @@
     <p id="signupWrap" hidden><a id="signupLink" href="/admin/signup">Create the first admin</a></p>
   </main>
   <script>
-    const next = new URLSearchParams(location.search).get("next") || "/admin/invites";
+    const requested = new URLSearchParams(location.search).get("next") || "";
     fetch("/health").then((r) => r.json()).then((h) => {
       const wrap = document.getElementById("signupWrap");
       if (wrap) wrap.hidden = Boolean(h.admin_bootstrapped);
@@ -55,7 +55,12 @@
         err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
         return;
       }
-      location.href = next;
+      const status = await fetch("/api/candidate/status").then((r) => r.json()).catch(() => ({}));
+      if (!status.onboarded) {
+        location.href = "/onboarding";
+        return;
+      }
+      location.href = requested || "/admin";
     });
   </script>
 </body>

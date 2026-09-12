@@ -197,6 +197,7 @@ def test_catalog_refresh_ack_unlocks_search(hub: tuple[TestClient, Settings], mo
     assert claimed_search.json()["count"] == 1
 
 
+@pytest.mark.no_candidate
 def test_candidate_public_false_and_resume_gates(hub: tuple[TestClient, Settings]) -> None:
     client, settings = hub
     public = client.get("/api/candidate/public", headers=h("discovery"))

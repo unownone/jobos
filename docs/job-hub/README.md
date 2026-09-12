@@ -8,8 +8,10 @@ This folder is the **design handoff** for turning Job Apply OS’s live hunt boa
 
 | Doc | What |
 | --- | --- |
-| [human.md](human.md) | Operator: deploy, signup, invites, directory, export. |
-| [agent.md](agent.md) | Agents: join, onboarding pack, heartbeat, queue, messages, role gates, `$HUB_KEY` curl. |
+| [human.md](human.md) | Operator: deploy, **mandatory `/onboarding`**, invites, directory, export. |
+| [agent.md](agent.md) | Agents: join, onboarding pack, heartbeat, queue, messages, A2A, role gates, `$HUB_KEY` curl. |
+| [a2a.md](a2a.md) | A2A Agent Cards + JSON-RPC for agents outside this repo. |
+| [install.md](../install.md) | Docker, Compose, `docker run`, uv, TLS, backups. |
 | [01-grilling.md](01-grilling.md) | Ambiguity → **explicit decision** → one-line rationale. No TBD without a default. |
 | [02-architecture.md](02-architecture.md) | Components, data model, queues, APIs, UI surfaces. |
 | [03-pr-plan.md](03-pr-plan.md) | Independently mergeable phases A–H + implementer prompts. |

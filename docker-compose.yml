@@ -2,6 +2,9 @@
 #   HUB_PUBLIC_HOST=12.234.244.34 docker compose up -d --build
 # Traefik listens on 80 and 443. The board is served at /.
 #
+# Plain Hub on :8787 (no Traefik): docker compose -f docker-compose.plain.yml up -d --build
+# First operator step after signup is always /onboarding.
+#
 # HUB_PUBLIC_HOST may be a hostname, IPv4, or IP:port (invites use that origin).
 
 name: jobos

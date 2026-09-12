@@ -4,11 +4,12 @@ This is the contract. Skills implement slices of it. If a skill and this documen
 
 ## 0. Preconditions
 
-- `profiles/candidate.yaml` exists and is truthful.
-- At least one resume PDF exists locally at the path named in the profile.
+- Hub: finish `/onboarding` so `GET /health` has `candidate_onboarded: true`. Airgap: `profiles/candidate.yaml` exists and is truthful (never the example file as live data).
+- At least one resume PDF exists locally or on the Hub (`PUT /api/candidate/resume`).
 - The operator has claimed a role in `ledger/INDEX.md`.
 - Discovery has a reasonably current `docs/catalogs/skills-and-mcps.md` (or will refresh it first).
 - Maintainer, when claimed, also keeps `skills/lists/` in sync with that catalog.
+- Install/host: [`docs/install.md`](install.md). Cross-agent protocol: [`docs/job-hub/a2a.md`](job-hub/a2a.md).
 
 ## 1. Catalog pass (discovery, first)
 

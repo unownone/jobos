@@ -126,7 +126,7 @@ def test_invite_create_join_owner_then_agent(hub: tuple[TestClient, Settings]) -
     info = preview.json()
     assert info["track"] == "discovery"
     assert info["join"]["url"] == "/api/auth/join"
-    assert info["candidate"]["present"] is False
+    assert info["candidate"]["present"] is True
     assert "model" in info["metadata_known_keys"]
 
     first = client.post(

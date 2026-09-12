@@ -85,7 +85,7 @@ def test_discovery_invite_onboarding_skills_and_no_apply_secrets(
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["track"] == "discovery"
-    assert body["candidate"]["present"] is False
+    assert body["candidate"]["present"] is True
     names = [row["name"] for row in body["skills"]]
     assert "job-discovery" in names
     assert "skill-and-mcp-catalog" in names
@@ -122,7 +122,7 @@ def test_discovery_invite_onboarding_skills_and_no_apply_secrets(
     assert info["onboarding"]["available"] is True
     assert info["onboarding"]["url"] == "/api/onboarding"
     assert info["hub"]["pack_sha"]
-    assert info["candidate"]["present"] is False
+    assert info["candidate"]["present"] is True
 
 
 def test_application_zip_contains_job_apply(hub: tuple[TestClient, Settings]) -> None:
@@ -175,13 +175,11 @@ def test_docs_path_traversal_is_404(hub: tuple[TestClient, Settings]) -> None:
 
 
 def test_candidate_present_false_in_this_workspace(hub: tuple[TestClient, Settings]) -> None:
-    client, settings = hub
-    assert public_candidate(settings.repo_root or Path("/workspace"))["present"] is False or not (
-        Path("/workspace/profiles/candidate.yaml").is_file()
-    )
+    client, _settings = hub
+    assert not Path("/workspace/profiles/candidate.yaml").is_file()
     invite_id, secret = make_invite(client, "outreach")
     body = client.get("/api/onboarding", params={"invite_id": invite_id, "s": secret}).json()
-    assert body["candidate"]["present"] is False
+    assert body["candidate"]["present"] is True
     assert "target.titles" in body["candidate"]["fields_public"]
     assert "phone" not in json.dumps(body["candidate"])
     gmail = next(c for c in body["connectors_needed"] if c["id"] == "gmail")
@@ -216,8 +214,9 @@ def test_compat_role_and_rebuild(hub: tuple[TestClient, Settings]) -> None:
     assert maint.json()["catalog_updated_at"] == "2026-09-06"
 
 
+@pytest.mark.no_candidate
 def test_public_candidate_omits_phone(tmp_path: Path) -> None:
-    (tmp_path / "profiles").mkdir()
+    (tmp_path / "profiles").mkdir(exist_ok=True)
     (tmp_path / "profiles" / "candidate.yaml").write_text(
         "identity:\n"
         '  full_name: "Secret Person"\n'

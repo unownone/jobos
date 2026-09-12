@@ -131,6 +131,7 @@ echo "Public origin: ${PUBLIC}  (invites, signup, onboarding)"
 echo "Gitignored secrets: ${ROOT}/.env ${ROOT}/tokens.local.json"
 if [[ -n "${HUB_BOOTSTRAP_TOKEN:-}" && "${HUB_BOOTSTRAP_USED:-}" != "1" ]]; then
   echo "Admin signup (one-time): ${PUBLIC}/admin/signup#bootstrap=${HUB_BOOTSTRAP_TOKEN}"
+  echo "Then onboard the candidate (required): ${PUBLIC}/onboarding"
   echo "After that admin exists, /admin/signup redirects to /login."
 fi
 echo "Sibling agents: ${PUBLIC}/api/jobs with Bearer keys (or X-Role + X-Token compat)"

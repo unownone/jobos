@@ -117,9 +117,13 @@ Give each bot **only** its role token, out of band (not in the codebase, not in 
 bash scripts/hub_deploy.sh
 # or interactive (asks for public host if unset)
 bash board/start.sh
-# or Docker + Traefik on :80 / :443, board at /
+# Docker plain (port 8787):
+docker compose -f docker-compose.plain.yml up -d --build
+# Docker + Traefik on :80 / :443, board at /
 HUB_PUBLIC_HOST=12.234.244.34 bash scripts/hub_docker.sh
 ```
+
+Install guide: [`docs/install.md`](../docs/install.md). After admin signup, **`/onboarding` is required** before invites or agents. A2A cards: `/.well-known/agent-card.json`.
 
 Listens on `http://0.0.0.0:8787` inside the process (override `BOARD_HOST` / `BOARD_PORT`). Traefik publishes **80** and **443** and routes `/` to the board. First start generates compat role tokens **and** a one-time `jh_boot_*` admin bootstrap token if no admin user exists. Signup URL is printed to stdout. Set `HUB_PUBLIC_HOST` (hostname, IP, or `IP:port`) or `HUB_PUBLIC_URL` for invite origins.
 
@@ -292,8 +296,14 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 | POST | `/api/import` | admin, maintenance (`replace` is admin-only) |
 | GET | `/api/export/ledger` | admin, maintenance — yaml+jsonl tarball or `?format=json`; strips tokens |
 | GET/POST/PATCH | `/api/people` `/api/people/{id}` | outreach, admin — hiring contacts, no secrets |
+| GET | `/onboarding` | candidate wizard (mandatory after admin signup) |
+| GET | `/api/candidate/status` `/api/candidate/template` | public status; template is admin |
+| GET/PUT | `/api/candidate` | admin YAML/JSON; stored next to sqlite, never git |
 | GET | `/api/candidate/public` | any user — `{present:false}` until admin supplies yaml |
-| GET | `/api/candidate/resume` | apply, outreach, admin |
+| GET/PUT | `/api/candidate/resume` | GET: apply, outreach, admin. PUT: admin |
+| GET | `/.well-known/agent-card.json` `/a2a/{track}/agent-card.json` | public A2A Agent Cards |
+| POST | `/a2a` `/a2a/{track}` | JSON-RPC `message/send` (Bearer). Writes Hub inbox |
+| GET/POST | `/api/a2a/directory` `/api/a2a/peers` | local cards + federated peers |
 | POST | `/api/metrics/token_burn` | any authenticated role |
 | GET | `/api/metrics/token_burn` `/api/metrics/summary` | admin, maintenance |
 

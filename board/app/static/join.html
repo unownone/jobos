@@ -61,6 +61,12 @@
         return;
       }
       document.getElementById("title").textContent = "Joining " + body.track;
+      if (body.join_blocked || !(body.candidate && body.candidate.onboarded)) {
+        document.getElementById("blurb").textContent =
+          "Candidate onboarding is not complete. The human admin must finish /onboarding with a truthful profile before any agent can join. Do not invent a candidate.";
+        document.getElementById("payload").textContent = JSON.stringify(body, null, 2);
+        return;
+      }
       document.getElementById("blurb").textContent =
         "You are joining the " + body.track + " track (" + body.mode + "). First redemption is the owner unless the track already has one. Copy the API key after register — it is shown once. Send Authorization: Bearer or X-Hub-Key. Fetch GET /api/onboarding?invite_id=&s= for skills, MCP example, install scripts, and connectors (no secrets; do not clone the hunt repo).";
       document.getElementById("payload").textContent = JSON.stringify(body, null, 2);

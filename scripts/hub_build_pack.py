@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "argon2-cffi>=23",
+#   "pyyaml>=6",
 # ]
 # ///
 """Build an immutable Job Hub skill/MCP pack from the operator checkout."""

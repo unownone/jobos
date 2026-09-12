@@ -46,4 +46,5 @@ export HUB_PUBLIC_HOST HUB_PUBLIC_URL
 
 echo "Public origin: ${HUB_PUBLIC_URL}"
 echo "Traefik: :80 and :443 → Hub /"
+echo "First step after admin signup: ${HUB_PUBLIC_URL}/onboarding"
 exec docker compose -f "$REPO/docker-compose.yml" up -d --build "$@"

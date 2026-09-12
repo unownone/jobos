@@ -21,9 +21,10 @@ flowchart TB
 
   subgraph hub [Job Hub — only non-AI component]
     api[FastAPI same origin]
-    ui[Board + Admin + Presence + Invites]
-    db[(SQLite jobs events queue users presence)]
+    ui[Board + Admin + Onboarding + Presence + Invites]
+    db[(SQLite jobs events queue users presence A2A)]
     pack[Skill/MCP/docs pack]
+    a2a[A2A JSON-RPC + Agent Cards]
     secrets[gitignored .env + encrypted connectors]
   end
 
@@ -40,7 +41,12 @@ flowchart TB
   m --> api
   api --> db
   api --> pack
+  api --> a2a
   api --> secrets
+  d -->|A2A message/send| a2a
+  a --> a2a
+  o --> a2a
+  m --> a2a
   skills -->|deploy / pack rebuild| pack
   api -->|optional export| ledger
   ui --> api
@@ -53,7 +59,7 @@ flowchart TB
 | Queue | Table `queue_items` + row locks; not Redis |
 | Pack | Files under `board/data/packs/<sha>/` |
 | UI | Extend `board/app/static/index.html` (or split `admin.html` if the file gets large) |
-| Deploy | `scripts/hub_deploy.sh` wrapping `board/start.sh`; optional `board/docker-compose.yml` |
+| Deploy | `scripts/hub_deploy.sh`; Docker Compose plain (`docker-compose.plain.yml`) or Traefik (`docker-compose.yml`). See [`docs/install.md`](../install.md). |
 
 ## Identity and tracks
 
@@ -247,6 +253,10 @@ v1 minimum: people JSON on the job `outreach_packet` is enough; dedicated people
 | POST | `/api/messages` | any_user | Send (no SMS) |
 | GET | `/api/messages` | any_user | Inbox |
 | POST | `/api/messages/{id}/read` | recipient | |
+| GET | `/.well-known/agent-card.json` | public | A2A Agent Card |
+| POST | `/a2a` | Bearer (JSON-RPC) | A2A `message/send` → same inbox |
+
+See [`a2a.md`](a2a.md). Candidate onboarding is required before send.
 
 ### Candidate slice
 

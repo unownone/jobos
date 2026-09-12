@@ -366,7 +366,12 @@ def user_has_event_since(db: BoardDB, user: dict[str, Any], since: str) -> bool:
         return False
     placeholders = ",".join("?" * len(actors))
     cur = db.conn.execute(
-        f"SELECT 1 FROM events WHERE ts >= ? AND actor IN ({placeholders}) LIMIT 1",
+        f"""SELECT 1 FROM events
+            WHERE ts >= ?
+              AND actor IN ({placeholders})
+              AND job_id IS NOT NULL
+              AND TRIM(job_id) != ''
+            LIMIT 1""",
         [since, *actors],
     )
     return cur.fetchone() is not None

@@ -39,7 +39,7 @@ The page loads JSON from `GET /api/join/{invite_id}?s=`. That payload is **not**
 - `track`, `mode` (`owner_then_agents` | `owner_only` | `agents_only`)
 - `expires_at`, `remaining` redemptions, `allow_multiple_owners`
 - `hub.public_url`, `hub.pack_sha`, `hub.git_sha`
-- `candidate.present` (false until the human fills `profiles/candidate.yaml` — **do not invent one**)
+- `candidate.present` (false until the human finishes `/onboarding` — **do not invent one**). Join is blocked until then.
 - `heartbeat_s` (10)
 - `join` instructions (`POST /api/auth/join`)
 - `onboarding`: URLs for pack JSON/zip/docs/skills/scripts, `catalog_updated_at`
@@ -197,9 +197,13 @@ Discovery claiming `apply.ready` → **403**. Maintenance cannot claim `discover
 
 Dedup: unique `(kind, job_id)` for job-scoped kinds. Duplicate `apply.ready` for the same job is a no-op upsert.
 
-## Messages (agent-to-agent)
+## Messages (agent-to-agent) and A2A
 
-Not SMS, WhatsApp, InMail, or employer email. Types: `note` | `block` | `handoff` | `question`. Destination is a Hub user id **or** a track (`discovery` | `application` | `outreach` | `maintenance` | `admin`), not an email address.
+Not SMS, WhatsApp, InMail, or employer email. Hub inbox types: `note` | `block` | `handoff` | `question`. Destination is a Hub user id **or** a track.
+
+Interoperable plane for agents **outside this repo**: [A2A](https://a2a-protocol.org/latest/). Fetch `GET /.well-known/agent-card.json`, then `POST /a2a` JSON-RPC `message/send` with Bearer `$HUB_KEY`. That writes the same inbox. Per-track cards: `/a2a/{track}/agent-card.json`. Details: [`a2a.md`](a2a.md).
+
+If `candidate_onboarded` is false, A2A send returns JSON-RPC `-32090` and Hub APIs return `409 candidate_required`. Stop; tell the human to open `/onboarding`. Destination is a Hub user id **or** a track (`discovery` | `application` | `outreach` | `maintenance` | `admin`), not an email address.
 
 ```bash
 curl -sS -X POST "$HUB_URL/api/messages" \

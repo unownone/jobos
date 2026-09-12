@@ -7,11 +7,13 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.auth import Principal, require_admin, require_owner_or_admin, require_principal
+from app.auth import Principal, optional_principal, require_admin, require_owner_or_admin, require_principal
+from app.a2a import create_a2a_router
 from app.bootstrap import (
     consume_bootstrap,
     ensure_bootstrap,
@@ -22,6 +24,7 @@ from app.bootstrap import (
     verify_password,
 )
 from app.candidate import create_candidate_router
+from app.gates import CandidateGateMiddleware
 from app.constants import METADATA_KNOWN_KEYS, ROLES, STATUSES, TRACKS
 from app.db import BoardDB, public_user
 from app.export import create_export_router
@@ -58,6 +61,7 @@ from app.permissions import (
     ensure_can_stop,
     validate_status,
 )
+from app.profile import candidate_onboarded, candidate_status
 from app.presence import mount_presence
 from app.queue import QUEUE_KINDS, QueueService, register_queue_routes
 from app.settings import Settings, load_settings
@@ -252,11 +256,24 @@ def _extract_bootstrap_token(request: Request, body: BootstrapIn) -> str:
 def _health_payload(db: BoardDB, settings: Settings) -> dict[str, Any]:
     configured = sorted(role for role, token in settings.tokens.items() if token)
     bootstrapped = db.admin_bootstrapped()
+    cand = candidate_status(settings)
+    if not bootstrapped:
+        next_step = "signup"
+    elif not cand["onboarded"]:
+        next_step = "onboarding"
+    elif not cand["resume_present"]:
+        next_step = "resume"
+    else:
+        next_step = "ready"
     return {
         "ok": True,
         "roles_configured": configured,
         "all_roles_configured": configured == sorted(ROLES),
         "admin_bootstrapped": bootstrapped,
+        "candidate_onboarded": cand["onboarded"],
+        "resume_present": cand["resume_present"],
+        "ready_for_agents": cand["ready_for_agents"] and bootstrapped,
+        "next_step": next_step,
     }
 
 
@@ -268,6 +285,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.db_path.parent / "metrics.jsonl",
     )
     principal_dep = require_principal(settings, db)
+    optional_principal_dep = optional_principal(settings, db)
     pack = PackStore(settings)
     pack.ensure_current()
     queue = QueueService(db, pack=pack)
@@ -276,7 +294,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="Job Hub",
         description="Private live coordination plane. Maintainer owns tokens, schema, and uptime.",
-        version="0.4.0",
+        version="0.5.0",
+    )
+    app.add_middleware(CandidateGateMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
     )
     app.state.settings = settings
     app.state.db = db
@@ -289,6 +314,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(create_people_router(principal_dep))
     app.include_router(create_export_router(principal_dep))
     app.include_router(create_candidate_router(settings, principal_dep))
+    app.include_router(create_a2a_router(settings, principal_dep, optional_principal_dep))
     if minted:
         print(format_signup_line(settings, minted), flush=True)
         print(
@@ -302,9 +328,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(create_onboarding_router(settings, db, pack, principal_dep))
 
-    @app.get("/")
-    def index() -> FileResponse:
+    @app.get("/", response_model=None)
+    def index() -> FileResponse | RedirectResponse:
+        if db.admin_bootstrapped() and not candidate_onboarded(settings):
+            return RedirectResponse(url="/onboarding", status_code=302)
         return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/onboarding")
+    def candidate_onboarding_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "onboarding.html")
 
     @app.get("/admin/signup", response_model=None)
     def admin_signup() -> FileResponse | RedirectResponse:
@@ -627,6 +659,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "queue_lease_m": 15,
             "catalog_updated_at": pack.meta_without_ensure().catalog_updated_at,
             "catalog_max_age_days": 7,
+            "a2a": {
+                "agent_card": "/.well-known/agent-card.json",
+                "jsonrpc": "/a2a",
+                "protocolVersion": "0.3.0",
+            },
+            "candidate_onboarded": candidate_onboarded(settings),
         }
 
     @app.get("/api/whoami")
