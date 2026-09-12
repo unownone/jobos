@@ -15,6 +15,7 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 
 from app.db import BoardDB, utc_now
 from app.settings import Settings, parse_env_file
+from app.urls import resolve_public_url
 
 BOOTSTRAP_PREFIX = "jh_boot_"
 BOOTSTRAP_META_KEY = "bootstrap"
@@ -53,11 +54,8 @@ def verify_password(password_hash: str, password: str) -> bool:
 
 def public_base(settings: Settings) -> str:
     if settings.public_url:
-        return settings.public_url.rstrip("/")
-    host = settings.host
-    if host in {"0.0.0.0", "::", "[::]"}:
-        host = "127.0.0.1"
-    return f"http://{host}:{settings.port}"
+        return resolve_public_url(public_url=settings.public_url)
+    return resolve_public_url(listen_host=settings.host, listen_port=settings.port)
 
 
 def format_signup_url(settings: Settings, token: str) -> str:
@@ -105,6 +103,7 @@ def upsert_env_file(path: Path, updates: dict[str, str | None]) -> None:
         "BOARD_TOKEN_OUTREACH",
         "BOARD_TOKEN_ADMIN",
         "BOARD_TOKEN_MAINTENANCE",
+        "HUB_PUBLIC_HOST",
         "HUB_PUBLIC_URL",
         TOKEN_ENV_KEY,
         USED_ENV_KEY,
@@ -256,7 +255,7 @@ def consume_bootstrap(
         raise ValueError(err)
     meta = db.get_secret_meta(BOOTSTRAP_META_KEY)
     if db.admin_bootstrapped():
-        raise PermissionError("admin already bootstrapped")
+        raise PermissionError("signup closed; log in at /login")
     if not token_matches(meta, token):
         raise PermissionError("invalid or used bootstrap token")
     user = db.create_admin(

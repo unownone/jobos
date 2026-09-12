@@ -1,4 +1,4 @@
-.PHONY: board board-tokens board-test board-bench
+.PHONY: board board-tokens board-test board-bench board-docker
 
 board:
 	bash board/start.sh
@@ -11,3 +11,6 @@ board-test:
 
 board-bench:
 	uv run board/scripts/benchmark.py
+
+board-docker:
+	bash scripts/hub_docker.sh

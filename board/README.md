@@ -115,15 +115,15 @@ Give each bot **only** its role token, out of band (not in the codebase, not in 
 
 ```bash
 bash scripts/hub_deploy.sh
-# or
+# or interactive (asks for public host if unset)
 bash board/start.sh
-# or
-make -C board run
+# or Docker + Traefik on :80 / :443, board at /
+HUB_PUBLIC_HOST=12.234.244.34 bash scripts/hub_docker.sh
 ```
 
-Listens on `http://0.0.0.0:8787` (override `BOARD_HOST` / `BOARD_PORT`). First start generates compat role tokens **and** a one-time `jh_boot_*` admin bootstrap token if no admin user exists. Signup URL is printed to stdout (`Admin signup: …/admin/signup#bootstrap=…`). Set `HUB_PUBLIC_URL` for the printed origin. Docker Compose (`board/docker-compose.yml`) is optional; Cursor Cloud does not need Docker.
+Listens on `http://0.0.0.0:8787` inside the process (override `BOARD_HOST` / `BOARD_PORT`). Traefik publishes **80** and **443** and routes `/` to the board. First start generates compat role tokens **and** a one-time `jh_boot_*` admin bootstrap token if no admin user exists. Signup URL is printed to stdout. Set `HUB_PUBLIC_HOST` (hostname, IP, or `IP:port`) or `HUB_PUBLIC_URL` for invite origins.
 
-After `POST /api/auth/bootstrap`, the plaintext bootstrap token is wiped from `board/.env` / `tokens.local.json`. `GET /health` includes `admin_bootstrapped` (no secrets). Existing `X-Role` + `X-Token` job APIs stay valid (compat).
+After the first `POST /api/auth/bootstrap`, signup is closed: `/admin/signup` redirects to `/login`, the bootstrap token is wiped, and a second signup 403s. `GET /health` includes `admin_bootstrapped` (no secrets). Existing `X-Role` + `X-Token` job APIs stay valid (compat).
 
 ```bash
 make -C board test          # API + token generator tests

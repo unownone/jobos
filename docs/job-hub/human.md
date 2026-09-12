@@ -14,9 +14,19 @@ One FastAPI process (`board/`). SQLite under gitignored `board/data/`. Secrets i
 
 ```bash
 # from repo root
-export HUB_PUBLIC_URL="${HUB_PUBLIC_URL:-http://127.0.0.1:8787}"
+export HUB_PUBLIC_HOST="${HUB_PUBLIC_HOST:-127.0.0.1}"   # hostname, IP, or IP:port
 bash scripts/hub_deploy.sh
 ```
+
+Or Docker + Traefik (ports **80** and **443**, board at `/`):
+
+```bash
+# hostname, IP, or IP:port (invites use this origin)
+HUB_PUBLIC_HOST=12.234.244.34 bash scripts/hub_docker.sh
+# or: HUB_PUBLIC_HOST=12.234.244.34:343 docker compose up -d --build
+```
+
+`HUB_PUBLIC_HOST=12.234.244.34:343` becomes `http://12.234.244.34:343` on invite URLs. `:443` becomes `https://`. A full `HUB_PUBLIC_URL` still wins.
 
 What the script does:
 
@@ -26,11 +36,9 @@ What the script does:
 4. Builds the onboarding pack (`scripts/hub_build_pack.py`).
 5. Starts `board/start.sh` (uvicorn on `BOARD_HOST`/`BOARD_PORT`, default `0.0.0.0:8787`).
 
-Stdout prints `Admin signup: $HUB_PUBLIC_URL/admin/signup#bootstrap=…`. Copy that URL once. After signup the plaintext bootstrap is wiped from `.env`.
+Stdout prints `Admin signup: $public_origin/admin/signup#bootstrap=…` once. After that admin exists, **nobody else can sign up** — `/admin/signup` redirects to `/login` and `POST /api/auth/bootstrap` returns 403.
 
 Dry run (no uvicorn): `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
-
-Optional Docker: `board/docker-compose.yml` (volume for `board/data` and `.env`). Cursor Cloud does not need Docker.
 
 `GET /health` is public and includes `admin_bootstrapped` (boolean). It does not leak tokens.
 
@@ -41,7 +49,7 @@ There is **no** `POST /api/auth/bootstrap/rotate` in the shipped API. A new boot
 1. Open the printed signup URL (`/admin/signup`).
 2. Email + password (password min 8). The page sends `POST /api/auth/bootstrap` with `Authorization: Bearer` of the bootstrap token.
 3. You get a session cookie (`hub_session`, 12h idle) plus `hub_csrf`. Browser writes need header `X-CSRF` matching that cookie.
-4. Later visits: `/login` → `POST /api/auth/login`. Logout: `POST /api/auth/logout`.
+4. Later visits: `/login` → `POST /api/auth/login`. Logout: `POST /api/auth/logout`. There is no second signup.
 
 Do not commit the bootstrap token, session cookies, or admin password.
 

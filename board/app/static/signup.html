@@ -33,6 +33,9 @@
     </form>
   </main>
   <script>
+    fetch("/health").then((r) => r.json()).then((h) => {
+      if (h.admin_bootstrapped) location.replace("/login");
+    }).catch(() => {});
     const params = new URLSearchParams(location.hash.replace(/^#/, ""));
     const fromHash = params.get("bootstrap");
     if (fromHash) document.getElementById("token").value = fromHash;

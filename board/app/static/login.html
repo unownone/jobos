@@ -30,10 +30,14 @@
       <button type="submit">Log in</button>
       <div class="err" id="err"></div>
     </form>
-    <p><a href="/admin/signup">First-time bootstrap</a></p>
+    <p id="signupWrap" hidden><a id="signupLink" href="/admin/signup">Create the first admin</a></p>
   </main>
   <script>
     const next = new URLSearchParams(location.search).get("next") || "/admin/invites";
+    fetch("/health").then((r) => r.json()).then((h) => {
+      const wrap = document.getElementById("signupWrap");
+      if (wrap) wrap.hidden = Boolean(h.admin_bootstrapped);
+    }).catch(() => {});
     document.getElementById("form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const err = document.getElementById("err");

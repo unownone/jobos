@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -306,15 +306,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
 
-    @app.get("/admin/signup")
-    def admin_signup() -> FileResponse:
+    @app.get("/admin/signup", response_model=None)
+    def admin_signup() -> FileResponse | RedirectResponse:
+        if db.admin_bootstrapped():
+            return RedirectResponse(url="/login", status_code=302)
         return FileResponse(STATIC_DIR / "signup.html")
 
-    @app.get("/admin")
-    def admin_home() -> FileResponse:
+    @app.get("/admin", response_model=None)
+    def admin_home() -> FileResponse | RedirectResponse:
         if db.admin_bootstrapped():
             return FileResponse(STATIC_DIR / "admin.html")
-        return FileResponse(STATIC_DIR / "signup.html")
+        return RedirectResponse(url="/admin/signup", status_code=302)
 
     @app.get("/admin/invites")
     def admin_invites() -> FileResponse:

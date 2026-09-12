@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "argon2-cffi>=23",
+# ]
+# ///
 """Build an immutable Job Hub skill/MCP pack from the operator checkout."""
 
 from __future__ import annotations

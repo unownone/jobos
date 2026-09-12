@@ -27,6 +27,7 @@ from app.bootstrap import (  # noqa: E402
 )
 from app.db import BoardDB  # noqa: E402
 from app.settings import Settings, load_token_files, parse_env_file  # noqa: E402
+from app.urls import resolve_public_url  # noqa: E402
 
 
 def settings_for_board(board_dir: Path) -> Settings:
@@ -40,13 +41,19 @@ def settings_for_board(board_dir: Path) -> Settings:
         db_path = board_dir / db_path
     host = merged.get("BOARD_HOST", "0.0.0.0") or "0.0.0.0"
     port_raw = merged.get("BOARD_PORT", "8787") or "8787"
+    public_url = resolve_public_url(
+        public_url=merged.get("HUB_PUBLIC_URL") or "",
+        public_host=merged.get("HUB_PUBLIC_HOST") or "",
+        listen_host=host,
+        listen_port=int(port_raw),
+    )
     return Settings(
         board_dir=board_dir,
         db_path=db_path,
         host=host,
         port=int(port_raw),
         tokens=load_token_files() if board_dir == ROOT / "board" else {},
-        public_url=(merged.get("HUB_PUBLIC_URL") or "").strip().rstrip("/"),
+        public_url=public_url,
         bootstrap_token=(merged.get("HUB_BOOTSTRAP_TOKEN") or "").strip(),
         env_path=env_path,
         tokens_json_path=json_path,
