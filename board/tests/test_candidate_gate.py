@@ -59,6 +59,9 @@ def test_health_points_at_onboarding(hub: tuple[TestClient, Settings]) -> None:
     health = client.get("/health").json()
     assert health["candidate_onboarded"] is False
     assert health["next_step"] in {"signup", "onboarding"}
+    denied = client.get("/onboarding")
+    assert denied.status_code == 401
+    bootstrap_admin(client)
     page = client.get("/onboarding")
     assert page.status_code == 200
     assert "Candidate onboarding" in page.text
@@ -136,10 +139,11 @@ def test_example_profile_rejected_then_real_profile_unlocks(hub: tuple[TestClien
 
 def test_onboarding_page_and_status_with_fixture(hub: tuple[TestClient, Settings]) -> None:
     client, _settings = hub
-    status = client.get("/api/candidate/status")
+    assert client.get("/api/candidate/status").status_code == 401
+    status = client.get("/api/candidate/status", headers=h("admin"))
     assert status.status_code == 200
     assert status.json()["onboarded"] is True
-    assert client.get("/onboarding").status_code == 200
+    assert client.get("/onboarding", headers=h("admin")).status_code == 200
     assert client.get("/.well-known/agent-card.json").status_code == 200
     card = client.get("/.well-known/agent-card.json", headers={"Origin": "https://other-agent.example"})
     assert card.headers.get("access-control-allow-origin") == "*"

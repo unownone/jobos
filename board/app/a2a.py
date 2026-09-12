@@ -359,6 +359,8 @@ def create_a2a_router(
             return _jsonrpc_result(rpc_id, _card(track=default_track, extended=True))
 
         if method == "tasks/get":
+            if principal is None:
+                return _jsonrpc_error(rpc_id, RPC_AUTH_REQUIRED, "Authorization Bearer required")
             task_id = str(params.get("id") or params.get("taskId") or "").strip()
             if not task_id:
                 return _jsonrpc_error(rpc_id, RPC_INVALID_PARAMS, "id is required")
@@ -379,6 +381,8 @@ def create_a2a_router(
             )
 
         if method == "tasks/cancel":
+            if principal is None:
+                return _jsonrpc_error(rpc_id, RPC_AUTH_REQUIRED, "Authorization Bearer required")
             task_id = str(params.get("id") or params.get("taskId") or "").strip()
             stored = get_task(db, task_id) if task_id else None
             if stored is None:

@@ -44,6 +44,19 @@ def _parse_ts(raw: str | None) -> datetime | None:
     return dt
 
 
+def has_request_credentials(request: Request) -> bool:
+    """True when the request carries any Hub auth material (not invite secrets)."""
+    return any(
+        [
+            (request.headers.get("authorization") or "").strip(),
+            (request.headers.get("x-hub-key") or "").strip(),
+            (request.headers.get("x-role") or "").strip(),
+            (request.headers.get("x-token") or "").strip(),
+            (request.cookies.get("hub_session") or "").strip(),
+        ]
+    )
+
+
 def _extract_bearer(authorization: str | None, x_hub_key: str | None) -> str:
     if x_hub_key and x_hub_key.strip():
         return x_hub_key.strip()
@@ -236,16 +249,7 @@ def optional_principal(settings: Settings, db: BoardDB):
         hub_session: Annotated[str | None, Cookie()] = None,
         hub_csrf: Annotated[str | None, Cookie()] = None,
     ) -> Principal | None:
-        has_creds = any(
-            [
-                (authorization or "").strip(),
-                (x_hub_key or "").strip(),
-                (x_role or "").strip(),
-                (x_token or "").strip(),
-                (hub_session or "").strip(),
-            ]
-        )
-        if not has_creds:
+        if not has_request_credentials(request):
             return None
         try:
             return authenticate(
