@@ -6,7 +6,9 @@ You run the Hub. Agents do not clone this hunt repo. They join a **track**, fetc
 
 Companion: [agent.md](agent.md) (curl + join). Spec: [02-architecture.md](02-architecture.md). Live process: [`board/README.md`](../../board/README.md).
 
-This workspace has **no** `profiles/candidate.yaml`. Copy `profiles/candidate.example.yaml` and fill it yourself. **Do not invent a candidate.** The Hub returns `candidate.present: false` until you supply a truthful file.
+This workspace has **no** live `profiles/candidate.yaml` until you finish Hub **`/onboarding`**. Copying the example file as if it were real is rejected. **Do not invent a candidate.** Until `GET /health` shows `candidate_onboarded: true`, invites, jobs, queues, messages, and A2A sends return `409 candidate_required`.
+
+Install and hosting: **[`docs/install.md`](../install.md)** (Docker, Compose plain/Traefik, `docker run`, uv, TLS, backups). A2A: [`a2a.md`](a2a.md).
 
 ## What you deploy
 
@@ -18,13 +20,16 @@ export HUB_PUBLIC_HOST="${HUB_PUBLIC_HOST:-127.0.0.1}"   # hostname, IP, or IP:p
 bash scripts/hub_deploy.sh
 ```
 
-Or Docker + Traefik (ports **80** and **443**, board at `/`):
+Or Docker:
 
 ```bash
-# hostname, IP, or IP:port (invites use this origin)
+# plain Hub on :8787
+docker compose -f docker-compose.plain.yml up -d --build
+# or Traefik on :80 / :443
 HUB_PUBLIC_HOST=12.234.244.34 bash scripts/hub_docker.sh
-# or: HUB_PUBLIC_HOST=12.234.244.34:343 docker compose up -d --build
 ```
+
+Full hosting: [`docs/install.md`](../install.md). **After signup, open `/onboarding` before minting invites.**
 
 `HUB_PUBLIC_HOST=12.234.244.34:343` becomes `http://12.234.244.34:343` on invite URLs. `:443` becomes `https://`. A full `HUB_PUBLIC_URL` still wins.
 
@@ -49,17 +54,21 @@ There is **no** `POST /api/auth/bootstrap/rotate` in the shipped API. A new boot
 1. Open the printed signup URL (`/admin/signup`).
 2. Email + password (password min 8). The page sends `POST /api/auth/bootstrap` with `Authorization: Bearer` of the bootstrap token.
 3. You get a session cookie (`hub_session`, 12h idle) plus `hub_csrf`. Browser writes need header `X-CSRF` matching that cookie.
-4. Later visits: `/login` → `POST /api/auth/login`. Logout: `POST /api/auth/logout`. There is no second signup.
+4. The UI then **requires** [`/onboarding`](#candidate--resume-mandatory-first). Invites stay blocked until that succeeds.
+5. Later visits: `/login` → `POST /api/auth/login`. Logout: `POST /api/auth/logout`. There is no second signup.
 
 Do not commit the bootstrap token, session cookies, or admin password.
 
-## Candidate + resume (you fill these)
+## Candidate + resume (mandatory first)
 
-Until you do this, agents see `GET /api/candidate/public` → `{ "present": false, … }`. Discovery must not invent titles, dates, or experience.
+This is the first operator action after admin signup. The Hub does not proceed without it.
 
-- Put a truthful `profiles/candidate.yaml` on the hunt machine **or** `PUT /api/candidate` as admin (raw YAML body). Hub stores a copy at gitignored `board/data/profiles/candidate.yaml`.
-- Resume PDF: drop under `assets/resume/*.pdf` (gitignored) **or** `PUT /api/candidate/resume` as admin. Apply and outreach may `GET /api/candidate/resume`. **Discovery cannot download the PDF** (403).
+- UI: `/onboarding` (identity, titles, locations, proof, resume PDF).
+- Or `PUT /api/candidate` as admin (JSON or YAML). Stored gitignored next to sqlite (`/data/profiles/candidate.yaml` in Docker).
+- Resume: `PUT /api/candidate/resume` or a PDF under `assets/resume/`. Apply and outreach may `GET /api/candidate/resume`. **Discovery cannot download the PDF** (403).
+- `GET /api/candidate/status` and `/health` expose `candidate_onboarded` / `ready_for_agents` without dumping PII.
 - Admin may `GET /api/candidate` for the YAML. 404 if still missing.
+- The example identity `Ada Example` / `ada@example.com` is rejected.
 
 `HUB_DATA_KEY` in `.env.example` is unused until encrypted connector blobs exist. Do not put Gmail/Indeed secrets in ledger YAML or in invite URLs.
 

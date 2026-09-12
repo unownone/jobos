@@ -16,6 +16,7 @@ from typing import Any, Iterable
 
 from app.bootstrap import public_base
 from app.constants import TRACKS, canonical_track
+from app.profile import public_candidate_at, public_candidate_for_settings
 from app.settings import Settings
 
 PACK_VERSION = "1"
@@ -24,13 +25,6 @@ TREE_NAME = "tree"
 CATALOG_DATE_RE = re.compile(r"Last catalog pass[:\s\*]*(\d{4}-\d{2}-\d{2})")
 SKILL_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
 SAFE_FILE_RE = re.compile(r"^[A-Za-z0-9._-]+$")
-
-CANDIDATE_PUBLIC_FIELDS = [
-    "target.titles",
-    "target.locations",
-    "target.deal_breakers",
-    "identity.work_authorization",
-]
 
 FORBIDDEN_BASENAMES = frozenset(
     {
@@ -321,33 +315,11 @@ def _scalar_in_section(section: str, key: str) -> str | None:
 
 
 def public_candidate(repo_root: Path) -> dict[str, Any]:
-    path = repo_root / "profiles" / "candidate.yaml"
-    base = {"present": False, "fields_public": list(CANDIDATE_PUBLIC_FIELDS)}
-    if not path.is_file():
-        return base
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return {**base, "present": True}
-    identity = ""
-    target = ""
-    ident_match = re.search(r"^identity:\n((?:  .*\n)*)", text, re.M)
-    if ident_match:
-        identity = ident_match.group(0)
-    target_match = re.search(r"^target:\n((?:  .*\n)*)", text, re.M)
-    if target_match:
-        target = target_match.group(0)
-    return {
-        "present": True,
-        "fields_public": list(CANDIDATE_PUBLIC_FIELDS),
-        "target": {
-            "titles": _block_list(target, "titles"),
-            "locations": _block_list(target, "locations"),
-            "deal_breakers": _block_list(target, "deal_breakers"),
-        },
-        "work_authorization": _scalar_in_section(identity, "work_authorization"),
-        "resume_url": None,
-    }
+    hub = repo_root / "data" / "profiles" / "candidate.yaml"
+    repo = repo_root / "profiles" / "candidate.yaml"
+    if hub.is_file():
+        return public_candidate_at(hub)
+    return public_candidate_at(repo if repo.is_file() else None)
 
 
 def skills_on_disk(repo_root: Path) -> list[str]:
@@ -636,7 +608,7 @@ class PackStore:
             "connectors_needed": connectors_for_track(key),
             "heartbeat_s": 10,
             "queues": list(TRACK_QUEUES.get(key, [])),
-            "candidate": public_candidate(self.repo_root),
+            "candidate": public_candidate_for_settings(self.settings),
             "catalog_updated_at": meta.catalog_updated_at,
             "pack": {
                 "git_sha": meta.git_sha,

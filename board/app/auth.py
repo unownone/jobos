@@ -145,6 +145,9 @@ def authenticate(
             auth = "admin_key"
         return _principal_from_user(user, auth=auth, actor_override=x_actor or None)
 
+    if (x_role or "").strip() and (x_token or "").strip():
+        return authenticate_compat(settings, x_role, x_token, x_actor)
+
     session_token = (hub_session or "").strip()
     if session_token:
         sess = db.get_session_by_token_hash(sha256_hex(session_token))
@@ -215,6 +218,53 @@ def require_principal(settings: Settings, db: BoardDB):
             hub_session=hub_session,
             hub_csrf=hub_csrf,
         )
+
+    return dependency
+
+
+def optional_principal(settings: Settings, db: BoardDB):
+    """A2A JSON-RPC: missing/invalid creds become None instead of HTTP 401."""
+
+    async def dependency(
+        request: Request,
+        authorization: Annotated[str | None, Header()] = None,
+        x_hub_key: Annotated[str | None, Header(alias="X-Hub-Key")] = None,
+        x_role: Annotated[str | None, Header()] = None,
+        x_token: Annotated[str | None, Header()] = None,
+        x_actor: Annotated[str | None, Header()] = None,
+        x_csrf: Annotated[str | None, Header(alias="X-CSRF")] = None,
+        hub_session: Annotated[str | None, Cookie()] = None,
+        hub_csrf: Annotated[str | None, Cookie()] = None,
+    ) -> Principal | None:
+        has_creds = any(
+            [
+                (authorization or "").strip(),
+                (x_hub_key or "").strip(),
+                (x_role or "").strip(),
+                (x_token or "").strip(),
+                (hub_session or "").strip(),
+            ]
+        )
+        if not has_creds:
+            return None
+        try:
+            return authenticate(
+                settings,
+                db,
+                request=request,
+                authorization=authorization,
+                x_hub_key=x_hub_key,
+                x_role=x_role,
+                x_token=x_token,
+                x_actor=x_actor,
+                x_csrf=x_csrf,
+                hub_session=hub_session,
+                hub_csrf=hub_csrf,
+            )
+        except HTTPException as exc:
+            if exc.status_code in {401, 403}:
+                return None
+            raise
 
     return dependency
 

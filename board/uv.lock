@@ -343,6 +343,7 @@ dependencies = [
     { name = "argon2-cffi" },
     { name = "fastapi" },
     { name = "python-multipart" },
+    { name = "pyyaml" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -357,6 +358,7 @@ requires-dist = [
     { name = "argon2-cffi", specifier = ">=23" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "python-multipart", specifier = ">=0.0.12" },
+    { name = "pyyaml", specifier = ">=6" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 

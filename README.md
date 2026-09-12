@@ -18,13 +18,21 @@ For a live multi-agent hunt on a shared machine, maintainer also runs the privat
 
 ## Start here
 
-1. Copy [`profiles/candidate.example.yaml`](profiles/candidate.example.yaml) to `profiles/candidate.yaml` and tell the truth.
-2. Put resume PDFs in [`assets/resume/`](assets/resume/) (gitignored).
-3. Read [`docs/process.md`](docs/process.md) once. That is the contract.
-4. Pick a role in [`AGENTS.md`](AGENTS.md). One bot may hold every role. Several bots may split a role by portal or channel.
-5. Discovery owner runs [`skills/skill-and-mcp-catalog`](skills/skill-and-mcp-catalog/SKILL.md) first, then [`skills/deep-research`](skills/deep-research/SKILL.md), then [`skills/job-discovery`](skills/job-discovery/SKILL.md).
-6. When the work is the **skill tree** (find MCPs, prune, write lists), claim **maintainer** and run [`skills/skill-maintainer`](skills/skill-maintainer/SKILL.md). That is not a discovery cycle.
-7. Everyone writes to [`ledger/`](ledger/README.md). Git is the live list. No deploy required.
+**Onboard the candidate before anything else.** The Hub will not let you hunt, invite agents, or send A2A messages until a truthful profile exists. Do not invent one. Do not ship `candidate.example.yaml` as live data.
+
+1. **Install the Hub** — [`docs/install.md`](docs/install.md) / [`INSTALL.md`](INSTALL.md).
+   - Plain Docker Compose: `docker compose -f docker-compose.plain.yml up -d --build`
+   - Traefik (80/443): `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh`
+   - `docker run` and uv/bare metal are in the same guide.
+2. **Create the admin** at the printed `/admin/signup` URL (one-time).
+3. **Fill `/onboarding`** (identity, titles, locations, resume PDF). This is mandatory.
+4. Read [`docs/process.md`](docs/process.md). Pick a role in [`AGENTS.md`](AGENTS.md).
+5. Discovery runs catalog → research → shortlist. **No Easy Apply.**
+6. Apply and outreach consume packets. Cross-agent talk is **A2A** ([`docs/job-hub/a2a.md`](docs/job-hub/a2a.md)) plus the Hub inbox.
+
+Airgapped bots without a Hub still copy [`profiles/candidate.example.yaml`](profiles/candidate.example.yaml) to `profiles/candidate.yaml` locally, put PDFs in [`assets/resume/`](assets/resume/), and write [`ledger/`](ledger/README.md). Git remains the airgap protocol.
+
+Live multi-agent hunt: [`board/README.md`](board/README.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md).
 
 ## Why this is split
 

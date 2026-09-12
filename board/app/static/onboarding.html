@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Hub — Candidate onboarding</title>
+  <style>
+    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
+    h1 { font-size: 1.15rem; margin: 0; }
+    main { max-width: 44rem; margin: 1.5rem auto; padding: 0 1rem 3rem; }
+    p, label { color: var(--muted); }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1rem; }
+    label { display: block; font-size: 0.8rem; margin: 0.65rem 0 0.25rem; }
+    input, textarea, select { width: 100%; padding: 0.5rem 0.65rem; border-radius: 8px; border: 1px solid var(--line); background: #0e1218; color: var(--text); }
+    textarea { min-height: 4.5rem; font: inherit; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    button { margin-top: 0.85rem; padding: 0.55rem 0.9rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #1c2430; border: 1px solid var(--line); }
+    .err { color: var(--bad); min-height: 1.2em; }
+    .ok { color: var(--good); }
+    .steps { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0 0 1rem; }
+    .steps span { font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+    .steps span.on { border-color: var(--accent); color: var(--text); }
+    code { font-size: 0.85rem; }
+    a { color: var(--accent); }
+    @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Candidate onboarding</h1>
+  </header>
+  <main>
+    <p>This is the first Hub step after creating the admin. Agents cannot join, hunt, apply, or talk over A2A until a <strong>truthful</strong> profile exists. Do not paste the example Ada Example file.</p>
+    <div class="steps">
+      <span id="s1" class="on">1. Identity</span>
+      <span id="s2">2. Targets</span>
+      <span id="s3">3. Proof</span>
+      <span id="s4">4. Resume</span>
+    </div>
+    <p id="who">Checking session…</p>
+    <div class="panel" id="formPanel" hidden>
+      <div id="step1">
+        <h2>Identity</h2>
+        <div class="row">
+          <div>
+            <label for="full_name">Full name</label>
+            <input id="full_name" required autocomplete="name" />
+          </div>
+          <div>
+            <label for="preferred_name">Preferred name</label>
+            <input id="preferred_name" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="email">Email</label>
+            <input id="email" type="email" required autocomplete="email" />
+          </div>
+          <div>
+            <label for="phone">Phone (optional)</label>
+            <input id="phone" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="location">Location</label>
+            <input id="location" placeholder="Bengaluru, India" />
+          </div>
+          <div>
+            <label for="timezone">Timezone</label>
+            <input id="timezone" placeholder="Asia/Kolkata" />
+          </div>
+        </div>
+        <label for="work_authorization">Work authorization (label only)</label>
+        <input id="work_authorization" placeholder="India citizen; open to remote" />
+        <div class="row">
+          <div>
+            <label for="linkedin_url">LinkedIn URL</label>
+            <input id="linkedin_url" />
+          </div>
+          <div>
+            <label for="github_url">GitHub URL</label>
+            <input id="github_url" />
+          </div>
+        </div>
+        <button type="button" id="to2">Next — targets</button>
+      </div>
+      <div id="step2" hidden>
+        <h2>Targets</h2>
+        <label for="titles">Titles (comma-separated)</label>
+        <input id="titles" placeholder="Staff Software Engineer, Senior Backend Engineer" />
+        <label for="locations_t">Locations (comma-separated)</label>
+        <input id="locations_t" placeholder="Remote, Bengaluru" />
+        <label for="seniority">Seniority (comma-separated)</label>
+        <input id="seniority" placeholder="senior, staff" />
+        <label for="domains">Domains (comma-separated)</label>
+        <input id="domains" placeholder="developer tools, infra" />
+        <label for="remote">Remote preference</label>
+        <input id="remote" placeholder="required-or-hybrid" />
+        <label for="must_haves">Must-haves (one per line)</label>
+        <textarea id="must_haves"></textarea>
+        <label for="deal_breakers">Deal-breakers (one per line)</label>
+        <textarea id="deal_breakers"></textarea>
+        <button type="button" class="secondary" id="back1">Back</button>
+        <button type="button" id="to3">Next — proof</button>
+      </div>
+      <div id="step3" hidden>
+        <h2>Proof (from the resume only)</h2>
+        <label for="headline">Headline</label>
+        <input id="headline" />
+        <label for="years">Years of experience</label>
+        <input id="years" type="number" min="0" step="1" value="0" />
+        <label for="stack">Stack (comma-separated)</label>
+        <input id="stack" />
+        <label for="highlights">Highlights (one per line, no invented metrics)</label>
+        <textarea id="highlights"></textarea>
+        <label for="do_not_claim">Do not claim (one per line)</label>
+        <textarea id="do_not_claim"></textarea>
+        <label for="writing_voice">Writing voice</label>
+        <input id="writing_voice" placeholder="Direct, specific, no fluff" />
+        <button type="button" class="secondary" id="back2">Back</button>
+        <button type="button" id="save">Save profile</button>
+      </div>
+      <div id="step4" hidden>
+        <h2>Resume PDF</h2>
+        <p>Required before apply and outreach agents can attach a resume. Discovery does not download it.</p>
+        <input id="resume" type="file" accept="application/pdf,.pdf" />
+        <button type="button" id="uploadResume">Upload resume</button>
+        <button type="button" class="secondary" id="skipResume">Skip for now</button>
+        <p class="ok" id="resumeOk"></p>
+      </div>
+      <p class="err" id="err"></p>
+      <p class="ok" id="ok"></p>
+    </div>
+  </main>
+  <script>
+    function csrfHeaders(extra) {
+      const hit = document.cookie.split("; ").find((c) => c.startsWith("hub_csrf="));
+      const val = hit ? decodeURIComponent(hit.split("=").slice(1).join("=")) : "";
+      return Object.assign({ "Content-Type": "application/json", "X-CSRF": val }, extra || {});
+    }
+    function splitList(raw) {
+      return String(raw || "").split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+    }
+    function show(step) {
+      ["step1","step2","step3","step4"].forEach((id) => {
+        document.getElementById(id).hidden = id !== step;
+      });
+      document.getElementById("s1").classList.toggle("on", step === "step1");
+      document.getElementById("s2").classList.toggle("on", step === "step2");
+      document.getElementById("s3").classList.toggle("on", step === "step3");
+      document.getElementById("s4").classList.toggle("on", step === "step4");
+    }
+    async function me() {
+      const res = await fetch("/api/auth/me");
+      if (res.status === 401) {
+        location.href = "/login?next=/onboarding";
+        return null;
+      }
+      const body = await res.json();
+      if (body.kind !== "admin" && body.role !== "admin") {
+        document.getElementById("who").textContent = "Admin session required to onboard the candidate.";
+        return null;
+      }
+      document.getElementById("who").textContent = "Signed in as " + ((body.user && body.user.email) || body.actor) + ". Fill a real profile.";
+      document.getElementById("formPanel").hidden = false;
+      return body;
+    }
+    function payload() {
+      return {
+        identity: {
+          full_name: document.getElementById("full_name").value,
+          preferred_name: document.getElementById("preferred_name").value,
+          email: document.getElementById("email").value,
+          phone: document.getElementById("phone").value,
+          location: document.getElementById("location").value,
+          timezone: document.getElementById("timezone").value,
+          work_authorization: document.getElementById("work_authorization").value,
+          linkedin_url: document.getElementById("linkedin_url").value,
+          github_url: document.getElementById("github_url").value,
+          portfolio_url: "",
+          website: "",
+        },
+        target: {
+          titles: splitList(document.getElementById("titles").value),
+          locations: splitList(document.getElementById("locations_t").value),
+          seniority: splitList(document.getElementById("seniority").value),
+          domains: splitList(document.getElementById("domains").value),
+          remote: document.getElementById("remote").value,
+          salary_floor_usd: 0,
+          visa_needs: false,
+          company_sizes: [],
+          must_haves: splitList(document.getElementById("must_haves").value),
+          deal_breakers: splitList(document.getElementById("deal_breakers").value),
+        },
+        proof: {
+          headline: document.getElementById("headline").value,
+          years_experience: Number(document.getElementById("years").value || 0),
+          stack: splitList(document.getElementById("stack").value),
+          highlights: splitList(document.getElementById("highlights").value),
+          do_not_claim: splitList(document.getElementById("do_not_claim").value),
+        },
+        materials: {
+          resume_primary: "assets/resume/resume-primary.pdf",
+          resume_variants: [],
+          writing_voice: document.getElementById("writing_voice").value,
+        },
+        constraints: {
+          max_discovers_per_cycle: 40,
+          max_shortlist_per_cycle: 12,
+          max_applies_per_day: 8,
+          max_outreach_touches_per_person: 2,
+          easy_apply_policy: "never during discovery; apply role may use it only after a packet exists",
+        },
+      };
+    }
+    document.getElementById("to2").addEventListener("click", () => {
+      document.getElementById("err").textContent = "";
+      if (!document.getElementById("full_name").value.trim() || !document.getElementById("email").value.trim()) {
+        document.getElementById("err").textContent = "Full name and email are required.";
+        return;
+      }
+      show("step2");
+    });
+    document.getElementById("back1").addEventListener("click", () => show("step1"));
+    document.getElementById("to3").addEventListener("click", () => {
+      document.getElementById("err").textContent = "";
+      if (!splitList(document.getElementById("titles").value).length || !splitList(document.getElementById("locations_t").value).length) {
+        document.getElementById("err").textContent = "At least one title and one location are required.";
+        return;
+      }
+      show("step3");
+    });
+    document.getElementById("back2").addEventListener("click", () => show("step2"));
+    document.getElementById("save").addEventListener("click", async () => {
+      const err = document.getElementById("err");
+      const ok = document.getElementById("ok");
+      err.textContent = "";
+      ok.textContent = "";
+      const res = await fetch("/api/candidate", {
+        method: "PUT",
+        headers: csrfHeaders(),
+        body: JSON.stringify(payload()),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = body.detail;
+        err.textContent = (detail && (detail.message || JSON.stringify(detail.missing || detail))) || res.statusText;
+        return;
+      }
+      ok.textContent = "Profile saved. Upload a resume PDF next.";
+      show("step4");
+    });
+    document.getElementById("uploadResume").addEventListener("click", async () => {
+      const err = document.getElementById("err");
+      const resumeOk = document.getElementById("resumeOk");
+      err.textContent = "";
+      const file = document.getElementById("resume").files[0];
+      if (!file) {
+        err.textContent = "Choose a PDF first.";
+        return;
+      }
+      const buf = await file.arrayBuffer();
+      const res = await fetch("/api/candidate/resume", {
+        method: "PUT",
+        headers: { "X-CSRF": csrfHeaders()["X-CSRF"], "Content-Type": "application/pdf" },
+        body: buf,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
+        return;
+      }
+      resumeOk.textContent = "Resume stored. Opening the board…";
+      location.href = "/";
+    });
+    document.getElementById("skipResume").addEventListener("click", () => {
+      location.href = "/admin";
+    });
+    me();
+  </script>
+</body>
+</html>

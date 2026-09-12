@@ -8,6 +8,7 @@ dependencies = [
   "uvicorn[standard]>=0.32",
   "python-multipart>=0.0.12",
   "argon2-cffi>=23",
+  "pyyaml>=6",
 ]
 
 [dependency-groups]
@@ -19,3 +20,6 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+  "no_candidate: do not seed a candidate.yaml fixture (gate tests)",
+]

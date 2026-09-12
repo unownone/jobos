@@ -1,0 +1,74 @@
+"""Shared Hub test fixtures. Autouse a truthful-enough candidate so operational APIs are ungated."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+MINIMAL_CANDIDATE = """\
+identity:
+  full_name: "Test Candidate"
+  preferred_name: "Test"
+  email: "test.candidate@example.test"
+  phone: ""
+  location: "Remote"
+  timezone: "UTC"
+  work_authorization: "test fixture; not a live hunt"
+  linkedin_url: ""
+  github_url: ""
+  portfolio_url: ""
+  website: ""
+
+target:
+  titles:
+    - "Staff Software Engineer"
+  seniority: ["staff"]
+  domains: ["test"]
+  locations:
+    - "Remote"
+  remote: "required"
+  salary_floor_usd: 0
+  visa_needs: false
+  company_sizes: ["startup"]
+  must_haves:
+    - "Writes production code"
+  deal_breakers:
+    - "Unpaid trial projects"
+
+proof:
+  headline: "Test fixture profile"
+  years_experience: 1
+  stack: ["Python"]
+  highlights:
+    - "Fixture only"
+  do_not_claim:
+    - "Anything not in this fixture"
+
+materials:
+  resume_primary: "assets/resume/resume-primary.pdf"
+  resume_variants: []
+  writing_voice: "Direct"
+
+constraints:
+  max_discovers_per_cycle: 40
+  max_shortlist_per_cycle: 12
+  max_applies_per_day: 8
+  max_outreach_touches_per_person: 2
+  easy_apply_policy: "never during discovery"
+"""
+
+
+@pytest.fixture(autouse=True)
+def seed_hub_candidate(request: pytest.FixtureRequest, tmp_path: Path) -> None:
+    if request.node.get_closest_marker("no_candidate"):
+        return
+    dest = tmp_path / "data" / "profiles" / "candidate.yaml"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(MINIMAL_CANDIDATE, encoding="utf-8")
+    # Tests that set Settings.db_path = tmp_path / "board.db" persist next to sqlite.
+    alt = tmp_path / "profiles" / "candidate.yaml"
+    alt.parent.mkdir(parents=True, exist_ok=True)
+    alt.write_text(MINIMAL_CANDIDATE, encoding="utf-8")
+    # Default Settings.db_path is tmp_path/board.db so hub path is tmp_path/profiles/...
+    # Also cover tmp_path/board.db parent.

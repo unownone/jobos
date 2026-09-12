@@ -1,0 +1,32 @@
+# Job Hub only (no Traefik). From repo root:
+#   docker compose -f docker-compose.plain.yml up -d --build
+# Hub listens on http://127.0.0.1:8787
+#
+# First visit: /admin/signup → /onboarding (required) → then invites/agents.
+
+name: jobos-plain
+
+services:
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${HUB_PORT:-8787}:8787"
+    environment:
+      JOBOS_NONINTERACTIVE: "1"
+      BOARD_HOST: "0.0.0.0"
+      BOARD_PORT: "8787"
+      HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-127.0.0.1:8787}"
+      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8787}"
+    volumes:
+      - hub-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  hub-data:

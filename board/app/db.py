@@ -10,6 +10,7 @@ from typing import Any
 
 from app.constants import JSON_FIELDS, STATUSES
 from app.message_store import ensure_messages_schema
+from app.a2a_store import ensure_a2a_schema
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -205,6 +206,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE invites ADD COLUMN allow_multiple_owners INTEGER NOT NULL DEFAULT 0"
         )
     ensure_messages_schema(conn)
+    ensure_a2a_schema(conn)
 
 
 def _dump(value: Any) -> str | None:

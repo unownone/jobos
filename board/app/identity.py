@@ -17,7 +17,8 @@ from app.constants import (
     role_for_track,
 )
 from app.db import BoardDB, public_user, utc_now
-from app.pack import hub_pack_fields, join_onboarding_section, public_candidate, repo_root_for
+from app.pack import hub_pack_fields, join_onboarding_section
+from app.profile import candidate_status, public_candidate_for_settings
 from app.settings import Settings
 
 COOKIE_SESSION = "hub_session"
@@ -443,7 +444,9 @@ def disable_agent(db: BoardDB, user: dict[str, Any]) -> dict[str, Any]:
 def join_payload(settings: Settings, invite: dict[str, Any]) -> dict[str, Any]:
     track = invite["track"]
     pack_fields = hub_pack_fields(settings)
-    candidate = public_candidate(repo_root_for(settings))
+    candidate = public_candidate_for_settings(settings)
+    status = candidate_status(settings)
+    onboarded = bool(status["onboarded"])
     return {
         "hub": {
             "public_url": public_base(settings),
@@ -465,7 +468,11 @@ def join_payload(settings: Settings, invite: dict[str, Any]) -> dict[str, Any]:
             "fields": ["invite_id", "s", "display_name", "metadata"],
         },
         "metadata_known_keys": list(METADATA_KNOWN_KEYS),
-        "candidate": {"present": bool(candidate.get("present"))},
+        "candidate": {
+            "present": bool(candidate.get("present")),
+            "onboarded": onboarded,
+        },
+        "join_blocked": not onboarded,
         "onboarding": join_onboarding_section(settings, invite),
         "heartbeat_s": 10,
         "now": utc_now(),

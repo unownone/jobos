@@ -4,7 +4,7 @@ You are working in **Job Apply OS**. Read this before doing anything else.
 
 ## Identity
 
-1. Read `profiles/candidate.yaml`. If it is missing, copy `profiles/candidate.example.yaml` and stop for the human to fill it in. Do not invent a candidate.
+1. Read `profiles/candidate.yaml` **or** Hub `GET /api/candidate/public`. If it is missing / `present: false`, stop for the human to finish `/onboarding`. Copy `profiles/candidate.example.yaml` only as a template. Do not invent a candidate.
 2. Read `docs/process.md` if you have not already this session.
 3. Claim a role from `docs/roles.md`. Write the claim into `ledger/INDEX.md` under **Active operators**.
 
