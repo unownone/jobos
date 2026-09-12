@@ -1,0 +1,25 @@
+# File provider so Traefik does not need the Docker socket (Docker 29+).
+http:
+  routers:
+    hub:
+      rule: PathPrefix(`/`)
+      entryPoints:
+        - web
+      service: hub
+    hub-secure:
+      rule: PathPrefix(`/`)
+      entryPoints:
+        - websecure
+      service: hub
+      priority: 1
+      tls: {}
+    hub-legacy:
+      rule: PathPrefix(`/`)
+      entryPoints:
+        - hub
+      service: hub
+  services:
+    hub:
+      loadBalancer:
+        servers:
+          - url: http://hub:8787

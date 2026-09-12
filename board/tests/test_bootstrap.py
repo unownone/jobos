@@ -153,6 +153,31 @@ def test_existing_job_apis_still_work_after_bootstrap(
     assert listed.json()["jobs"][0]["id"] == "remoteok__hub1"
 
 
+def test_signup_page_redirects_to_login_after_bootstrap(
+    hub: tuple[TestClient, Settings],
+) -> None:
+    client, _settings = hub
+    token = client.app.state.bootstrap_token
+    boot = client.post(
+        "/api/auth/bootstrap",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"email": "owner@example.test", "password": "correct-horse"},
+    )
+    assert boot.status_code == 200, boot.text
+    page = client.get("/admin/signup", follow_redirects=False)
+    assert page.status_code == 302
+    assert page.headers["location"].endswith("/login")
+    closed = client.post(
+        "/api/auth/bootstrap",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"email": "intruder@example.test", "password": "correct-horse"},
+    )
+    assert closed.status_code == 403
+    assert "signup closed" in str(closed.json().get("detail", "")).lower() or "log in" in str(
+        closed.json().get("detail", "")
+    ).lower()
+
+
 def test_hub_ensure_bootstrap_prints_signup_url(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["HUB_PUBLIC_URL"] = "http://hub.internal:8787"

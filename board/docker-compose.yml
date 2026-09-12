@@ -1,16 +1,41 @@
-# Optional self-host. Not required for Cursor Cloud (use scripts/hub_deploy.sh, bind 0.0.0.0:8787).
+# Prefer repo-root: docker compose up -d --build
+name: jobos
+
 services:
-  hub:
-    image: python:3.12-slim-bookworm
-    working_dir: /repo
-    command: ["bash", "scripts/hub_deploy.sh"]
+  traefik:
+    image: traefik:v3.3
     ports:
+      - "80:80"
+      - "443:443"
       - "8787:8787"
+    volumes:
+      - ../traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ../traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    restart: unless-stopped
+    depends_on:
+      hub:
+        condition: service_healthy
+
+  hub:
+    build:
+      context: ..
+      dockerfile: Dockerfile
     environment:
+      JOBOS_NONINTERACTIVE: "1"
       BOARD_HOST: "0.0.0.0"
       BOARD_PORT: "8787"
-      HUB_PUBLIC_URL: "http://127.0.0.1:8787"
+      HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
+      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
     volumes:
-      - ..:/repo
-      - ./data:/repo/board/data
-      - ./.env:/repo/board/.env
+      - hub-data:/data
+    expose:
+      - "8787"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  hub-data:

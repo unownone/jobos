@@ -111,13 +111,15 @@ def main() -> int:
     existing: dict[str, str] = {}
     extra_json: dict[str, str] = {}
     if json_path.is_file():
-        payload = json.loads(json_path.read_text(encoding="utf-8"))
-        if isinstance(payload, dict):
-            for role in ROLES:
-                if payload.get(role):
-                    existing[role] = str(payload[role])
-            if payload.get("bootstrap"):
-                extra_json["bootstrap"] = str(payload["bootstrap"])
+        raw = json_path.read_text(encoding="utf-8").strip()
+        if raw:
+            payload = json.loads(raw)
+            if isinstance(payload, dict):
+                for role in ROLES:
+                    if payload.get(role):
+                        existing[role] = str(payload[role])
+                if payload.get("bootstrap"):
+                    extra_json["bootstrap"] = str(payload["bootstrap"])
     if values.get("HUB_BOOTSTRAP_TOKEN"):
         extra_json["bootstrap"] = values["HUB_BOOTSTRAP_TOKEN"]
     for role in ROLES:

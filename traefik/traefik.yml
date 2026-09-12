@@ -1,0 +1,20 @@
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+    http:
+      tls: {}
+  hub:
+    address: ":8787"
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+api:
+  dashboard: false
+
+log:
+  level: INFO

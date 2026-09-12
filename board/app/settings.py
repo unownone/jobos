@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.constants import ROLES, TOKEN_ENV
+from app.urls import resolve_public_url
 
 BOARD_DIR = Path(__file__).resolve().parents[1]
 ENV_PATH = BOARD_DIR / ".env"
@@ -75,7 +76,12 @@ def load_settings() -> Settings:
         db_path = BOARD_DIR / db_path
     host = merged.get("BOARD_HOST", "0.0.0.0") or "0.0.0.0"
     port_raw = merged.get("BOARD_PORT", "8787") or "8787"
-    public_url = (merged.get("HUB_PUBLIC_URL") or "").strip().rstrip("/")
+    public_url = resolve_public_url(
+        public_url=merged.get("HUB_PUBLIC_URL") or "",
+        public_host=merged.get("HUB_PUBLIC_HOST") or "",
+        listen_host=host,
+        listen_port=int(port_raw),
+    )
     bootstrap_token = (merged.get("HUB_BOOTSTRAP_TOKEN") or "").strip()
     repo_raw = (merged.get("HUB_REPO_ROOT") or "").strip()
     packs_raw = (merged.get("HUB_PACKS_DIR") or "").strip()

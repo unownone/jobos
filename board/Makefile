@@ -1,10 +1,13 @@
-.PHONY: run tokens test import bench shots deploy
+.PHONY: run tokens test import bench shots deploy docker
 
 run:
 	bash start.sh
 
 deploy:
 	bash ../scripts/hub_deploy.sh
+
+docker:
+	bash ../scripts/hub_docker.sh
 
 tokens:
 	uv run ../scripts/board_gen_tokens.py --dir . --print
