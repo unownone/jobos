@@ -72,3 +72,33 @@ def seed_hub_candidate(request: pytest.FixtureRequest, tmp_path: Path) -> None:
     alt.write_text(MINIMAL_CANDIDATE, encoding="utf-8")
     # Default Settings.db_path is tmp_path/board.db so hub path is tmp_path/profiles/...
     # Also cover tmp_path/board.db parent.
+
+
+# Modules that do not boot the FastAPI app (CI `test` job).
+_UNIT_MODULE_NAMES = frozenset(
+    {
+        "test_urls.py",
+        "test_tokens.py",
+        "test_unauth_secrets_unit.py",
+        "test_auth_gate_helpers.py",
+    }
+)
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Split unit vs in-process HTTP e2e so CI jobs stay distinct.
+
+    ``*e2e*`` modules and ``test_unauth_apis.py`` are e2e. Named unit modules
+    stay unit. Remaining TestClient suites are e2e (in-process FastAPI; no
+    extra server or browser install).
+    """
+    e2e = pytest.mark.e2e
+    unit = pytest.mark.unit
+    for item in items:
+        name = Path(str(item.path)).name
+        if "e2e" in name or name == "test_unauth_apis.py":
+            item.add_marker(e2e)
+        elif name in _UNIT_MODULE_NAMES or name.endswith("_unit.py"):
+            item.add_marker(unit)
+        else:
+            item.add_marker(e2e)

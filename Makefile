@@ -1,4 +1,4 @@
-.PHONY: board board-tokens board-test board-bench board-docker
+.PHONY: board board-tokens board-lint board-test board-test-unit board-test-e2e board-bench board-docker
 
 board:
 	bash board/start.sh
@@ -6,8 +6,17 @@ board:
 board-tokens:
 	uv run scripts/board_gen_tokens.py --print
 
+board-lint:
+	$(MAKE) -C board lint
+
 board-test:
 	$(MAKE) -C board test
+
+board-test-unit:
+	$(MAKE) -C board test-unit
+
+board-test-e2e:
+	$(MAKE) -C board test-e2e
 
 board-bench:
 	uv run board/scripts/benchmark.py

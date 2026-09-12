@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.auth import require_principal
 from app.constants import ROLES
 from app.main import create_app
-from app.presence import IDLE_AFTER_S, STALE_AFTER_S, derive_status, mount_presence
+from app.presence import STALE_AFTER_S, derive_status, mount_presence
 from app.settings import Settings
 
 TOKENS = {role: f"test-token-{role}-not-real" for role in ROLES}
