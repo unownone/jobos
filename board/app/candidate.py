@@ -28,7 +28,8 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
     router = APIRouter(tags=["candidate"])
 
     @router.get("/api/candidate/status")
-    def candidate_status_endpoint() -> dict[str, Any]:
+    def candidate_status_endpoint(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
+        del principal
         return candidate_status(settings)
 
     @router.get("/api/candidate/template")

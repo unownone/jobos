@@ -610,7 +610,8 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
         }
 
     @router.get("/admin/users")
-    def users_page() -> FileResponse:
+    def users_page(principal: Principal = Depends(principal_dep)) -> FileResponse:
+        del principal
         return FileResponse(STATIC_DIR / "users.html")
 
     return router

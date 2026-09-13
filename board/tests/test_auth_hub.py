@@ -411,4 +411,7 @@ def test_login_pages_exist(hub: tuple[TestClient, Settings]) -> None:
     client, _settings = hub
     assert client.get("/login").status_code == 200
     assert "Admin login" in client.get("/login").text
+    denied = client.get("/admin/invites")
+    assert denied.status_code == 401
+    bootstrap_admin(client)
     assert client.get("/admin/invites").status_code == 200

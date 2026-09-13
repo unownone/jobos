@@ -287,7 +287,10 @@ def test_maintenance_hygiene_and_import(client: TestClient) -> None:
 
 
 def test_ui_is_served(client: TestClient) -> None:
-    res = client.get("/")
+    denied = client.get("/")
+    assert denied.status_code == 401
+    assert "Select a job" not in denied.text
+    res = client.get("/", headers=h("admin"))
     assert res.status_code == 200
     assert "Get That Job" in res.text
     assert "Job Hunt Board" in res.text

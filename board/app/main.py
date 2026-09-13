@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth import Principal, optional_principal, require_admin, require_owner_or_admin, require_principal
+from app.auth_gate import AuthGateMiddleware, redact_secrets
 from app.a2a import create_a2a_router
 from app.bootstrap import (
     consume_bootstrap,
@@ -277,6 +278,19 @@ def _health_payload(db: BoardDB, settings: Settings) -> dict[str, Any]:
     }
 
 
+def _flatten_included_routers(app: FastAPI) -> None:
+    """Copy included APIRoute objects onto app.routes so auth guards are inspectable."""
+    flat: list[Any] = []
+    for route in app.router.routes:
+        original = getattr(route, "original_router", None)
+        nested = getattr(original, "routes", None) if original is not None else None
+        if nested is not None:
+            flat.extend(nested)
+        else:
+            flat.append(route)
+    app.router.routes = flat
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     db = BoardDB(settings.db_path)
@@ -297,6 +311,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.5.0",
     )
     app.add_middleware(CandidateGateMiddleware)
+    app.add_middleware(AuthGateMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -329,13 +344,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(create_onboarding_router(settings, db, pack, principal_dep))
 
     @app.get("/", response_model=None)
-    def index() -> FileResponse | RedirectResponse:
+    def index(principal: Principal = Depends(principal_dep)) -> FileResponse | RedirectResponse:
+        del principal
         if db.admin_bootstrapped() and not candidate_onboarded(settings):
             return RedirectResponse(url="/onboarding", status_code=302)
         return FileResponse(STATIC_DIR / "index.html")
 
     @app.get("/onboarding")
-    def candidate_onboarding_page() -> FileResponse:
+    def candidate_onboarding_page(
+        principal: Principal = Depends(principal_dep),
+    ) -> FileResponse:
+        del principal
         return FileResponse(STATIC_DIR / "onboarding.html")
 
     @app.get("/admin/signup", response_model=None)
@@ -345,13 +364,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return FileResponse(STATIC_DIR / "signup.html")
 
     @app.get("/admin", response_model=None)
-    def admin_home() -> FileResponse | RedirectResponse:
+    def admin_home(principal: Principal = Depends(principal_dep)) -> FileResponse | RedirectResponse:
+        del principal
         if db.admin_bootstrapped():
             return FileResponse(STATIC_DIR / "admin.html")
         return RedirectResponse(url="/admin/signup", status_code=302)
 
     @app.get("/admin/invites")
-    def admin_invites() -> FileResponse:
+    def admin_invites(principal: Principal = Depends(principal_dep)) -> FileResponse:
+        del principal
         if db.admin_bootstrapped():
             return FileResponse(STATIC_DIR / "admin.html")
         return FileResponse(STATIC_DIR / "signup.html")
@@ -1071,7 +1092,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(HTTPException)
     async def http_exc(_request: Request, exc: HTTPException) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        return JSONResponse(status_code=exc.status_code, content={"detail": redact_secrets(exc.detail)})
 
     mount_presence(app, db, principal_dep)
+    _flatten_included_routers(app)
     return app
