@@ -117,7 +117,7 @@ Paste join URLs to agents out of band. Do not put `s=` in git.
 - Human directory: `/admin/users` and `GET /api/users` (admin). Columns include model, harness, bed, track, last seen, current task. **API keys never appear.**
 - `GET /api/presence`: admin + maintenance see everyone; **track owners** see their own track; **agents cannot list the directory** (403). Anyone authenticated may `POST /api/presence/heartbeat`.
 
-Heartbeat contract for agents: every **10s**. Server marks **stale after 30s**.
+Heartbeat contract for agents: every **10s**. Server marks **stale after 30s**. Each heartbeat (and each queue claim) includes a compact **memory** card: that worker's private pod, the track's shared pod, and common. Inspector UI: `/admin/memory`. Protocol: [`memory.md`](memory.md). Do not treat memory as a second job list.
 
 ## Export (airgap)
 

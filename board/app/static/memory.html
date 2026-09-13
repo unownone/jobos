@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Hub — Memory</title>
+  <style>
+    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
+    main { max-width: 72rem; margin: 1.5rem auto; padding: 0 1rem 3rem; }
+    a { color: var(--accent); }
+    h1 { font-size: 1.15rem; margin: 0; }
+    h2 { font-size: 0.95rem; margin: 1.25rem 0 0.5rem; }
+    p, label { color: var(--muted); }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1rem; }
+    .row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 0.75rem; align-items: end; }
+    input, select { width: 100%; padding: 0.5rem 0.65rem; border-radius: 8px; border: 1px solid var(--line); background: #0e1218; color: var(--text); }
+    button { padding: 0.55rem 0.9rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+    button.ghost { background: #1c2430; border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.45rem 0.4rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 650; background: #2a3344; }
+    .err { color: var(--bad); }
+    .muted { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Job Hub — Memory pods</h1>
+    <div>
+      <a href="/">Board</a>
+      &nbsp;·&nbsp;
+      <a href="/admin">Invites</a>
+      &nbsp;·&nbsp;
+      <a href="/admin/users">Directory</a>
+      &nbsp;·&nbsp;
+      <a href="/admin/skills">Skills</a>
+      &nbsp;·&nbsp;
+      <a href="#" id="logout">Log out</a>
+    </div>
+  </header>
+  <main>
+    <p id="who">Checking session…</p>
+    <p>Worker pods are private. Track pods are shared on a lane. Common is shared by every track. Recall freely; store only durable facts.</p>
+    <div class="panel">
+      <div class="row">
+        <div>
+          <label for="pod">Pod</label>
+          <select id="pod"></select>
+        </div>
+        <div>
+          <label for="q">Search</label>
+          <input id="q" placeholder="greenhouse, RemoteOK, Exa…" />
+        </div>
+        <div>
+          <label for="kind">Kind</label>
+          <input id="kind" placeholder="optional kind" />
+        </div>
+        <button id="load" type="button">Recall</button>
+      </div>
+      <p class="muted" id="policy"></p>
+    </div>
+    <div class="panel">
+      <h2>Items</h2>
+      <p class="err" id="err"></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Pod</th><th>Kind</th><th>Title</th><th>Fact</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+  <script>
+    function csrfHeaders(extra) {
+      const hit = document.cookie.split("; ").find((c) => c.startsWith("hub_csrf="));
+      const val = hit ? decodeURIComponent(hit.split("=").slice(1).join("=")) : "";
+      return Object.assign({ "Content-Type": "application/json", "X-CSRF": val }, extra || {});
+    }
+    async function api(path, opts) {
+      const res = await fetch(path, Object.assign({ headers: csrfHeaders() }, opts || {}));
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        location.href = "/login?next=/admin/memory";
+        throw new Error("auth");
+      }
+      if (!res.ok) {
+        const detail = data.detail;
+        throw new Error(typeof detail === "string" ? detail : (detail && detail.message) || res.statusText);
+      }
+      return data;
+    }
+    async function boot() {
+      const me = await api("/api/auth/me");
+      document.getElementById("who").textContent =
+        ((me.user && me.user.display_name) || me.actor || me.user_id || "signed in") +
+        " · " + (me.track || me.role || "");
+      const pods = await api("/api/memory/pods");
+      const sel = document.getElementById("pod");
+      sel.innerHTML = '<option value="">visible pods</option>' +
+        (pods.pods || []).map((p) => '<option value="' + p.id + '">' + p.label + "</option>").join("");
+      const policy = pods.write_policy || {};
+      document.getElementById("policy").textContent =
+        (policy.store_when || "") + " Caps / 15m: " + JSON.stringify(policy.caps || {});
+      await load();
+    }
+    async function load() {
+      document.getElementById("err").textContent = "";
+      const pod = document.getElementById("pod").value;
+      const q = document.getElementById("q").value.trim();
+      const kind = document.getElementById("kind").value.trim();
+      const params = new URLSearchParams();
+      if (pod) params.set("pod", pod);
+      if (q) params.set("q", q);
+      if (kind) params.set("kind", kind);
+      try {
+        const data = await api("/api/memory/items?" + params.toString());
+        const tb = document.getElementById("rows");
+        tb.innerHTML = "";
+        (data.items || []).forEach((item) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            '<td><span class="pill">' + escapeHtml(item.pod) + "</span></td>" +
+            "<td>" + escapeHtml(item.kind) + "</td>" +
+            "<td>" + escapeHtml(item.title) + "</td>" +
+            "<td>" + escapeHtml(item.body) +
+            (item.company ? '<div class="muted">' + escapeHtml(item.company) + "</div>" : "") +
+            "</td>" +
+            '<td><button class="ghost" type="button" data-id="' + item.id + '">Forget</button></td>';
+          tb.appendChild(tr);
+        });
+        tb.querySelectorAll("button[data-id]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            await api("/api/memory/items/" + btn.dataset.id, {
+              method: "PATCH",
+              body: JSON.stringify({ forget: true }),
+            });
+            await load();
+          });
+        });
+      } catch (err) {
+        document.getElementById("err").textContent = String(err.message || err);
+      }
+    }
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+    document.getElementById("load").addEventListener("click", load);
+    document.getElementById("logout").addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      await fetch("/api/auth/logout", { method: "POST", headers: csrfHeaders() });
+      location.href = "/login";
+    });
+    boot().catch((err) => {
+      document.getElementById("who").textContent = String(err.message || err);
+    });
+  </script>
+</body>
+</html>

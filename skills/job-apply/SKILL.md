@@ -26,6 +26,7 @@ Outline: `docs/catalogs/skill-outline.md`.
 2. Take jobs with `status: apply_ready` (or `shortlisted` if the user approved).
 3. Claim `owners.apply` and set `applying` before opening a portal.
 4. Follow `apply_packet` in the YAML. If the packet is incomplete, bounce to discovery (`apply_blocked: packet incomplete`) instead of guessing a URL.
+5. If Hub is up, recall `/api/memory/recall?company=` for this employer before opening the ATS. Store a `portal_quirk` or `blocker` only when the packet was wrong or the site did something another applicator must know.
 
 ## Writing bar
 

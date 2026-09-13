@@ -7,6 +7,7 @@ This is the contract. Skills implement slices of it. If a skill and this documen
 - Hub: finish `/onboarding` so `GET /health` has `candidate_onboarded: true`. Airgap: `profiles/candidate.yaml` exists and is truthful (never the example file as live data).
 - At least one resume PDF exists locally or on the Hub (`PUT /api/candidate/resume`).
 - The operator has claimed a role in `ledger/INDEX.md`.
+- If Hub is up, the operator recalled `GET /api/memory/recall` (worker + track + common) before the cycle. Do not skip it. Do not write memory until there is a durable fact.
 - Discovery has a reasonably current `docs/catalogs/skills-and-mcps.md` (or will refresh it first).
 - Maintainer, when claimed, also keeps `skills/lists/` in sync with that catalog, and consumes Hub `skill.record`.
 - Install/host: [`docs/install.md`](install.md). Cross-agent protocol: [`docs/job-hub/a2a.md`](job-hub/a2a.md). Skill registry contract: [`docs/catalogs/skill-outline.md`](catalogs/skill-outline.md).
@@ -203,6 +204,7 @@ Suggested, not mandatory:
 - Every `applied` job has proof and an outreach seed
 - Every outreach touch has a person record
 - Catalog notes any tool that failed, so the next bot does not rediscover a dead MCP
+- If Hub ran: memory was recalled this round; only durable facts were stored (see [`docs/job-hub/memory.md`](job-hub/memory.md))
 - If maintainer ran: `skills/lists/INDEX.md` matches the YAML lists
 - If Hub is up: GitHub starters were seeded into the registry; no un-proctored shared skills from other bots
 

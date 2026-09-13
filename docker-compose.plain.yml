@@ -1,6 +1,7 @@
 # Job Hub only (no Traefik). From repo root:
 #   docker compose -f docker-compose.plain.yml up -d --build
 # Hub listens on http://127.0.0.1:8787
+# Memory pods persist in hub-data (same SQLite as jobs). No extra service.
 #
 # First visit: /admin/signup → /onboarding (required) → then invites/agents.
 

@@ -475,5 +475,11 @@ def join_payload(settings: Settings, invite: dict[str, Any]) -> dict[str, Any]:
         "join_blocked": not onboarded,
         "onboarding": join_onboarding_section(settings, invite),
         "heartbeat_s": 10,
+        "memory": {
+            "recall": "/api/memory/recall",
+            "write": "/api/memory/items",
+            "pods": "/api/memory/pods",
+            "docs": "/api/docs/docs/job-hub/memory.md",
+        },
         "now": utc_now(),
     }

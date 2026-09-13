@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.auth import Principal
 from app.bootstrap import new_id
 from app.db import BoardDB, utc_now
+from app.memory_store import safe_compact_recall
 from app.pack import catalog_updated_at
 from app.settings import BOARD_DIR
 
@@ -778,7 +779,23 @@ def register_queue_routes(
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         items = queue.claim(principal, kinds=body.kinds, limit=body.limit)
-        return {"items": [public_item(i) for i in items], "count": len(items)}
+        job_id = items[0].get("job_id") if items else None
+        company = None
+        if job_id:
+            job = queue.db.get_job(job_id)
+            if job:
+                company = job.get("company") or None
+        memory = safe_compact_recall(
+            queue.db,
+            principal,
+            job_id=job_id,
+            company=company,
+        )
+        return {
+            "items": [public_item(i) for i in items],
+            "count": len(items),
+            "memory": memory,
+        }
 
     @router.post("/ack/{item_id}")
     def queue_ack(

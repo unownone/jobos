@@ -47,6 +47,7 @@ from app.identity import (
     verify_invite_secret,
 )
 from app.messages import create_messages_router
+from app.memory import create_memory_router
 from app.metrics import MetricsStore
 from app.onboarding import create_onboarding_router
 from app.pack import PackStore
@@ -333,6 +334,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_queue_routes(app, queue=queue, principal_dep=principal_dep)
     app.include_router(create_registry_router(principal_dep))
     app.include_router(create_messages_router(principal_dep))
+    app.include_router(create_memory_router(principal_dep))
     app.include_router(create_people_router(principal_dep))
     app.include_router(create_export_router(principal_dep))
     app.include_router(create_candidate_router(settings, principal_dep))
@@ -692,6 +694,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "agent_card": "/.well-known/agent-card.json",
                 "jsonrpc": "/a2a",
                 "protocolVersion": "0.3.0",
+            },
+            "memory": {
+                "recall": "/api/memory/recall",
+                "write": "/api/memory/items",
+                "pods": ["worker", "track", "common"],
+                "docs": "/api/docs/docs/job-hub/memory.md",
             },
             "candidate_onboarded": candidate_onboarded(settings),
         }

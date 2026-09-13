@@ -22,6 +22,7 @@ TRACK_ALIASES = {
     "discovery": "discovery",
     "application": "application",
     "apply": "application",
+    "applicator": "application",
     "outreach": "outreach",
     "maintenance": "maintenance",
     "maintainer": "maintenance",

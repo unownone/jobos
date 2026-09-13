@@ -304,6 +304,18 @@ Jobs remain board rows; queue items are **work leases**. Dedup: unique `(kind, j
 
 ---
 
+## Memory
+
+### Q. Shared memory: Mem0 / Qdrant vs Hub SQLite
+
+**Decision:** Hub-native SQLite FTS5 **pods** in the existing FastAPI process and `hub-data` volume. No extra Compose service, no Mem0, no Qdrant, no Ollama embedder.
+
+Pods: `worker:{user_id}` (private), `track:{track}` (shared on the lane; `applicator` → application), `common` (all tracks). Heartbeat and queue claim return a compact recall card. Writes are gated (kinds, length, secrets, hash dedup, 6/3/2 per 15 minutes). Memory is not ledger-exported.
+
+**Rationale:** Agents already talk to Hub every 10s; LLM extraction stores too much; this hunt machine has no assumed GPU or paid embedder; Job Hub is the only non-AI component.
+
+---
+
 ## Process constraints (locked)
 
 | Topic | Decision |

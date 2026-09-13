@@ -26,6 +26,7 @@ Outline: `docs/catalogs/skill-outline.md`.
 2. If `docs/catalogs/skills-and-mcps.md` is stale, run `skills/skill-and-mcp-catalog/SKILL.md` first.
 3. Load `docs/catalogs/platforms.md` and `docs/catalogs/big-tech-careers.md`.
 4. Claim yourself under **Active operators** in `ledger/INDEX.md`.
+5. If Hub is up, `GET /api/memory/recall` before the first search.
 
 ## Loop
 
@@ -42,6 +43,10 @@ For each platform in scope (user list, else the minimum viable set in process.md
 9. If maintainer published `BOARD_URL` and your discovery token: POST the row to the hunt board as well (`board/README.md`). You consume the board; you do not issue tokens or change schema.
 
 Stop at `max_shortlist_per_cycle`. Prefer a tight list.
+
+## Memory (Hub)
+
+If `HUB_URL` is set: recall `GET /api/memory/recall` at the start of the cycle (heartbeat already includes a compact card). Store **0–2** track/common facts at the end, only if another discovery worker would otherwise rediscover them (dead MCP, portal skip, search cursor). Worker notes are private. Never store JDs or secrets. [`docs/job-hub/memory.md`](../../docs/job-hub/memory.md).
 
 ## IDs
 

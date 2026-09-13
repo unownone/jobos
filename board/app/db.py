@@ -11,6 +11,7 @@ from typing import Any
 from app.constants import JSON_FIELDS, STATUSES
 from app.message_store import ensure_messages_schema
 from app.a2a_store import ensure_a2a_schema
+from app.memory_store import ensure_memory_schema
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -207,6 +208,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         )
     ensure_messages_schema(conn)
     ensure_a2a_schema(conn)
+    ensure_memory_schema(conn)
 
 
 def _dump(value: Any) -> str | None:

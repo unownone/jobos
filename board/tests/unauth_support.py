@@ -112,11 +112,13 @@ PROTECTED_PAGES = (
     ("/admin/invites", "admin invites page"),
     ("/admin/users", "admin user directory page"),
     ("/admin/skills", "skill registry page"),
+    ("/admin/memory", "memory pods page"),
     ("/onboarding", "candidate onboarding page"),
     ("/static/index.html", "job board static HTML"),
     ("/static/admin.html", "admin static HTML"),
     ("/static/users.html", "users directory static HTML"),
     ("/static/skills.html", "skill registry static HTML"),
+    ("/static/memory.html", "memory pods static HTML"),
     ("/static/onboarding.html", "candidate onboarding static HTML"),
 )
 
@@ -153,6 +155,9 @@ PROTECTED_GETS = (
     ("/api/registry/recordings", "skill recordings"),
     ("/api/a2a/directory", "A2A peer directory"),
     ("/api/a2a/peers", "A2A peers"),
+    ("/api/memory/recall", "memory recall"),
+    ("/api/memory/items", "memory items"),
+    ("/api/memory/pods", "memory pods"),
     ("/docs", "OpenAPI Swagger UI"),
     ("/redoc", "OpenAPI ReDoc"),
     ("/openapi.json", "OpenAPI schema dump"),
