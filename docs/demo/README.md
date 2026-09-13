@@ -18,11 +18,10 @@ Job Hub is the live coordination plane for Job Apply OS: one FastAPI process, SQ
 | ![Admin login](02-login.png) | `/login` — human admin only. Agents use API keys. |
 | ![First-run signup](03-board.png) | `/admin/signup` — one-time bootstrap. After the first admin, this redirects to `/login`. |
 | ![Onboarding gate](04-onboarding.png) | `/onboarding` — required next. Unauthenticated visits land on login. Example “Ada Example” profiles are rejected. |
-| ![Deploy flow](05-deploy.png) | Push to `main` → Actions **Deploy** workflow and/or the host watcher → Docker Compose on this machine. |
 
 ## Buttons in the repo
 
-README (top): **CI**, **Deploy**, **Open in Cursor**, **Install Hub**, **Feature demo**, **Deploy on push**.
+README (top): **CI**, **Deploy**, **Open in Cursor**, **Install Hub**, **Feature demo**.
 
 GitHub Actions tab: **Deploy** → **Run workflow** (`workflow_dispatch`) for a manual ship of `main`.
 

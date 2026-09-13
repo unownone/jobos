@@ -112,28 +112,6 @@ def main() -> int:
                 page.wait_for_timeout(800)
                 page.screenshot(path=str(ROOT / "03-board.png"), full_page=False)
 
-        page.set_content(
-            """
-            <html><body style="margin:0;background:#0e1218;color:#e7edf6;font:16px ui-sans-serif,system-ui">
-              <main style="max-width:880px;margin:48px auto;padding:32px;background:#151b24;border:1px solid #2a3444;border-radius:16px">
-                <p style="color:#8b97ab;text-transform:uppercase;letter-spacing:.08em;font-size:12px">Job Apply OS</p>
-                <h1 style="margin:0 0 12px">Deploy on push to main</h1>
-                <p style="color:#8b97ab">GitHub <code>unownone/jobos</code> → this OCI host → Traefik + Hub</p>
-                <ol style="line-height:1.7">
-                  <li>Push (or merge) to <b>main</b></li>
-                  <li>Actions workflow <b>Deploy</b> on runner label <code>jobos</code></li>
-                  <li>Host watcher fetches <code>origin/main</code> every ~45s as backup</li>
-                  <li><code>docker compose up -d --build</code> in <code>/home/opc/jobos-live</code></li>
-                  <li><code>GET /health</code> must succeed before the job is green</li>
-                </ol>
-                <p style="margin-top:24px"><b>Buttons:</b> README CI · Deploy · Open in Cursor · Install Hub · Feature demo</p>
-              </main>
-            </body></html>
-            """
-        )
-        page.wait_for_timeout(300)
-        page.screenshot(path=str(ROOT / "05-deploy.png"), full_page=False)
-
         context.close()
         browser.close()
 
