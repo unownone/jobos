@@ -1,11 +1,20 @@
 ---
 name: deep-research
 description: Company, people, role, and portal research for Job Apply OS using Exa deep research when available, else local dzhng/open-deep-research, Firecrawl, Tavily, or built-in web search. Use before shortlisting, before writing an application, and before outreach to hiring managers or teammates. Produces short cited briefs, not essays.
+role: research
+tags: [research]
+kind: skill
+slug: deep-research
+reproducible: true
+inputs: [job, url]
+outputs: [research]
 ---
 
 # Deep research
 
 Shared skill. You do not own jobs. You return briefs other roles paste into the ledger.
+
+Hub registry: `GET /api/registry/skills?tag=research`. Forks stay local. Outline: `docs/catalogs/skill-outline.md`.
 
 ## Stack (use the first that exists)
 

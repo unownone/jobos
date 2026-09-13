@@ -4,6 +4,8 @@ You run the Hub. Agents do not clone this hunt repo. They join a **track**, fetc
 
 **Maintainer owns the Hub.** That is not discovery. Do not source jobs, Easy Apply, or send outreach from this role.
 
+Hub seeds GitHub `skills/` + `skills/starters/` into the registry on boot and pack rebuild. Admin/maintainer UI: `/admin/skills`. Do not paste API keys into skill bodies or recordings. Candidate `/onboarding` is still mandatory first.
+
 Companion: [agent.md](agent.md) (curl + join). Spec: [02-architecture.md](02-architecture.md). Live process: [`board/README.md`](../../board/README.md).
 
 This workspace has **no** live `profiles/candidate.yaml` until you finish Hub **`/onboarding`**. Copying the example file as if it were real is rejected. **Do not invent a candidate.** Until `GET /health` shows `candidate_onboarded: true`, invites, jobs, queues, messages, and A2A sends return `409 candidate_required`.
@@ -152,7 +154,15 @@ curl -sS -X POST "$HUB_URL/api/packs/rebuild" \
   -H "Authorization: Bearer $HUB_KEY"
 ```
 
-Admin or maintenance. Agents then `GET /api/onboarding` / `GET /api/packs/current/skills.zip`.
+Admin or maintenance. Agents then `GET /api/onboarding` / `GET /api/packs/current/skills.zip`. Rebuild also re-seeds GitHub starters into the registry (does not overwrite promoted non-github shared slugs).
+
+## Skill registry
+
+GitHub OS skills and `skills/starters/` are defaults written into SQLite. Agents use `GET /api/registry/skills`, not git, as the live list. Contract: [`docs/catalogs/skill-outline.md`](../catalogs/skill-outline.md).
+
+UI: `/admin/skills` (admin + maintenance). Proctor `skill.record` there or via API. Promote only on pass. Do not paste API keys. Local skills stay per-bot; do not copy another bot’s local body into shared.
+
+Candidate `/onboarding` is still mandatory first. Registry seed does not invent a candidate.
 
 ## Compat tokens
 
@@ -165,6 +175,7 @@ Admin or maintenance. Agents then `GET /api/onboarding` / `GET /api/packs/curren
 | `/` | Board (jobs) |
 | `/login` | Admin login |
 | `/admin` `/admin/invites` | Admin home / invites |
+| `/admin/skills` | Admin / maintenance: registry + proctor |
 | `/admin/signup` | First admin |
 | `/admin/users` | Directory |
 | `/join/{invite_id}?s=` | Agent join page |
@@ -178,6 +189,7 @@ Documented from live `board/` routes on the Hub API branch:
 - Join URL is `/join/{id}?s=` plus `GET /api/join/{id}?s=`. Invite compact token `jh_inv_{id}.{secret}` works on join only.
 - `GET /api/presence` is admin/maintenance/owners — **not agents**. Heartbeat is any authenticated user.
 - `apply.ready` / `outreach.ready` are system-enqueued; agents cannot push those kinds.
+- `skill.record`: any track may push; only maintenance/admin claim, proctor, and promote.
 - Stale catalog: explicit `discovery.search` claim → 409; mixed claim omits that kind.
 - People API: outreach + admin only (not application).
 - `HUB_DATA_KEY` / connector blob APIs are not shipped. `connectors_needed` is names only.

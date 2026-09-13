@@ -19,6 +19,7 @@ Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts
 | maintainer | cursor-cloud-agent (job-hub-board-api) | Job Hub phase F: people + ledger export + catalog gate + board UI hub (no discovery/apply/outreach) | 2026-09-07 |
 | maintainer | cursor-cloud-agent (job-hub-docs) | Job Hub phase H: operator + agent docs (no discovery/apply/outreach) | 2026-09-07 |
 | maintainer | cursor-cloud-agent (a2a-onboard-docker) | Mandatory `/onboarding` gate + A2A protocol + Docker/Compose install docs (no discovery/apply/outreach) | 2026-09-12 |
+| maintainer | cursor-cloud-agent (skill-registry) | skill registry + starters + proctor queue (no discovery/apply/outreach) | 2026-09-13 |
 
 ## Jobs
 

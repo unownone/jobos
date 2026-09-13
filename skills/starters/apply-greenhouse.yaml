@@ -1,0 +1,34 @@
+slug: apply-greenhouse
+name: Greenhouse apply
+kind: skill
+role: apply
+tags: [apply, ats, greenhouse]
+platform: greenhouse
+match:
+  ats: [greenhouse]
+  url_patterns:
+    - "boards.greenhouse.io/*"
+    - "*.greenhouse.io/*"
+  apply_kind: [ats]
+reproducible: true
+inputs: [job, apply_packet, candidate]
+outputs: [proof]
+body: |
+  # Greenhouse apply
+
+  Same form flow for every `boards.greenhouse.io` job. Follow the packet. Do not invent a URL.
+
+  ## Steps
+
+  1. Claim `owners.apply` and set `applying`.
+  2. Open the packet URL. Confirm company and title match the job row.
+  3. Upload the named resume PDF. Answer screening questions from the profile only.
+  4. Write a short, specific note (first line = why this team; two proof bullets; close with availability).
+  5. Submit. Save proof (timestamp, confirmation, uploaded files, answers_summary).
+  6. Status `applied`. Seed outreach_packet.
+
+  If captcha / unknown legal question: `apply_blocked` with the exact blocker.
+
+  ## Hard no
+
+  Skipping the packet. Fabricating proof. Applying on a different req.

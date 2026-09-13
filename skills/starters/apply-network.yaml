@@ -1,0 +1,26 @@
+slug: apply-network
+name: Network apply
+kind: skill
+role: apply
+tags: [apply, network]
+platform: network
+match:
+  ats: []
+  url_patterns: []
+  apply_kind: [network]
+reproducible: true
+inputs: [job, apply_packet, candidate]
+outputs: [proof]
+body: |
+  # Network apply
+
+  Talent-network intake (Toptal, Flexiple, Turing, Lemon.io, BairesDev). The packet says how to apply to the network. Same bar as ATS apply: proof, no invention.
+
+  ## Steps
+
+  1. Only if `apply_kind: network`. Follow packet steps (profile, screens, take-home if listed).
+  2. Do not invent a JD. Proof of what was submitted. Seed outreach if the network expects a human conversation.
+
+  ## Hard no
+
+  Treating a marketplace “matched you” email as a job offer. Skipping the job row.

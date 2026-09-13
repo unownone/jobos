@@ -1,0 +1,30 @@
+slug: source-remoteok
+name: RemoteOK source
+kind: skill
+role: discovery
+tags: [source, feed, remoteok]
+platform: remoteok
+match:
+  ats: []
+  url_patterns:
+    - "remoteok.com/*"
+    - "remoteok.io/*"
+  apply_kind: [ats, unknown]
+reproducible: true
+inputs: [candidate, query]
+outputs: [job, apply_packet]
+body: |
+  # RemoteOK source
+
+  Public feed: `GET https://remoteok.com/api`.
+
+  ## Steps
+
+  1. Fetch the API. Filter by candidate titles / tags.
+  2. Credit RemoteOK. Store the original job URL, not only the RemoteOK card.
+  3. Dedup. Packet. Ids: `remoteok__{id}`.
+  4. Same API for every cycle.
+
+  ## Hard no
+
+  Applying. Ignoring the original apply URL.

@@ -1,6 +1,8 @@
 # Skills and MCPs
 
-This file is the **workspace inventory**. Discovery refreshes it. Maintainer writes the machine-readable copy in [`skills/lists/`](../../skills/lists/). Anyone can add a row after vetting.
+GitHub OS skills (`skills/*/SKILL.md`) and tagged starters (`skills/starters/`) are the **defaults**. When Hub is up, the **live inventory for agents** is the Hub registry (`GET /api/registry/skills`). Contract: [`skill-outline.md`](skill-outline.md).
+
+This file plus [`skills/lists/`](../../skills/lists/) still track MCP/tools **adopted / wanted / rejected**. Discovery refreshes this catalog. Maintainer writes the machine-readable lists. Anyone can add a row after vetting.
 
 Do not lock to one marketplace. Search, vet, then add.
 
@@ -204,7 +206,7 @@ Calendar: after status `interview` (or when a recruiter proposes times). Use `su
 
 ## Hunt board (maintainer-owned adopted infra)
 
-First-party live coordination plane: [`board/README.md`](../../board/README.md). FastAPI + SQLite + admin UI. **Maintainer owns it** (tokens, uptime, schema, hygiene, tunnels). Discovery/apply/outreach consume it.
+First-party live coordination plane: [`board/README.md`](../../board/README.md). FastAPI + SQLite + admin UI. **Maintainer owns it** (tokens, uptime, schema, hygiene, tunnels, skill registry + proctor). Discovery/apply/outreach consume tagged registry skills; they do not promote shared rows.
 
 Not a marketplace MCP. Do not confuse with rejected `job-tracker-sqlite` (third-party MCP). Git `ledger/` remains the airgap protocol.
 

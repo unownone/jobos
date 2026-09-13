@@ -1,0 +1,30 @@
+slug: source-workatastartup
+name: Work at a Startup source
+kind: skill
+role: discovery
+tags: [source, board, ycombinator]
+platform: workatastartup
+match:
+  ats: []
+  url_patterns:
+    - "www.workatastartup.com/*"
+    - "workatastartup.com/*"
+  apply_kind: [ats, network]
+reproducible: true
+inputs: [candidate, query]
+outputs: [job, apply_packet]
+body: |
+  # Work at a Startup source
+
+  YC company jobs via `workatastartup-mcp` (`bash scripts/mcp/workatastartup.sh`) or the public site.
+
+  ## Steps
+
+  1. Search with candidate titles. Prefer the pinned uvx MCP.
+  2. Store company, title, apply URL, YC batch if present.
+  3. Dedup. Packet. Same query works for the next title.
+  4. Cookie-session forks of the MCP stay rejected; use the public package.
+
+  ## Hard no
+
+  Applying on the YC portal. Using stolen session cookies.

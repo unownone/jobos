@@ -1,0 +1,42 @@
+slug: source-google-dorks
+name: Google ATS dorks source
+kind: skill
+role: discovery
+tags: [source, dork]
+platform: google_dorks
+match:
+  ats: [greenhouse, lever, ashby, workday, workable, smartrecruiters]
+  url_patterns:
+    - "boards.greenhouse.io/*"
+    - "jobs.lever.co/*"
+    - "jobs.ashbyhq.com/*"
+    - "*.myworkdayjobs.com/*"
+    - "apply.workable.com/*"
+  apply_kind: [ats]
+reproducible: true
+inputs: [candidate, query]
+outputs: [job, apply_packet]
+body: |
+  # Google ATS dorks source
+
+  Public search operators over employer ATS pages. Ordinary search, not an exploit.
+
+  ## Queries
+
+  Swap `{title}` for the candidate target:
+
+  - site:boards.greenhouse.io "{title}"
+  - site:jobs.lever.co "{title}"
+  - site:jobs.ashbyhq.com "{title}"
+  - site:*.myworkdayjobs.com "{title}"
+  - site:apply.workable.com "{title}"
+
+  ## Steps
+
+  1. Run the operators. Open the **employer** page (Google cards go stale).
+  2. Set `ats` from the host. Packet that URL. Dedup.
+  3. Same operators work for the next title. Do not special-case one company.
+
+  ## Hard no
+
+  Applying. Scraping authenticated ATS search.

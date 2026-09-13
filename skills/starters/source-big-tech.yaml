@@ -1,0 +1,33 @@
+slug: source-big-tech
+name: Big-tech careers source
+kind: skill
+role: discovery
+tags: [source, career]
+platform: big-tech
+match:
+  ats: [workday, greenhouse, lever]
+  url_patterns:
+    - "www.amazon.jobs/*"
+    - "jobs.careers.microsoft.com/*"
+    - "www.google.com/about/careers/*"
+    - "www.uber.com/careers/*"
+    - "careers.google.com/*"
+  apply_kind: [ats]
+reproducible: true
+inputs: [candidate, companies]
+outputs: [job, apply_packet]
+body: |
+  # Big-tech careers source
+
+  Company career sites in `docs/catalogs/big-tech-careers.md`. Amazon, Microsoft, Google, Uber, and fork extras.
+
+  ## Steps
+
+  1. Search each in-scope career site for candidate titles.
+  2. Capture req id. Packet the employer URL. Set `ats` from the host (often Workday-ish).
+  3. Dedup by req id when present. Ids: `{company}__{req_id}`.
+  4. Same steps for the next company in the catalog.
+
+  ## Hard no
+
+  Applying. Skipping req id on Amazon-style postings.

@@ -1,0 +1,29 @@
+slug: source-weekday
+name: Weekday source
+kind: skill
+role: discovery
+tags: [source, board, weekday]
+platform: weekday
+match:
+  ats: [workable]
+  url_patterns:
+    - "jobs.weekday.works/*"
+    - "*.weekday.works/*"
+  apply_kind: [ats, unknown]
+reproducible: true
+inputs: [candidate, query]
+outputs: [job, apply_packet]
+body: |
+  # Weekday source
+
+  Public job pages (often Workable). No MCP. Record whether listings are Workable on first cycle.
+
+  ## Steps
+
+  1. Search public pages for candidate titles.
+  2. If the apply URL is Workable, set `ats: workable`.
+  3. Dedup. Packet the employer URL.
+
+  ## Hard no
+
+  Applying. Inventing a Weekday MCP.

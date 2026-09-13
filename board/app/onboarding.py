@@ -13,6 +13,7 @@ from app.db import BoardDB
 from app.identity import invite_status_error, verify_invite_secret
 from app.pack import PackStore, normalize_relpath, skill_allowed
 from app.settings import Settings
+from app.skill_seed import seed_github_skills
 
 TEXT_TYPES = {
     ".md": "text/markdown; charset=utf-8",
@@ -189,12 +190,17 @@ def create_onboarding_router(
         if principal.role not in {"admin", "maintenance"} and principal.kind != "admin":
             require_admin(principal)
         meta = pack.rebuild()
+        counts = seed_github_skills(db, pack.repo_root, settings=settings)
         db.add_event(
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
             action="pack_rebuild",
-            fields={"pack_sha": meta.pack_sha, "git_sha": meta.git_sha},
+            fields={
+                "pack_sha": meta.pack_sha,
+                "git_sha": meta.git_sha,
+                "skill_seed": counts,
+            },
         )
         return {
             "ok": True,
@@ -203,6 +209,7 @@ def create_onboarding_router(
             "built_at": meta.built_at,
             "catalog_updated_at": meta.catalog_updated_at,
             "files": meta.files,
+            "skill_seed": counts,
         }
 
     return router

@@ -65,6 +65,9 @@ from app.permissions import (
 from app.profile import candidate_onboarded, candidate_status
 from app.presence import mount_presence
 from app.queue import QUEUE_KINDS, QueueService, register_queue_routes
+from app.registry import create_registry_router
+from app.skill_seed import seed_github_skills
+from app.skill_store import SkillStore
 from app.settings import Settings, load_settings
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -303,6 +306,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     pack = PackStore(settings)
     pack.ensure_current()
     queue = QueueService(db, pack=pack)
+    skills = SkillStore(db)
+    seed_github_skills(db, pack.repo_root, settings=settings)
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
@@ -322,9 +327,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.db = db
     app.state.metrics = metrics
     app.state.queue = queue
+    app.state.skills = skills
     app.state.pack = pack
     app.state.bootstrap_token = minted
     register_queue_routes(app, queue=queue, principal_dep=principal_dep)
+    app.include_router(create_registry_router(principal_dep))
     app.include_router(create_messages_router(principal_dep))
     app.include_router(create_people_router(principal_dep))
     app.include_router(create_export_router(principal_dep))
@@ -678,6 +685,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "heartbeat_s": 10,
             "queue_kinds": list(QUEUE_KINDS),
             "queue_lease_m": 15,
+            "registry": "/api/registry/skills",
             "catalog_updated_at": pack.meta_without_ensure().catalog_updated_at,
             "catalog_max_age_days": 7,
             "a2a": {

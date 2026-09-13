@@ -1,11 +1,24 @@
 ---
 name: job-apply
 description: Apply to shortlisted jobs in Job Apply OS with specific, worth-reading materials. Follows apply packets only. Use when submitting applications, Easy Apply after discovery, Greenhouse/Lever/Workday forms, or writing cover notes. Never invent jobs or start cold outreach.
+role: apply
+tags: [apply]
+kind: skill
+slug: job-apply
+reproducible: true
+inputs: [job, apply_packet, candidate]
+outputs: [proof, outreach_packet]
 ---
 
 # Job apply
 
 You submit. You do not source. You do not cold-email.
+
+## Registry
+
+When `HUB_URL` is set, pick the tagged `apply` skill that matches the packet ATS/URL (`GET /api/registry/skills?tag=apply&ats=workday` or `&url=`). Workday on job A is Workday on job B. Tenant quirks stay on a **local** fork (`POST /api/registry/skills/{id}/fork`). Others cannot see that fork. To share, `POST /api/registry/recordings` — only maintainer consumes `skill.record`. Airgapped: follow this role skill.
+
+Outline: `docs/catalogs/skill-outline.md`.
 
 ## Startup sequence
 

@@ -55,6 +55,7 @@ QUEUE_KINDS = (
     "outreach.ready",
     "maintenance.hygiene",
     "maintenance.pack_rebuild",
+    "skill.record",
 )
 
 JOB_SCOPED_KINDS = frozenset(
@@ -80,6 +81,7 @@ KIND_CONSUMER_TRACK = {
     "outreach.ready": "outreach",
     "maintenance.hygiene": "maintenance",
     "maintenance.pack_rebuild": "maintenance",
+    "skill.record": "maintenance",
 }
 
 CONSUME_KINDS: dict[str, frozenset[str]] = {
@@ -89,19 +91,35 @@ CONSUME_KINDS: dict[str, frozenset[str]] = {
     "apply": frozenset({"apply.ready", "apply.blocked_retry"}),
     "outreach": frozenset({"outreach.ready"}),
     "maintenance": frozenset(
-        {"catalog.refresh", "maintenance.hygiene", "maintenance.pack_rebuild"}
+        {
+            "catalog.refresh",
+            "maintenance.hygiene",
+            "maintenance.pack_rebuild",
+            "skill.record",
+        }
     ),
     "admin": frozenset(QUEUE_KINDS),
 }
 
 PRODUCE_KINDS: dict[str, frozenset[str]] = {
     "discovery": frozenset(
-        {"catalog.refresh", "discovery.search", "discovery.enrich", "discovery.packet"}
+        {
+            "catalog.refresh",
+            "discovery.search",
+            "discovery.enrich",
+            "discovery.packet",
+            "skill.record",
+        }
     ),
-    "apply": frozenset(),
-    "outreach": frozenset(),
+    "apply": frozenset({"skill.record"}),
+    "outreach": frozenset({"skill.record"}),
     "maintenance": frozenset(
-        {"catalog.refresh", "maintenance.hygiene", "maintenance.pack_rebuild"}
+        {
+            "catalog.refresh",
+            "maintenance.hygiene",
+            "maintenance.pack_rebuild",
+            "skill.record",
+        }
     ),
     "admin": frozenset(QUEUE_KINDS),
 }
@@ -243,6 +261,11 @@ def dedupe_key_for(kind: str, job_id: str | None, payload: dict[str, Any] | None
         return f"{kind}:{portal}:{query}"
     if kind in {"catalog.refresh", "maintenance.hygiene", "maintenance.pack_rebuild"}:
         return kind
+    if kind == "skill.record":
+        recording_id = str(payload.get("recording_id") or "").strip()
+        if not recording_id:
+            raise HTTPException(status_code=422, detail="skill.record requires payload.recording_id")
+        return f"{kind}:{recording_id}"
     raise HTTPException(status_code=422, detail=f"unknown queue kind {kind}")
 
 

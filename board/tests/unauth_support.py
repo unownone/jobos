@@ -111,10 +111,12 @@ PROTECTED_PAGES = (
     ("/admin", "admin dashboard"),
     ("/admin/invites", "admin invites page"),
     ("/admin/users", "admin user directory page"),
+    ("/admin/skills", "skill registry page"),
     ("/onboarding", "candidate onboarding page"),
     ("/static/index.html", "job board static HTML"),
     ("/static/admin.html", "admin static HTML"),
     ("/static/users.html", "users directory static HTML"),
+    ("/static/skills.html", "skill registry static HTML"),
     ("/static/onboarding.html", "candidate onboarding static HTML"),
 )
 
@@ -147,6 +149,8 @@ PROTECTED_GETS = (
     ("/api/whoami", "whoami principal"),
     ("/api/auth/me", "session /api/auth/me"),
     ("/api/onboarding", "onboarding pack (skills/MCP)"),
+    ("/api/registry/skills", "skill registry list"),
+    ("/api/registry/recordings", "skill recordings"),
     ("/api/a2a/directory", "A2A peer directory"),
     ("/api/a2a/peers", "A2A peers"),
     ("/docs", "OpenAPI Swagger UI"),

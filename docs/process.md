@@ -8,8 +8,8 @@ This is the contract. Skills implement slices of it. If a skill and this documen
 - At least one resume PDF exists locally or on the Hub (`PUT /api/candidate/resume`).
 - The operator has claimed a role in `ledger/INDEX.md`.
 - Discovery has a reasonably current `docs/catalogs/skills-and-mcps.md` (or will refresh it first).
-- Maintainer, when claimed, also keeps `skills/lists/` in sync with that catalog.
-- Install/host: [`docs/install.md`](install.md). Cross-agent protocol: [`docs/job-hub/a2a.md`](job-hub/a2a.md).
+- Maintainer, when claimed, also keeps `skills/lists/` in sync with that catalog, and consumes Hub `skill.record`.
+- Install/host: [`docs/install.md`](install.md). Cross-agent protocol: [`docs/job-hub/a2a.md`](job-hub/a2a.md). Skill registry contract: [`docs/catalogs/skill-outline.md`](catalogs/skill-outline.md).
 
 ## 1. Catalog pass (discovery, first)
 
@@ -21,7 +21,8 @@ Goal: know which skills and MCPs this workspace can actually use.
 4. Write the chosen stack into `docs/catalogs/skills-and-mcps.md` with install notes.
 5. If the pass is a platform/MCP coverage refresh, also update `docs/research/platform-mcp-build-plan.md`.
 6. If the work is **updating the skill tree** (lists, pruning, example MCP config), load [`skills/skill-maintainer`](../skills/skill-maintainer/SKILL.md) and write `skills/lists/` — that is not a discovery cycle.
-7. Do not install an auto-apply skill into the discovery bot.
+7. GitHub starters (`skills/starters/*.yaml` and role `SKILL.md`) seed the Hub registry (`scope=shared`, `status=approved`, `origin=github`) on boot / pack rebuild. [`skills/lists/`](../skills/lists/) remain the MCP/tool inventory (adopted / wanted / rejected) — not runnable skills.
+8. When Hub is up, live selection is `GET /api/registry/skills`, not git. Do not install an auto-apply skill into the discovery bot.
 
 ## 2. Profile freeze
 
@@ -40,6 +41,8 @@ If the human changes the profile mid-cycle, finish in-flight packets, then re-sc
 ## 3. Discovery cycle
 
 Goal: a shortlist with reproducible apply packets. **No applications.**
+
+When Hub is up, pick a matching tagged skill: `GET /api/registry/skills?tag=source` (and `platform` / URL as needed). Airgap: role [`job-discovery`](../skills/job-discovery/SKILL.md) plus `skills/starters/*.yaml`. Do not load another bot’s local skill.
 
 ### 3.1 Coverage
 
@@ -93,6 +96,8 @@ Never “just knock out a few Easy Applies” to feel productive.
 
 Goal: submit a small number of high-quality applications.
 
+When Hub is up, pick a matching tagged skill: `GET /api/registry/skills?tag=apply` (ATS / `url`). Airgap: role [`job-apply`](../skills/job-apply/SKILL.md) plus `skills/starters/*.yaml`. Do not load another bot’s local skill.
+
 ### 4.1 Claim
 
 Only take jobs in `apply_ready` (or `shortlisted` if the human approved them). Set `owners.apply` and `status: applying` before touching a portal.
@@ -130,6 +135,8 @@ If a portal needs a human (captcha, government ID upload, unknown work-auth ques
 ## 5. Outreach cycle
 
 Goal: a human conversation. Not a spray.
+
+When Hub is up, pick a matching tagged skill: `GET /api/registry/skills?tag=outreach`. Airgap: role [`job-outreach`](../skills/job-outreach/SKILL.md) plus `skills/starters/*.yaml`. Do not load another bot’s local skill.
 
 ### 5.1 When
 
@@ -197,17 +204,21 @@ Suggested, not mandatory:
 - Every outreach touch has a person record
 - Catalog notes any tool that failed, so the next bot does not rediscover a dead MCP
 - If maintainer ran: `skills/lists/INDEX.md` matches the YAML lists
+- If Hub is up: GitHub starters were seeded into the registry; no un-proctored shared skills from other bots
 
 ## 10. Maintainer pass (seldom)
 
-Goal: keep the skill/MCP inventory true, and keep the hunt board honest. **No job sourcing.**
+Goal: keep the skill/MCP inventory true, keep the Hub registry honest, and keep the hunt board honest. **No job sourcing.**
 
 1. Claim `maintainer` on `ledger/INDEX.md`.
 2. Load [`skills/skill-maintainer`](../skills/skill-maintainer/SKILL.md).
 3. Search at least two registries. Vet. Write `skills/lists/{adopted,wanted,rejected,by-platform,sources}.yaml`.
 4. `uv run scripts/rebuild_skill_index.py`.
 5. Patch `mcp/mcp.example.json` / `.cursor/environment.json` only for tools that moved to **adopted**.
-6. Append catalog workspace log + `ledger/events.jsonl`.
-7. Hunt board (when this hunt uses one): generate/rotate tokens with `scripts/board_gen_tokens.py`, keep `board/start.sh` up, import ledger history if needed, run hygiene. Tokens stay gitignored.
+6. **Skill registry:** claim `skill.record` (maintenance only). Proctor first against the [`skill-outline`](catalogs/skill-outline.md) rubric. Promote only on pass. Fail with a note; the submitter may keep the local copy.
+7. Anyone (any track) may enqueue a recording (`POST /api/registry/recordings` or queue push `skill.record`). Only maintainer / admin **consumes**.
+8. Seed / re-seed GitHub starters (`POST /api/registry/seed`) if needed. Does not overwrite promoted non-github shared slugs.
+9. Append catalog workspace log + `ledger/events.jsonl`.
+10. Hunt board (when this hunt uses one): generate/rotate tokens with `scripts/board_gen_tokens.py`, keep `board/start.sh` up, import ledger history if needed, run hygiene. Tokens stay gitignored.
 
 Do not start a discovery search from this pass.

@@ -1,0 +1,29 @@
+slug: source-hiringcafe
+name: Hiring Cafe source
+kind: skill
+role: discovery
+tags: [source, board, hiringcafe]
+platform: hiringcafe
+match:
+  ats: []
+  url_patterns:
+    - "hiringcafe.com/*"
+    - "hiring.cafe/*"
+  apply_kind: [ats, unknown]
+reproducible: true
+inputs: [candidate, query]
+outputs: [job, apply_packet]
+body: |
+  # Hiring Cafe source
+
+  Aggregated career pages. `python3 scripts/fetch_hiringcafe.py` or public `/jobs/{slug}`.
+
+  ## Steps
+
+  1. Query for candidate titles. If Cloudflare 403, Exa crawl / WebFetch the same URL.
+  2. Always store employer `apply_url` when present, not only the Hiring Cafe card.
+  3. Dedup against other boards. Packet. Ids: `hiringcafe__{slug}`.
+
+  ## Hard no
+
+  Applying from the card. Treating Hiring Cafe as the ATS.
