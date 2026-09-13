@@ -7,6 +7,7 @@ You are working in **Job Apply OS**. Read this before doing anything else.
 1. Read `profiles/candidate.yaml` **or** Hub `GET /api/candidate/public`. If it is missing / `present: false`, stop for the human to finish `/onboarding`. Copy `profiles/candidate.example.yaml` only as a template. Do not invent a candidate.
 2. Read `docs/process.md` if you have not already this session.
 3. Claim a role from `docs/roles.md`. Write the claim into `ledger/INDEX.md` under **Active operators**.
+4. If Hub is live, `GET /api/memory/recall` (or read `memory` on the first heartbeat) before searching or claiming work.
 
 If the user says you own everything, you still run the three roles **in order**: catalog + research + discovery, then apply, then outreach. Never Easy Apply during discovery. Maintainer is a fourth owner and is **seldom** used; run it when the skill/MCP inventory is the work, not mid-search.
 
@@ -33,6 +34,7 @@ Discovery **starts** with the catalog skill unless `docs/catalogs/skills-and-mcp
 - Prefer official APIs, public JSON feeds, and public career pages.
 - Attach PDFs on **email**. LinkedIn DMs usually cannot take a PDF; send a short note and ask for a chat, and point at a resume link if you have one.
 - Every state change gets a row in `ledger/events.jsonl` and an update on the job YAML.
+- If Hub is up (`HUB_URL` / `BOARD_URL`): **recall memory every round** (`GET /api/memory/recall` and the `memory` card on heartbeat / queue claim). Store only durable facts (portal quirks, blockers, dead tools). Do not dump transcripts, JDs, or secrets. Pods: worker (private) / track (shared on the lane) / common. Docs: [`docs/job-hub/memory.md`](docs/job-hub/memory.md).
 
 ## Ledger writes
 

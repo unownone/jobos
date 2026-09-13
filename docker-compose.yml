@@ -1,6 +1,7 @@
 # Job Hub behind Traefik. From repo root:
 #   HUB_PUBLIC_HOST=12.234.244.34 docker compose up -d --build
 # Traefik listens on 80 and 443. The board is served at /.
+# Memory pods live in Hub SQLite on hub-data (no extra vector-DB / Mem0 service).
 #
 # Plain Hub on :8787 (no Traefik): docker compose -f docker-compose.plain.yml up -d --build
 # First operator step after signup is always /onboarding.

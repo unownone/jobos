@@ -6,7 +6,7 @@ Private **live coordination plane** for a multi-agent job hunt. FastAPI + SQLite
 
 This is not a replacement for the git ledger in `ledger/`. See [Architecture](#architecture).
 
-**Job Hub docs:** operator [`docs/job-hub/human.md`](../docs/job-hub/human.md) (deploy, signup, invites, export); agents [`docs/job-hub/agent.md`](../docs/job-hub/agent.md) (`$HUB_KEY`, join, onboarding, heartbeat, queue). Maintainer owns this process; maintainer is not discovery.
+**Job Hub docs:** operator [`docs/job-hub/human.md`](../docs/job-hub/human.md) (deploy, signup, invites, export); agents [`docs/job-hub/agent.md`](../docs/job-hub/agent.md) (`$HUB_KEY`, join, onboarding, heartbeat, queue, memory). Memory pods: [`docs/job-hub/memory.md`](../docs/job-hub/memory.md). Maintainer owns this process; maintainer is not discovery.
 
 ![Admin dashboard — job list](docs/01-dashboard.png)
 

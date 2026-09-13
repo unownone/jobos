@@ -19,6 +19,7 @@ from app.auth import Principal
 from app.constants import ROLE_TO_TRACK, role_for_track
 from app.db import BoardDB
 from app.message_store import count_unread
+from app.memory_store import safe_compact_recall
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -546,6 +547,11 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             compat_role=principal.role if user is None else None,
         )
         assert_no_secrets(self_row)
+        memory = safe_compact_recall(
+            db,
+            principal,
+            job_id=(payload.job_id or "").strip() or None,
+        )
         return {
             "ok": True,
             "status": computed,
@@ -553,6 +559,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             "stale_after_s": STALE_AFTER_S,
             "last_seen": now_iso,
             "pending_messages": count_unread(db, principal),
+            "memory": memory,
             "self": self_row,
         }
 

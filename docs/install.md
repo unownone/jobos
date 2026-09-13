@@ -39,7 +39,7 @@ curl -sS -X POST "$HUB_URL/api/jobs" -H "X-Role: discovery" ...
 
 ## Docker Compose (plain)
 
-Hub only. Binds **8787**. Persistence is the `hub-data` volume (`/data` in the container: sqlite, packs, candidate yaml, resume, `.env`).
+Hub only. Binds **8787**. Persistence is the `hub-data` volume (`/data` in the container: sqlite including **memory pods**, packs, candidate yaml, resume, `.env`). There is no separate vector database.
 
 ```bash
 cd /path/to/jobOS

@@ -22,7 +22,7 @@ flowchart TB
   subgraph hub [Job Hub — only non-AI component]
     api[FastAPI same origin]
     ui[Board + Admin + Onboarding + Presence + Invites]
-    db[(SQLite jobs events queue users presence A2A)]
+    db[(SQLite jobs events queue users presence A2A memory)]
     pack[Skill/MCP/docs pack]
     a2a[A2A JSON-RPC + Agent Cards]
     secrets[gitignored .env + encrypted connectors]
@@ -128,6 +128,19 @@ Keep `jobs` and `events` as today. Add:
 
 Optional `claim_user_id`, `claim_lease_until` for the **active lane claim** (mirrors queue). `owners` JSON stays (`discovery`/`apply`/`outreach` keys — keep `apply` in the job document for schema compatibility).
 
+### `memory_items`
+
+Segmented working memory. **Not** the job ledger.
+
+| Column | Notes |
+| --- | --- |
+| `pod` | `common` \| `track:{track}` \| `worker:{user_id}` |
+| `kind` | Allowlisted per pod (portal_quirk, tool_failure, …) |
+| `content_hash` | Dedup inside a pod |
+| `expires_at` | Worker notes TTL; low-importance track/common TTL |
+
+FTS5 virtual table `memory_fts`. Write caps per 15 minutes: worker 6, track 3, common 2. Heartbeat and queue claim return a compact recall card.
+
 ## Queue model
 
 See grilling Q20–Q21. Claim SQL sketch:
@@ -161,6 +174,7 @@ System triggers (in job PATCH/POST):
 | Invites | `/admin/invites` | admin |
 | Presence / user directory | `/admin/users` | admin + maintenance |
 | Join (human-readable) | `/join/{invite_id}` | invite secret |
+| Memory inspector | `/admin/memory` | session |
 | Health | `/health` | public, no secrets |
 
 Board adds a **presence rail** (who is working) using `GET /api/presence` if the principal may read it (admin, maintenance, owners see own track).
@@ -257,6 +271,18 @@ v1 minimum: people JSON on the job `outreach_packet` is enough; dedicated people
 | POST | `/a2a` | Bearer (JSON-RPC) | A2A `message/send` → same inbox |
 
 See [`a2a.md`](a2a.md). Candidate onboarding is required before send.
+
+### Memory pods
+
+See [`memory.md`](memory.md). Same SQLite as the Hub. No extra Compose service.
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/memory/recall` | any_user | Worker + track + common facts for this round |
+| GET | `/api/memory/pods` | any_user | Pods this principal may see |
+| GET/POST | `/api/memory/items` | any_user | List / sparse write (gated) |
+| PATCH/DELETE | `/api/memory/items/{id}` | author or inspector | Forget / pin / delete |
+| GET | `/admin/memory` | any_user | Inspector UI |
 
 ### Candidate slice
 

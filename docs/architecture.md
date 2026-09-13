@@ -93,6 +93,8 @@ Source of truth for git-based hunts: jobs, people, and events as files. Git is t
 
 [`board/`](../board/README.md) is a FastAPI + SQLite private board (Job Hub) with Bearer / `X-Hub-Key` owner-agent keys, plus deprecated `X-Role` + `X-Token`. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. It does not replace the ledger schema. Import history with `scripts/board_import_ledger.py`. Operator/agent docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md).
 
+**Memory pods** live in the same Hub SQLite (no extra Compose service): per-worker private, per-track shared (discovery / application / outreach / maintenance), plus a common pod. Agents recall every heartbeat and queue claim; writes are gated. [`docs/job-hub/memory.md`](job-hub/memory.md).
+
 ## Data flow for one job
 
 ```mermaid
