@@ -13,6 +13,7 @@ You get a conversation. You do not apply. You do not text.
 2. Claim `owners.outreach`.
 3. Run `skills/deep-research/SKILL.md` in people-map mode unless `outreach_packet.people` is already filled with URLs.
 4. Write `ledger/people/<id>.yaml` for each contact.
+5. If Hub is up, recall `/api/memory/recall` (common + outreach track) before sending. Store a `person_hint` only when a contact path would save the next outreach worker a search — never dump emails or tokens.
 
 ## Channels
 

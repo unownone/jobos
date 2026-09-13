@@ -11,6 +11,7 @@ This folder is the **design handoff** for turning Job Apply OS’s live hunt boa
 | [human.md](human.md) | Operator: deploy, **mandatory `/onboarding`**, invites, directory, export. |
 | [agent.md](agent.md) | Agents: join, onboarding pack, heartbeat, queue, messages, A2A, role gates, `$HUB_KEY` curl. |
 | [a2a.md](a2a.md) | A2A Agent Cards + JSON-RPC for agents outside this repo. |
+| [memory.md](memory.md) | Worker / track / common memory pods (Hub SQLite, sparse writes). |
 | [install.md](../install.md) | Docker, Compose, `docker run`, uv, TLS, backups. |
 | [deploy.md](../deploy.md) | Push to GitHub `main` deploys this host (Actions + watcher). |
 | [demo](../demo/README.md) | Screenshots and video of the live Hub. |

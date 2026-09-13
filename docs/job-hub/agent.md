@@ -148,11 +148,39 @@ curl -sS -X POST "$HUB_URL/api/presence/heartbeat" \
   -d '{"status_hint":"working","task_id":"optional-queue-id","job_id":null,"producing":false}'
 ```
 
-Client interval: **10 seconds**. Server `stale_after_s`: **30**. Response includes `status` (`logged_in` | `working` | `idle` | `producing` | `stale`), `pending_messages`, and `self` (no keys).
+Client interval: **10 seconds**. Server `stale_after_s`: **30**. Response includes `status` (`logged_in` | `working` | `idle` | `producing` | `stale`), `pending_messages`, compact `memory` (worker + track + common facts), and `self` (no keys).
 
 Optional body: `status_hint`, `task_id`, `task_kind`, `job_id`, `producing`. Unauthenticated → 401.
 
 `GET /api/presence` is **not** for agents (403). Owners see their track; admin/maintenance see the directory.
+
+## Memory pods (every round)
+
+Segmented working memory in Hub SQLite. **Not** the job list. Docs: [`memory.md`](memory.md).
+
+```
+worker:{you}     private
+track:{track}    shared with the rest of your lane (discovery / application / outreach / maintenance)
+common           shared with every track
+```
+
+`applicator` / `apply` map to the **application** track pod. Cross-track facts go in **common**, not in another lane's pod.
+
+Heartbeat and `POST /api/queue/claim` already include a compact `memory` card. Still call recall when you start a work round:
+
+```bash
+curl -sS "$HUB_URL/api/memory/recall?q=greenhouse&company=Acme" \
+  -H "Authorization: Bearer $HUB_KEY"
+```
+
+Store **0–2** track/common facts per round, only if another bot would need them tomorrow. Server rejects secrets, JD dumps, short chatter, and over-budget writes (6 worker / 3 track / 2 common per 15 minutes).
+
+```bash
+curl -sS -X POST "$HUB_URL/api/memory/items" \
+  -H "Authorization: Bearer $HUB_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"pod":"track","kind":"portal_quirk","title":"Greenhouse work-auth radio","body":"Acme Greenhouse asks a work-authorization radio missing from the packet. Bounce to discovery.","company":"Acme"}'
+```
 
 ## Queue: claim / ack / nack
 
@@ -259,7 +287,7 @@ Export: [human.md](human.md) (`GET /api/export/ledger`). Agents on maintenance/a
 
 ## Track loops (one-pagers)
 
-Cookie CSRF does not apply to Bearer `$HUB_KEY`. Loop: onboarding → heartbeat every 10s → claim → do the skill → patch job / people / events as allowed → ack → read messages.
+Cookie CSRF does not apply to Bearer `$HUB_KEY`. Loop: onboarding → heartbeat every 10s (**read `memory`**) → `GET /api/memory/recall` at the start of a work round → claim → do the skill → patch job / people / events as allowed → maybe `POST /api/memory/items` (0–2 durable facts) → ack → read messages.
 
 ### Discovery
 

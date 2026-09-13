@@ -41,6 +41,7 @@ Write yourself under **Active operators** in `ledger/INDEX.md` as `maintainer`. 
 7. If a tool is clearly adopted, **pin it** (`uvx package==version`, or a SHA clone into gitignored `agent-tools/`). Do not copy 50k-line data files or upstream trees into git. Hosted tools get a snippet in `mcp/hosted/`. Third-party skills go in `.agents/skills/` via `npx skills add`.
 8. Append `ledger/events.jsonl`. No job YAML.
 9. If this hunt uses the live board: follow [`board/README.md`](../../board/README.md). Generate/rotate gitignored tokens, start `board/start.sh`, import ledger history, run hygiene. Discovery/apply/outreach consume the board; they do not own it.
+10. Recall Hub memory (`GET /api/memory/recall`) at the start of a maintainer pass. Put catalog/tool deaths in the **common** pod (`catalog_note` / `tool_failure`) so discovery does not rediscover a dead MCP. Do not store secrets. [`docs/job-hub/memory.md`](../../docs/job-hub/memory.md).
 
 ## Do not
 

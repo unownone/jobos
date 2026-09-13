@@ -83,6 +83,8 @@
     #presenceRail .who { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
     #presenceRail .who .name { font-weight: 650; }
     #presenceRail .muted { color: var(--muted); font-size: 11px; }
+    #presenceRail .mem { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+    #presenceRail .mem .kind { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
     #list { overflow: auto; }
     .side { border-left: 1px solid var(--line); background: var(--panel); padding: 16px; overflow: auto; }
     table { width: 100%; border-collapse: collapse; }
@@ -133,6 +135,7 @@
           <a href="/login">Login</a> ·
           <a href="/admin">Admin</a> ·
           <a href="/admin/users">Presence</a> ·
+          <a href="/admin/memory">Memory</a> ·
           <a href="/.well-known/agent-card.json">A2A Agent Card</a> ·
           <a href="/api/onboarding">Onboarding JSON</a>
         </div>
@@ -179,6 +182,9 @@
       <h2>Presence</h2>
       <div class="muted" id="presenceEmpty">Connect to see who is logged in and heartbeating. Join via an admin invite URL.</div>
       <div id="presenceList"></div>
+      <h2>Memory</h2>
+      <div class="muted" id="memoryEmpty">Heartbeat recalls worker + track + common facts each round.</div>
+      <div id="memoryList"></div>
     </aside>
     <section id="list"><div class="empty">Connect with a role token or paste a Hub API key to load the shared board.</div></section>
     <aside class="side" id="side"></aside>
@@ -310,7 +316,8 @@
         body.job_id = selectedId;
       }
       try {
-        await api("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(body) });
+        const beat = await api("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(body) });
+        renderMemory(beat.memory);
       } catch (_err) {
         /* directory is best-effort; board still works */
       }
@@ -333,6 +340,26 @@
           <div>${pill(u.status || "offline")} <span class="muted">${escapeHtml(u.kind || "")} · ${escapeHtml(u.track || u.role || "")}</span></div>
           <div class="muted">${escapeHtml([u.model, u.harness, u.bed].filter(Boolean).join(" · "))}</div>
           <div class="muted">${escapeHtml(u.last_seen || "")}${task ? " · " + escapeHtml(task) : ""}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderMemory(memory) {
+      const empty = document.getElementById("memoryEmpty");
+      const list = document.getElementById("memoryList");
+      const items = (memory && memory.items) || [];
+      if (!items.length) {
+        empty.hidden = false;
+        empty.textContent = (memory && memory.hint) || "No stored facts yet. Write only durable lessons.";
+        list.innerHTML = "";
+        return;
+      }
+      empty.hidden = true;
+      list.innerHTML = items.map((item) => {
+        return `<div class="mem">
+          <div class="kind">${escapeHtml(item.pod_scope || "")} · ${escapeHtml(item.kind || "")}</div>
+          <div class="name">${escapeHtml(item.title || "")}</div>
+          <div class="muted">${escapeHtml(item.body || "")}</div>
         </div>`;
       }).join("");
     }
