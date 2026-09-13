@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Capture docs/demo screenshots + a short webm from the live Hub. No tokens in git."""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+ROOT = Path(__file__).resolve().parent
+HUB = os.environ.get("HUB_URL", os.environ.get("BOARD_URL", "http://127.0.0.1:8787")).rstrip("/")
+TOKEN = os.environ.get("BOARD_TOKEN_ADMIN", "")
+
+
+def launch(p):
+    kwargs: dict = {"headless": True}
+    for candidate in (
+        os.environ.get("CHROME_PATH"),
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/google-chrome",
+    ):
+        if candidate and Path(candidate).is_file():
+            kwargs["executable_path"] = candidate
+            break
+    try:
+        return p.chromium.launch(**kwargs)
+    except Exception:
+        return p.chromium.launch(headless=True)
+
+
+def main() -> int:
+    ROOT.mkdir(parents=True, exist_ok=True)
+    video_dir = ROOT / "_video"
+    video_dir.mkdir(exist_ok=True)
+
+    with sync_playwright() as p:
+        browser = launch(p)
+        context = browser.new_context(
+            viewport={"width": 1400, "height": 860},
+            record_video_dir=str(video_dir),
+            record_video_size={"width": 1400, "height": 860},
+        )
+        page = context.new_page()
+
+        page.goto(f"{HUB}/health", wait_until="networkidle")
+        page.wait_for_timeout(400)
+        page.screenshot(path=str(ROOT / "01-health.png"), full_page=True)
+
+        page.goto(f"{HUB}/login", wait_until="networkidle")
+        page.wait_for_timeout(300)
+        page.screenshot(path=str(ROOT / "02-login.png"), full_page=False)
+
+        page.goto(f"{HUB}/admin/signup", wait_until="networkidle")
+        page.wait_for_timeout(400)
+        page.screenshot(path=str(ROOT / "03-board.png"), full_page=False)
+
+        root = page.goto(f"{HUB}/", wait_until="networkidle")
+        if TOKEN:
+            role = page.locator("#role")
+            token_box = page.locator("#token")
+            connect = page.locator("#connectBtn")
+            if role.count() and token_box.count() and connect.count():
+                role.select_option("admin")
+                token_box.fill(TOKEN)
+                connect.click()
+                page.wait_for_timeout(800)
+                page.screenshot(path=str(ROOT / "03-board.png"), full_page=False)
+        elif root is not None and root.ok:
+            page.screenshot(path=str(ROOT / "03-board.png"), full_page=False)
+
+        onboarding = page.goto(f"{HUB}/onboarding", wait_until="networkidle")
+        page.wait_for_timeout(400)
+        if onboarding is not None and onboarding.status == 401:
+            page.goto(f"{HUB}/login", wait_until="networkidle")
+            page.wait_for_timeout(200)
+        page.screenshot(path=str(ROOT / "04-onboarding.png"), full_page=False)
+
+        page.set_content(
+            """
+            <html><body style="margin:0;background:#0e1218;color:#e7edf6;font:16px ui-sans-serif,system-ui">
+              <main style="max-width:880px;margin:48px auto;padding:32px;background:#151b24;border:1px solid #2a3444;border-radius:16px">
+                <p style="color:#8b97ab;text-transform:uppercase;letter-spacing:.08em;font-size:12px">Job Apply OS</p>
+                <h1 style="margin:0 0 12px">Deploy on push to main</h1>
+                <p style="color:#8b97ab">GitHub <code>unownone/jobos</code> → this OCI host → Traefik + Hub</p>
+                <ol style="line-height:1.7">
+                  <li>Push (or merge) to <b>main</b></li>
+                  <li>Actions workflow <b>Deploy</b> on runner label <code>jobos</code></li>
+                  <li>Host watcher fetches <code>origin/main</code> every ~45s as backup</li>
+                  <li><code>docker compose up -d --build</code> in <code>/home/opc/jobos-live</code></li>
+                  <li><code>GET /health</code> must succeed before the job is green</li>
+                </ol>
+                <p style="margin-top:24px"><b>Buttons:</b> README CI · Deploy · Open in Cursor · Install Hub · Feature demo</p>
+              </main>
+            </body></html>
+            """
+        )
+        page.wait_for_timeout(300)
+        page.screenshot(path=str(ROOT / "05-deploy.png"), full_page=False)
+
+        context.close()
+        browser.close()
+
+        videos = list(video_dir.glob("*.webm"))
+        dest = ROOT / "job_hub_feature_demo.webm"
+        if videos:
+            videos[0].replace(dest)
+        for leftover in video_dir.glob("*"):
+            leftover.unlink()
+        video_dir.rmdir()
+
+    print("wrote", ROOT / "01-health.png")
+    health = ROOT / "01-health.png"
+    if not health.is_file():
+        print("missing health screenshot", file=sys.stderr)
+        return 1
+    print("hub", HUB, "health bytes", health.stat().st_size)
+    try:
+        print("health json", json.dumps(json.loads(os.popen(f"curl -fsS {HUB}/health").read())))
+    except Exception:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,17 @@
+[Unit]
+Description=Job Hub deploy watcher (pull GitHub main when it moves)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=opc
+Group=opc
+Environment=HOME=/home/opc
+Environment=JOBOS_DEPLOY_SCRIPT=/home/opc/.jobos/hub_host_deploy.sh
+EnvironmentFile=-/home/opc/.jobos/deploy.env
+WorkingDirectory=/home/opc/jobos-live
+ExecStart=/bin/bash /home/opc/.jobos/jobos_deploy_watch.sh
+
+[Install]
+WantedBy=multi-user.target

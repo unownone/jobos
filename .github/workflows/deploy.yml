@@ -1,0 +1,65 @@
+name: Deploy
+
+# Push to main (or Run workflow) deploys Job Hub on the OCI host.
+# The job runs on the self-hosted runner labeled `jobos` (this machine).
+# Until that runner is registered, the host timer still pulls origin/main
+# every minute — see docs/deploy.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit SHA to deploy (empty = this workflow SHA)"
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-jobos-host
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy to host
+    runs-on: [self-hosted, jobos]
+    timeout-minutes: 25
+    env:
+      JOBOS_REPO: /home/opc/jobos-live
+      JOBOS_HEALTH_URL: http://127.0.0.1:8787/health
+    steps:
+      - name: Deploy Hub from GitHub main
+        env:
+          JOBOS_SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          live="${JOBOS_REPO}"
+          if [[ ! -d "$live/.git" ]]; then
+            git clone --branch main git@github.com:unownone/jobos.git "$live"
+          fi
+          script="$live/scripts/hub_host_deploy.sh"
+          if [[ ! -x "$script" ]]; then
+            chmod +x "$script" 2>/dev/null || true
+          fi
+          if [[ -x "$script" ]]; then
+            bash "$script" "$JOBOS_SHA"
+          else
+            cd "$live"
+            git fetch origin
+            git reset --hard "$JOBOS_SHA"
+            if docker info >/dev/null 2>&1; then
+              docker compose up -d --build
+            else
+              sudo -n docker compose up -d --build
+            fi
+            curl -fsS "$JOBOS_HEALTH_URL"
+          fi
+
+      - name: Record health
+        run: |
+          curl -sS "$JOBOS_HEALTH_URL"
+          echo
+          git -C "$JOBOS_REPO" rev-parse --short HEAD

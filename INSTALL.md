@@ -1,6 +1,6 @@
 # Install
 
-See **[`docs/install.md`](docs/install.md)** for Docker, Docker Compose (plain and Traefik), `docker run`, uv/bare metal, TLS, backups, and the mandatory candidate onboarding step.
+See **[`docs/install.md`](docs/install.md)** for Docker, Docker Compose (plain and Traefik), `docker run`, uv/bare metal, TLS, backups, and the mandatory candidate onboarding step. Push to `main` deploys this host: [`docs/deploy.md`](docs/deploy.md).
 
 Quick start (plain Compose, port 8787):
 

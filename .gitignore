@@ -39,3 +39,6 @@ agent-transcripts/
 
 # Ledger working copies (optional local overlays)
 ledger/.cache/
+
+# Playwright demo scratch (committed shots live in docs/demo/*.png)
+docs/demo/_video/
