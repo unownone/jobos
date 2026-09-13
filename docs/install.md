@@ -14,8 +14,9 @@ Full operator API: [`docs/job-hub/human.md`](job-hub/human.md). Agents: [`docs/j
 | **Docker Compose + Traefik** | Public host, ports 80/443 | `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` |
 | **`docker build` / `docker run`** | One container, no Compose | See [Docker (no Compose)](#docker-no-compose) |
 | **uv / bare metal** | Cursor Cloud, no Docker | `bash scripts/hub_deploy.sh` |
+| **Push to `main`** | This OCI host (Traefik + Hub already up) | [Deploy on push](deploy.md) |
 
-Docker Desktop, Engine 24+, or Compose v2 is enough. Traefik is **optional**.
+Docker Desktop, Engine 24+, or Compose v2 is enough. Traefik is **optional**. This GitHub repo deploys to the hunt machine on every push to `main` — see [`docs/deploy.md`](deploy.md). Feature screenshots: [`docs/demo/README.md`](demo/README.md).
 
 ## First-run sequence (every install)
 
@@ -156,6 +157,15 @@ See [`docs/job-hub/a2a.md`](job-hub/a2a.md).
 | Lost admin password | Restore `/data` from backup. Do not invent `candidate.yaml` to “unblock”. |
 | Docker healthcheck failing | `docker compose logs hub`. `/health` must answer on 8787 inside the container. |
 | Traefik 404 | Confirm `traefik/dynamic.yml` service URL is `http://hub:8787` and the `hub` service is healthy. |
+
+## Deploy on push (this host)
+
+GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose + Traefik, volume preserved). Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
+
+```bash
+bash scripts/hub_host_deploy.sh   # manual ship of origin/main on the host
+make deploy
+```
 
 ## What not to do
 

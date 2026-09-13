@@ -1,5 +1,15 @@
 # Job Apply OS
 
+[![CI](https://github.com/unownone/jobos/actions/workflows/ci.yml/badge.svg)](https://github.com/unownone/jobos/actions/workflows/ci.yml)
+[![Deploy](https://github.com/unownone/jobos/actions/workflows/deploy.yml/badge.svg)](https://github.com/unownone/jobos/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
+[![Open in Cursor](https://img.shields.io/badge/Open%20in-Cursor-000000?style=for-the-badge)](https://cursor.com/en/download)
+[![GitHub](https://img.shields.io/badge/GitHub-unownone%2Fjobos-181717?style=for-the-badge&logo=github)](https://github.com/unownone/jobos)
+[![Install Hub](https://img.shields.io/badge/Install-Hub-2ea44f?style=for-the-badge)](docs/install.md)
+[![Feature demo](https://img.shields.io/badge/Feature-demo-6f42c1?style=for-the-badge)](docs/demo/README.md)
+[![Deploy on push](https://img.shields.io/badge/Deploy-on%20push%20to%20main-1f883d?style=for-the-badge)](docs/deploy.md)
+
 A template for a **distributed job search**, not a single auto-apply bot.
 
 One repo. Three exclusive job-search roles, plus a seldom-used maintainer. One shared ledger. Bots can be airgapped.
@@ -24,6 +34,7 @@ For a live multi-agent hunt on a shared machine, maintainer also runs the privat
    - Plain Docker Compose: `docker compose -f docker-compose.plain.yml up -d --build`
    - Traefik (80/443): `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh`
    - `docker run` and uv/bare metal are in the same guide.
+   - **This host:** push to `main` deploys automatically — [`docs/deploy.md`](docs/deploy.md). Feature walkthrough: [`docs/demo/README.md`](docs/demo/README.md).
 2. **Create the admin** at the printed `/admin/signup` URL (one-time).
 3. **Fill `/onboarding`** (identity, titles, locations, resume PDF). This is mandatory.
 4. Read [`docs/process.md`](docs/process.md). Pick a role in [`AGENTS.md`](AGENTS.md).
@@ -186,6 +197,9 @@ vendor/mcp/PINNED.txt     uvx / git SHA pins for local MCPs (no source trees)
 mcp/hosted/               Copy-paste hosted MCP snippets
 mcp/SETUP.md              How to attach local vs hosted MCPs
 .cursor/environment.json  Cloud-agent install (clones open-deep-research)
+.github/workflows/        CI on PR; Deploy on push to main (this host)
+docs/deploy.md            Host deploy (Actions runner + watcher)
+docs/demo/                Screenshots + video of the live Hub
 ledger/                   Shared live list
 profiles/                 Candidate profile (example committed)
 mcp/                      Example MCP config

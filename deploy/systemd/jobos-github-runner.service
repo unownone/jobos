@@ -1,0 +1,17 @@
+[Unit]
+Description=GitHub Actions self-hosted runner (Job Hub host)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=opc
+Group=opc
+Environment=HOME=/home/opc
+WorkingDirectory=/home/opc/actions-runner
+ExecStart=/home/opc/actions-runner/run.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
