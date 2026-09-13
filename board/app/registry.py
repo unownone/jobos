@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth import Principal
 from app.db import utc_now
+from app.memory_store import set_solidify_status
 from app.queue import QueueService, claimant_id
 from app.skill_seed import seed_github_skills
 from app.skill_store import (
@@ -138,6 +139,29 @@ def _recording_payload_from_skill(skill: dict[str, Any], extra: dict[str, Any] |
     if extra:
         payload.update({k: v for k, v in extra.items() if v is not None})
     return payload
+
+
+def _sync_memory_solidify(request: Request, recording: dict[str, Any], status: str) -> None:
+    payload = recording.get("payload") or {}
+    memory_id = payload.get("memory_id")
+    if not memory_id:
+        return
+    set_solidify_status(
+        request.app.state.db,
+        str(memory_id),
+        status=status,
+        recording_id=recording.get("id"),
+    )
+
+
+def _promote_origin(payload: dict[str, Any], recording_id: str) -> tuple[str, str]:
+    origin = str(payload.get("origin") or "recording")
+    if origin not in {"recording", "mutation", "memory"}:
+        origin = "recording"
+    origin_ref = str(payload.get("origin_ref") or recording_id)
+    if origin == "recording":
+        origin_ref = recording_id
+    return origin, origin_ref
 
 
 def _claimed_recording(queue: QueueService, principal: Principal, recording: dict[str, Any]) -> None:
@@ -454,6 +478,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
                 "reviewed_at": utc_now(),
             },
         )
+        _sync_memory_solidify(request, stored, "passed" if passed else "failed")
         request.app.state.db.add_event(
             job_id=None,
             actor_role=principal.role,
@@ -483,14 +508,15 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         fields = validate_skill_fields(payload)
         now = utc_now()
         who = owner_key(principal)
+        origin, origin_ref = _promote_origin(payload, recording_id)
         existing = store.get_shared_by_slug(fields["slug"])
         shared_fields = {
             **fields,
             "scope": "shared",
             "owner_user_id": None,
             "status": "approved",
-            "origin": "recording",
-            "origin_ref": recording_id,
+            "origin": origin,
+            "origin_ref": origin_ref,
             "proctor_status": "passed",
             "proctor_note": recording.get("proctor_note") or "",
             "proctor_evidence": recording.get("proctor_evidence") or {},
@@ -509,6 +535,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
                 },
             )
         stored = store.update_recording(recording_id, {"status": "promoted", "skill_id": skill["id"]})
+        _sync_memory_solidify(request, stored, "promoted")
         if recording.get("queue_item_id"):
             try:
                 queue.ack(principal, recording["queue_item_id"])
@@ -550,6 +577,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
                 "reviewed_at": utc_now(),
             },
         )
+        _sync_memory_solidify(request, stored, "declined")
         if recording.get("queue_item_id"):
             try:
                 queue.nack(principal, recording["queue_item_id"], requeue=False, note=note or "declined")

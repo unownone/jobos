@@ -148,7 +148,7 @@ Live playbooks. GitHub starters seed `scope=shared` `status=approved` `origin=gi
 | `reproducible` | boolean |
 | `inputs` / `outputs` | JSON arrays of packet field names |
 | `body` | markdown playbook |
-| `origin` | `github` \| `recording` \| `mutation` |
+| `origin` | `github` \| `recording` \| `mutation` \| `memory` |
 | `origin_ref` / `parent_skill_id` | |
 | `version` / `content_hash` | |
 | `proctor_status` | `none` \| `pending` \| `passed` \| `failed` |
@@ -165,7 +165,7 @@ Enqueue for maintainer proctor. Any track may insert; only maintenance / admin c
 | `id` | recording id |
 | `skill_id` | local or forked skill being submitted |
 | `submitter_user_id` | owning bot |
-| `origin` | `recording` \| `mutation` |
+| `origin` | `recording` \| `mutation` \| `memory` |
 | `body_snapshot` / `payload_json` | what to proctor |
 | `status` | pending / proctoring / passed / failed / promoted |
 | `proctor_user_id` / `proctor_note` | maintainer after claim |
@@ -183,6 +183,8 @@ Segmented working memory. **Not** the job ledger.
 | `kind` | Allowlisted per pod (portal_quirk, tool_failure, …) |
 | `content_hash` | Dedup inside a pod |
 | `expires_at` | Worker notes TTL; low-importance track/common TTL |
+| `solidify_status` | `none` \| `queued` \| `passed` \| `failed` \| `promoted` \| `declined` |
+| `recording_id` | Set when a track/common fact is solidified into `skill_recordings` |
 
 FTS5 virtual table `memory_fts`. Write caps per 15 minutes: worker 6, track 3, common 2. Heartbeat and queue claim return a compact recall card.
 
@@ -346,6 +348,7 @@ See [`memory.md`](memory.md). Same SQLite as the Hub. No extra Compose service.
 | GET | `/api/memory/pods` | any_user | Pods this principal may see |
 | GET/POST | `/api/memory/items` | any_user | List / sparse write (gated) |
 | PATCH/DELETE | `/api/memory/items/{id}` | author or inspector | Forget / pin / delete |
+| POST | `/api/memory/items/{id}/solidify` | author or maintainer | Snapshot track/common fact → `skill.record` (`origin=memory`) |
 | GET | `/admin/memory` | any_user | Inspector UI |
 
 ### Candidate slice
@@ -375,6 +378,7 @@ Resume: `GET /api/candidate/resume` outreach+application+admin; not discovery by
 | Claim `skill.record` | no | no | no | yes | steal |
 | Proctor / promote recording | no | no | no | yes | yes |
 | Seed GitHub starters | no | no | no | yes | yes |
+| Solidify track/common memory | author | author | author | yes | yes |
 
 \*Admin may inspect for operations; admin does not silently copy another bot’s local body into shared. Promote only after proctor pass.
 

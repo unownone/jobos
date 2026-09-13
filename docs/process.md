@@ -204,7 +204,7 @@ Suggested, not mandatory:
 - Every `applied` job has proof and an outreach seed
 - Every outreach touch has a person record
 - Catalog notes any tool that failed, so the next bot does not rediscover a dead MCP
-- If Hub ran: memory was recalled this round; only durable facts were stored (see [`docs/job-hub/memory.md`](job-hub/memory.md))
+- If Hub ran: memory was recalled this round; only durable facts were stored (see [`docs/job-hub/memory.md`](job-hub/memory.md)); track/common facts that should become skills were solidified
 - If maintainer ran: `skills/lists/INDEX.md` matches the YAML lists
 - If Hub is up: GitHub starters were seeded into the registry; no un-proctored shared skills from other bots
 
@@ -217,7 +217,7 @@ Goal: keep the skill/MCP inventory true, keep the Hub registry honest, and keep 
 3. Search at least two registries. Vet. Write `skills/lists/{adopted,wanted,rejected,by-platform,sources}.yaml`.
 4. `uv run scripts/rebuild_skill_index.py`.
 5. Patch `mcp/mcp.example.json` / `.cursor/environment.json` only for tools that moved to **adopted**.
-6. **Skill registry:** claim `skill.record` (maintenance only). Proctor first against the [`skill-outline`](catalogs/skill-outline.md) rubric. Promote only on pass. Fail with a note; the submitter may keep the local copy.
+6. **Skill registry:** claim `skill.record` (maintenance only). Proctor first against the [`skill-outline`](catalogs/skill-outline.md) rubric. Promote only on pass. Fail with a note; the submitter may keep the local copy. Memory facts that were solidified stay in this same queue (`origin=memory`).
 7. Anyone (any track) may enqueue a recording (`POST /api/registry/recordings` or queue push `skill.record`). Only maintainer / admin **consumes**.
 8. Seed / re-seed GitHub starters (`POST /api/registry/seed`) if needed. Does not overwrite promoted non-github shared slugs.
 9. Append catalog workspace log + `ledger/events.jsonl`.

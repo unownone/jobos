@@ -160,7 +160,7 @@ Admin or maintenance. Agents then `GET /api/onboarding` / `GET /api/packs/curren
 
 GitHub OS skills and `skills/starters/` are defaults written into SQLite. Agents use `GET /api/registry/skills`, not git, as the live list. Contract: [`docs/catalogs/skill-outline.md`](../catalogs/skill-outline.md).
 
-UI: `/admin/skills` (admin + maintenance). Proctor `skill.record` there or via API. Promote only on pass. Do not paste API keys. Local skills stay per-bot; do not copy another bot’s local body into shared.
+UI: `/admin/skills` (admin + maintenance). Proctor `skill.record` there or via API. Promote only on pass. Do not paste API keys. Local skills stay per-bot; do not copy another bot’s local body into shared. Track/common memory facts become recordings via `/admin/memory` **Solidify** or `POST /api/memory/items/{id}/solidify`.
 
 Candidate `/onboarding` is still mandatory first. Registry seed does not invent a candidate.
 
@@ -176,6 +176,7 @@ Candidate `/onboarding` is still mandatory first. Registry seed does not invent 
 | `/login` | Admin login |
 | `/admin` `/admin/invites` | Admin home / invites |
 | `/admin/skills` | Admin / maintenance: registry + proctor |
+| `/admin/memory` | Session: memory pods; solidify track/common facts |
 | `/admin/signup` | First admin |
 | `/admin/users` | Directory |
 | `/join/{invite_id}?s=` | Agent join page |

@@ -13,18 +13,31 @@ from app.auth import Principal
 from app.memory_policy import (
     RECALL_LIMIT_DEFAULT,
     RECALL_LIMIT_MAX,
+    MemoryDenied,
     MemoryError,
+    MemoryNotFound,
+    can_read_pod,
+    is_inspector,
+    pod_scope,
+    worker_id,
     write_budget_hint,
 )
 from app.memory_store import (
+    OPEN_SOLIDIFY_STATUSES,
     compact_recall,
     delete_item,
+    get_item,
     grouped_recall,
     insert_item,
     list_items,
     pod_catalog,
+    public_item,
+    row_to_item,
+    set_solidify_status,
+    skill_draft_from_memory,
     update_item,
 )
+from app.skill_store import SkillStore, owner_key, public_recording, validate_skill_fields
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -54,11 +67,31 @@ class MemoryPatch(BaseModel):
     forget: bool = False
 
 
+class SolidifyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slug: str | None = None
+    name: str | None = None
+    role: str | None = None
+    tags: list[str] | None = None
+    platform: str | None = None
+    match: dict[str, Any] | None = None
+    note: str | None = None
+
+
 def _raise_memory(exc: MemoryError) -> None:
     raise HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code, "message": exc.detail},
     ) from exc
+
+
+def _skill_store(request: Request) -> SkillStore:
+    store = getattr(request.app.state, "skills", None)
+    if store is None:
+        store = SkillStore(request.app.state.db)
+        request.app.state.skills = store
+    return store
 
 
 def create_memory_router(principal_dep) -> APIRouter:
@@ -190,6 +223,88 @@ def create_memory_router(principal_dep) -> APIRouter:
         except MemoryError as exc:
             _raise_memory(exc)
             raise
+
+    @router.post("/api/memory/items/{item_id}/solidify")
+    def memory_solidify(
+        item_id: str,
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+        body: SolidifyIn | None = None,
+    ) -> dict[str, Any]:
+        db = request.app.state.db
+        raw = get_item(db, item_id)
+        if raw is None or not can_read_pod(principal, raw["pod"]):
+            _raise_memory(MemoryNotFound("memory item not found"))
+            raise
+        stored = row_to_item(raw)
+        owns = stored["created_by"] == worker_id(principal)
+        if not owns and not is_inspector(principal):
+            _raise_memory(MemoryDenied("only the author or maintainer can solidify this memory"))
+            raise
+        if pod_scope(stored["pod"]) == "worker":
+            _raise_memory(MemoryDenied("private worker notes cannot become skills"))
+            raise
+        existing_id = stored.get("recording_id")
+        store = _skill_store(request)
+        if existing_id and (stored.get("solidify_status") or "none") in OPEN_SOLIDIFY_STATUSES:
+            recording = store.get_recording(existing_id)
+            if recording is not None:
+                return {
+                    "item": {
+                        **stored,
+                        "solidify_status": stored.get("solidify_status") or "queued",
+                        "recording_id": existing_id,
+                    },
+                    "recording": public_recording(recording),
+                    "status": "exists",
+                }
+        extra = (body.model_dump(exclude_none=True) if body is not None else {})
+        note = extra.pop("note", None)
+        try:
+            draft = skill_draft_from_memory(stored)
+        except MemoryError as exc:
+            _raise_memory(exc)
+            raise
+        draft.update({key: value for key, value in extra.items() if value is not None})
+        fields = validate_skill_fields(draft)
+        payload = {
+            **fields,
+            "origin": "memory",
+            "origin_ref": stored["id"],
+            "memory_id": stored["id"],
+            "memory_pod": stored["pod"],
+            "memory_kind": stored.get("kind"),
+            "source_skill_id": None,
+            "source_scope": "memory",
+        }
+        if note:
+            payload["submitter_note"] = note
+        who = owner_key(principal)
+        recording = store.insert_recording(skill_id=None, submitted_by=who, payload=payload)
+        queue = request.app.state.queue
+        item = queue.upsert(
+            kind="skill.record",
+            job_id=None,
+            payload={"recording_id": recording["id"], "slug": payload.get("slug"), "memory_id": stored["id"]},
+            actor_role=principal.role,
+            actor=principal.actor,
+        )
+        recording = store.update_recording(recording["id"], {"queue_item_id": item["id"]})
+        set_solidify_status(db, stored["id"], status="queued", recording_id=recording["id"])
+        db.add_event(
+            job_id=None,
+            actor_role=principal.role,
+            actor=principal.actor,
+            action="memory_solidify",
+            note=str(payload.get("slug") or ""),
+            fields={"memory_id": stored["id"], "recording_id": recording["id"], "queue_id": item["id"]},
+        )
+        return {
+            "item": public_item(db, stored["id"]),
+            "recording": public_recording(recording),
+            "queue_item": {"id": item["id"], "kind": item["kind"]},
+            "status": "queued",
+        }
 
     @router.get("/admin/memory")
     def memory_page(principal: Principal = Depends(principal_dep)) -> FileResponse:

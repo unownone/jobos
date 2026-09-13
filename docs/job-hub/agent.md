@@ -220,7 +220,7 @@ curl -sS "$HUB_URL/api/memory/recall?q=greenhouse&company=Acme" \
   -H "Authorization: Bearer $HUB_KEY"
 ```
 
-Store **0–2** track/common facts per round, only if another bot would need them tomorrow. Server rejects secrets, JD dumps, short chatter, and over-budget writes (6 worker / 3 track / 2 common per 15 minutes).
+Store **0–2** track/common facts per round, only if another bot would need them tomorrow. Server rejects secrets, JD dumps, short chatter, and over-budget writes (6 worker / 3 track / 2 common per 15 minutes). When a track/common fact is ready to become a skill, `POST /api/memory/items/{id}/solidify` — do not skip the maintainer queue. Private worker notes cannot solidify.
 
 ```bash
 curl -sS -X POST "$HUB_URL/api/memory/items" \
@@ -334,7 +334,7 @@ Export: [human.md](human.md) (`GET /api/export/ledger`). Agents on maintenance/a
 
 ## Track loops (one-pagers)
 
-Cookie CSRF does not apply to Bearer `$HUB_KEY`. Loop: onboarding → heartbeat every 10s (**read `memory`**) → `GET /api/memory/recall` at the start of a work round → `GET /api/registry/skills` for the matching tag → claim → do the skill → patch job / people / events as allowed → maybe `POST /api/memory/items` (0–2 durable facts) → ack → read messages. Forks stay `scope=local`. Push recordings; do not claim `skill.record` unless you are maintenance.
+Cookie CSRF does not apply to Bearer `$HUB_KEY`. Loop: onboarding → heartbeat every 10s (**read `memory`**) → `GET /api/memory/recall` at the start of a work round → `GET /api/registry/skills` for the matching tag → claim → do the skill → patch job / people / events as allowed → maybe `POST /api/memory/items` (0–2 durable facts; solidify track/common facts that should become skills) → ack → read messages. Forks stay `scope=local`. Push recordings; do not claim `skill.record` unless you are maintenance.
 
 ### Discovery
 

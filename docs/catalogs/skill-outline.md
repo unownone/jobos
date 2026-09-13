@@ -76,11 +76,16 @@ Worker uses shared skill
     ├─ follows it as-is
     └─ mutates for a tenant → scope=local origin=mutation (only that bot)
 
+Worker writes a track/common memory fact that should become a playbook
+    └─ POST /api/memory/items/{id}/solidify  → origin=memory recording + skill.record
+          (private worker notes cannot solidify)
+
 Anyone POST /api/registry/recordings  (or queue push skill.record)
     └─ only maintainer claims
           1. proctor (does it match, reproduce, stay in-role?)
           2. pass → promote to shared approved
              fail → declined; submitter may keep using the local copy
+             memory facts keep solidify_status in sync
 ```
 
 **Only maintainer consumes `skill.record` and decides.** Discovery / apply / outreach may enqueue. They must not ack another bot’s local skill into shared.
@@ -91,7 +96,15 @@ Scopes: `shared` (everyone on the role) | `local` (owning `user_id` only). Compa
 
 ## Memory
 
-A dedicated memory layer is **not in this pass**. Local skill forks are the only private, per-bot store. Do not invent a memories table.
+Hub **memory pods** are short-term working memory (`docs/job-hub/memory.md`): private worker notes (7-day TTL), shared track facts, and `common` catalog notes. They are **not** the live skill catalog.
+
+When a track/common fact is reusable (portal quirk, dead tool, process note), **solidify** it:
+
+`POST /api/memory/items/{id}/solidify`
+
+That snapshots the fact into `skill_recordings` with `origin=memory` and enqueues `skill.record`. Author or maintainer/admin may solidify. Other bots on the same track can read the fact; they cannot steal it into a recording. Private `pod=worker` notes return 403.
+
+After proctor **pass**, promote as usual. Promoted skills from memory keep `origin=memory`. Local skill forks remain the per-bot mutation store.
 
 ## Hub API (live)
 
@@ -105,6 +118,7 @@ Auth: session, Bearer / `X-Hub-Key`, or compat role token. Unauthenticated → 4
 | PATCH | `/api/registry/skills/{id}` | owner: local only. Maintainer/admin: shared |
 | POST | `/api/registry/skills/{id}/fork` | copy shared (or own) → new local |
 | POST | `/api/registry/recordings` | **any track** submits a recording; enqueues `skill.record` |
+| POST | `/api/memory/items/{id}/solidify` | author or maintainer: snapshot a track/common fact into a recording |
 | GET | `/api/registry/recordings` | submitter: own. Maintainer/admin: all |
 | POST | `/api/registry/recordings/{id}/proctor` | **maintainer/admin** after claim: `pass` \| `fail` |
 | POST | `/api/registry/recordings/{id}/promote` | **maintainer/admin**, only after pass |

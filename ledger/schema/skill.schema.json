@@ -49,7 +49,7 @@
     "body": { "type": "string", "minLength": 1 },
     "origin": {
       "type": "string",
-      "enum": ["github", "recording", "mutation"]
+      "enum": ["github", "recording", "mutation", "memory"]
     },
     "origin_ref": { "type": "string" },
     "parent_skill_id": { "type": ["string", "null"] },

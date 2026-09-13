@@ -38,7 +38,7 @@ If the work is **updating the skill tree itself** (lists, mcp.example.json, prun
 - Every state change gets a row in `ledger/events.jsonl` and an update on the job YAML.
 - Local skills are **per-bot**. Do not load, copy, or promote another bot’s `scope=local` skill.
 - Only maintainer consumes `skill.record` and promotes after proctor. Discovery / apply / outreach may enqueue recordings; they must not ack them into shared.
-- If Hub is up (`HUB_URL` / `BOARD_URL`): **recall memory every round** (`GET /api/memory/recall` and the `memory` card on heartbeat / queue claim). Store only durable facts (portal quirks, blockers, dead tools). Do not dump transcripts, JDs, or secrets. Pods: worker (private) / track (shared on the lane) / common. Docs: [`docs/job-hub/memory.md`](docs/job-hub/memory.md).
+- If Hub is up (`HUB_URL` / `BOARD_URL`): **recall memory every round** (`GET /api/memory/recall` and the `memory` card on heartbeat / queue claim). Store only durable facts (portal quirks, blockers, dead tools). Do not dump transcripts, JDs, or secrets. Pods: worker (private) / track (shared on the lane) / common. Track/common facts that should become playbooks: `POST /api/memory/items/{id}/solidify`. Docs: [`docs/job-hub/memory.md`](docs/job-hub/memory.md).
 
 ## Ledger writes
 

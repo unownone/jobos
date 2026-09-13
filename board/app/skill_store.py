@@ -1,4 +1,4 @@
-"""Skill registry: shared GitHub starters + per-bot local forks. No memory layer."""
+"""Skill registry: shared GitHub starters + per-bot local forks + memory solidify."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ SKILL_ROLES = ("discovery", "apply", "outreach", "research", "maintain")
 SKILL_KINDS = ("skill", "mcp", "http", "builtin")
 SKILL_SCOPES = ("shared", "local")
 SKILL_STATUSES = ("draft", "recorded", "proctoring", "approved", "rejected", "retired")
-SKILL_ORIGINS = ("github", "recording", "mutation")
+SKILL_ORIGINS = ("github", "recording", "mutation", "memory")
 PROCTOR_STATUSES = ("none", "pending", "passed", "failed")
 RECORDING_STATUSES = ("queued", "proctoring", "passed", "failed", "promoted", "declined")
 MOTION_TAGS = ("source", "apply", "outreach", "research", "maintain")

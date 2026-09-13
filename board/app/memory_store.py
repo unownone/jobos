@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
@@ -63,7 +64,9 @@ CREATE TABLE IF NOT EXISTS memory_items (
     updated_at TEXT NOT NULL,
     expires_at TEXT,
     last_recalled_at TEXT,
-    recall_count INTEGER NOT NULL DEFAULT 0
+    recall_count INTEGER NOT NULL DEFAULT 0,
+    solidify_status TEXT NOT NULL DEFAULT 'none',
+    recording_id TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_pod_hash
@@ -72,6 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_memory_pod ON memory_items(pod);
 CREATE INDEX IF NOT EXISTS idx_memory_kind ON memory_items(kind);
 CREATE INDEX IF NOT EXISTS idx_memory_expires ON memory_items(expires_at);
 CREATE INDEX IF NOT EXISTS idx_memory_created_by ON memory_items(created_by, created_at);
+CREATE INDEX IF NOT EXISTS idx_memory_recording ON memory_items(recording_id);
 """
 
 FTS_SCHEMA = """
@@ -127,8 +131,19 @@ def _iso_future(days: int, now: datetime | None = None) -> str:
     return when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _column_names(conn: Any, table: str) -> set[str]:
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
 def ensure_memory_schema(conn: Any) -> None:
     conn.executescript(SCHEMA)
+    cols = _column_names(conn, "memory_items")
+    if "solidify_status" not in cols:
+        conn.execute(
+            "ALTER TABLE memory_items ADD COLUMN solidify_status TEXT NOT NULL DEFAULT 'none'"
+        )
+    if "recording_id" not in cols:
+        conn.execute("ALTER TABLE memory_items ADD COLUMN recording_id TEXT")
     try:
         conn.executescript(FTS_SCHEMA)
         conn.executescript(FTS_TRIGGERS)
@@ -170,6 +185,8 @@ def row_to_item(row: Any, *, compact: bool = False) -> dict[str, Any]:
         "updated_at": data["updated_at"],
         "expires_at": data["expires_at"] or None,
         "recall_count": int(data["recall_count"] or 0),
+        "solidify_status": data.get("solidify_status") or "none",
+        "recording_id": data.get("recording_id") or None,
     }
     return item
 
@@ -566,7 +583,8 @@ def grouped_recall(
     return {
         "recall_url": "/api/memory/recall",
         "write_url": "/api/memory/items",
-        "hint": "Use these facts this round. Store only if another bot would need them tomorrow.",
+        "solidify_url": "/api/memory/items/{id}/solidify",
+        "hint": "Use these facts this round. Store only if another bot would need them tomorrow. Solidify track/common facts that should become skills.",
         "pods": pod_catalog(principal),
         "items": items,
         "by_pod": buckets,
@@ -619,6 +637,7 @@ def safe_compact_recall(
         return {
             "recall_url": "/api/memory/recall",
             "write_url": "/api/memory/items",
+            "solidify_url": "/api/memory/items/{id}/solidify",
             "hint": "memory unavailable this beat; continue the loop",
             "pods": [],
             "items": [],
@@ -627,3 +646,144 @@ def safe_compact_recall(
             "write_policy": write_budget_hint(),
             "compact": True,
         }
+
+
+OPEN_SOLIDIFY_STATUSES = frozenset({"queued", "proctoring", "passed", "promoted"})
+CLOSED_SOLIDIFY_RETRY = frozenset({"failed", "declined"})
+
+TRACK_SKILL_LANE = {
+    "discovery": {
+        "role": "discovery",
+        "tag": "source",
+        "inputs": ["job"],
+        "outputs": ["apply_packet"],
+    },
+    "application": {
+        "role": "apply",
+        "tag": "apply",
+        "inputs": ["job", "apply_packet"],
+        "outputs": ["proof"],
+    },
+    "outreach": {
+        "role": "outreach",
+        "tag": "outreach",
+        "inputs": ["job", "outreach_packet"],
+        "outputs": ["touch"],
+    },
+    "maintenance": {
+        "role": "maintain",
+        "tag": "maintain",
+        "inputs": ["registry"],
+        "outputs": ["skills_lists"],
+    },
+}
+
+ATS_HINTS = (
+    ("greenhouse", ("greenhouse",)),
+    ("workday", ("workday", "myworkdayjobs")),
+    ("lever", ("lever.co", " lever")),
+    ("ashby", ("ashby",)),
+    ("linkedin", ("linkedin", "easy apply")),
+)
+
+_SLUG_STRIP = re.compile(r"[^a-z0-9]+")
+
+
+def set_solidify_status(
+    db: HasConn,
+    item_id: str,
+    *,
+    status: str,
+    recording_id: str | None = None,
+) -> None:
+    stored = get_item(db, item_id)
+    if stored is None:
+        return
+    now = utc_now()
+    rec_id = recording_id if recording_id is not None else stored.get("recording_id")
+    db.conn.execute(
+        """
+        UPDATE memory_items
+        SET solidify_status = ?, recording_id = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (status, rec_id, now, item_id),
+    )
+    db.conn.commit()
+
+
+def _slug_from_title(title: str, item_id: str) -> str:
+    base = _SLUG_STRIP.sub("-", (title or "").lower()).strip("-")[:50]
+    if not base:
+        tail = re.sub(r"[^a-z0-9]", "", item_id.lower())[-12:] or "fact"
+        base = tail
+    return f"mem-{base}"[:80]
+
+
+def _platform_from_text(text: str) -> str:
+    lowered = text.lower()
+    for platform, needles in ATS_HINTS:
+        if any(needle in lowered for needle in needles):
+            return platform
+    return ""
+
+
+def skill_draft_from_memory(item: dict[str, Any]) -> dict[str, Any]:
+    """Turn a track/common memory fact into a skill recording payload."""
+    scope = pod_scope(item["pod"])
+    if scope == POD_KIND_WORKER:
+        raise MemoryDenied("private worker notes cannot become skills")
+    if scope == POD_KIND_COMMON:
+        lane = TRACK_SKILL_LANE["maintenance"]
+    else:
+        track = item["pod"].split(":", 1)[1] if ":" in item["pod"] else ""
+        lane = TRACK_SKILL_LANE.get(track) or TRACK_SKILL_LANE["maintenance"]
+    kind_tag = str(item.get("kind") or "").replace("_", "-")
+    tags = [lane["tag"]]
+    if kind_tag and kind_tag not in tags:
+        tags.append(kind_tag)
+    for extra in item.get("tags") or []:
+        cleaned = _SLUG_STRIP.sub("-", str(extra).lower()).strip("-")
+        if cleaned and cleaned not in tags:
+            tags.append(cleaned)
+    blob = f"{item.get('title') or ''} {item.get('body') or ''}"
+    platform = _platform_from_text(blob)
+    if platform and platform not in tags:
+        tags.append(platform)
+    match = {"ats": [platform] if platform else [], "url_patterns": [], "apply_kind": []}
+    company = (item.get("company") or "").strip()
+    body_parts = [
+        f"# {item['title']}",
+        "",
+        f"Solidified from Hub memory `{item['id']}` (`{item['pod']}`, `{item.get('kind')}`).",
+        "",
+        str(item.get("body") or "").strip(),
+        "",
+        "## Reproducibility",
+        "",
+        "Keep these steps generic to the matching board or ATS. Do not pin them to one posting.",
+    ]
+    if company:
+        body_parts.insert(5, f"Observed at: {company}.")
+        body_parts.insert(6, "")
+    return {
+        "slug": _slug_from_title(str(item.get("title") or ""), str(item.get("id") or "")),
+        "name": str(item.get("title") or "Memory fact")[:120],
+        "kind": "skill",
+        "role": lane["role"],
+        "tags": tags,
+        "platform": platform,
+        "match": match,
+        "inputs": list(lane["inputs"]),
+        "outputs": list(lane["outputs"]),
+        "body": "\n".join(body_parts),
+        "origin": "memory",
+        "origin_ref": item["id"],
+        "parent_skill_id": None,
+        "reproducible": True,
+        "memory_id": item["id"],
+        "memory_pod": item["pod"],
+        "memory_kind": item.get("kind"),
+        "source_skill_id": None,
+        "source_scope": "memory",
+    }

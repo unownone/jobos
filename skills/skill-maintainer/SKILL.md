@@ -51,7 +51,7 @@ Write yourself under **Active operators** in `ledger/INDEX.md` as `maintainer`. 
 8. Append `ledger/events.jsonl`. No job YAML.
 9. If this hunt uses the live board: follow [`board/README.md`](../../board/README.md). Generate/rotate gitignored tokens, start `board/start.sh`, import ledger history, run hygiene. Discovery/apply/outreach consume the board; they do not own it.
 10. **Skill registry (Hub):** `GET /api/registry/recordings?status=queued`. Claim `skill.record` from `/api/queue/claim`. Proctor first (`POST /api/registry/recordings/{id}/proctor` with `pass` or `fail`) using the rubric in the outline. Only after **pass** call `/promote`. Decline failed recordings. `POST /api/registry/seed` re-reads GitHub starters; it will not overwrite a promoted non-github shared slug. Do not use another bot's local skills.
-11. Recall Hub memory (`GET /api/memory/recall`) at the start of a maintainer pass. Put catalog/tool deaths in the **common** pod (`catalog_note` / `tool_failure`) so discovery does not rediscover a dead MCP. Do not store secrets. [`docs/job-hub/memory.md`](../../docs/job-hub/memory.md).
+11. Recall Hub memory (`GET /api/memory/recall`) at the start of a maintainer pass. Put catalog/tool deaths in the **common** pod (`catalog_note` / `tool_failure`) so discovery does not rediscover a dead MCP. Track/common facts that should become playbooks: check `solidify_status` and proctor the resulting `skill.record`. Do not store secrets. [`docs/job-hub/memory.md`](../../docs/job-hub/memory.md).
 
 ## Do not
 

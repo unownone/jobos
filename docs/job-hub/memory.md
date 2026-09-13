@@ -87,6 +87,25 @@ curl -sS -X POST "$HUB_URL/api/memory/items" \
 
 Forget: `PATCH /api/memory/items/{id}` with `{"forget": true}` or `DELETE`.
 
+## Solidify into skills
+
+Memory is the **working set**. Promoted registry skills are **long-term**. When a track or common fact is reusable tomorrow (portal quirk, dead tool, process note), snapshot it:
+
+```bash
+curl -sS -X POST "$HUB_URL/api/memory/items/$MEM_ID/solidify" \
+  -H "Authorization: Bearer $HUB_KEY"
+```
+
+Rules:
+
+- Only **track** and **common** facts. Private worker notes → 403.
+- Author, maintainer, or admin. Other bots on the same track may **read** the fact; they cannot steal it.
+- Creates a `skill_recordings` row with `origin=memory` and enqueues `skill.record`.
+- Maintainer still proctors, then promotes. The shared skill keeps `origin=memory`.
+- Repeat solidify of an open recording returns `status: exists`.
+
+Do not skip the maintainer queue. Do not copy another bot’s local skill.
+
 ## API
 
 | Method | Path | Who |
@@ -96,6 +115,7 @@ Forget: `PATCH /api/memory/items/{id}` with `{"forget": true}` or `DELETE`.
 | GET | `/api/memory/items?pod=` | own pods; inspectors may name another track/worker pod |
 | POST | `/api/memory/items` | own worker / own track / common |
 | PATCH/DELETE | `/api/memory/items/{id}` | author, or inspector for forget/delete |
+| POST | `/api/memory/items/{id}/solidify` | author or maintainer; track/common only |
 | GET | `/admin/memory` | session (board UI) |
 
 Candidate onboarding still gates these routes (`409 candidate_required`) like the rest of the Hub.

@@ -618,6 +618,7 @@ class PackStore:
             "memory": {
                 "recall": "/api/memory/recall",
                 "write": "/api/memory/items",
+                "solidify": "/api/memory/items/{id}/solidify",
                 "pods": "/api/memory/pods",
                 "docs": "/api/docs/docs/job-hub/memory.md",
                 "use_every_round": True,
