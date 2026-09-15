@@ -1,8 +1,7 @@
 name: Deploy check
 
 # Merge-request gate for Job Hub host deploy. This does not ship to production.
-# Push-to-main deploy stays in deploy.yml and is only trusted after this workflow
-# is green on the PR.
+# Release + Deploy stay on merge to main / published GitHub Releases.
 
 on:
   pull_request:
@@ -18,64 +17,35 @@ permissions:
 
 jobs:
   selftest:
-    name: ssh deploy selftest
+    name: deploy wiring selftest
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Offline SSH wiring checks
-        run: bash scripts/github_ssh_selftest.sh
+      - name: Offline deploy + SSH wiring checks
+        run: bash scripts/deploy_selftest.sh
 
-  ssh-git:
-    name: ssh git ls-remote
+  image-smoke:
+    name: docker build smoke (amd64)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: selftest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prove GitHub SSH with JOBOS_DEPLOY_KEY
-        env:
-          JOBOS_DEPLOY_KEY: ${{ secrets.JOBOS_DEPLOY_KEY }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${JOBOS_DEPLOY_KEY}" ]]; then
-            echo "::warning::Actions secret JOBOS_DEPLOY_KEY is not set."
-            echo "Host deploy fetch needs the private key at ~/.ssh/jobos_deploy on the OCI box."
-            echo "To prove SSH from Actions, add the matching private key as repository secret JOBOS_DEPLOY_KEY."
-            echo "Skipping live SSH git probe."
-            exit 0
-          fi
-          install -d -m 700 "${HOME}/.ssh"
-          key="${HOME}/.ssh/jobos_deploy"
-          printf '%s\n' "${JOBOS_DEPLOY_KEY}" | tr -d '\r' > "$key"
-          chmod 600 "$key"
-          if ! ssh-keygen -y -f "$key" >/dev/null; then
-            echo "JOBOS_DEPLOY_KEY is not a usable OpenSSH private key" >&2
-            exit 1
-          fi
-          ssh-keygen -l -f "$key"
-          export JOBOS_SSH_KEY="$key"
-          # shellcheck disable=SC1091
-          source scripts/github_ssh.sh
-          jobos_github_ssh_apply
-          set +e
-          ssh -F "$JOBOS_SSH_CONFIG" -o BatchMode=yes -o ConnectTimeout=15 -T git@github.com
-          ssh_rc=$?
-          set -e
-          if [[ "$ssh_rc" -ne 1 ]]; then
-            echo "GitHub SSH auth failed (exit ${ssh_rc}; expected 1 from ssh -T on success)" >&2
-            exit 1
-          fi
-          git ls-remote git@github.com:unownone/jobos.git HEAD
-          echo "SSH fetch (ls-remote) OK"
-          mkdir -p /tmp/jobos-ssh-probe
-          git clone --depth 1 git@github.com:unownone/jobos.git /tmp/jobos-ssh-probe
-          if git -C /tmp/jobos-ssh-probe push --dry-run origin HEAD:refs/heads/main; then
-            echo "SSH push dry-run OK (deploy key has write access)"
-          else
-            echo "::notice::SSH fetch works; push dry-run was denied. Host deploy only needs fetch. Enable write on the GitHub deploy key if agents must git push over SSH."
-          fi
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: true
+          tags: jobos-hub:smoke
+          cache-from: type=gha,scope=smoke-linux-amd64
+          cache-to: type=gha,mode=max,scope=smoke-linux-amd64
+          provenance: false

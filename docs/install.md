@@ -14,9 +14,9 @@ Full operator API: [`docs/job-hub/human.md`](job-hub/human.md). Agents: [`docs/j
 | **Docker Compose + Traefik** | Public host, ports 80/443 | `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` |
 | **`docker build` / `docker run`** | One container, no Compose | See [Docker (no Compose)](#docker-no-compose) |
 | **uv / bare metal** | Cursor Cloud, no Docker | `bash scripts/hub_deploy.sh` |
-| **Push to `main`** | This OCI host (Traefik + Hub already up) | [Deploy on push](deploy.md) |
+| **Push to `main`** | This OCI host (Traefik + Hub already up) | [Release + SSH pull GHCR](deploy.md) |
 
-Docker Desktop, Engine 24+, or Compose v2 is enough. Traefik is **optional**. This GitHub repo deploys to the hunt machine on every push to `main` — see [`docs/deploy.md`](deploy.md). Feature screenshots: [`docs/demo/README.md`](demo/README.md).
+Docker Desktop, Engine 24+, or Compose v2 is enough. Traefik is **optional**. This GitHub repo deploys Job Hub by publishing a GHCR image and SSHing from GitHub-hosted Actions — see [`docs/deploy.md`](deploy.md). Feature screenshots: [`docs/demo/README.md`](demo/README.md).
 
 ## First-run sequence (every install)
 
@@ -158,12 +158,12 @@ See [`docs/job-hub/a2a.md`](job-hub/a2a.md).
 | Docker healthcheck failing | `docker compose logs hub`. `/health` must answer on 8787 inside the container. |
 | Traefik 404 | Confirm `traefik/dynamic.yml` service URL is `http://hub:8787` and the `hub` service is healthy. |
 
-## Deploy on push (this host)
+## Deploy on merge to main (this host)
 
-GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose + Traefik, volume preserved). Pull requests run **Deploy check** first (SSH wiring; no ship). GitHub SSH uses `ssh.github.com:443` and `~/.ssh/jobos_deploy`. Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
+GitHub `unownone/jobos` is origin. A merge to `main` cuts a **GitHub Release**, pushes `ghcr.io/unownone/jobos:<tag>`, then a GitHub-hosted job SSHs into the OCI box and `docker pull`s that tag. The git tree is not copied. Pull requests run **Deploy check** first (wiring + image smoke; no ship). Details and the secrets checklist: [`docs/deploy.md`](deploy.md).
 
 ```bash
-bash scripts/hub_host_deploy.sh   # manual ship of origin/main on the host
+bash scripts/hub_apply_image.sh v2026.09.15-a1b2c3d   # manual apply of a GHCR tag on the host
 make deploy
 ```
 

@@ -1,21 +1,17 @@
 name: Deploy
 
-# Push to main (or Run workflow) deploys Job Hub on the OCI host.
-# The job runs on the self-hosted runner labeled `jobos` (this machine).
-# Until that runner is registered, the host timer still pulls origin/main
-# every minute — see docs/deploy.md.
-#
-# Merge requests do not deploy. They run .github/workflows/deploy-check.yml
-# (SSH wiring + optional live git ls-remote). Only merge after that is green.
+# GitHub Release (from release.yml on merge to main) SSHs into the Hub host,
+# pulls the release tag from GHCR, and applies compose. GitHub-hosted only.
+# The git tree is not copied. Merge requests never ship.
 
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
-      sha:
-        description: "Commit SHA to deploy (empty = this workflow SHA)"
-        required: false
+      tag:
+        description: "Release tag to deploy (vYYYY.MM.DD-<sha7>)"
+        required: true
         type: string
 
 concurrency:
@@ -24,54 +20,69 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   deploy:
-    name: deploy to host
-    runs-on: [self-hosted, jobos]
+    name: ssh pull GHCR tag
+    runs-on: ubuntu-latest
     timeout-minutes: 25
-    env:
-      JOBOS_REPO: /home/opc/jobos-live
-      JOBOS_HEALTH_URL: http://127.0.0.1:8787/health
     steps:
-      - name: Deploy Hub from GitHub main
+      - name: Checkout release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Require host SSH key
         env:
-          JOBOS_SHA: ${{ inputs.sha || github.sha }}
+          JOBOS_HOST_SSH_KEY: ${{ secrets.JOBOS_HOST_SSH_KEY }}
+          JOBOS_DEPLOY_KEY: ${{ secrets.JOBOS_DEPLOY_KEY }}
         run: |
           set -euo pipefail
-          live="${JOBOS_REPO}"
-          if [[ -f "$live/scripts/github_ssh.sh" ]]; then
-            # shellcheck disable=SC1091
-            source "$live/scripts/github_ssh.sh"
-            jobos_github_ssh_apply
-          elif [[ -f "${HOME}/.jobos/github_ssh.sh" ]]; then
-            # shellcheck disable=SC1091
-            source "${HOME}/.jobos/github_ssh.sh"
-            jobos_github_ssh_apply
+          if [[ -n "${JOBOS_HOST_SSH_KEY}" || -n "${JOBOS_DEPLOY_KEY}" ]]; then
+            echo "Host SSH key secret is present."
+            exit 0
           fi
-          if [[ ! -d "$live/.git" ]]; then
-            git clone --branch main git@github.com:unownone/jobos.git "$live"
-          fi
-          script="$live/scripts/hub_host_deploy.sh"
-          if [[ ! -x "$script" ]]; then
-            chmod +x "$script" 2>/dev/null || true
-          fi
-          if [[ -x "$script" ]]; then
-            bash "$script" "$JOBOS_SHA"
-          else
-            cd "$live"
-            git fetch origin
-            git reset --hard "$JOBOS_SHA"
-            if docker info >/dev/null 2>&1; then
-              docker compose up -d --build
-            else
-              sudo -n docker compose up -d --build
-            fi
-            curl -fsS "$JOBOS_HEALTH_URL"
-          fi
+          cat <<'EOF' >&2
+          Deploy cannot SSH into the Hub host. Add these GitHub repository secrets / variables:
 
-      - name: Record health
+            Secret JOBOS_HOST_SSH_KEY
+              Private OpenSSH key whose public half is in opc's authorized_keys
+              on the OCI box. (Fallback: JOBOS_DEPLOY_KEY if that key already
+              logs you into the box.)
+
+            Variable JOBOS_HOST
+              Hostname or IP (this hunt: 129.225.116.58)
+
+            Variable JOBOS_HOST_USER
+              SSH user (default opc if unset)
+
+            Optional secret JOBOS_HOST_KNOWN_HOSTS
+              ssh-keyscan -H $JOBOS_HOST  (pins the host key)
+
+          On the box:
+            1. Install the matching public key in ~/.ssh/authorized_keys
+            2. Allow inbound TCP 22 from GitHub-hosted Actions (or 0.0.0.0/0)
+            3. Disable the old self-hosted runner + git watcher:
+                 sudo systemctl disable --now jobos-github-runner.service
+                 sudo systemctl disable --now jobos-deploy-watch.timer
+
+          Full checklist: docs/deploy.md
+          EOF
+          exit 1
+
+      - name: SSH pull and apply
+        env:
+          JOBOS_HOST: ${{ vars.JOBOS_HOST || secrets.JOBOS_HOST || '129.225.116.58' }}
+          JOBOS_HOST_USER: ${{ vars.JOBOS_HOST_USER || secrets.JOBOS_HOST_USER }}
+          JOBOS_HOST_SSH_PORT: ${{ vars.JOBOS_HOST_SSH_PORT || secrets.JOBOS_HOST_SSH_PORT }}
+          JOBOS_HOST_SSH_KEY_DATA: ${{ secrets.JOBOS_HOST_SSH_KEY || secrets.JOBOS_DEPLOY_KEY }}
+          JOBOS_HOST_KNOWN_HOSTS: ${{ secrets.JOBOS_HOST_KNOWN_HOSTS }}
+          JOBOS_DEPLOY_DIR: ${{ vars.JOBOS_DEPLOY_DIR || secrets.JOBOS_DEPLOY_DIR }}
+          GHCR_USERNAME: ${{ github.repository_owner }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JOBOS_GHCR_IMAGE: ghcr.io/${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          curl -sS "$JOBOS_HEALTH_URL"
-          echo
-          git -C "$JOBOS_REPO" rev-parse --short HEAD
+          set -euo pipefail
+          bash scripts/hub_remote_deploy.sh "$TAG"

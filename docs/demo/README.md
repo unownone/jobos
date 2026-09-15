@@ -1,6 +1,6 @@
 # Feature demo — Job Hub on this host
 
-This is the live Job Hub after a GitHub `main` deploy on the OCI box. Tokens and passwords are **not** in these shots.
+This is the live Job Hub after a GitHub Release deploy (GHCR tag pulled over SSH) on the OCI box. Tokens and passwords are **not** in these shots.
 
 Public origin: `http://129.225.116.58/` · local: `http://127.0.0.1:8787/`
 
@@ -23,7 +23,7 @@ Job Hub is the live coordination plane for Job Apply OS: one FastAPI process, SQ
 
 README (top): **CI**, **Deploy**, **Open in Cursor**, **Install Hub**, **Feature demo**.
 
-GitHub Actions tab: **Deploy** → **Run workflow** (`workflow_dispatch`) for a manual ship of `main`.
+GitHub Actions tab: **Deploy** → **Run workflow** with a release tag for a manual GHCR pull. **Release** on push to `main` cuts the tag.
 
 ## Reproduce the shots
 

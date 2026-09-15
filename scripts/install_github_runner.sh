@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
-# Register a GitHub Actions self-hosted runner on this host (linux/arm64).
-# Labels: jobos, linux, ARM64. The Deploy workflow runs only on `jobos`.
+# Retired. Job Hub deploy no longer uses a self-hosted Actions runner.
+# Merge to main publishes GHCR + a GitHub Release; Deploy SSHs from ubuntu-latest.
+# See docs/deploy.md. Set JOBOS_ALLOW_SELF_HOSTED_RUNNER=1 to force this script.
 set -euo pipefail
+
+if [[ "${JOBOS_ALLOW_SELF_HOSTED_RUNNER:-}" != "1" ]]; then
+  cat >&2 <<'EOF'
+install_github_runner: self-hosted runners are retired.
+
+  Merge to main → .github/workflows/release.yml (GHCR + GitHub Release)
+  Release       → .github/workflows/deploy.yml  (GitHub-hosted SSH + docker pull)
+
+  bash scripts/disable_legacy_selfhosted_deploy.sh
+  docs: docs/deploy.md
+EOF
+  exit 1
+fi
+
 
 REPO_SLUG="${JOBOS_GITHUB_REPO:-unownone/jobos}"
 RUNNER_DIR="${JOBOS_RUNNER_DIR:-${HOME}/actions-runner}"

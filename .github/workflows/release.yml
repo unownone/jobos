@@ -1,0 +1,227 @@
+name: Release
+
+# Merge to main (or Run workflow) cuts a GitHub Release and publishes the
+# Job Hub image to GHCR. Deploy.yml then SSHs to the host and pulls that tag.
+# GitHub-hosted runners only. Never self-hosted. Never copies the git tree.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit SHA to release (empty = this workflow SHA)"
+        required: false
+        type: string
+
+concurrency:
+  group: release-jobos-hub
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  version:
+    name: next tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      image: ${{ steps.tag.outputs.image }}
+      image_name: ${{ steps.tag.outputs.image_name }}
+      sha: ${{ steps.tag.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.sha || github.sha }}
+
+      - name: Compute release tag
+        id: tag
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          sha="${INPUT_SHA:-${GITHUB_SHA}}"
+          sha="${sha#sha-}"
+          image_name="${REGISTRY}/${GITHUB_REPOSITORY,,}"
+          tag="$(bash scripts/jobos_release_tag.sh "$sha")"
+          {
+            echo "tag=${tag}"
+            echo "image=${image_name}:${tag}"
+            echo "image_name=${image_name}"
+            echo "sha=${sha}"
+          } >> "$GITHUB_OUTPUT"
+          echo "tag ${tag}"
+          echo "image ${image_name}:${tag}"
+
+  build:
+    name: build ${{ matrix.platform }}
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    steps:
+      - name: Platform pair
+        run: |
+          platform="${{ matrix.platform }}"
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ needs.version.outputs.image_name }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.version.outputs.sha }}
+            org.opencontainers.image.version=${{ needs.version.outputs.tag }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+          outputs: type=image,name=${{ needs.version.outputs.image_name }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: tag image + GitHub Release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+    outputs:
+      tag: ${{ needs.version.outputs.tag }}
+      image: ${{ needs.version.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ needs.version.outputs.image_name }}
+          tags: |
+            type=raw,value=${{ needs.version.outputs.tag }}
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      - name: Create manifest list
+        env:
+          IMAGE_NAME: ${{ needs.version.outputs.image_name }}
+          TAGGED_IMAGE: ${{ needs.version.outputs.image }}
+          META_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          tag_args=()
+          while IFS= read -r t; do
+            [[ -n "$t" ]] || continue
+            tag_args+=(--tag "$t")
+          done <<< "$META_TAGS"
+          digest_args=()
+          for f in /tmp/digests/*; do
+            digest_args+=("${IMAGE_NAME}@sha256:$(basename "$f")")
+          done
+          docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
+          docker buildx imagetools inspect "$TAGGED_IMAGE"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          SHA: ${{ needs.version.outputs.sha }}
+          IMAGE: ${{ needs.version.outputs.image }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists"
+            exit 0
+          fi
+          notes="$(cat <<EOF
+          Job Hub ${TAG}
+
+          - Image: \`${IMAGE}\`
+          - Also: \`ghcr.io/${GITHUB_REPOSITORY,,}:latest\` and \`ghcr.io/${GITHUB_REPOSITORY,,}:sha-${SHA:0:7}\`
+          - Commit: ${SHA}
+
+          Publishing this release triggers **Deploy**, which SSHs to the Hub host and pulls this tag from GHCR. The git tree is not copied to the server.
+          EOF
+          )"
+          gh release create "$TAG" \
+            --target "$SHA" \
+            --title "Job Hub ${TAG}" \
+            --notes "$notes"
+          echo "created release $TAG"

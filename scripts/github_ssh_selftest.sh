@@ -23,6 +23,11 @@ check test -x scripts/github_ssh.sh
 check test -x scripts/install_github_ssh.sh
 check test -x scripts/hub_host_deploy.sh
 check test -x scripts/jobos_deploy_watch.sh
+check test -x scripts/jobos_release_tag.sh
+check test -x scripts/hub_apply_image.sh
+check test -x scripts/hub_remote_deploy.sh
+check test -x scripts/deploy_selftest.sh
+check test -x scripts/disable_legacy_selfhosted_deploy.sh
 
 echo "bash -n"
 bash -n scripts/github_ssh.sh
@@ -31,6 +36,11 @@ bash -n scripts/hub_host_deploy.sh
 bash -n scripts/jobos_deploy_watch.sh
 bash -n scripts/install_host_services.sh
 bash -n scripts/github_ssh_selftest.sh
+bash -n scripts/jobos_release_tag.sh
+bash -n scripts/hub_apply_image.sh
+bash -n scripts/hub_remote_deploy.sh
+bash -n scripts/deploy_selftest.sh
+bash -n scripts/disable_legacy_selfhosted_deploy.sh
 echo "ok: bash -n deploy scripts"
 
 echo "known_hosts fingerprints (must match GitHub docs)"

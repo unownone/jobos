@@ -1,5 +1,7 @@
-# Job Hub behind Traefik. From repo root:
+# Job Hub behind Traefik — local / first-install (builds from this Dockerfile).
 #   HUB_PUBLIC_HOST=12.234.244.34 docker compose up -d --build
+# Production on the OCI host does not use this file. It pulls a GHCR tag:
+#   deploy/compose.yml  (see docs/deploy.md)
 # Traefik listens on 80 and 443. The board is served at /.
 # Memory pods live in Hub SQLite on hub-data (no extra vector-DB / Mem0 service).
 #

@@ -28,4 +28,4 @@ deploy:
 	bash scripts/hub_host_deploy.sh
 
 deploy-check:
-	bash scripts/github_ssh_selftest.sh
+	bash scripts/deploy_selftest.sh
