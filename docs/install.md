@@ -160,7 +160,7 @@ See [`docs/job-hub/a2a.md`](job-hub/a2a.md).
 
 ## Deploy on push (this host)
 
-GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose + Traefik, volume preserved). Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
+GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose + Traefik, volume preserved). Pull requests run **Deploy check** first (SSH wiring; no ship). GitHub SSH uses `ssh.github.com:443` and `~/.ssh/jobos_deploy`. Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
 
 ```bash
 bash scripts/hub_host_deploy.sh   # manual ship of origin/main on the host
