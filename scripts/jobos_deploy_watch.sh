@@ -3,12 +3,28 @@
 # Outbound-only (git fetch). No inbound webhook. Complements the Actions runner.
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+jobos_load_github_ssh() {
+  if [[ -f "$SCRIPT_DIR/github_ssh.sh" ]]; then
+    # shellcheck source=github_ssh.sh
+    source "$SCRIPT_DIR/github_ssh.sh"
+  elif [[ -f "${HOME}/.jobos/github_ssh.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${HOME}/.jobos/github_ssh.sh"
+  fi
+  if declare -F jobos_github_ssh_apply >/dev/null; then
+    jobos_github_ssh_apply
+  fi
+}
+
 if [[ -f "${HOME}/.jobos/deploy.env" ]]; then
   # shellcheck disable=SC1091
   set -a
   source "${HOME}/.jobos/deploy.env"
   set +a
 fi
+
+jobos_load_github_ssh
 
 REPO="${JOBOS_REPO:-${HOME}/jobos-live}"
 STATE_DIR="${JOBOS_STATE_DIR:-${HOME}/.jobos}"

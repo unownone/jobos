@@ -1,0 +1,22 @@
+# Job Hub GitHub SSH. Port 22 is often filtered; GitHub accepts SSH on 443.
+# IdentityFile is added at install time when ~/.ssh/jobos_deploy exists.
+# Source of truth: scripts/github_ssh.sh writes a runtime copy under ~/.jobos/ssh/.
+
+Host github.com
+  HostName ssh.github.com
+  Port 443
+  User git
+  IdentitiesOnly yes
+  IdentityAgent none
+  PreferredAuthentications publickey
+  StrictHostKeyChecking yes
+  HashKnownHosts no
+
+Host ssh.github.com
+  Port 443
+  User git
+  IdentitiesOnly yes
+  IdentityAgent none
+  PreferredAuthentications publickey
+  StrictHostKeyChecking yes
+  HashKnownHosts no

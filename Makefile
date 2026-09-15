@@ -1,4 +1,4 @@
-.PHONY: board board-tokens board-lint board-test board-test-unit board-test-e2e board-bench board-docker deploy
+.PHONY: board board-tokens board-lint board-test board-test-unit board-test-e2e board-bench board-docker deploy deploy-check
 
 board:
 	bash board/start.sh
@@ -26,3 +26,6 @@ board-docker:
 
 deploy:
 	bash scripts/hub_host_deploy.sh
+
+deploy-check:
+	bash scripts/github_ssh_selftest.sh
