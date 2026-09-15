@@ -4,6 +4,9 @@ name: Deploy
 # The job runs on the self-hosted runner labeled `jobos` (this machine).
 # Until that runner is registered, the host timer still pulls origin/main
 # every minute — see docs/deploy.md.
+#
+# Merge requests do not deploy. They run .github/workflows/deploy-check.yml
+# (SSH wiring + optional live git ls-remote). Only merge after that is green.
 
 on:
   push:
@@ -37,6 +40,15 @@ jobs:
         run: |
           set -euo pipefail
           live="${JOBOS_REPO}"
+          if [[ -f "$live/scripts/github_ssh.sh" ]]; then
+            # shellcheck disable=SC1091
+            source "$live/scripts/github_ssh.sh"
+            jobos_github_ssh_apply
+          elif [[ -f "${HOME}/.jobos/github_ssh.sh" ]]; then
+            # shellcheck disable=SC1091
+            source "${HOME}/.jobos/github_ssh.sh"
+            jobos_github_ssh_apply
+          fi
           if [[ ! -d "$live/.git" ]]; then
             git clone --branch main git@github.com:unownone/jobos.git "$live"
           fi

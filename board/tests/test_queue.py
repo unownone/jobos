@@ -96,6 +96,25 @@ def mint_track_agents(client: TestClient, track: str, names: list[str]) -> list[
     return keys
 
 
+def unlock_discovery_search(client: TestClient) -> None:
+    """Ack catalog.refresh so discovery.search claims are not 409 when the pack date is >7 days old."""
+    pushed = client.post(
+        "/api/queue/push",
+        headers=h("maintenance"),
+        json={"kind": "catalog.refresh", "payload": {"reason": "pytest"}},
+    )
+    assert pushed.status_code == 200, pushed.text
+    claimed = client.post(
+        "/api/queue/claim",
+        headers=h("maintenance"),
+        json={"kinds": ["catalog.refresh"], "limit": 1},
+    )
+    assert claimed.status_code == 200, claimed.text
+    item_id = claimed.json()["items"][0]["id"]
+    acked = client.post(f"/api/queue/ack/{item_id}", headers=h("maintenance"))
+    assert acked.status_code == 200, acked.text
+
+
 def test_meta_lists_queue_kinds(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
     res = client.get("/api/meta", headers=h("discovery"))
@@ -108,6 +127,7 @@ def test_meta_lists_queue_kinds(hub: tuple[TestClient, Settings]) -> None:
 
 def test_two_agents_claim_distinct_items(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
+    unlock_discovery_search(client)
     keys = mint_track_agents(client, "discovery", ["disc-a", "disc-b"])
     for portal in ("remoteok", "indeed"):
         pushed = client.post(
@@ -139,6 +159,7 @@ def test_two_agents_claim_distinct_items(hub: tuple[TestClient, Settings]) -> No
 
 def test_same_item_not_double_claimed_while_lease_valid(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
+    unlock_discovery_search(client)
     keys = mint_track_agents(client, "discovery", ["one", "two"])
     client.post(
         "/api/queue/push",
@@ -157,6 +178,7 @@ def test_same_item_not_double_claimed_while_lease_valid(hub: tuple[TestClient, S
 
 def test_expired_lease_stolen_emits_claim_expired(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
+    unlock_discovery_search(client)
     keys = mint_track_agents(client, "discovery", ["old", "new"])
     client.post(
         "/api/queue/push",
@@ -177,6 +199,7 @@ def test_expired_lease_stolen_emits_claim_expired(hub: tuple[TestClient, Setting
 
 def test_nack_requeue_then_dead_on_fifth(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
+    unlock_discovery_search(client)
     keys = mint_track_agents(client, "discovery", ["nack-bot"])
     client.post(
         "/api/queue/push",
@@ -331,6 +354,7 @@ def test_discovery_cannot_push_apply_ready(hub: tuple[TestClient, Settings]) -> 
 
 def test_three_discovery_bots_no_collision(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
+    unlock_discovery_search(client)
     keys = mint_track_agents(client, "discovery", ["bot-0", "bot-1", "bot-2"])
     for portal in ("remoteok", "indeed", "wellfound"):
         res = client.post(
