@@ -64,6 +64,7 @@ def test_skill_draft_from_memory_maps_discovery_track() -> None:
     assert "source" in draft["tags"]
     assert draft["platform"] == "greenhouse"
     assert draft["slug"].startswith("mem-")
+    assert "boards.greenhouse.io/*" in draft["match"]["url_patterns"]
 
 
 def _settings(tmp_path: Path) -> Settings:

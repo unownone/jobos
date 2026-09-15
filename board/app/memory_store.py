@@ -686,6 +686,29 @@ ATS_HINTS = (
     ("linkedin", ("linkedin", "easy apply")),
 )
 
+ATS_MATCH = {
+    "greenhouse": {
+        "url_patterns": ["boards.greenhouse.io/*", "*.greenhouse.io/*"],
+        "apply_kind": ["ats"],
+    },
+    "workday": {
+        "url_patterns": ["*.myworkdayjobs.com/*", "*workday.com/*"],
+        "apply_kind": ["ats"],
+    },
+    "lever": {
+        "url_patterns": ["jobs.lever.co/*"],
+        "apply_kind": ["ats"],
+    },
+    "ashby": {
+        "url_patterns": ["jobs.ashbyhq.com/*"],
+        "apply_kind": ["ats"],
+    },
+    "linkedin": {
+        "url_patterns": ["*.linkedin.com/*"],
+        "apply_kind": ["easy_apply"],
+    },
+}
+
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
 
 
@@ -750,7 +773,12 @@ def skill_draft_from_memory(item: dict[str, Any]) -> dict[str, Any]:
     platform = _platform_from_text(blob)
     if platform and platform not in tags:
         tags.append(platform)
-    match = {"ats": [platform] if platform else [], "url_patterns": [], "apply_kind": []}
+    hints = ATS_MATCH.get(platform) or {}
+    match = {
+        "ats": [platform] if platform else [],
+        "url_patterns": list(hints.get("url_patterns") or []),
+        "apply_kind": list(hints.get("apply_kind") or []),
+    }
     company = (item.get("company") or "").strip()
     body_parts = [
         f"# {item['title']}",
