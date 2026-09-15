@@ -1,11 +1,24 @@
 ---
 name: job-discovery
 description: Discover and shortlist jobs for Job Apply OS. Covers LinkedIn, Indeed, Wellfound, Work at a Startup, Google Jobs and ATS dorks, RemoteOK, Hiring Cafe, Weekday, Roro Remote, talent networks (Flexiple, Turing, Toptal, Lemon.io, BairesDev), and big-company career sites. Writes apply packets. Never applies, including Easy Apply. Use when sourcing, searching, or shortlisting jobs.
+role: discovery
+tags: [source]
+kind: skill
+slug: job-discovery
+reproducible: true
+inputs: [candidate, platforms]
+outputs: [job, apply_packet]
 ---
 
 # Job discovery
 
 You find work. You do not apply.
+
+## Registry
+
+When `HUB_URL` is set, **select a matching tagged `source` skill** from `GET /api/registry/skills?tag=source` (filter `platform`, `url`, or `ats`). GitHub starters seed that table. If you mutate a playbook for one portal, `POST /api/registry/skills/{id}/fork` and keep it **local**. Submit a recording for maintainer proctor if it should be shared. Airgapped: follow this role skill plus `docs/catalogs/platforms.md`.
+
+Outline: `docs/catalogs/skill-outline.md`.
 
 ## Startup sequence
 

@@ -1,11 +1,24 @@
 ---
 name: job-outreach
 description: After an application (or for network-only targets), reach out by email and LinkedIn DM. Attach the resume PDF on email. Ask for a short chat. Find hiring managers, teammates, or execs at small companies via deep research. Use when following up, asking for referrals, or when email attachments previously failed. No SMS.
+role: outreach
+tags: [outreach]
+kind: skill
+slug: job-outreach
+reproducible: true
+inputs: [job, outreach_packet, candidate]
+outputs: [touches]
 ---
 
 # Job outreach
 
 You get a conversation. You do not apply. You do not text.
+
+## Registry
+
+When `HUB_URL` is set, use tagged `outreach` skills (`outreach-email`, `outreach-linkedin-dm`) from `GET /api/registry/skills?tag=outreach`. Local copy edits stay local. Recordings go to the maintainer queue. Airgapped: this playbook.
+
+Outline: `docs/catalogs/skill-outline.md`.
 
 ## Startup sequence
 

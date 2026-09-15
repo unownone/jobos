@@ -70,6 +70,17 @@ PROTECTED_ROUTE_PATHS = frozenset(
         "/api/onboarding",
         "/api/a2a/directory",
         "/api/a2a/peers",
+        "/api/registry/skills",
+        "/api/registry/skills/{skill_id}",
+        "/api/registry/recordings",
+        "/api/registry/recordings/{recording_id}",
+        "/admin/skills",
+        "/api/memory/recall",
+        "/api/memory/items",
+        "/api/memory/items/{item_id}",
+        "/api/memory/items/{item_id}/solidify",
+        "/api/memory/pods",
+        "/admin/memory",
     }
 )
 

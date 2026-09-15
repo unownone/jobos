@@ -58,6 +58,7 @@ TRACK_READINGS: dict[str, tuple[str, ...]] = {
         "docs/roles.md",
         "docs/job-hub/memory.md",
         "docs/catalogs/skills-and-mcps.md",
+        "docs/catalogs/skill-outline.md",
         "handoffs/apply-packet.md",
     ),
     "application": (
@@ -65,6 +66,7 @@ TRACK_READINGS: dict[str, tuple[str, ...]] = {
         "docs/process.md",
         "docs/roles.md",
         "docs/job-hub/memory.md",
+        "docs/catalogs/skill-outline.md",
         "handoffs/apply-packet.md",
     ),
     "outreach": (
@@ -72,6 +74,7 @@ TRACK_READINGS: dict[str, tuple[str, ...]] = {
         "docs/process.md",
         "docs/roles.md",
         "docs/job-hub/memory.md",
+        "docs/catalogs/skill-outline.md",
         "handoffs/outreach-packet.md",
     ),
     "maintenance": (
@@ -80,6 +83,7 @@ TRACK_READINGS: dict[str, tuple[str, ...]] = {
         "docs/roles.md",
         "docs/job-hub/memory.md",
         "docs/catalogs/skills-and-mcps.md",
+        "docs/catalogs/skill-outline.md",
         "skills/lists/INDEX.md",
     ),
 }
@@ -126,7 +130,7 @@ TRACK_QUEUES: dict[str, list[str]] = {
     "discovery": ["discovery.search"],
     "application": ["apply.ready"],
     "outreach": ["outreach.ready"],
-    "maintenance": [],
+    "maintenance": ["skill.record", "catalog.refresh"],
 }
 
 # Names and instructions only. Never secret values.
@@ -614,6 +618,7 @@ class PackStore:
             "memory": {
                 "recall": "/api/memory/recall",
                 "write": "/api/memory/items",
+                "solidify": "/api/memory/items/{id}/solidify",
                 "pods": "/api/memory/pods",
                 "docs": "/api/docs/docs/job-hub/memory.md",
                 "use_every_round": True,
@@ -622,6 +627,7 @@ class PackStore:
             "queues": list(TRACK_QUEUES.get(key, [])),
             "candidate": public_candidate_for_settings(self.settings),
             "catalog_updated_at": meta.catalog_updated_at,
+            "registry": "/api/registry/skills",
             "pack": {
                 "git_sha": meta.git_sha,
                 "pack_sha": meta.pack_sha,
@@ -643,6 +649,7 @@ def join_onboarding_section(settings: Settings, invite: dict[str, Any]) -> dict[
         "mcp_example": "/api/mcp/example.json",
         "docs": "/api/docs/{path}",
         "skills": "/api/skills/{name}/{file}",
+        "registry": "/api/registry/skills",
         "scripts": "/api/scripts/{name}",
         "hosted_mcp": "/api/mcp/hosted/{name}.json",
         "pack_sha": meta.pack_sha,

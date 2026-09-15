@@ -9,7 +9,7 @@ You are working in **Job Apply OS**. Read this before doing anything else.
 3. Claim a role from `docs/roles.md`. Write the claim into `ledger/INDEX.md` under **Active operators**.
 4. If Hub is live, `GET /api/memory/recall` (or read `memory` on the first heartbeat) before searching or claiming work.
 
-If the user says you own everything, you still run the three roles **in order**: catalog + research + discovery, then apply, then outreach. Never Easy Apply during discovery. Maintainer is a fourth owner and is **seldom** used; run it when the skill/MCP inventory is the work, not mid-search.
+If the user says you own everything, you still run the three roles **in order**: catalog + research + discovery, then apply, then outreach. Never Easy Apply during discovery. Maintainer is a fourth owner and is **seldom** used; run it when the skill/MCP inventory, the Hub registry, or the proctor queue is the work, not mid-search.
 
 ## Role picker
 
@@ -20,9 +20,11 @@ If the user says you own everything, you still run the three roles **in order**:
 | outreach, email, LinkedIn DM, referral, hiring manager | `skills/job-outreach/SKILL.md` |
 | find skills, find MCPs, skillhub, skills.sh | `skills/skill-and-mcp-catalog/SKILL.md` |
 | research the company, find the hiring manager, deep research | `skills/deep-research/SKILL.md` |
-| maintain, update skills, manage catalog, skill lists, hunt board | `skills/skill-maintainer/SKILL.md` |
+| maintain, update skills, manage catalog, skill lists, hunt board, skill registry, proctor | `skills/skill-maintainer/SKILL.md` |
 
-Discovery **starts** with the catalog skill unless `docs/catalogs/skills-and-mcps.md` was updated this week. If the work is **updating the skill tree itself** (lists, mcp.example.json, pruning dead tools) **or operating the hunt board**, that is the seldom-used **maintainer** role, not discovery.
+Discovery **starts** with the catalog skill unless `docs/catalogs/skills-and-mcps.md` was updated this week. When Hub is up, also `GET /api/registry/skills?tag=source` and pick a matching tagged **source** skill. Apply uses `?tag=apply` (ATS / site). Outreach uses `?tag=outreach` (channel). Airgap falls back to the role `SKILL.md` plus `skills/starters/`.
+
+If the work is **updating the skill tree itself** (lists, mcp.example.json, pruning dead tools), **operating the hunt board**, or **the skill registry + proctor queue** (`skill.record`), that is the seldom-used **maintainer** role, not discovery. Maintainer owns the registry and consumes `skill.record`.
 
 ## Hard rules
 
@@ -34,7 +36,9 @@ Discovery **starts** with the catalog skill unless `docs/catalogs/skills-and-mcp
 - Prefer official APIs, public JSON feeds, and public career pages.
 - Attach PDFs on **email**. LinkedIn DMs usually cannot take a PDF; send a short note and ask for a chat, and point at a resume link if you have one.
 - Every state change gets a row in `ledger/events.jsonl` and an update on the job YAML.
-- If Hub is up (`HUB_URL` / `BOARD_URL`): **recall memory every round** (`GET /api/memory/recall` and the `memory` card on heartbeat / queue claim). Store only durable facts (portal quirks, blockers, dead tools). Do not dump transcripts, JDs, or secrets. Pods: worker (private) / track (shared on the lane) / common. Docs: [`docs/job-hub/memory.md`](docs/job-hub/memory.md).
+- Local skills are **per-bot**. Do not load, copy, or promote another bot’s `scope=local` skill.
+- Only maintainer consumes `skill.record` and promotes after proctor. Discovery / apply / outreach may enqueue recordings; they must not ack them into shared.
+- If Hub is up (`HUB_URL` / `BOARD_URL`): **recall memory every round** (`GET /api/memory/recall` and the `memory` card on heartbeat / queue claim). Store only durable facts (portal quirks, blockers, dead tools). Do not dump transcripts, JDs, or secrets. Pods: worker (private) / track (shared on the lane) / common. Track/common facts that should become playbooks: `POST /api/memory/items/{id}/solidify`. Docs: [`docs/job-hub/memory.md`](docs/job-hub/memory.md).
 
 ## Ledger writes
 
@@ -57,4 +61,4 @@ Write `apply_blocked` or a `blocked` note with the exact missing thing (login, w
 
 ## Job Hub (if `HUB_URL` or `BOARD_URL` is set)
 
-Use the Hub as the **live** job list (heartbeat, queue claim/ack, board APIs). Do not treat git `ledger/` as a second live board for that run. Do not clone the hunt repo for skills — fetch `/api/onboarding` and the pack zip. Operator: [`docs/job-hub/human.md`](docs/job-hub/human.md). Agent: [`docs/job-hub/agent.md`](docs/job-hub/agent.md). **Maintainer ≠ discovery.** Never Easy Apply on the discovery track. If `profiles/candidate.yaml` is missing, stop for the human; do not invent a candidate.
+Use the Hub as the **live** job list (heartbeat, queue claim/ack, board APIs) and the **live skill registry** (`GET /api/registry/skills`). Do not treat git `ledger/` as a second live board for that run. Do not clone the hunt repo for skills — fetch `/api/onboarding` and the pack zip, then select tagged skills from the registry. Operator: [`docs/job-hub/human.md`](docs/job-hub/human.md). Agent: [`docs/job-hub/agent.md`](docs/job-hub/agent.md). **Maintainer ≠ discovery.** Maintainer consumes `skill.record` and promotes after proctor. Never Easy Apply on the discovery track. If `profiles/candidate.yaml` is missing, stop for the human; do not invent a candidate.

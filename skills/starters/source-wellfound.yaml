@@ -1,0 +1,30 @@
+slug: source-wellfound
+name: Wellfound source
+kind: skill
+role: discovery
+tags: [source, board, wellfound]
+platform: wellfound
+match:
+  ats: []
+  url_patterns:
+    - "*.wellfound.com/*"
+    - "wellfound.com/*"
+  apply_kind: [ats, unknown]
+reproducible: true
+inputs: [candidate, query]
+outputs: [job, apply_packet]
+body: |
+  # Wellfound source
+
+  Public / session search of Wellfound (AngelList) listings. No official MCP.
+
+  ## Steps
+
+  1. Search the live site for candidate titles.
+  2. Dedup against LinkedIn and other boards (same startup jobs duplicate often).
+  3. Packet the employer apply URL. Note if the listing is a startup without a separate ATS.
+  4. Do not add Apify/Wellfound scrapers unless the human accepts ToS risk in writing.
+
+  ## Hard no
+
+  Applying, scraping behind a login you do not own.

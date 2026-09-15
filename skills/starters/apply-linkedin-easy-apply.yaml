@@ -1,0 +1,29 @@
+slug: apply-linkedin-easy-apply
+name: LinkedIn Easy Apply
+kind: skill
+role: apply
+tags: [apply, linkedin]
+platform: linkedin
+match:
+  ats: []
+  url_patterns:
+    - "*.linkedin.com/jobs/*"
+  apply_kind: [linkedin_easy_apply]
+reproducible: true
+inputs: [job, apply_packet, candidate]
+outputs: [proof]
+body: |
+  # LinkedIn Easy Apply
+
+  Apply role only. Discovery must never run this. Same modal flow for every Easy Apply packet.
+
+  ## Steps
+
+  1. Take jobs with `apply_kind: linkedin_easy_apply` and a complete packet.
+  2. Claim apply. Open the listing. Use Easy Apply here, not during discovery.
+  3. Note length 800–1200 characters unless they ask for more. Proof + profile only.
+  4. Submit. Proof. `applied`. Prefer resolving the real ATS URL into the packet when visible.
+
+  ## Hard no
+
+  Running this on discovery. InMail. Skipping the packet.

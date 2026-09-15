@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.constants import ROLES
 from app.main import create_app
+from app.memory_store import skill_draft_from_memory
 from app.settings import Settings
 
 TOKENS = {role: f"test-token-{role}-not-real" for role in ROLES}
@@ -43,6 +44,27 @@ COMMON_FACT = {
         "Parallel Search until the operator adds an Exa key."
     ),
 }
+
+
+def test_skill_draft_from_memory_maps_discovery_track() -> None:
+    draft = skill_draft_from_memory(
+        {
+            "id": "mem_abc",
+            "pod": "track:discovery",
+            "kind": "portal_quirk",
+            "title": "Greenhouse work-auth radio",
+            "body": "Acme Greenhouse asks a work-authorization radio missing from the packet.",
+            "company": "Acme",
+            "tags": [],
+        }
+    )
+    assert draft["role"] == "discovery"
+    assert draft["origin"] == "memory"
+    assert draft["origin_ref"] == "mem_abc"
+    assert "source" in draft["tags"]
+    assert draft["platform"] == "greenhouse"
+    assert draft["slug"].startswith("mem-")
+    assert "boards.greenhouse.io/*" in draft["match"]["url_patterns"]
 
 
 def _settings(tmp_path: Path) -> Settings:
@@ -117,6 +139,7 @@ def test_memory_requires_auth(hub: tuple[TestClient, Settings]) -> None:
     assert client.get("/api/memory/recall").status_code == 401
     assert client.get("/api/memory/items").status_code == 401
     assert client.post("/api/memory/items", json=TRACK_FACT).status_code == 401
+    assert client.post("/api/memory/items/mem_missing/solidify", json={}).status_code == 401
 
 
 def test_heartbeat_includes_memory_card(hub: tuple[TestClient, Settings]) -> None:
@@ -332,3 +355,129 @@ def test_queue_claim_includes_memory(hub: tuple[TestClient, Settings]) -> None:
     assert claimed.status_code == 200, claimed.text
     assert "memory" in claimed.json()
     assert claimed.json()["memory"]["recall_url"] == "/api/memory/recall"
+
+
+def test_solidify_track_fact_becomes_memory_origin_skill(
+    hub: tuple[TestClient, Settings],
+) -> None:
+    client, _settings = hub
+    bootstrap_admin(client)
+    disc_a = invite_join(client, "discovery", "disc-solid-a")
+    disc_b = invite_join(client, "discovery", "disc-solid-b")
+    maint = invite_join(client, "maintenance", "maint-solid", mode="owner_then_agents")
+
+    stored = client.post(
+        "/api/memory/items",
+        headers=bearer(disc_a["api_key"]),
+        json=TRACK_FACT,
+    )
+    assert stored.status_code == 201, stored.text
+    item_id = stored.json()["item"]["id"]
+
+    stolen = client.post(
+        f"/api/memory/items/{item_id}/solidify",
+        headers=bearer(disc_b["api_key"]),
+        json={},
+    )
+    assert stolen.status_code == 403, stolen.text
+
+    solid = client.post(
+        f"/api/memory/items/{item_id}/solidify",
+        headers=bearer(disc_a["api_key"]),
+        json={},
+    )
+    assert solid.status_code == 200, solid.text
+    assert solid.json()["status"] == "queued"
+    recording = solid.json()["recording"]
+    payload = recording["payload"]
+    assert payload["origin"] == "memory"
+    assert payload["origin_ref"] == item_id
+    assert payload["role"] == "discovery"
+    assert "source" in payload["tags"]
+    assert payload["platform"] == "greenhouse"
+    assert solid.json()["item"]["solidify_status"] == "queued"
+    recording_id = recording["id"]
+    queue_id = solid.json()["queue_item"]["id"]
+
+    again = client.post(
+        f"/api/memory/items/{item_id}/solidify",
+        headers=bearer(disc_a["api_key"]),
+        json={},
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["status"] == "exists"
+    assert again.json()["recording"]["id"] == recording_id
+
+    denied = client.post(
+        "/api/queue/claim",
+        headers=bearer(disc_a["api_key"]),
+        json={"kinds": ["skill.record"]},
+    )
+    assert denied.status_code == 403
+
+    claimed = client.post(
+        "/api/queue/claim",
+        headers=bearer(maint["api_key"]),
+        json={"kinds": ["skill.record"]},
+    )
+    assert claimed.status_code == 200, claimed.text
+    assert claimed.json()["items"][0]["id"] == queue_id
+
+    proctor = client.post(
+        f"/api/registry/recordings/{recording_id}/proctor",
+        headers=bearer(maint["api_key"]),
+        json={"verdict": "pass", "note": "reusable greenhouse quirk"},
+    )
+    assert proctor.status_code == 200, proctor.text
+
+    promoted = client.post(
+        f"/api/registry/recordings/{recording_id}/promote",
+        headers=bearer(maint["api_key"]),
+    )
+    assert promoted.status_code == 200, promoted.text
+    skill = promoted.json()["skill"]
+    assert skill["scope"] == "shared"
+    assert skill["status"] == "approved"
+    assert skill["origin"] == "memory"
+    assert skill["origin_ref"] == item_id
+    assert skill["slug"].startswith("mem-")
+
+    visible = client.get("/api/registry/skills", headers=bearer(disc_b["api_key"]))
+    slugs = {row["slug"] for row in visible.json()["skills"]}
+    assert skill["slug"] in slugs
+
+    recalled = client.get("/api/memory/items", headers=bearer(disc_a["api_key"]))
+    fact = next(row for row in recalled.json()["items"] if row["id"] == item_id)
+    assert fact["solidify_status"] == "promoted"
+    assert fact["recording_id"] == recording_id
+
+
+def test_worker_notes_cannot_solidify(hub: tuple[TestClient, Settings]) -> None:
+    client, _settings = hub
+    created = client.post("/api/memory/items", headers=h("discovery"), json=WORKER_NOTE)
+    assert created.status_code == 201, created.text
+    item_id = created.json()["item"]["id"]
+    blocked = client.post(
+        f"/api/memory/items/{item_id}/solidify",
+        headers=h("discovery"),
+        json={},
+    )
+    assert blocked.status_code == 403, blocked.text
+    assert blocked.json()["detail"]["code"] == "memory_forbidden"
+
+
+def test_common_fact_solidify_maps_to_maintain(hub: tuple[TestClient, Settings]) -> None:
+    client, _settings = hub
+    created = client.post("/api/memory/items", headers=h("discovery"), json=COMMON_FACT)
+    assert created.status_code == 201, created.text
+    item_id = created.json()["item"]["id"]
+    solid = client.post(
+        f"/api/memory/items/{item_id}/solidify",
+        headers=h("discovery"),
+        json={},
+    )
+    assert solid.status_code == 200, solid.text
+    payload = solid.json()["recording"]["payload"]
+    assert payload["role"] == "maintain"
+    assert "maintain" in payload["tags"]
+    assert payload["origin"] == "memory"

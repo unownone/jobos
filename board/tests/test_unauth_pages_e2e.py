@@ -100,3 +100,21 @@ def test_authenticated_session_control_can_open_job_board_api(
     assert listed.status_code == 200, listed.text
     companies = [job.get("company") for job in listed.json().get("jobs", [])]
     assert JOB_COMPANY in companies
+
+
+def test_authenticated_session_can_open_skills_and_memory_pages(
+    seeded: SeededHub,
+) -> None:
+    login = seeded.authed.post(
+        "/api/auth/login",
+        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+    )
+    assert login.status_code == 200, login.text
+    skills = seeded.authed.get("/admin/skills", headers=BROWSER_HEADERS)
+    assert skills.status_code == 200, skills.text
+    assert "Skill registry" in skills.text
+    assert JOB_COMPANY not in skills.text
+    memory = seeded.authed.get("/admin/memory", headers=BROWSER_HEADERS)
+    assert memory.status_code == 200, memory.text
+    assert "Memory pods" in memory.text
+    assert "data-solidify" in memory.text

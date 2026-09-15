@@ -1,11 +1,20 @@
 ---
 name: skill-and-mcp-catalog
 description: Discover, vet, and add agent skills and MCP servers from any registry (skills.sh, Skills Hub, ClawHub, GitHub, mcp.so, vendor docs). Use when setting up Job Apply OS, when a portal has no tool, or when the user mentions Skillhub, skills.sh, MCP install, Indeed MCP, Exa, or missing capabilities. Do not lock to one marketplace.
+role: maintain
+tags: [maintain, source]
+kind: skill
+slug: skill-and-mcp-catalog
+reproducible: true
+inputs: [catalog]
+outputs: [skills_and_mcps]
 ---
 
 # Skill and MCP catalog
 
 You are the procurement desk for this workspace. Find tools, vet them, write them down. Do not run job applications.
+
+Live Hub skills are a **different** store: `GET /api/registry/skills`. This catalog skill finds third-party tools. Maintainer seeds GitHub starters into the registry and proctors recordings. Outline: `docs/catalogs/skill-outline.md`.
 
 ## When
 

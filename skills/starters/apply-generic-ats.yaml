@@ -1,0 +1,27 @@
+slug: apply-generic-ats
+name: Generic ATS apply
+kind: skill
+role: apply
+tags: [apply, ats]
+platform: ""
+match:
+  ats: [workable, smartrecruiters, icims, unknown]
+  url_patterns: []
+  apply_kind: [ats]
+reproducible: true
+inputs: [job, apply_packet, candidate]
+outputs: [proof]
+body: |
+  # Generic ATS apply
+
+  Fallback when the URL is not Greenhouse / Lever / Ashby / Workday / LinkedIn Easy Apply. Follow the packet steps in order. If this ATS repeats, fork locally and submit a recording so maintainer can promote a named skill.
+
+  ## Steps
+
+  1. Claim apply. Open packet URL only.
+  2. Walk the numbered packet steps. Upload named PDF. Profile-only answers.
+  3. Proof. `applied`. If the portal is unique, PATCH a local skill with `url_patterns` for that host, then record it.
+
+  ## Hard no
+
+  Improvising a different URL. Guessing legal answers.

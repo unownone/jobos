@@ -1,0 +1,28 @@
+slug: source-rororemote
+name: Roro Remote source
+kind: skill
+role: discovery
+tags: [source, board, rororemote]
+platform: rororemote
+match:
+  ats: []
+  url_patterns:
+    - "*roro*"
+  apply_kind: [ats, outreach_only]
+reproducible: true
+inputs: [candidate, query]
+outputs: [job, apply_packet]
+body: |
+  # Roro Remote source
+
+  Named portal. Confirm the live URL on first cycle. If there is no board, one job file with `apply_kind: outreach_only`.
+
+  ## Steps
+
+  1. Find the current public URL. Search titles.
+  2. If listings exist, packet them. If not, record a network/outreach_only row.
+  3. Same motion next cycle; update the URL if it moved.
+
+  ## Hard no
+
+  Inventing jobs. Applying.

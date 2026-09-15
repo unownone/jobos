@@ -281,3 +281,36 @@ def test_authenticated_control_candidate_and_people_still_work(seeded: SeededHub
     jobs = seeded.authed.get("/api/jobs", headers=role_headers("apply"))
     assert jobs.status_code == 200
     assert any(job["id"] == JOB_ID for job in jobs.json()["jobs"])
+
+
+def test_unauthenticated_cannot_write_registry_or_memory(seeded: SeededHub) -> None:
+    created = seeded.unauth.post(
+        "/api/registry/skills",
+        json={
+            "slug": "unauth-hijack",
+            "name": "Hijack",
+            "role": "apply",
+            "tags": ["apply"],
+            "body": "should not land",
+        },
+    )
+    assert_unauthenticated_denied(created, what="POST /api/registry/skills")
+    recorded = seeded.unauth.post(
+        "/api/registry/recordings",
+        json={"slug": "unauth-rec", "name": "Hijack", "role": "apply", "tags": ["apply"], "body": "nope"},
+    )
+    assert_unauthenticated_denied(recorded, what="POST /api/registry/recordings")
+    seed = seeded.unauth.post("/api/registry/seed")
+    assert_unauthenticated_denied(seed, what="POST /api/registry/seed")
+    mem = seeded.unauth.post(
+        "/api/memory/items",
+        json={
+            "pod": "track",
+            "kind": "portal_quirk",
+            "title": "Unauth greenhouse quirk",
+            "body": "Unauthenticated write of a durable portal quirk must be rejected by the Hub.",
+        },
+    )
+    assert_unauthenticated_denied(mem, what="POST /api/memory/items")
+    solid = seeded.unauth.post("/api/memory/items/mem_missing/solidify", json={})
+    assert_unauthenticated_denied(solid, what="POST /api/memory/items/{id}/solidify")

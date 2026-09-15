@@ -1,13 +1,22 @@
 ---
 name: skill-maintainer
-description: Seldom-used owner that maintains Job Apply OS skills, MCP lists, catalog files, and the live hunt board. Use when the user says maintain, update skills, manage the catalog, find MCPs, refresh skill lists, prune dead tools, or operate the Get That Job board (tokens, uptime, hygiene). Searches registries, vets, and writes skills/lists. Does not discover jobs, apply, or send outreach.
+description: Seldom-used owner that maintains Job Apply OS skills, MCP lists, catalog files, the live hunt board, and the Hub skill registry. Use when the user says maintain, update skills, manage the catalog, find MCPs, refresh skill lists, prune dead tools, proctor skill recordings, or operate the Get That Job board (tokens, uptime, hygiene). Searches registries, vets, writes skills/lists, and is the only consumer of skill.record. Does not discover jobs, apply, or send outreach.
+role: maintain
+tags: [maintain]
+kind: skill
+slug: skill-maintainer
+reproducible: true
+inputs: [registry, lists]
+outputs: [skills_lists]
 ---
 
 # Skill maintainer
 
-You own the **skill tree** and the **live hunt board**. You do not own jobs.
+You own the **skill tree**, the **live hunt board**, and the **skill registry**. You do not own jobs.
 
-This role is **seldom used**. Discovery still runs a catalog pass at the start of a cycle. Maintainer is who refreshes, prunes, and writes the lists when the inventory itself is the work.
+This role is **seldom used**. Discovery still runs a catalog pass at the start of a cycle. Maintainer is who refreshes, prunes, writes the lists, seeds GitHub starters into the Hub DB, and **proctors skill recordings**.
+
+Anyone may **push** `skill.record`. **Only you claim it.** Do not promote until proctor passes. Outline: [`docs/catalogs/skill-outline.md`](../../docs/catalogs/skill-outline.md).
 
 ## When
 
@@ -41,7 +50,8 @@ Write yourself under **Active operators** in `ledger/INDEX.md` as `maintainer`. 
 7. If a tool is clearly adopted, **pin it** (`uvx package==version`, or a SHA clone into gitignored `agent-tools/`). Do not copy 50k-line data files or upstream trees into git. Hosted tools get a snippet in `mcp/hosted/`. Third-party skills go in `.agents/skills/` via `npx skills add`.
 8. Append `ledger/events.jsonl`. No job YAML.
 9. If this hunt uses the live board: follow [`board/README.md`](../../board/README.md). Generate/rotate gitignored tokens, start `board/start.sh`, import ledger history, run hygiene. Discovery/apply/outreach consume the board; they do not own it.
-10. Recall Hub memory (`GET /api/memory/recall`) at the start of a maintainer pass. Put catalog/tool deaths in the **common** pod (`catalog_note` / `tool_failure`) so discovery does not rediscover a dead MCP. Do not store secrets. [`docs/job-hub/memory.md`](../../docs/job-hub/memory.md).
+10. **Skill registry (Hub):** `GET /api/registry/recordings?status=queued`. Claim `skill.record` from `/api/queue/claim`. Proctor first (`POST /api/registry/recordings/{id}/proctor` with `pass` or `fail`) using the rubric in the outline. Only after **pass** call `/promote`. Decline failed recordings. `POST /api/registry/seed` re-reads GitHub starters; it will not overwrite a promoted non-github shared slug. Do not use another bot's local skills.
+11. Recall Hub memory (`GET /api/memory/recall`) at the start of a maintainer pass. Put catalog/tool deaths in the **common** pod (`catalog_note` / `tool_failure`) so discovery does not rediscover a dead MCP. Track/common facts that should become playbooks: check `solidify_status` and proctor the resulting `skill.record`. Do not store secrets. [`docs/job-hub/memory.md`](../../docs/job-hub/memory.md).
 
 ## Do not
 

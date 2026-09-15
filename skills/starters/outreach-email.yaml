@@ -1,0 +1,31 @@
+slug: outreach-email
+name: Email outreach
+kind: skill
+role: outreach
+tags: [outreach, mail]
+platform: gmail
+match:
+  ats: []
+  url_patterns: []
+  apply_kind: [ats, network, outreach_only]
+reproducible: true
+inputs: [job, outreach_packet, candidate, resume]
+outputs: [touches]
+body: |
+  # Email outreach
+
+  Same channel rules for every job: draft, attach the PDF, ask for a 15-minute chat.
+
+  ## Steps
+
+  1. Take `applied` or network `outreach_ready` jobs. Claim outreach.
+  2. People map via deep-research unless packet.people is filled.
+  3. Draft with Gmail MCP `create_draft`. Attach resume: `attachments[{filename, mimeType, content}]` base64.
+  4. Subject specific. Body 6–10 lines. Ask for a short chat. Send or leave for human.
+  5. Log the touch. Status `waiting`. Cap touches per person.
+
+  If attachment fails, do not send a naked email. Blocked: attachment.
+
+  ## Hard no
+
+  SMS. Sequences. Email without PDF.

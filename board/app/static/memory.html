@@ -36,12 +36,14 @@
       &nbsp;·&nbsp;
       <a href="/admin/users">Directory</a>
       &nbsp;·&nbsp;
+      <a href="/admin/skills">Skills</a>
+      &nbsp;·&nbsp;
       <a href="#" id="logout">Log out</a>
     </div>
   </header>
   <main>
     <p id="who">Checking session…</p>
-    <p>Worker pods are private. Track pods are shared on a lane. Common is shared by every track. Recall freely; store only durable facts.</p>
+    <p>Worker pods are private. Track pods are shared on a lane. Common is shared by every track. Recall freely; store only durable facts. Solidify a track/common fact to enqueue <code>skill.record</code> for the maintainer.</p>
     <div class="panel">
       <div class="row">
         <div>
@@ -121,6 +123,8 @@
         tb.innerHTML = "";
         (data.items || []).forEach((item) => {
           const tr = document.createElement("tr");
+          const canSolidify = item.pod_scope !== "worker" && (item.solidify_status || "none") === "none";
+          const solidLabel = item.recording_id ? (item.solidify_status || "queued") : "Solidify";
           tr.innerHTML =
             '<td><span class="pill">' + escapeHtml(item.pod) + "</span></td>" +
             "<td>" + escapeHtml(item.kind) + "</td>" +
@@ -128,7 +132,11 @@
             "<td>" + escapeHtml(item.body) +
             (item.company ? '<div class="muted">' + escapeHtml(item.company) + "</div>" : "") +
             "</td>" +
-            '<td><button class="ghost" type="button" data-id="' + item.id + '">Forget</button></td>';
+            "<td>" +
+            (canSolidify
+              ? '<button class="ghost" type="button" data-solidify="' + item.id + '">Solidify</button> '
+              : (item.recording_id ? '<span class="muted">' + escapeHtml(solidLabel) + "</span> " : "")) +
+            '<button class="ghost" type="button" data-id="' + item.id + '">Forget</button></td>';
           tb.appendChild(tr);
         });
         tb.querySelectorAll("button[data-id]").forEach((btn) => {
@@ -137,6 +145,12 @@
               method: "PATCH",
               body: JSON.stringify({ forget: true }),
             });
+            await load();
+          });
+        });
+        tb.querySelectorAll("button[data-solidify]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            await api("/api/memory/items/" + btn.dataset.solidify + "/solidify", { method: "POST" });
             await load();
           });
         });

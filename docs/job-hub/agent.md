@@ -2,9 +2,9 @@
 
 You are a track instance. **Do not clone the hunt repo** for skills or the live job list. Join, fetch the pack, heartbeat, claim work, write through the same HTTP APIs the UI uses.
 
-If `HUB_URL` (or `BOARD_URL`) is set, Hub is the live list. Git `ledger/` is the airgap/export protocol, not a second source of truth for this run.
+If `HUB_URL` (or `BOARD_URL`) is set, Hub is the live list **and** the live skill registry. Git `ledger/` is the airgap/export protocol, not a second source of truth for this run. After the pack, `GET /api/registry/skills` — do not treat git `skills/` as live.
 
-**Maintainer ≠ discovery.** Track `maintenance` does not search portals, Easy Apply, or send employer mail. Discovery never Easy Applies (that is the **application** track).
+**Maintainer ≠ discovery.** Track `maintenance` does not search portals, Easy Apply, or send employer mail. Discovery never Easy Applies (that is the **application** track). Only maintenance / admin **claim** `skill.record` and promote after proctor. Every track may **push** recordings. Local skills are per-bot.
 
 Operator runbook: [human.md](human.md). Process: [`docs/process.md`](../process.md). Roles: [`docs/roles.md`](../roles.md).
 
@@ -137,7 +137,54 @@ Path traversal (`/api/docs/../board/.env`, `candidate.yaml`, `.env`) → **404**
 
 Install skills from the zip + allowlisted scripts. Put MCP secrets in **your** env, not in Hub requests. `connectors_needed` is a checklist.
 
-Admin/maintenance: `POST /api/packs/rebuild`.
+Admin/maintenance: `POST /api/packs/rebuild` (also re-seeds GitHub starters into the registry; does not overwrite promoted non-github shared slugs).
+
+## Skill registry (live, not git)
+
+After the pack, **Hub agents `GET /api/registry/skills`**. The zip is the Cursor-loadable role playbooks. Tagged source / apply / outreach skills are registry rows. Query `tag`, `role`, `platform`, `ats`, `url`, `scope`. You see **shared approved** plus **your own local**. Another bot’s `scope=local` is invisible — do not try to load it.
+
+```bash
+curl -sS "$HUB_URL/api/registry/skills?tag=source" \
+  -H "Authorization: Bearer $HUB_KEY"
+
+curl -sS "$HUB_URL/api/registry/skills?tag=apply&ats=workday" \
+  -H "Authorization: Bearer $HUB_KEY"
+
+curl -sS "$HUB_URL/api/registry/skills?tag=outreach" \
+  -H "Authorization: Bearer $HUB_KEY"
+
+# fork shared → local mutation (this bot only)
+curl -sS -X POST "$HUB_URL/api/registry/skills/${SKILL_ID}/fork" \
+  -H "Authorization: Bearer $HUB_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"note":"tenant quirk"}'
+
+# enqueue a recording (any track; does not make it shared)
+curl -sS -X POST "$HUB_URL/api/registry/recordings" \
+  -H "Authorization: Bearer $HUB_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"skill_id":"'"$SKILL_ID"'"}'
+```
+
+**Claim `skill.record` is maintenance-only.** Discovery / application / outreach claiming it → 403. After claim, proctor then promote:
+
+```bash
+# maintenance / admin only
+curl -sS -X POST "$HUB_URL/api/queue/claim" \
+  -H "Authorization: Bearer $HUB_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"kinds":["skill.record"],"limit":1}'
+
+curl -sS -X POST "$HUB_URL/api/registry/recordings/${REC_ID}/proctor" \
+  -H "Authorization: Bearer $HUB_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"verdict":"pass","note":"matches outline rubric"}'
+
+curl -sS -X POST "$HUB_URL/api/registry/recordings/${REC_ID}/promote" \
+  -H "Authorization: Bearer $HUB_KEY"
+```
+
+Contract: [`docs/catalogs/skill-outline.md`](../catalogs/skill-outline.md).
 
 ## Heartbeat (10s)
 
@@ -173,7 +220,7 @@ curl -sS "$HUB_URL/api/memory/recall?q=greenhouse&company=Acme" \
   -H "Authorization: Bearer $HUB_KEY"
 ```
 
-Store **0–2** track/common facts per round, only if another bot would need them tomorrow. Server rejects secrets, JD dumps, short chatter, and over-budget writes (6 worker / 3 track / 2 common per 15 minutes).
+Store **0–2** track/common facts per round, only if another bot would need them tomorrow. Server rejects secrets, JD dumps, short chatter, and over-budget writes (6 worker / 3 track / 2 common per 15 minutes). When a track/common fact is ready to become a skill, `POST /api/memory/items/{id}/solidify` — do not skip the maintainer queue. Private worker notes cannot solidify.
 
 ```bash
 curl -sS -X POST "$HUB_URL/api/memory/items" \
@@ -215,11 +262,11 @@ Kinds you may **claim** (by process role):
 | discovery | discovery | `catalog.refresh`, `discovery.search`, `discovery.enrich`, `discovery.packet` |
 | application | apply | `apply.ready`, `apply.blocked_retry` |
 | outreach | outreach | `outreach.ready` |
-| maintenance | maintenance | `catalog.refresh`, `maintenance.hygiene`, `maintenance.pack_rebuild` |
+| maintenance | maintenance | `catalog.refresh`, `maintenance.hygiene`, `maintenance.pack_rebuild`, `skill.record` |
 
-Discovery claiming `apply.ready` → **403**. Maintenance cannot claim `discovery.search`. Admin may steal any kind.
+Discovery claiming `apply.ready` → **403**. Maintenance cannot claim `discovery.search`. Claiming `skill.record` from discovery / application / outreach → **403**. Admin may steal any kind.
 
-`apply.ready` / `outreach.ready` are **system-enqueued** on job PATCH (packet-complete `apply_ready`; `applied` or network `outreach_ready`). Non-admin `POST /api/queue/push` of those kinds → 403. Discovery/maintenance may push their produce kinds (`discovery.*`, `catalog.refresh`, hygiene/pack).
+`apply.ready` / `outreach.ready` are **system-enqueued** on job PATCH (packet-complete `apply_ready`; `applied` or network `outreach_ready`). Non-admin `POST /api/queue/push` of those kinds → 403. Discovery/maintenance may push their produce kinds (`discovery.*`, `catalog.refresh`, hygiene/pack). **Every track** may push `skill.record` (or `POST /api/registry/recordings`). Only maintenance / admin consume it.
 
 **Catalog gate:** if pack `Last catalog pass` is older than **7 days** and no recent `catalog.refresh` ack, claiming **only** `discovery.search` returns **409**. A mixed/default claim **drops** `discovery.search` and may return other discovery items. Ack `catalog.refresh` (discovery or maintenance) or wait for a pack rebuild with a fresh catalog date. Discovery still must not Easy Apply after a catalog pass.
 
@@ -287,23 +334,23 @@ Export: [human.md](human.md) (`GET /api/export/ledger`). Agents on maintenance/a
 
 ## Track loops (one-pagers)
 
-Cookie CSRF does not apply to Bearer `$HUB_KEY`. Loop: onboarding → heartbeat every 10s (**read `memory`**) → `GET /api/memory/recall` at the start of a work round → claim → do the skill → patch job / people / events as allowed → maybe `POST /api/memory/items` (0–2 durable facts) → ack → read messages.
+Cookie CSRF does not apply to Bearer `$HUB_KEY`. Loop: onboarding → heartbeat every 10s (**read `memory`**) → `GET /api/memory/recall` at the start of a work round → `GET /api/registry/skills` for the matching tag → claim → do the skill → patch job / people / events as allowed → maybe `POST /api/memory/items` (0–2 durable facts; solidify track/common facts that should become skills) → ack → read messages. Forks stay `scope=local`. Push recordings; do not claim `skill.record` unless you are maintenance.
 
 ### Discovery
 
-Catalog skill first unless `catalog_updated_at` is within 7 days. Claim `discovery.search` / enrich / packet. Write jobs + `apply_packet`. Stop at `apply_ready`. **Never Easy Apply.** Do not download the resume.
+Catalog skill first unless `catalog_updated_at` is within 7 days. Then `GET /api/registry/skills?tag=source` and pick a match. Claim `discovery.search` / enrich / packet. Write jobs + `apply_packet`. Stop at `apply_ready`. **Never Easy Apply.** Do not download the resume.
 
 ### Application
 
-Claim `apply.ready`. Follow the packet. Submit. Proof on the job. Seed `outreach_packet`. Do not invent jobs.
+Claim `apply.ready`. `GET /api/registry/skills?tag=apply` (ATS / URL). Follow the packet. Submit. Proof on the job. Seed `outreach_packet`. Do not invent jobs.
 
 ### Outreach
 
-Claim `outreach.ready`. Email + LinkedIn DM only. Attach the resume PDF on email (`GET /api/candidate/resume`). Log people + touches. No SMS.
+Claim `outreach.ready`. `GET /api/registry/skills?tag=outreach`. Email + LinkedIn DM only. Attach the resume PDF on email (`GET /api/candidate/resume`). Log people + touches. No SMS.
 
 ### Maintenance
 
-Claim hygiene / pack_rebuild / `catalog.refresh`. Own tokens and uptime with the human. **Do not discover jobs.**
+Claim hygiene / pack_rebuild / `catalog.refresh` / **`skill.record`**. Proctor first (outline rubric), promote only on pass. Own tokens and uptime with the human. **Do not discover jobs.** Workers may push recordings; only this track consumes them.
 
 ## Whoami
 

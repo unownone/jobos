@@ -1,6 +1,6 @@
 # Job Hub target architecture
 
-Grows **`board/`** (FastAPI + SQLite + admin UI) into the Hub. Consumers do not clone the hunt repo. Skills are authored in git on the **operator** machine and served as a pack.
+Grows **`board/`** (FastAPI + SQLite + admin UI) into the Hub. Consumers do not clone the hunt repo. Role playbooks are authored in git and served as a pack. Tagged skills live in the Hub **registry** (seeded from `skills/starters/`). Git is the starter copy; SQLite is the live copy.
 
 Related: [grilling](01-grilling.md), [PR plan](03-pr-plan.md), current overlay [board/README.md](../../board/README.md).
 
@@ -22,7 +22,7 @@ flowchart TB
   subgraph hub [Job Hub — only non-AI component]
     api[FastAPI same origin]
     ui[Board + Admin + Onboarding + Presence + Invites]
-    db[(SQLite jobs events queue users presence A2A memory)]
+    db[(SQLite jobs events queue users presence A2A skills recordings memory)]
     pack[Skill/MCP/docs pack]
     a2a[A2A JSON-RPC + Agent Cards]
     secrets[gitignored .env + encrypted connectors]
@@ -128,6 +128,51 @@ Keep `jobs` and `events` as today. Add:
 
 Optional `claim_user_id`, `claim_lease_until` for the **active lane claim** (mirrors queue). `owners` JSON stays (`discovery`/`apply`/`outreach` keys — keep `apply` in the job document for schema compatibility).
 
+### `skills` (Hub registry)
+
+Live playbooks. GitHub starters seed `scope=shared` `status=approved` `origin=github`. Contract: [`docs/catalogs/skill-outline.md`](../catalogs/skill-outline.md). Schema: [`ledger/schema/skill.schema.json`](../../ledger/schema/skill.schema.json).
+
+| Column | Notes |
+| --- | --- |
+| `id` | `skl_` + ulid (compat rows may use `compat:…`) |
+| `slug` | stable among shared skills |
+| `name` | display |
+| `kind` | `skill` \| `mcp` \| `http` \| `builtin` |
+| `role` | `discovery` \| `apply` \| `outreach` \| `research` \| `maintain` |
+| `tags` | JSON; motion tags `source` \| `apply` \| `outreach` \| `research` \| `maintain` plus platform |
+| `scope` | `shared` \| `local` |
+| `owner_user_id` | null for shared; owning bot for local |
+| `status` | `draft` \| `recorded` \| `proctoring` \| `approved` \| `rejected` \| `retired` |
+| `platform` | platform catalog id or ATS name |
+| `match_json` | `ats`, `url_patterns`, `apply_kind` |
+| `reproducible` | boolean |
+| `inputs` / `outputs` | JSON arrays of packet field names |
+| `body` | markdown playbook |
+| `origin` | `github` \| `recording` \| `mutation` \| `memory` |
+| `origin_ref` / `parent_skill_id` | |
+| `version` / `content_hash` | |
+| `proctor_status` | `none` \| `pending` \| `passed` \| `failed` |
+| `proctor_note` / `proctor_evidence` | |
+
+Visibility: any user sees **shared approved** + **own local**. Local rows are invisible to other bots.
+
+### `skill_recordings`
+
+Enqueue for maintainer proctor. Any track may insert; only maintenance / admin claim.
+
+| Column | Notes |
+| --- | --- |
+| `id` | recording id |
+| `skill_id` | local or forked skill being submitted |
+| `submitter_user_id` | owning bot |
+| `origin` | `recording` \| `mutation` \| `memory` |
+| `body_snapshot` / `payload_json` | what to proctor |
+| `status` | pending / proctoring / passed / failed / promoted |
+| `proctor_user_id` / `proctor_note` | maintainer after claim |
+| `created_at` | |
+
+Pushing a recording also upserts queue kind `skill.record`.
+
 ### `memory_items`
 
 Segmented working memory. **Not** the job ledger.
@@ -138,6 +183,8 @@ Segmented working memory. **Not** the job ledger.
 | `kind` | Allowlisted per pod (portal_quirk, tool_failure, …) |
 | `content_hash` | Dedup inside a pod |
 | `expires_at` | Worker notes TTL; low-importance track/common TTL |
+| `solidify_status` | `none` \| `queued` \| `passed` \| `failed` \| `promoted` \| `declined` |
+| `recording_id` | Set when a track/common fact is solidified into `skill_recordings` |
 
 FTS5 virtual table `memory_fts`. Write caps per 15 minutes: worker 6, track 3, common 2. Heartbeat and queue claim return a compact recall card.
 
@@ -162,6 +209,7 @@ System triggers (in job PATCH/POST):
 - status becomes `apply_ready` **and** packet has `url` or `steps` → upsert `apply.ready` (dedupe_key `apply.ready:<job_id>`).
 - status `applied` or (`apply_kind` in network/outreach_only and discovery marks `outreach_ready`) → upsert `outreach.ready`.
 - Discovery create does **not** enqueue apply.
+- `POST /api/registry/recordings` (or `POST /api/queue/push` kind `skill.record`) → upsert `skill.record`. **Produce:** every track. **Consume:** maintenance and admin only.
 
 ## UI surfaces
 
@@ -173,6 +221,7 @@ System triggers (in job PATCH/POST):
 | Login | `/login` | public |
 | Invites | `/admin/invites` | admin |
 | Presence / user directory | `/admin/users` | admin + maintenance |
+| Skills registry / proctor | `/admin/skills` | admin + maintenance |
 | Join (human-readable) | `/join/{invite_id}` | invite secret |
 | Memory inspector | `/admin/memory` | session |
 | Health | `/health` | public, no secrets |
@@ -209,6 +258,23 @@ Auth column: `public` | `bootstrap` | `invite` | `admin` | `owner` | `agent` | `
 | GET | `/api/scripts/{name}` | invite or any_user | Allowlisted `scripts/*.sh` |
 | GET | `/api/packs/current/skills.zip` | invite or any_user | |
 | POST | `/api/packs/rebuild` | admin, maintenance | |
+
+### Skill registry
+
+Auth: session, Bearer / `X-Hub-Key`, or compat role token. Unauthenticated → 401. Local skills are owner-only.
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/registry/skills` | any_user | Shared approved + **own local**. Query `tag`, `role`, `platform`, `ats`, `url`, `scope` |
+| GET | `/api/registry/skills/{id}` | any_user | Same visibility |
+| POST | `/api/registry/skills` | any_user | Create **local** draft / mutation |
+| PATCH | `/api/registry/skills/{id}` | owner: local only. maintenance/admin: shared | |
+| POST | `/api/registry/skills/{id}/fork` | any_user | Copy shared (or own) → new local |
+| POST | `/api/registry/recordings` | any_user (every track) | Submit recording; enqueues `skill.record` |
+| GET | `/api/registry/recordings` | submitter: own. maintenance/admin: all | |
+| POST | `/api/registry/recordings/{id}/proctor` | maintenance, admin | After claim: `pass` \| `fail` |
+| POST | `/api/registry/recordings/{id}/promote` | maintenance, admin | Only after pass |
+| POST | `/api/registry/seed` | maintenance, admin | Re-seed GitHub starters (does not overwrite promoted non-github shared slugs) |
 
 ### Presence and directory
 
@@ -282,6 +348,7 @@ See [`memory.md`](memory.md). Same SQLite as the Hub. No extra Compose service.
 | GET | `/api/memory/pods` | any_user | Pods this principal may see |
 | GET/POST | `/api/memory/items` | any_user | List / sparse write (gated) |
 | PATCH/DELETE | `/api/memory/items/{id}` | author or inspector | Forget / pin / delete |
+| POST | `/api/memory/items/{id}/solidify` | author or maintainer | Snapshot track/common fact → `skill.record` (`origin=memory`) |
 | GET | `/admin/memory` | any_user | Inspector UI |
 
 ### Candidate slice
@@ -305,6 +372,15 @@ Resume: `GET /api/candidate/resume` outreach+application+admin; not discovery by
 | Hygiene / pack | no | no | no | yes | yes |
 | Invites | no | no | no | no | yes |
 | Mint agents | owner only | owner only | owner only | owner only | yes |
+| List registry skills | shared+own local | shared+own local | shared+own local | shared+own local | all |
+| See another bot’s local skill | no | no | no | no | no* |
+| Push `skill.record` / POST recordings | yes | yes | yes | yes | yes |
+| Claim `skill.record` | no | no | no | yes | steal |
+| Proctor / promote recording | no | no | no | yes | yes |
+| Seed GitHub starters | no | no | no | yes | yes |
+| Solidify track/common memory | author | author | author | yes | yes |
+
+\*Admin may inspect for operations; admin does not silently copy another bot’s local body into shared. Promote only after proctor pass.
 
 ## Candidate and secrets
 

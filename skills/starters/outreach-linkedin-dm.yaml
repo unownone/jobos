@@ -1,0 +1,28 @@
+slug: outreach-linkedin-dm
+name: LinkedIn DM outreach
+kind: skill
+role: outreach
+tags: [outreach, linkedin]
+platform: linkedin
+match:
+  ats: []
+  url_patterns:
+    - "*.linkedin.com/in/*"
+  apply_kind: [ats, network, outreach_only]
+reproducible: true
+inputs: [job, outreach_packet, candidate]
+outputs: [touches]
+body: |
+  # LinkedIn DM outreach
+
+  Short note, ask for a chat. No PDF expected. Same ask for every contact.
+
+  ## Steps
+
+  1. After apply (or network / outreach_only). Named person with LinkedIn URL.
+  2. 4–7 lines. Who you are, what you applied to, one proof, ask for 15 minutes. Link the job or a resume URL if you have one.
+  3. Do not InMail-blast. Do not scrape the inbox. Log the touch.
+
+  ## Hard no
+
+  SMS / WhatsApp. PDF-required email rules do not apply here; still no spray.

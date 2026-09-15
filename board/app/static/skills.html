@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Hub — Skill registry</title>
+  <style>
+    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
+    main { max-width: 72rem; margin: 1.5rem auto; padding: 0 1rem 3rem; }
+    a { color: var(--accent); }
+    h1 { font-size: 1.15rem; margin: 0; }
+    h2 { font-size: 1rem; margin: 1.5rem 0 0.75rem; }
+    p { color: var(--muted); }
+    .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+    select, input, button { font: inherit; }
+    select, input { background: #0e1218; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 0.45rem 0.65rem; }
+    button { padding: 0.45rem 0.8rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #1c2430; border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 650; background: #2a3344; margin-right: 4px; }
+    .err { color: var(--bad); }
+    .ok { color: var(--good); }
+    code { font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Job Hub — Skill registry</h1>
+    <div>
+      <a href="/">Board</a>
+      &nbsp;·&nbsp;
+      <a href="/admin">Invites</a>
+      &nbsp;·&nbsp;
+      <a href="/admin/users">Directory</a>
+      &nbsp;·&nbsp;
+      <a href="/admin/memory">Memory</a>
+      &nbsp;·&nbsp;
+      <a href="#" id="logout">Log out</a>
+    </div>
+  </header>
+  <main>
+    <p id="who">Checking session…</p>
+    <p>GitHub starters seed shared skills. Local forks stay on the owning bot. Only maintainer consumes <code>skill.record</code> after proctor.</p>
+    <div class="row">
+      <select id="tag">
+        <option value="">all tags</option>
+        <option value="source">source</option>
+        <option value="apply">apply</option>
+        <option value="outreach">outreach</option>
+        <option value="research">research</option>
+        <option value="maintain">maintain</option>
+      </select>
+      <select id="scope">
+        <option value="">shared + mine</option>
+        <option value="shared">shared</option>
+        <option value="local">local</option>
+      </select>
+      <button type="button" id="reload">Reload</button>
+      <button type="button" class="secondary" id="seed">Re-seed GitHub</button>
+    </div>
+    <p id="msg" class="ok"></p>
+    <h2>Skills</h2>
+    <table>
+      <thead>
+        <tr><th>Slug</th><th>Role</th><th>Tags</th><th>Scope</th><th>Origin</th><th>Status</th></tr>
+      </thead>
+      <tbody id="skills"></tbody>
+    </table>
+    <h2>Recordings</h2>
+    <table>
+      <thead>
+        <tr><th>Id</th><th>Slug</th><th>Status</th><th>Submitted by</th><th>Queue</th></tr>
+      </thead>
+      <tbody id="recordings"></tbody>
+    </table>
+  </main>
+  <script>
+    function csrfHeaders(extra) {
+      const csrf = (document.cookie.match(/(?:^|; )hub_csrf=([^;]*)/) || [])[1] || "";
+      const headers = { "X-CSRF": decodeURIComponent(csrf), "Content-Type": "application/json" };
+      if (extra) Object.assign(headers, extra);
+      return headers;
+    }
+    async function api(path, opts) {
+      const res = await fetch(path, Object.assign({ credentials: "same-origin", headers: csrfHeaders() }, opts || {}));
+      const text = await res.text();
+      let body = {};
+      try { body = text ? JSON.parse(text) : {}; } catch (_err) { body = { detail: text }; }
+      if (!res.ok) throw new Error(body.detail || res.statusText);
+      return body;
+    }
+    function cell(value) { return String(value || "").replace(/</g, "&lt;"); }
+    async function loadSkills() {
+      const tag = document.getElementById("tag").value;
+      const scope = document.getElementById("scope").value;
+      const q = new URLSearchParams();
+      if (tag) q.set("tag", tag);
+      if (scope) q.set("scope", scope);
+      const data = await api("/api/registry/skills?" + q.toString());
+      document.getElementById("skills").innerHTML = (data.skills || []).map((s) =>
+        `<tr>
+          <td><code>${cell(s.slug)}</code></td>
+          <td>${cell(s.role)}</td>
+          <td>${(s.tags || []).map((t) => `<span class="pill">${cell(t)}</span>`).join("")}</td>
+          <td>${cell(s.scope)}</td>
+          <td>${cell(s.origin)}</td>
+          <td>${cell(s.status)}</td>
+        </tr>`
+      ).join("") || `<tr><td colspan="6" class="muted">none</td></tr>`;
+    }
+    async function loadRecordings() {
+      try {
+        const data = await api("/api/registry/recordings");
+        document.getElementById("recordings").innerHTML = (data.recordings || []).map((r) =>
+          `<tr>
+            <td><code>${cell(r.id)}</code></td>
+            <td>${cell((r.payload || {}).slug)}</td>
+            <td>${cell(r.status)}</td>
+            <td><code>${cell(r.submitted_by)}</code></td>
+            <td><code>${cell(r.queue_item_id)}</code></td>
+          </tr>`
+        ).join("") || `<tr><td colspan="5">none</td></tr>`;
+      } catch (err) {
+        document.getElementById("recordings").innerHTML = `<tr><td colspan="5">${cell(err.message)}</td></tr>`;
+      }
+    }
+    async function boot() {
+      try {
+        const me = await api("/api/auth/me");
+        document.getElementById("who").textContent = (me.display_name || me.role || "signed in") + " · " + (me.track || me.kind || "");
+        await loadSkills();
+        await loadRecordings();
+      } catch (_err) {
+        location.href = "/login?next=/admin/skills";
+      }
+    }
+    document.getElementById("reload").onclick = () => { loadSkills(); loadRecordings(); };
+    document.getElementById("seed").onclick = async () => {
+      const msg = document.getElementById("msg");
+      try {
+        const data = await api("/api/registry/seed", { method: "POST" });
+        msg.className = "ok";
+        msg.textContent = "Seeded: " + JSON.stringify(data.counts || {});
+        await loadSkills();
+      } catch (err) {
+        msg.className = "err";
+        msg.textContent = err.message;
+      }
+    };
+    document.getElementById("logout").onclick = async (ev) => {
+      ev.preventDefault();
+      await api("/api/auth/logout", { method: "POST" });
+      location.href = "/login";
+    };
+    boot();
+  </script>
+</body>
+</html>

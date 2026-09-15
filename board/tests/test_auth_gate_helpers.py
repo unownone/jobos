@@ -26,6 +26,8 @@ def test_path_is_public_rejects_sensitive_surfaces() -> None:
         "/admin",
         "/admin/invites",
         "/admin/users",
+        "/admin/skills",
+        "/admin/memory",
         "/static/index.html",
         "/static/admin.html",
         "/api/jobs",
@@ -41,6 +43,8 @@ def test_path_is_public_rejects_sensitive_surfaces() -> None:
         "/api/presence",
         "/api/users",
         "/api/meta",
+        "/api/registry/skills",
+        "/api/memory/recall",
         "/docs",
         "/openapi.json",
     ):

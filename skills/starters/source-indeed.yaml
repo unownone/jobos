@@ -1,0 +1,35 @@
+slug: source-indeed
+name: Indeed source
+kind: skill
+role: discovery
+tags: [source, board, indeed]
+platform: indeed
+match:
+  ats: []
+  url_patterns:
+    - "*.indeed.com/*"
+    - "indeed.com/*"
+  apply_kind: [ats, unknown]
+reproducible: true
+inputs: [candidate, query]
+outputs: [job, apply_packet]
+body: |
+  # Indeed source
+
+  Search and packet. Do not apply.
+
+  ## Match
+
+  Indeed job search and job detail URLs. Official Indeed MCP when authenticated; else public job URLs.
+
+  ## Steps
+
+  1. Search with candidate titles. Prefer Indeed MCP Job Search + Job Detail.
+  2. Store the job detail URL and the employer apply URL when present.
+  3. Dedup. Create the job row. Enrich with deep-research if shortlisting.
+  4. Write apply_packet with the employer URL, not only the Indeed card.
+  5. Stop. Easy Apply / apply on Indeed is the apply role.
+
+  ## Hard no
+
+  Submitting on Indeed. Inventing an unofficial scraper MCP.

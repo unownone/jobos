@@ -19,7 +19,7 @@ One repo. Three exclusive job-search roles, plus a seldom-used maintainer. One s
 Discovery finds and shortlists.
 Apply submits with writing worth reading.
 Outreach follows up by email and LinkedIn only.
-Maintainer (seldom) updates skills and MCP lists.
+Maintainer (seldom) updates skills/MCP lists, owns the Hub registry, and proctors recordings.
 Nobody jumps the queue.
 ```
 
@@ -55,7 +55,7 @@ Combined “search and Easy Apply” agents optimize for volume. This template o
 | Discovery | Find, enrich, score, shortlist, write an apply packet | Easy Apply, form submit, outreach |
 | Apply | Submit using the packet, write the message, log proof | Inventing jobs, cold outreach, skipping the packet |
 | Outreach | Email + LinkedIn DM after apply (or when there is no portal) | SMS, WhatsApp, spam, applying |
-| Maintainer (seldom) | Search registries, vet, write `skills/lists/`, patch example MCP config, **own the hunt board** (tokens, uptime, schema, hygiene) | Discovering jobs, applying, sending mail |
+| Maintainer (seldom) | Search registries, vet, write `skills/lists/`, patch example MCP config, **own the hunt board** (tokens, uptime, schema, hygiene), **own the skill registry** (seed GitHub starters, consume `skill.record`, proctor, promote). Workers may push recordings. | Discovering jobs, applying, sending mail |
 
 Roles can be subdivided:
 
@@ -72,6 +72,7 @@ The ledger stays the same. That is the point.
 flowchart TD
   profile[Candidate profile]
   catalog[Skill and MCP catalog]
+  registry[Hub skill registry]
   research[Deep research]
   discovery[Discovery role]
   ledger[Git ledger airgap]
@@ -83,7 +84,11 @@ flowchart TD
   profile --> discovery
   catalog --> discovery
   catalog --> maintainer
+  registry --> discovery
+  registry --> apply
+  registry --> outreach
   maintainer -->|"skills/lists"| catalog
+  maintainer -->|"seed + proctor"| registry
   maintainer -->|"tokens + uptime"| board
   research --> discovery
   research --> apply
@@ -120,16 +125,18 @@ Discovery still owns the **git** ledger portal (conflicts, INDEX, schema). **Mai
 
 ## Skills in this repo
 
+GitHub `skills/` (role playbooks) and `skills/starters/` (tagged platform YAML) are the **defaults**. Hub writes them into the registry DB on boot / pack rebuild. Live agents prefer `GET /api/registry/skills`. Contract: [`docs/catalogs/skill-outline.md`](docs/catalogs/skill-outline.md).
+
 | Skill | Owner | Job |
 | --- | --- | --- |
 | [`skill-and-mcp-catalog`](skills/skill-and-mcp-catalog/SKILL.md) | Discovery first, maintainer as subroutine | Discover, vet, and add skills/MCPs from any registry |
-| [`skill-maintainer`](skills/skill-maintainer/SKILL.md) | Maintainer (seldom) | Search registries, write `skills/lists/`, prune dead tools, own `board/` |
+| [`skill-maintainer`](skills/skill-maintainer/SKILL.md) | Maintainer (seldom) | Search registries, write `skills/lists/`, prune dead tools, own `board/`, seed + proctor the Hub skill registry |
 | [`deep-research`](skills/deep-research/SKILL.md) | Shared | Company, people, role, and portal research |
-| [`job-discovery`](skills/job-discovery/SKILL.md) | Discovery | Portals, career sites, dorks, shortlist, apply packets |
-| [`job-apply`](skills/job-apply/SKILL.md) | Apply | High-quality submit + proof |
-| [`job-outreach`](skills/job-outreach/SKILL.md) | Outreach | Email with PDF, LinkedIn DMs, ask for a chat |
+| [`job-discovery`](skills/job-discovery/SKILL.md) | Discovery | Portals, career sites, dorks, shortlist, apply packets; Hub: pick tagged `source` skills |
+| [`job-apply`](skills/job-apply/SKILL.md) | Apply | High-quality submit + proof; Hub: pick tagged `apply` skills |
+| [`job-outreach`](skills/job-outreach/SKILL.md) | Outreach | Email with PDF, LinkedIn DMs, ask for a chat; Hub: pick tagged `outreach` skills |
 
-Registries are not locked to one marketplace. Use skills.sh, Skills Hub, ClawHub, GitHub, mcp.so, Smithery — whatever you can search, vet, and install. See [`docs/catalogs/skills-and-mcps.md`](docs/catalogs/skills-and-mcps.md).
+Marketplace registries (skills.sh, Skills Hub, ClawHub, GitHub, mcp.so, Smithery) are for **finding** tools. The Hub registry is the **live** copy agents run. See [`docs/catalogs/skills-and-mcps.md`](docs/catalogs/skills-and-mcps.md).
 
 ## Default tool stack
 
@@ -176,7 +183,7 @@ Discovery may set `skipped`. Apply may set `apply_blocked` with a reason and a p
 - Discovery output is a **packet** another bot can apply from tomorrow with no chat history.
 - Apply output is a message a hiring manager might actually finish reading, plus proof of submit.
 - Outreach output is a short email with the PDF attached, a LinkedIn DM asking for a chat, and a logged touch.
-- The ledger is the only memory that matters.
+- The ledger is the shared job memory. Long-term playbooks are Hub registry skills (GitHub starters, then maintainer-promoted recordings). Local forks stay on the owning bot.
 
 ## Repo layout
 
@@ -187,8 +194,10 @@ docs/architecture.md      Components and data flow
 docs/roles.md             Split / combine / subdivide roles
 docs/sharing.md           Airgapped ledger protocol
 docs/catalogs/            Platforms, MCPs, career sites, research
+docs/catalogs/skill-outline.md  Skill registry contract (starters, local vs shared, proctor)
 docs/research/            Build plans (MCP coverage, deep-research wrap)
 skills/                   Agent Skills (SKILL.md) — canonical OS skills
+skills/starters/          Tagged platform YAML seeded into the Hub registry
 .agents/skills/           Downloaded third-party Agent Skills (npx skills add)
 .claude/skills/<name>     Per-skill symlink for Claude Code
 .cursor/skills/<name>     Per-skill symlink for Cursor
@@ -202,6 +211,7 @@ mcp/SETUP.md              How to attach local vs hosted MCPs
 docs/deploy.md            Host deploy (Actions runner + watcher)
 docs/demo/                Screenshots + video of the live Hub
 ledger/                   Shared live list
+ledger/schema/skill.schema.json  Skill JSON Schema
 profiles/                 Candidate profile (example committed)
 mcp/                      Example MCP config
 handoffs/                 Packet templates
@@ -228,7 +238,7 @@ Then, in the agent:
 - Discovery: “Run the discovery skill for this candidate. Do not apply.”
 - Apply: “Apply only to jobs in apply_ready. Write like a human worth reading.”
 - Outreach: “Work outreach_ready. Email + LinkedIn only. Attach the PDF on email.”
-- Maintainer (seldom): “Refresh skills/lists. Find MCPs. Do not discover jobs.” Owns the hunt board: tokens, uptime, hygiene.
+- Maintainer (seldom): “Refresh skills/lists. Find MCPs. Do not discover jobs.” Owns the hunt board: tokens, uptime, hygiene. Consumes `skill.record`, proctors against the outline rubric, promotes only on pass. Workers may enqueue recordings.
 
 ## Public template
 

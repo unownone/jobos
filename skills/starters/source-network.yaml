@@ -1,0 +1,33 @@
+slug: source-network
+name: Talent network source
+kind: skill
+role: discovery
+tags: [source, network]
+platform: network
+match:
+  ats: []
+  url_patterns:
+    - "*.flexiple.com/*"
+    - "*.toptal.com/*"
+    - "*.turing.com/*"
+    - "*.lemon.io/*"
+    - "*.bairesdev.com/*"
+  apply_kind: [network, outreach_only]
+reproducible: true
+inputs: [candidate]
+outputs: [job, apply_packet]
+body: |
+  # Talent network source
+
+  Flexiple, Turing, BairesDev, Toptal, Lemon.io, and similar. Often no public JD.
+
+  ## Steps
+
+  1. One job file per network, or per open req if a real JD exists.
+  2. Set `apply_kind: network` or `outreach_only`.
+  3. Packet: how to apply to the network, plus an outreach seed. Still no Easy Apply.
+  4. Same packet shape for every network.
+
+  ## Hard no
+
+  Pretending a marketplace matching email is a job submit. Skipping the job row.

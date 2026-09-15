@@ -1,0 +1,36 @@
+slug: source-linkedin
+name: LinkedIn Jobs source
+kind: skill
+role: discovery
+tags: [source, board, linkedin]
+platform: linkedin
+match:
+  ats: []
+  url_patterns:
+    - "*.linkedin.com/jobs/*"
+    - "linkedin.com/jobs/*"
+  apply_kind: [linkedin_easy_apply, ats, unknown]
+reproducible: true
+inputs: [candidate, query]
+outputs: [job, apply_packet]
+body: |
+  # LinkedIn Jobs source
+
+  List and packet only. Never Easy Apply. Never message the poster.
+
+  ## Match
+
+  LinkedIn job search results and `/jobs/view/` URLs. Same steps for every listing.
+
+  ## Steps
+
+  1. Search with the candidate titles and locations. Capture job id, title, company, location, apply type, listing URL.
+  2. Dedup against Hub jobs / ledger by apply URL then `(company, title, location)`.
+  3. If Easy Apply, set `apply_kind: linkedin_easy_apply`. Do not click it.
+  4. Prefer the employer ATS URL when visible. Store both LinkedIn URL and `apply_url`.
+  5. Write a complete apply packet (URL, ATS, account, steps, materials, screening questions, why shortlisted).
+  6. Status `apply_ready` or `shortlisted`. Never `applying`.
+
+  ## Hard no
+
+  Easy Apply, InMail, creating accounts to apply, inflating scores.
