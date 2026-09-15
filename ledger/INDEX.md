@@ -22,6 +22,7 @@ Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts
 | maintainer | cursor-cloud-agent (skill-registry) | skill registry + starters + proctor queue (no discovery/apply/outreach) | 2026-09-13 |
 | maintainer | cursor-cloud-agent (hub-memory-pods) | Hub memory layer: worker / track / common pods in SQLite FTS (no extra Compose service) | 2026-09-13 |
 | maintainer | cursor-cloud-agent (skill-registry-memory) | merge memory pods onto registry; solidify track/common facts into origin=memory recordings | 2026-09-13 |
+| maintainer | cursor-cloud-agent (skill-memory-e2e) | in-process e2e for registry + memory solidify + catalog refresh unlock | 2026-09-15 |
 
 ## Jobs
 

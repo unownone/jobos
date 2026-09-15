@@ -6,7 +6,7 @@ This file plus [`skills/lists/`](../../skills/lists/) still track MCP/tools **ad
 
 Do not lock to one marketplace. Search, vet, then add.
 
-**Last catalog pass:** 2026-09-06 (this week). **Last maintainer pass:** 2026-09-06 — live `npx skills find`, Skills Hub CLI, GitHub, vendor docs, Smithery. Lists: [`skills/lists/INDEX.md`](../../skills/lists/INDEX.md).
+**Last catalog pass:** 2026-09-15 (this week). **Last maintainer pass:** 2026-09-15 — Hub registry + memory solidify e2e; lists unchanged from 2026-09-06.
 
 Build plan (what to install next, in order): [`docs/research/platform-mcp-build-plan.md`](../research/platform-mcp-build-plan.md).
 
@@ -173,6 +173,7 @@ When you vet one, append a `### <name>` block. 2026-09-06 verdicts:
 | 2026-09-06 | template | skills.sh, skills-hub.ai, GitHub, Indeed docs, Exa docs | Exa deep research, Indeed MCP, workatastartup-mcp, RemoteOK API, Gmail attachments | combined auto-apply as discovery |
 | 2026-09-06 | cursor-cloud-agent | skills.sh, skills-hub CLI, GitHub, PyPI, Indeed/Exa/Firecrawl/Tavily/Hunter/Apollo/Google Workspace docs, dzhng/deep-research clone | dzhng/open-deep-research local runner + cloud `environment.json`; ats-jobs-mcp; Hunter MCP; Playwright MCP; Google Calendar/Drive (already attached); platform MCP matrix | LinkedIn cookie messengers as discovery; Smartlead/Instantly sequences; Greenhouse Harvest recruiter MCP; resume-optimizer skills; jobpilot/jobhound combined apply; Apify scrapers as default |
 | 2026-09-06 | cursor-cloud-agent (maintainer) | npx skills add + hiringcafe.com public pages | Pinned uvx MCPs (no source trees); agent skills compose/draft-outreach + playwright-cli; Hiring Cafe platform + fetch_hiringcafe.py; mcp/hosted copy-paste configs | Apify HiringCafe scrapers; LinkedIn session MCPs not vendored; ats-jobs directory.json stays in the PyPI wheel |
+| 2026-09-15 | cursor-cloud-agent (maintainer) | Hub registry + memory solidify e2e (no new marketplace search) | In-process e2e for tagged skills, memory solidify, maintainer proctor/promote; catalog date refreshed so discovery.search is unblocked | no new rejections |
 
 ## Indeed MCP notes
 

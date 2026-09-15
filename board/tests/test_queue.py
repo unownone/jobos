@@ -42,6 +42,26 @@ def bearer(key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {key}"}
 
 
+def ack_catalog_refresh(client: TestClient, key: str) -> None:
+    """Unlock discovery.search in e2e without depending on the git catalog date."""
+    pushed = client.post(
+        "/api/queue/push",
+        headers=bearer(key),
+        json={"kind": "catalog.refresh", "payload": {"reason": "e2e"}},
+    )
+    assert pushed.status_code == 200, pushed.text
+    claimed = client.post(
+        "/api/queue/claim",
+        headers=bearer(key),
+        json={"kinds": ["catalog.refresh"], "limit": 1},
+    )
+    assert claimed.status_code == 200, claimed.text
+    assert claimed.json()["count"] == 1, claimed.text
+    item_id = claimed.json()["items"][0]["id"]
+    acked = client.post(f"/api/queue/ack/{item_id}", headers=bearer(key))
+    assert acked.status_code == 200, acked.text
+
+
 def csrf_headers(client: TestClient, extra: dict[str, str] | None = None) -> dict[str, str]:
     csrf = client.cookies.get("hub_csrf") or ""
     headers = {"X-CSRF": csrf, "Content-Type": "application/json"}
@@ -109,6 +129,7 @@ def test_meta_lists_queue_kinds(hub: tuple[TestClient, Settings]) -> None:
 def test_two_agents_claim_distinct_items(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
     keys = mint_track_agents(client, "discovery", ["disc-a", "disc-b"])
+    ack_catalog_refresh(client, keys[0])
     for portal in ("remoteok", "indeed"):
         pushed = client.post(
             "/api/queue/push",
@@ -140,6 +161,7 @@ def test_two_agents_claim_distinct_items(hub: tuple[TestClient, Settings]) -> No
 def test_same_item_not_double_claimed_while_lease_valid(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
     keys = mint_track_agents(client, "discovery", ["one", "two"])
+    ack_catalog_refresh(client, keys[0])
     client.post(
         "/api/queue/push",
         headers=bearer(keys[0]),
@@ -158,6 +180,7 @@ def test_same_item_not_double_claimed_while_lease_valid(hub: tuple[TestClient, S
 def test_expired_lease_stolen_emits_claim_expired(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
     keys = mint_track_agents(client, "discovery", ["old", "new"])
+    ack_catalog_refresh(client, keys[0])
     client.post(
         "/api/queue/push",
         headers=bearer(keys[0]),
@@ -178,6 +201,7 @@ def test_expired_lease_stolen_emits_claim_expired(hub: tuple[TestClient, Setting
 def test_nack_requeue_then_dead_on_fifth(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
     keys = mint_track_agents(client, "discovery", ["nack-bot"])
+    ack_catalog_refresh(client, keys[0])
     client.post(
         "/api/queue/push",
         headers=bearer(keys[0]),
@@ -332,6 +356,7 @@ def test_discovery_cannot_push_apply_ready(hub: tuple[TestClient, Settings]) -> 
 def test_three_discovery_bots_no_collision(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
     keys = mint_track_agents(client, "discovery", ["bot-0", "bot-1", "bot-2"])
+    ack_catalog_refresh(client, keys[0])
     for portal in ("remoteok", "indeed", "wellfound"):
         res = client.post(
             "/api/queue/push",
