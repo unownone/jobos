@@ -4,6 +4,20 @@
 # not the agent's working tree. Docker volume jobos_hub-data is kept.
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+jobos_load_github_ssh() {
+  if [[ -f "$SCRIPT_DIR/github_ssh.sh" ]]; then
+    # shellcheck source=github_ssh.sh
+    source "$SCRIPT_DIR/github_ssh.sh"
+  elif [[ -f "${HOME}/.jobos/github_ssh.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${HOME}/.jobos/github_ssh.sh"
+  fi
+  if declare -F jobos_github_ssh_apply >/dev/null; then
+    jobos_github_ssh_apply
+  fi
+}
+
 usage() {
   cat <<'EOF'
 Usage: hub_host_deploy.sh [--skip-git] [sha]
@@ -19,6 +33,7 @@ Env (optional file: $HOME/.jobos/deploy.env):
   HUB_PUBLIC_HOST       Hostname, IP, or IP:port for invite URLs
   HUB_PUBLIC_URL        Full origin (wins over HUB_PUBLIC_HOST)
   JOBOS_HEALTH_URL      Health probe (default: http://127.0.0.1:8787/health)
+  JOBOS_SSH_KEY         GitHub deploy private key (default: ~/.ssh/jobos_deploy)
 EOF
 }
 
@@ -38,6 +53,8 @@ if [[ -f "${HOME}/.jobos/deploy.env" ]]; then
   source "${HOME}/.jobos/deploy.env"
   set +a
 fi
+
+jobos_load_github_ssh
 
 REPO="${JOBOS_REPO:-${HOME}/jobos-live}"
 COMPOSE_FILE="${JOBOS_COMPOSE_FILE:-docker-compose.yml}"

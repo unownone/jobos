@@ -1,6 +1,7 @@
 # Job Apply OS
 
 [![CI](https://github.com/unownone/jobos/actions/workflows/ci.yml/badge.svg)](https://github.com/unownone/jobos/actions/workflows/ci.yml)
+[![Deploy check](https://github.com/unownone/jobos/actions/workflows/deploy-check.yml/badge.svg)](https://github.com/unownone/jobos/actions/workflows/deploy-check.yml)
 [![Deploy](https://github.com/unownone/jobos/actions/workflows/deploy.yml/badge.svg)](https://github.com/unownone/jobos/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
