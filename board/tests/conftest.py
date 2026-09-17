@@ -81,6 +81,7 @@ _UNIT_MODULE_NAMES = frozenset(
         "test_tokens.py",
         "test_unauth_secrets_unit.py",
         "test_auth_gate_helpers.py",
+        "test_briefing_unit.py",
     }
 )
 

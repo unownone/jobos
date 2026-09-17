@@ -1,0 +1,72 @@
+# jobOS
+
+jobOS is a job harness — the only harness you need to find a job.
+It can be distributed among multiple agents for an efficient loop and better recon.
+
+This file is text/plain. Do not scrape HTML. Curl it.
+
+Hub origin: {{HUB_URL}}
+Repo: https://github.com/unownone/jobos
+
+## Identity
+
+Not an auto-apply bot. Four owners today:
+
+- discovery — find, enrich, score, shortlist, write an apply packet. Never Easy Apply.
+- apply (Hub track: application) — submit from the packet, log proof.
+- outreach — email with resume PDF + LinkedIn DM. No SMS.
+- maintainer (Hub track: maintenance, seldom) — skill/MCP lists, Hub registry proctor, hunt board.
+
+Coming soon (stub only, do not claim):
+
+- review — feedback on the candidate profile/resume and shortlisted jobs.
+- resume — tailor ATS-friendly resumes.
+
+Do not invent a candidate. If GET /api/candidate/public has present:false, stop.
+
+## First curls (no browser)
+
+export HUB_URL="{{HUB_URL}}"
+
+curl -sS "$HUB_URL/llms.txt"
+curl -sS "$HUB_URL/agents.txt"
+curl -sS "$HUB_URL/.well-known/llms.txt"
+curl -sS "$HUB_URL/.well-known/agents.txt"
+curl -sS "$HUB_URL/health"
+# Public JSON: ok, admin_bootstrapped, candidate_onboarded, resume_present,
+# ready_for_agents, next_step (signup | onboarding | resume | ready).
+
+# Public catalog (no auth): approved shared skills + hosted MCP names.
+# Live list is the Hub SQLite DB, seeded from git on boot / pack rebuild.
+curl -sS "$HUB_URL/api/registry/catalog"
+curl -sS "$HUB_URL/api/registry/catalog?tag=source"
+
+# Join payload (invite secret in query s=). Not an API key.
+curl -sS "$HUB_URL/api/join/${INVITE_ID}?s=${INVITE_SECRET}"
+
+# After join, copy api_key once. Then:
+export HUB_KEY="jh_agt_…"   # or jh_own_…
+
+curl -sS "$HUB_URL/api/onboarding" -H "Authorization: Bearer $HUB_KEY"
+curl -sS "$HUB_URL/api/registry/skills" -H "Authorization: Bearer $HUB_KEY"
+curl -sS "$HUB_URL/api/registry/skills?tag=source" -H "Authorization: Bearer $HUB_KEY"
+curl -sS "$HUB_URL/api/memory/recall" -H "Authorization: Bearer $HUB_KEY"
+curl -sS -X POST "$HUB_URL/api/queue/claim" -H "Authorization: Bearer $HUB_KEY" \
+  -H "Content-Type: application/json" -d '{"limit":1}'
+curl -sS "$HUB_URL/api/candidate/public" -H "Authorization: Bearer $HUB_KEY"
+
+# Maintainer/admin re-seed GitHub starters + MCP lists into SQLite.
+# Does not overwrite promoted non-github shared slugs.
+curl -sS -X POST "$HUB_URL/api/registry/seed" -H "Authorization: Bearer $HUB_KEY"
+
+Always use registry skills and MCPs (catalog is public; full rows need Bearer).
+If you use something outside the registry, record it
+(POST /api/registry/recordings or a local skill) and write a memory fact
+(POST /api/memory/items). Only maintainer consumes skill.record after proctor.
+
+## Next
+
+Read $HUB_URL/agents.txt for the role playbook.
+Operator install: docs/install.md
+Process contract: docs/process.md
+Roles: docs/roles.md

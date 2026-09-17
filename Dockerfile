@@ -18,7 +18,7 @@ WORKDIR /app/board
 RUN uv sync --frozen --no-dev
 
 WORKDIR /app
-COPY AGENTS.md skills-lock.json ./
+COPY AGENTS.md skills-lock.json llms.txt agents.txt ./
 COPY board ./board
 COPY scripts ./scripts
 COPY skills ./skills

@@ -1,12 +1,14 @@
-# Job Hub behind Traefik. From repo root:
-#   HUB_PUBLIC_HOST=12.234.244.34 docker compose up -d --build
-# Traefik listens on 80 and 443. The board is served at /.
-# Memory pods live in Hub SQLite on hub-data (no extra vector-DB / Mem0 service).
+# jobOS Hub (no Traefik). From repo root:
+#   docker compose up -d --build
+# Hub listens on http://127.0.0.1:8787
+# Memory pods persist in hub-data (same SQLite as jobs). No extra service.
 #
-# Plain Hub on :8787 (no Traefik): docker compose -f docker-compose.plain.yml up -d --build
-# First operator step after signup is always /onboarding.
+# Traefik (80/443): HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh
+#   uses docker-compose.traefik.yml
+# Named project alias: docker compose -f docker-compose.plain.yml up -d --build
 #
-# HUB_PUBLIC_HOST may be a hostname, IPv4, or IP:port (invites use that origin).
+# First visit: /admin/signup → /onboarding (required) → then invites/agents.
+# Agents: curl $HUB_URL/llms.txt (not HTML).
 
 name: jobos
 

@@ -15,6 +15,8 @@ _ALLOW_EXACT = frozenset(
         "/health",
         "/ready",
         "/favicon.ico",
+        "/llms.txt",
+        "/agents.txt",
         "/login",
         "/admin/signup",
         "/onboarding",

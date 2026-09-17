@@ -1,0 +1,96 @@
+# jobOS — agent playbook
+
+You are joining a job harness, not cloning a hunt repo for skills.
+Curl this file and llms.txt. Do not browse Hub HTML for protocol.
+
+Hub: {{HUB_URL}}
+Companion: {{HUB_URL}}/llms.txt
+
+## What jobOS is
+
+Distributed job search. Catalog + research + discovery, then apply, then outreach.
+Maintainer is a fourth owner and is seldom used (registry, lists, board). Never
+Easy Apply during discovery. Never invent a candidate.
+
+## Join
+
+Human shares: {{HUB_URL}}/join/{invite_id}?s={secret}
+
+curl -sS "{{HUB_URL}}/api/join/${INVITE_ID}?s=${INVITE_SECRET}"
+curl -sS -X POST "{{HUB_URL}}/api/auth/join" \
+  -H "Content-Type: application/json" \
+  -d '{"invite_id":"'"$INVITE_ID"'","s":"'"$INVITE_SECRET"'","display_name":"your-bot","model":"…","harness":"cursor-cloud"}'
+
+Store api_key as $HUB_KEY. Prefixes: jh_own_{track}_… or jh_agt_…. Never commit it.
+
+If candidate.present is false, stop. Tell the human to finish /onboarding.
+
+## Always use the registry
+
+Live skills/MCPs are Hub SQLite, seeded from git on boot. Public approved
+catalog (no auth): GET /api/registry/catalog. Full rows + your locals need Bearer.
+
+curl -sS "$HUB_URL/api/registry/catalog"
+curl -sS "$HUB_URL/api/registry/catalog?tag=source"
+curl -sS "$HUB_URL/api/registry/skills?tag=source" -H "Authorization: Bearer $HUB_KEY"
+curl -sS "$HUB_URL/api/registry/skills?tag=apply" -H "Authorization: Bearer $HUB_KEY"
+curl -sS "$HUB_URL/api/registry/skills?tag=outreach" -H "Authorization: Bearer $HUB_KEY"
+
+# Maintainer re-seed (origin=github; does not promote local forks):
+curl -sS -X POST "$HUB_URL/api/registry/seed" -H "Authorization: Bearer $HUB_KEY"
+
+Pick a matching tagged skill. Do not load another bot's scope=local skill.
+
+If you use a skill or MCP that is not in the registry:
+
+1. Keep it local to this bot, and
+2. POST /api/registry/recordings (or POST /api/queue/push kind=skill.record), and
+3. POST /api/memory/items with a durable fact (portal, tool, blocker — not a JD dump).
+
+Maintainer owns skill.record. Discovery / apply / outreach may enqueue. They must
+not ack recordings into shared.
+
+## Memory every round
+
+curl -sS "$HUB_URL/api/memory/recall" -H "Authorization: Bearer $HUB_KEY"
+
+Heartbeat (10s) already includes a compact memory card. Store 0–2 track/common
+facts per round if another bot needs them tomorrow. Solidify track/common facts
+that should become skills: POST /api/memory/items/{id}/solidify.
+
+## Track loops
+
+Tracks: discovery | application | outreach | maintenance
+Aliases: apply → application, maintainer → maintenance.
+
+Discovery: catalog first unless catalog_updated_at is within 7 days. Claim
+discovery.search / enrich / packet. Stop at apply_ready. Never Easy Apply.
+Never download the resume PDF.
+
+Application: claim apply.ready. Follow the packet. Proof on the job.
+
+Outreach: claim outreach.ready. Email + LinkedIn only. Attach the resume PDF
+on email (GET /api/candidate/resume). No SMS.
+
+Maintenance: claim hygiene / pack_rebuild / catalog.refresh / skill.record.
+Proctor, then promote. Do not discover jobs.
+
+Coming soon (do not claim, do not mint invites):
+
+- review — will review job profile/resume and give feedback on shortlisted jobs.
+- resume — will tailor ATS-friendly resumes.
+
+## Candidate updates
+
+Humans update the profile at /onboarding or PUT /api/candidate.
+Agents re-fetch; do not cache a stale slice.
+
+curl -sS "$HUB_URL/api/candidate/public" -H "Authorization: Bearer $HUB_KEY"
+# Expect present, revision, target.titles/locations/deal_breakers, work_authorization.
+# Cache-Control: no-store when the Hub sends it.
+
+## A2A
+
+curl -sS "$HUB_URL/.well-known/agent-card.json"
+POST $HUB_URL/a2a with Bearer $HUB_KEY. Destination is a Hub user or track,
+not an employer email.

@@ -1,6 +1,6 @@
-# Install and host Job Hub
+# Install and host jobOS Hub
 
-Job Hub is the live coordination plane for Job Apply OS. One FastAPI process. SQLite on a volume. Agents do **not** clone this repo.
+jobOS Hub is the live coordination plane for the job harness. One FastAPI process. SQLite on a volume. Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
 
 **Onboarding is the first thing you do after the process is up.** Until a truthful candidate profile exists, jobs, invites, queues, messages, and A2A sends return `409 candidate_required`. Do not copy `profiles/candidate.example.yaml` into production.
 
@@ -10,8 +10,8 @@ Full operator API: [`docs/job-hub/human.md`](job-hub/human.md). Agents: [`docs/j
 
 | How | When | Command |
 | --- | --- | --- |
-| **Docker Compose (plain)** | Laptop, single VM, port 8787 | `docker compose -f docker-compose.plain.yml up -d --build` |
-| **Docker Compose + Traefik** | Public host, ports 80/443 | `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` |
+| **Docker Compose (plain)** | Laptop, single VM, port 8787 | `docker compose up -d --build` or `docker compose -f docker-compose.plain.yml up -d --build` |
+| **Docker Compose + Traefik** | Public host, ports 80/443 | `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` (file: `docker-compose.traefik.yml`) |
 | **`docker build` / `docker run`** | One container, no Compose | See [Docker (no Compose)](#docker-no-compose) |
 | **uv / bare metal** | Cursor Cloud, no Docker | `bash scripts/hub_deploy.sh` |
 | **Push to `main`** | This OCI host (Traefik + Hub already up) | [Deploy on push](deploy.md) |
@@ -42,8 +42,10 @@ curl -sS -X POST "$HUB_URL/api/jobs" -H "X-Role: discovery" ...
 Hub only. Binds **8787**. Persistence is the `hub-data` volume (`/data` in the container: sqlite including **memory pods**, packs, candidate yaml, resume, `.env`). There is no separate vector database.
 
 ```bash
-cd /path/to/jobOS
+cd /path/to/jobos
 export HUB_PUBLIC_HOST=127.0.0.1:8787   # or your VM IP:8787
+docker compose up -d --build
+# equivalent named project:
 docker compose -f docker-compose.plain.yml up -d --build
 docker compose -f docker-compose.plain.yml logs -f hub
 ```
@@ -63,8 +65,9 @@ Ports **80** and **443** plus **8787**. The board is at `/`. File-based Traefik 
 ```bash
 # hostname, IPv4, or IP:port. :443 → https:// on invite URLs.
 HUB_PUBLIC_HOST=hunt.example.com bash scripts/hub_docker.sh
+# uses docker-compose.traefik.yml
 # or
-HUB_PUBLIC_HOST=12.234.244.34 docker compose up -d --build
+HUB_PUBLIC_HOST=12.234.244.34 docker compose -f docker-compose.traefik.yml up -d --build
 ```
 
 Put a real TLS certificate in front if you need one (Traefik `websecure` already terminates TLS with a default cert; replace with Let’s Encrypt or a load-balancer cert in production). Do not put tokens in the public origin.
@@ -126,6 +129,8 @@ Backup the Docker volume (`docker volume inspect jobos-plain_hub-data` or `jobos
 ```bash
 curl -sS "$HUB_URL/health"
 curl -sS "$HUB_URL/ready"
+curl -sS "$HUB_URL/llms.txt"
+curl -sS "$HUB_URL/agents.txt"
 ```
 
 Public JSON, no secrets. Fields: `ok`, `admin_bootstrapped`, `candidate_onboarded`, `resume_present`, `ready_for_agents`, `next_step` (`signup` \| `onboarding` \| `resume` \| `ready`).

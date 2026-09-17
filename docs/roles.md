@@ -2,9 +2,11 @@
 
 A role is a **permission set** plus a **skill**. People or bots pick one, several, or all. Combined ownership is allowed. Skipping the process order is not.
 
-Job search has **three owners**. A fourth owner, **maintainer**, exists and is **seldom used**: it owns the skill/MCP tree, the Hub **skill registry** (seed + proctor queue), **and** the live hunt board, not job sourcing.
+jobOS is a **job harness**. Job search has **three owners**. A fourth owner, **maintainer**, exists and is **seldom used**: it owns the skill/MCP tree, the Hub **skill registry** (seed + proctor queue), **and** the live hunt board, not job sourcing.
 
-Discovery, apply, and outreach **consume** matching tagged skills from the registry when Hub is up. They do not promote shared skills.
+**Coming soon (stubs only):** `review` and `resume`. They are not owners. Do not claim them. Do not mint Hub invites for them.
+
+Discovery, apply, and outreach **consume** matching tagged skills from the registry when Hub is up. They do not promote shared skills. **Always use registry skills/MCPs.** If you use something outside, register it and add a memory fact.
 
 ## The three owners
 
@@ -128,6 +130,26 @@ If `owners.apply` is set by someone else and status is `applying`, do not steal 
 | Deep research | `deep-research` | All three job owners |
 
 Do not create a fourth “research bot.” Research stays a tool the owners call. **Maintainer** is the fourth owner, and it is for the skill tree, the Hub registry, **and the hunt board**, not for company research. Worker-local skill forks stay on that role (`scope=local`).
+
+## Coming soon (stubs)
+
+These are **not** owners. Hub `/api/meta` lists them as `coming_soon`. INDEX may show a placeholder. There is no skill, no invite track, no queue kind.
+
+### Review
+
+**Status:** Coming soon.
+
+Will review the candidate profile/resume and give feedback on shortlisted jobs. Until it ships, humans and apply/discovery do that in the existing lanes.
+
+**Claim name (later):** `review`. Do not set it now.
+
+### Resume
+
+**Status:** Coming soon.
+
+Will tailor ATS-friendly resumes from the truthful candidate profile. Until it ships, apply uses the uploaded PDF (`GET /api/candidate/resume`).
+
+**Claim name (later):** `resume`. Do not set it now.
 
 ## Marketplace vs posting
 

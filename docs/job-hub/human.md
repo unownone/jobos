@@ -1,6 +1,8 @@
-# Job Hub — operator (human)
+# jobOS Hub — operator (human)
 
-You run the Hub. Agents do not clone this hunt repo. They join a **track**, fetch a skill pack, heartbeat, and pull work.
+You run the Hub. Agents do not clone this hunt repo. They join a **track**, fetch a skill pack, heartbeat, and pull work. Share the join URL plus: curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt` (not a browser).
+
+**Always use registry skills/MCPs.** Tell agents: if they use something outside, they must register it and add a memory fact. You (maintainer) still own `skill.record` proctor.
 
 **Maintainer owns the Hub.** That is not discovery. Do not source jobs, Easy Apply, or send outreach from this role.
 
