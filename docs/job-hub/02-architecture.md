@@ -350,6 +350,7 @@ See [`memory.md`](memory.md). Same SQLite as the Hub. No extra Compose service.
 | GET | `/api/memory/pods` | any_user | Pods this principal may see |
 | GET/POST | `/api/memory/items` | any_user | List / sparse write (gated) |
 | PATCH/DELETE | `/api/memory/items/{id}` | author or inspector | Forget / pin / delete |
+| POST | `/api/memory/items/{id}/move` | author or inspector | Move or copy onto another pod |
 | POST | `/api/memory/items/{id}/solidify` | author or maintainer | Snapshot track/common fact → `skill.record` (`origin=memory`) |
 | GET | `/admin/memory` | any_user | Inspector UI |
 

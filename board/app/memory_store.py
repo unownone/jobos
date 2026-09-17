@@ -179,15 +179,24 @@ def purge_expired(db: HasConn, *, now_iso: str | None = None) -> int:
     return deleted
 
 
+SCOPE_DEFAULT_KIND = {
+    POD_KIND_WORKER: "fact",
+    POD_KIND_TRACK: "process_note",
+    POD_KIND_COMMON: "process_note",
+}
+
+
 def pod_catalog(principal: MemoryPrincipal) -> list[dict[str, Any]]:
     own_worker = worker_pod_id(principal)
     own_track = own_track_pod_id(principal)
+    admin = is_hub_admin(principal)
     pods = [
         {
             "id": own_worker,
             "scope": POD_KIND_WORKER,
             "label": "your worker (private)",
             "shared": False,
+            "writable": True,
         }
     ]
     if own_track:
@@ -198,6 +207,7 @@ def pod_catalog(principal: MemoryPrincipal) -> list[dict[str, Any]]:
                 "scope": POD_KIND_TRACK,
                 "label": f"{track} track (shared)",
                 "shared": True,
+                "writable": True,
             }
         )
     pods.append(
@@ -206,6 +216,7 @@ def pod_catalog(principal: MemoryPrincipal) -> list[dict[str, Any]]:
             "scope": POD_KIND_COMMON,
             "label": "common (all tracks)",
             "shared": True,
+            "writable": True,
         }
     )
     if is_inspector(principal):
@@ -220,6 +231,7 @@ def pod_catalog(principal: MemoryPrincipal) -> list[dict[str, Any]]:
                     "label": f"{track} track (inspect)",
                     "shared": True,
                     "inspect": True,
+                    "writable": admin,
                 }
             )
     return pods
@@ -510,6 +522,100 @@ def delete_item(db: HasConn, principal: MemoryPrincipal, item_id: str) -> dict[s
     return {"ok": True, "id": item_id, "deleted": True}
 
 
+def _kind_for_move(stored_kind: str, target_scope: str, override: str | None) -> str:
+    if override:
+        return validate_kind(target_scope, override)
+    allowed = kinds_for_scope(target_scope)
+    if stored_kind in allowed:
+        return stored_kind
+    return validate_kind(target_scope, SCOPE_DEFAULT_KIND[target_scope])
+
+
+def _can_pin(principal: MemoryPrincipal) -> bool:
+    return is_hub_admin(principal) or getattr(principal, "kind", None) == "owner"
+
+
+def move_item(
+    db: HasConn,
+    principal: MemoryPrincipal,
+    item_id: str,
+    *,
+    pod: str,
+    copy: bool = False,
+    kind: str | None = None,
+) -> dict[str, Any]:
+    stored = get_item(db, item_id)
+    if stored is None:
+        raise MemoryNotFound("memory item not found")
+    if not can_read_pod(principal, stored["pod"]):
+        raise MemoryDenied("cannot access this memory item")
+    writer = worker_id(principal)
+    if stored["created_by"] != writer and not is_inspector(principal):
+        raise MemoryDenied("cannot move another worker's memory")
+    target = resolve_write_pod(principal, pod)
+    target_scope = pod_scope(target)
+    stored_kind = _kind_for_move(stored["kind"], target_scope, kind)
+    title_text, body_text = stored["title"], stored["body"]
+    if stored_kind != stored["kind"]:
+        title_text, body_text = validate_write_text(
+            kind=stored_kind,
+            scope=target_scope,
+            title=stored["title"],
+            body=stored["body"],
+        )
+    digest = content_hash(
+        kind=stored_kind,
+        title=title_text,
+        body=body_text,
+        company=stored.get("company"),
+        job_id=stored.get("job_id"),
+    )
+    if target == stored["pod"] and stored_kind == stored["kind"] and not copy:
+        item = public_item(db, item_id)
+        item["moved"] = False
+        return item
+    if copy:
+        cloned = insert_item(
+            db,
+            principal,
+            pod=target,
+            kind=stored_kind,
+            title=title_text,
+            body=body_text,
+            job_id=stored.get("job_id"),
+            company=stored.get("company"),
+            tags=_load_tags(stored.get("tags_json")),
+            importance=int(stored.get("importance") or 2),
+            pinned=bool(stored.get("pinned")) and _can_pin(principal),
+        )
+        cloned["copied_from"] = item_id
+        return cloned
+    existing = db.conn.execute(
+        "SELECT * FROM memory_items WHERE pod = ? AND content_hash = ?",
+        (target, digest),
+    ).fetchone()
+    if existing and existing["id"] != item_id:
+        db.conn.execute("DELETE FROM memory_items WHERE id = ?", (item_id,))
+        db.conn.commit()
+        item = row_to_item(existing)
+        item["deduped"] = True
+        item["moved"] = True
+        return item
+    now = utc_now()
+    db.conn.execute(
+        """
+        UPDATE memory_items
+        SET pod = ?, kind = ?, title = ?, body = ?, content_hash = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (target, stored_kind, title_text, body_text, digest, now, item_id),
+    )
+    db.conn.commit()
+    item = public_item(db, item_id)
+    item["moved"] = True
+    return item
+
+
 def grouped_recall(
     db: HasConn,
     principal: MemoryPrincipal,
@@ -541,6 +647,7 @@ def grouped_recall(
     return {
         "recall_url": "/api/memory/recall",
         "write_url": "/api/memory/items",
+        "move_url": "/api/memory/items/{id}/move",
         "solidify_url": "/api/memory/items/{id}/solidify",
         "hint": "Use these facts this round. Store only if another bot would need them tomorrow. Solidify track/common facts that should become skills.",
         "pods": pod_catalog(principal),
@@ -595,6 +702,7 @@ def safe_compact_recall(
         return {
             "recall_url": "/api/memory/recall",
             "write_url": "/api/memory/items",
+            "move_url": "/api/memory/items/{id}/move",
             "solidify_url": "/api/memory/items/{id}/solidify",
             "hint": "memory unavailable this beat; continue the loop",
             "pods": [],

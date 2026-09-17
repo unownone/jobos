@@ -18,6 +18,7 @@ from app.memory_policy import (
     MemoryNotFound,
     can_read_pod,
     is_inspector,
+    kinds_for_scope,
     pod_scope,
     worker_id,
     write_budget_hint,
@@ -30,6 +31,7 @@ from app.memory_store import (
     grouped_recall,
     insert_item,
     list_items,
+    move_item,
     pod_catalog,
     public_item,
     row_to_item,
@@ -67,6 +69,14 @@ class MemoryPatch(BaseModel):
     forget: bool = False
 
 
+class MemoryMoveIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pod: str
+    copy: bool = False
+    kind: str | None = None
+
+
 class SolidifyIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -99,9 +109,15 @@ def create_memory_router(principal_dep) -> APIRouter:
 
     @router.get("/api/memory/pods")
     def memory_pods(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
+        catalog = pod_catalog(principal)
         return {
-            "pods": pod_catalog(principal),
+            "pods": catalog,
             "write_policy": write_budget_hint(),
+            "kinds": {
+                "worker": sorted(kinds_for_scope("worker")),
+                "track": sorted(kinds_for_scope("track")),
+                "common": sorted(kinds_for_scope("common")),
+            },
         }
 
     @router.get("/api/memory/recall")
@@ -223,6 +239,31 @@ def create_memory_router(principal_dep) -> APIRouter:
         except MemoryError as exc:
             _raise_memory(exc)
             raise
+
+    @router.post("/api/memory/items/{item_id}/move")
+    def memory_move(
+        request: Request,
+        item_id: str,
+        body: MemoryMoveIn,
+        principal: Principal = Depends(principal_dep),
+    ) -> dict[str, Any]:
+        db = request.app.state.db
+        try:
+            item = move_item(
+                db, principal, item_id, pod=body.pod, copy=body.copy, kind=body.kind
+            )
+        except MemoryError as exc:
+            _raise_memory(exc)
+            raise
+        db.add_event(
+            job_id=item.get("job_id"),
+            actor_role=principal.role,
+            actor=principal.actor,
+            action="memory_copy" if body.copy else "memory_move",
+            note=item.get("pod") or body.pod,
+            fields={"memory_id": item.get("id"), "from": item_id, "pod": item.get("pod")},
+        )
+        return {"item": item, "copied": body.copy}
 
     @router.post("/api/memory/items/{item_id}/solidify")
     def memory_solidify(

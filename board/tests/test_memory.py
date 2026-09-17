@@ -139,6 +139,7 @@ def test_memory_requires_auth(hub: tuple[TestClient, Settings]) -> None:
     assert client.get("/api/memory/recall").status_code == 401
     assert client.get("/api/memory/items").status_code == 401
     assert client.post("/api/memory/items", json=TRACK_FACT).status_code == 401
+    assert client.post("/api/memory/items/mem_missing/move", json={"pod": "common"}).status_code == 401
     assert client.post("/api/memory/items/mem_missing/solidify", json={}).status_code == 401
 
 
@@ -481,3 +482,131 @@ def test_common_fact_solidify_maps_to_maintain(hub: tuple[TestClient, Settings])
     assert payload["role"] == "maintain"
     assert "maintain" in payload["tags"]
     assert payload["origin"] == "memory"
+
+
+def test_patch_and_delete_memory_item(hub: tuple[TestClient, Settings]) -> None:
+    client, _settings = hub
+    created = client.post("/api/memory/items", headers=h("discovery"), json=WORKER_NOTE)
+    assert created.status_code == 201, created.text
+    item_id = created.json()["item"]["id"]
+    patched = client.patch(
+        f"/api/memory/items/{item_id}",
+        headers=h("discovery"),
+        json={"title": "RemoteOK page four cursor", "body": WORKER_NOTE["body"]},
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["item"]["title"] == "RemoteOK page four cursor"
+    deleted = client.delete(f"/api/memory/items/{item_id}", headers=h("discovery"))
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json()["deleted"] is True
+    missing = client.get("/api/memory/items", headers=h("discovery"))
+    assert item_id not in {row["id"] for row in missing.json()["items"]}
+
+
+def test_move_track_fact_to_common_and_copy_across_tracks(
+    hub: tuple[TestClient, Settings],
+) -> None:
+    client, _settings = hub
+    bootstrap_admin(client)
+    disc = invite_join(client, "discovery", "disc-move")
+    apply_a = invite_join(client, "application", "apply-move")
+
+    stored = client.post(
+        "/api/memory/items",
+        headers=bearer(disc["api_key"]),
+        json=TRACK_FACT,
+    )
+    assert stored.status_code == 201, stored.text
+    item_id = stored.json()["item"]["id"]
+
+    denied = client.post(
+        f"/api/memory/items/{item_id}/move",
+        headers=bearer(disc["api_key"]),
+        json={"pod": "track:outreach"},
+    )
+    assert denied.status_code == 403, denied.text
+
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "owner@example.test", "password": "correct-horse"},
+    )
+    assert login.status_code == 200, login.text
+    copied = client.post(
+        f"/api/memory/items/{item_id}/move",
+        headers=csrf_headers(client),
+        json={"pod": "track:outreach", "copy": True},
+    )
+    assert copied.status_code == 200, copied.text
+    assert copied.json()["copied"] is True
+    clone = copied.json()["item"]
+    assert clone["pod"] == "track:outreach"
+    assert clone["kind"] == "portal_quirk"
+    assert clone["id"] != item_id
+    assert clone["copied_from"] == item_id
+
+    moved = client.post(
+        f"/api/memory/items/{item_id}/move",
+        headers=bearer(disc["api_key"]),
+        json={"pod": "common"},
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["item"]["pod"] == "common"
+    assert moved.json()["item"]["kind"] == "process_note"
+    assert moved.json()["item"]["id"] == item_id
+
+    apply_recall = client.get("/api/memory/recall", headers=bearer(apply_a["api_key"]))
+    titles = [row["title"] for row in apply_recall.json()["items"]]
+    assert "Greenhouse work-auth radio" in titles
+
+
+def test_move_worker_note_onto_own_track(hub: tuple[TestClient, Settings]) -> None:
+    client, _settings = hub
+    created = client.post("/api/memory/items", headers=h("discovery", "mover"), json=WORKER_NOTE)
+    assert created.status_code == 201, created.text
+    item_id = created.json()["item"]["id"]
+    moved = client.post(
+        f"/api/memory/items/{item_id}/move",
+        headers=h("discovery", "mover"),
+        json={"pod": "track"},
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["item"]["pod"] == "track:discovery"
+    assert moved.json()["item"]["kind"] == "process_note"
+
+
+def test_peer_cannot_move_another_workers_memory(hub: tuple[TestClient, Settings]) -> None:
+    client, _settings = hub
+    bootstrap_admin(client)
+    disc_a = invite_join(client, "discovery", "disc-move-a")
+    disc_b = invite_join(client, "discovery", "disc-move-b")
+    stored = client.post(
+        "/api/memory/items",
+        headers=bearer(disc_a["api_key"]),
+        json=TRACK_FACT,
+    )
+    item_id = stored.json()["item"]["id"]
+    stolen = client.post(
+        f"/api/memory/items/{item_id}/move",
+        headers=bearer(disc_b["api_key"]),
+        json={"pod": "common"},
+    )
+    assert stolen.status_code == 403, stolen.text
+
+
+def test_memory_page_exposes_crud_controls(hub: tuple[TestClient, Settings]) -> None:
+    client, _settings = hub
+    bootstrap_admin(client)
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "owner@example.test", "password": "correct-horse"},
+    )
+    assert login.status_code == 200, login.text
+    page = client.get("/admin/memory")
+    assert page.status_code == 200, page.text
+    assert 'id="add-item"' in page.text
+    assert 'id="save-item"' in page.text
+    assert "data-delete" in page.text
+    assert "data-share" in page.text
+    assert "data-edit" in page.text
+    assert "/api/memory/items/" in page.text
+    assert "/move" in page.text

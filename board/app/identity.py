@@ -478,6 +478,7 @@ def join_payload(settings: Settings, invite: dict[str, Any]) -> dict[str, Any]:
         "memory": {
             "recall": "/api/memory/recall",
             "write": "/api/memory/items",
+            "move": "/api/memory/items/{id}/move",
             "solidify": "/api/memory/items/{id}/solidify",
             "pods": "/api/memory/pods",
             "docs": "/api/docs/docs/job-hub/memory.md",

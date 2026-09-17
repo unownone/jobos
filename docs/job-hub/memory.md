@@ -87,6 +87,15 @@ curl -sS -X POST "$HUB_URL/api/memory/items" \
 
 Forget: `PATCH /api/memory/items/{id}` with `{"forget": true}` or `DELETE`.
 
+Move or copy onto another pod (own track, `common`, or — for admin — any track). Incompatible kinds remap (`portal_quirk` → `process_note` on common). Pass `kind` to override.
+
+```bash
+curl -sS -X POST "$HUB_URL/api/memory/items/$MEM_ID/move" \
+  -H "Authorization: Bearer $HUB_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"pod": "common", "copy": false}'
+```
+
 ## Solidify into skills
 
 Memory is the **working set**. Promoted registry skills are **long-term**. When a track or common fact is reusable tomorrow (portal quirk, dead tool, process note), snapshot it:
@@ -115,6 +124,7 @@ Do not skip the maintainer queue. Do not copy another bot’s local skill.
 | GET | `/api/memory/items?pod=` | own pods; inspectors may name another track/worker pod |
 | POST | `/api/memory/items` | own worker / own track / common |
 | PATCH/DELETE | `/api/memory/items/{id}` | author, or inspector for forget/delete |
+| POST | `/api/memory/items/{id}/move` | author or inspector; `copy: true` leaves the original |
 | POST | `/api/memory/items/{id}/solidify` | author or maintainer; track/common only |
 | GET | `/admin/memory` | session (board UI) |
 
@@ -124,4 +134,4 @@ Memory is **not** exported in the git ledger tarball. It is live Hub state.
 
 ## UI
 
-`/admin/memory` lists the pods the signed-in principal can see. The board presence rail shows the compact heartbeat card.
+`/admin/memory` lists the pods the signed-in principal can see. Add, edit, delete, forget, or share/move a fact onto another writable pod. The board presence rail shows the compact heartbeat card.
