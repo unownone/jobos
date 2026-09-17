@@ -296,32 +296,6 @@ def catalog_updated_at(repo_root: Path) -> str | None:
     return match.group(1) if match else None
 
 
-def _unquote(raw: str) -> str:
-    text = raw.strip()
-    if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
-        return text[1:-1]
-    return text
-
-
-def _block_list(section: str, key: str) -> list[str]:
-    match = re.search(rf"^  {re.escape(key)}:\n((?:    - .*\n)*)", section, re.M)
-    if not match:
-        return []
-    items: list[str] = []
-    for line in match.group(1).splitlines():
-        stripped = line.strip()
-        if stripped.startswith("- "):
-            items.append(_unquote(stripped[2:]))
-    return items
-
-
-def _scalar_in_section(section: str, key: str) -> str | None:
-    match = re.search(rf"^  {re.escape(key)}:\s*(.+)\s*$", section, re.M)
-    if not match:
-        return None
-    return _unquote(match.group(1))
-
-
 def public_candidate(repo_root: Path) -> dict[str, Any]:
     hub = repo_root / "data" / "profiles" / "candidate.yaml"
     repo = repo_root / "profiles" / "candidate.yaml"

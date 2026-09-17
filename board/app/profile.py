@@ -7,7 +7,6 @@ Stored next to the Hub sqlite file so Docker `/data` volumes keep it.
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -137,48 +136,39 @@ def _as_list(value: Any) -> list[str]:
     return [text] if text else []
 
 
-def _block_list(section: str, key: str) -> list[str]:
-
-    match = re.search(rf"(?m)^\s+{re.escape(key)}:\n((?:\s+-\s+.*\n)*)", section)
-    if not match:
-        return []
-    items: list[str] = []
-    for raw in match.group(1).splitlines():
-        line = raw.strip()
-        if line.startswith("- "):
-            items.append(line[2:].strip().strip('"').strip("'"))
-    return items
-
-
-def _scalar_in_section(section: str, key: str) -> str | None:
-
-    match = re.search(rf"(?m)^\s+{re.escape(key)}:\s*(.*)$", section)
-    if not match:
-        return None
-    return match.group(1).strip().strip('"').strip("'") or None
-
-
-def public_slice_from_text(text: str) -> dict[str, Any]:
-
-    identity = ""
-    target = ""
-    ident_match = re.search(r"^identity:\n((?:  .*\n)*)", text, re.M)
-    if ident_match:
-        identity = ident_match.group(0)
-    target_match = re.search(r"^target:\n((?:  .*\n)*)", text, re.M)
-    if target_match:
-        target = target_match.group(0)
+def public_slice_from_mapping(data: dict[str, Any]) -> dict[str, Any]:
+    """Public Candidate Profile fields from a parsed mapping. No regex."""
+    identity = data.get("identity") if isinstance(data.get("identity"), dict) else {}
+    target = data.get("target") if isinstance(data.get("target"), dict) else {}
+    auth = identity.get("work_authorization")
+    auth_text = str(auth).strip() if auth is not None else ""
     return {
         "present": True,
         "fields_public": list(CANDIDATE_PUBLIC_FIELDS),
         "target": {
-            "titles": _block_list(target, "titles"),
-            "locations": _block_list(target, "locations"),
-            "deal_breakers": _block_list(target, "deal_breakers"),
+            "titles": _as_list(target.get("titles")),
+            "locations": _as_list(target.get("locations")),
+            "deal_breakers": _as_list(target.get("deal_breakers")),
         },
-        "work_authorization": _scalar_in_section(identity, "work_authorization"),
+        "work_authorization": auth_text or None,
         "resume_url": None,
     }
+
+
+def public_slice_from_text(text: str) -> dict[str, Any]:
+    try:
+        raw = yaml.safe_load(text)
+    except yaml.YAMLError:
+        raw = None
+    if not isinstance(raw, dict):
+        return {
+            "present": True,
+            "fields_public": list(CANDIDATE_PUBLIC_FIELDS),
+            "target": {"titles": [], "locations": [], "deal_breakers": []},
+            "work_authorization": None,
+            "resume_url": None,
+        }
+    return public_slice_from_mapping(raw)
 
 
 def public_candidate_at(path: Path | None) -> dict[str, Any]:

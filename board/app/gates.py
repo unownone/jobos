@@ -28,6 +28,7 @@ _ALLOW_EXACT = frozenset(
         "/api/candidate/resume",
         "/api/candidate/status",
         "/api/candidate/template",
+        "/api/registry/catalog",
     }
 )
 

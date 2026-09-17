@@ -163,6 +163,7 @@ def test_unauthenticated_health_and_agent_card_do_not_leak_secrets_or_pii(
         "/a2a",
         "/a2a/agent-card.json",
         "/login",
+        "/api/registry/catalog",
     ):
         res = seeded.unauth.get(path)
         body = res.text or ""
