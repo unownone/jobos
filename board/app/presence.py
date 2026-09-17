@@ -19,7 +19,7 @@ from app.auth import Principal
 from app.constants import ROLE_TO_TRACK, role_for_track
 from app.db import BoardDB
 from app.message_store import count_unread
-from app.memory_store import safe_compact_recall
+from app.memory_store import row_to_item, safe_compact_recall
 from app.profile import candidate_status
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -358,6 +358,75 @@ def list_recent_sessions(db: BoardDB, since: str) -> list[dict[str, Any]]:
     ]
 
 
+def user_activity(
+    db: BoardDB,
+    *,
+    user_id: str,
+    user: dict[str, Any] | None,
+    compat_actor: str | None = None,
+    limit: int = 24,
+) -> dict[str, Any]:
+    actors: list[str] = []
+    for value in (user_id, (user or {}).get("display_name"), (user or {}).get("email"), compat_actor):
+        text = str(value or "").strip()
+        if text and text not in actors:
+            actors.append(text)
+    if not actors:
+        return {"events": [], "memories": [], "tools": []}
+    placeholders = ",".join("?" for _ in actors)
+    event_cur = db.conn.execute(
+        f"""
+        SELECT * FROM events
+        WHERE actor IN ({placeholders})
+        ORDER BY id DESC LIMIT ?
+        """,
+        [*actors, limit],
+    )
+    events = []
+    for row in event_cur.fetchall():
+        events.append(
+            {
+                "id": row["id"],
+                "ts": row["ts"],
+                "job_id": row["job_id"],
+                "actor_role": row["actor_role"],
+                "actor": row["actor"] or "",
+                "action": row["action"],
+                "note": row["note"] or "",
+            }
+        )
+    mem_cur = db.conn.execute(
+        f"""
+        SELECT * FROM memory_items
+        WHERE created_by IN ({placeholders})
+        ORDER BY updated_at DESC LIMIT ?
+        """,
+        [*actors, limit],
+    )
+    memories = [row_to_item(row, compact=True) for row in mem_cur.fetchall()]
+    tool_cur = db.conn.execute(
+        f"""
+        SELECT tool_name, skill, COUNT(*) AS n, COALESCE(SUM(total_tokens), 0) AS tokens
+        FROM token_burn
+        WHERE actor IN ({placeholders}) OR actor_role IN ({placeholders})
+        GROUP BY tool_name, skill
+        ORDER BY tokens DESC, n DESC
+        LIMIT ?
+        """,
+        [*actors, *actors, 20],
+    )
+    tools = [
+        {
+            "tool_name": row["tool_name"],
+            "skill": row["skill"] or "",
+            "n": int(row["n"] or 0),
+            "tokens": int(row["tokens"] or 0),
+        }
+        for row in tool_cur.fetchall()
+    ]
+    return {"events": events, "memories": memories, "tools": tools}
+
+
 def user_has_event_since(db: BoardDB, user: dict[str, Any], since: str) -> bool:
     actors = [
         a
@@ -584,6 +653,59 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             "role": principal.role,
         }
 
+    @router.get("/api/presence/{user_id}")
+    def presence_detail(
+        user_id: str,
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+    ) -> dict[str, Any]:
+        _ensure_can_read_presence(principal)
+        now = clock_from_request(request)()
+        row = get_presence_row(db, user_id)
+        user = db.get_user(user_id)
+        compat_role = None
+        compat_actor = None
+        if user is None and user_id.startswith("compat:"):
+            parts = user_id.split(":", 2)
+            compat_role = parts[1] if len(parts) > 1 else None
+            compat_actor = parts[2] if len(parts) > 2 else None
+        if row is None and user is None and compat_actor is None:
+            raise HTTPException(status_code=404, detail="presence not found")
+        computed = _row_status(row or {}, user, now) if row else "offline"
+        item = public_presence(
+            user_id=user_id,
+            user=user,
+            row=row,
+            status=computed,
+            last_seen=(row or {}).get("last_heartbeat"),
+            compat_actor=compat_actor,
+            compat_role=compat_role,
+        )
+        activity = user_activity(db, user_id=user_id, user=user, compat_actor=compat_actor)
+        job = None
+        job_id = item.get("current_task") and item["current_task"].get("id")
+        if not job_id and row:
+            job_id = row.get("job_id")
+        if job_id:
+            job = db.get_job(str(job_id))
+            if job:
+                job = {
+                    "id": job["id"],
+                    "company": job["company"],
+                    "title": job["title"],
+                    "status": job["status"],
+                }
+        payload = {
+            "user": item,
+            "job": job,
+            "events": activity["events"],
+            "memories": activity["memories"],
+            "tools": activity["tools"],
+            "now": iso_z(now),
+        }
+        assert_no_secrets(payload)
+        return payload
+
     @router.get("/api/users")
     def list_users_directory(
         request: Request,
@@ -633,6 +755,7 @@ PRESENCE_PATHS = frozenset(
     {
         "/api/presence/heartbeat",
         "/api/presence",
+        "/api/presence/{user_id}",
         "/api/users",
         "/admin/users",
     }
