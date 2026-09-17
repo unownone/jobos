@@ -23,7 +23,7 @@ GitHub main ──push──► Actions (runner: jobos)
                  └──git fetch (ssh.github.com:443)──► /home/opc/jobos-live ──compose──► Traefik + Hub
 ```
 
-SQLite and secrets stay on Docker volume `jobos_hub-data` (`/data` in the container). Deploys do **not** use `--volumes`.
+SQLite and Hub Docker volumes are gone. Durable state is PostgreSQL. Postgres files stay on the host bind `JOBOS_PGDATA` (default `~/.jobos/pgdata`). The Hub container has **no** volume. Deploys do **not** publish Postgres ports.
 
 ## Deploy keys (SSH)
 
@@ -108,7 +108,7 @@ Feature branches never auto-deploy. Merge (or push) to `main` only after **Deplo
 
 ## Secrets
 
-Do not put Hub tokens, bootstrap URLs, `board/.env`, or deploy **private** keys in git or in workflow YAML. Host env is `~/.jobos/deploy.env` (mode 600) plus the Docker volume. The SSH private key is `~/.ssh/jobos_deploy`. Optional Actions secret: `JOBOS_DEPLOY_KEY`.
+Do not put Hub tokens, bootstrap URLs, `board/.env`, or deploy **private** keys in git or in workflow YAML. Host env is `~/.jobos/deploy.env` (mode 600) plus Postgres under `~/.jobos/pgdata`. The SSH private key is `~/.ssh/jobos_deploy`. Optional Actions secret: `JOBOS_DEPLOY_KEY`.
 
 ## Troubleshooting
 

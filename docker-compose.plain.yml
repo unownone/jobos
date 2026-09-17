@@ -1,13 +1,30 @@
-# Job Hub only (no Traefik). From repo root:
+# jobOS Hub only (no Traefik). From repo root:
 #   docker compose -f docker-compose.plain.yml up -d --build
 # Hub listens on http://127.0.0.1:8787
-# Memory pods persist in hub-data (same SQLite as jobs). No extra service.
+#
+# Durable state is PostgreSQL. Postgres has no published ports.
+# Data directory: ${JOBOS_PGDATA:-$HOME/.jobos/pgdata} (host bind, not a named volume).
 #
 # First visit: /admin/signup → /onboarding (required) → then invites/agents.
 
 name: jobos-plain
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jobos
+      POSTGRES_PASSWORD: ${JOBOS_PG_PASSWORD:-jobos}
+      POSTGRES_DB: jobos
+    volumes:
+      - ${JOBOS_PGDATA:-${HOME}/.jobos/pgdata}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
   hub:
     build:
       context: .
@@ -18,16 +35,17 @@ services:
       JOBOS_NONINTERACTIVE: "1"
       BOARD_HOST: "0.0.0.0"
       BOARD_PORT: "8787"
+      BOARD_DB: "/tmp/board.db"
+      HUB_PACKS_DIR: "/tmp/jobos-packs"
+      DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-127.0.0.1:8787}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8787}"
-    volumes:
-      - hub-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
       interval: 10s
       timeout: 5s
       retries: 12
     restart: unless-stopped
-
-volumes:
-  hub-data:

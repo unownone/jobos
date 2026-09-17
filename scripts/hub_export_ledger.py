@@ -1,8 +1,11 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = [
+#   "psycopg[binary]>=3.2",
+#   "pyyaml>=6",
+# ]
 # ///
-"""Write Hub SQLite jobs/people/events to a ledger directory. Optional/on-demand. Strips secrets."""
+"""Write Hub Postgres jobs/people/events to a ledger directory. Optional/on-demand. Strips secrets."""
 
 from __future__ import annotations
 
@@ -18,7 +21,7 @@ from app.export import build_ledger_files  # noqa: E402
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Export Hub SQLite to ledger YAML+jsonl (no secrets)")
+    parser = argparse.ArgumentParser(description="Export Hub Postgres to ledger YAML+jsonl (no secrets)")
     parser.add_argument("--db", default=str(ROOT / "board" / "data" / "board.db"))
     parser.add_argument("--dest", default=str(ROOT / "ledger"))
     args = parser.parse_args()

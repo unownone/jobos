@@ -16,7 +16,7 @@ Install and hosting: **[`docs/install.md`](../install.md)** (Docker, Compose pla
 
 ## What you deploy
 
-One FastAPI process (`board/`). SQLite under gitignored `board/data/`. Secrets in gitignored `board/.env` and `board/tokens.local.json`. Never paste tokens into git, docs, or group chat.
+One FastAPI process (`board/`). PostgreSQL for durable state (jobs, users, candidate, memory, metrics). Secrets in gitignored `board/.env` and `board/tokens.local.json`. Never paste tokens into git, docs, or group chat.
 
 ```bash
 # from repo root
@@ -68,7 +68,7 @@ Do not commit the bootstrap token, session cookies, or admin password.
 This is the first operator action after admin signup. The Hub does not proceed without it.
 
 - UI: `/onboarding` (identity, titles, locations, proof, resume PDF).
-- Or `PUT /api/candidate` as admin (JSON or YAML). Stored gitignored next to sqlite (`/data/profiles/candidate.yaml` in Docker).
+- Or `PUT /api/candidate` as admin (JSON or YAML). Stored in Postgres `hub_blobs` (survives Hub container rebuilds).
 - Resume: `PUT /api/candidate/resume` or a PDF under `assets/resume/`. Apply and outreach may `GET /api/candidate/resume`. **Discovery cannot download the PDF** (403).
 - `GET /api/candidate/status` and `/health` expose `candidate_onboarded` / `ready_for_agents` without dumping PII.
 - Admin may `GET /api/candidate` for the YAML. 404 if still missing.

@@ -139,6 +139,6 @@ if [[ -n "${HUB_BOOTSTRAP_TOKEN:-}" && "${HUB_BOOTSTRAP_USED:-}" != "1" ]]; then
   echo "After that admin exists, /admin/signup redirects to /login."
 fi
 echo "Sibling agents: ${PUBLIC}/api/jobs with Bearer keys (or X-Role + X-Token compat)"
-echo "Maintainer owns this process. Do not commit .env or data/*.db"
+echo "Maintainer owns this process. Do not commit .env. Durable state is PostgreSQL."
 
 exec uv run uvicorn app.main:create_app --factory --host "$HOST" --port "$PORT"

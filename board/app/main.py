@@ -301,11 +301,8 @@ def _flatten_included_routers(app: FastAPI) -> None:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
-    db = BoardDB(settings.db_path)
-    metrics = MetricsStore(
-        settings.db_path.parent / "metrics.sqlite",
-        settings.db_path.parent / "metrics.jsonl",
-    )
+    db = BoardDB(settings.db_path, settings.database_url or None)
+    metrics = MetricsStore(db.conn)
     principal_dep = require_principal(settings, db)
     optional_principal_dep = optional_principal(settings, db)
     pack = PackStore(settings)
@@ -318,7 +315,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="jobOS Hub",
-        description="Job harness coordination plane. Maintainer owns tokens, schema, and uptime.",
+        description="Job harness coordination plane. Durable state lives in PostgreSQL. Maintainer owns tokens, schema, and uptime.",
         version="0.5.0",
     )
     app.add_middleware(CandidateGateMiddleware)
@@ -1011,7 +1008,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             actor_role=principal.role,
             actor=principal.actor,
             action="vacuum",
-            note="sqlite vacuum",
+        note="postgres autovacuum",
         )
         return {"ok": True}
 

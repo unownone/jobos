@@ -1,7 +1,10 @@
-# Job Hub behind Traefik. From repo root:
+# jobOS Hub behind Traefik. From repo root:
 #   HUB_PUBLIC_HOST=hunt.example.com bash scripts/hub_docker.sh
 # Traefik listens on 80 and 443. The board is served at /.
 # Default Hub-only compose (no Traefik): docker compose up -d --build  (port 8787)
+#
+# Durable state is PostgreSQL (not a Hub volume). Postgres is not published.
+# Postgres files live on ${JOBOS_PGDATA:-$HOME/.jobos/pgdata}.
 #
 # First operator step after signup is always /onboarding.
 #
@@ -10,6 +13,21 @@
 name: jobos-traefik
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jobos
+      POSTGRES_PASSWORD: ${JOBOS_PG_PASSWORD:-jobos}
+      POSTGRES_DB: jobos
+    volumes:
+      - ${JOBOS_PGDATA:-${HOME}/.jobos/pgdata}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
   traefik:
     image: traefik:v3.3
     ports:
@@ -32,18 +50,19 @@ services:
       JOBOS_NONINTERACTIVE: "1"
       BOARD_HOST: "0.0.0.0"
       BOARD_PORT: "8787"
+      BOARD_DB: "/tmp/board.db"
+      HUB_PACKS_DIR: "/tmp/jobos-packs"
+      DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
-    volumes:
-      - hub-data:/data
     expose:
       - "8787"
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
       interval: 10s
       timeout: 5s
       retries: 12
-
-volumes:
-  hub-data:
