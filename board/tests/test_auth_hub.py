@@ -112,6 +112,9 @@ def test_invite_create_join_owner_then_agent(hub: tuple[TestClient, Settings]) -
     invite_id = payload["invite"]["id"]
     secret = payload["secret"]
     assert payload["join_url"] == f"https://hub.example.test/join/{invite_id}?s={secret}"
+    assert "jobOS" in payload["agent_prompt"]
+    assert "/llms.txt" in payload["agent_prompt"]
+    assert "Never Easy Apply" in payload["agent_prompt"]
     listed = client.get("/api/invites")
     assert listed.status_code == 200
     assert "secret" not in listed.json()["invites"][0]

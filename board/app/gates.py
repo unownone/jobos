@@ -36,6 +36,7 @@ _ALLOW_EXACT = frozenset(
 
 _ALLOW_PREFIXES = (
     "/static/",
+    "/brand/",
     "/.well-known/",
     "/a2a",
     "/api/join/",

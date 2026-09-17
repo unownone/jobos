@@ -72,6 +72,32 @@ HUB_PUBLIC_HOST=12.234.244.34 docker compose -f docker-compose.traefik.yml up -d
 
 Put a real TLS certificate in front if you need one (Traefik `websecure` already terminates TLS with a default cert; replace with Let’s Encrypt or a load-balancer cert in production). Do not put tokens in the public origin.
 
+## Coolify
+
+Coolify has no universal one-click URL. Create a **Docker Compose** resource pointed at this GitHub repo.
+
+1. Source: `https://github.com/unownone/jobos` (branch `main`).
+2. Compose file: `docker-compose.yml` (Hub on 8787, volume `hub-data`). Do not invent a second stack.
+3. Set `HUB_PUBLIC_URL` (and usually `HUB_PUBLIC_HOST`) to the Coolify FQDN, e.g. `https://hub.example.com`.
+4. Persist the named volume. Onboarding YAML and sqlite live under `/data`.
+5. After first boot, open `/admin/signup` then `/onboarding`. Healthcheck is `GET /health` on 8787 inside the container.
+
+Same image as Railway and local Compose (`Dockerfile` at repo root).
+
+## Railway
+
+Use the README **Deploy on Railway** button (`railway.json` + `Dockerfile`). Railway injects `PORT`; the entrypoint copies it to `BOARD_PORT` so uvicorn binds the port the platform probes.
+
+Set after the first domain exists:
+
+```bash
+HUB_PUBLIC_URL=https://<your-railway-domain>
+HUB_PUBLIC_HOST=<your-railway-domain>
+JOBOS_NONINTERACTIVE=1
+```
+
+Mount a volume at `/data` (sqlite, candidate yaml, resume, secrets). Healthcheck path is `/health`. Do not require `ready_for_agents` for the probe — that stays false until onboarding.
+
 ## Docker (no Compose)
 
 ```bash

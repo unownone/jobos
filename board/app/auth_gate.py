@@ -47,6 +47,7 @@ _PUBLIC_PREFIXES = (
     "/api/join/",
     "/.well-known/",
     "/a2a/",
+    "/brand/",
 )
 
 

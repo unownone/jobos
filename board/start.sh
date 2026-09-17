@@ -122,7 +122,11 @@ if [[ -f "$ROOT/.env" ]]; then
 fi
 
 HOST="${BOARD_HOST:-0.0.0.0}"
-PORT="${BOARD_PORT:-8787}"
+if [[ -n "${PORT:-}" ]]; then
+  PORT="$PORT"
+else
+  PORT="${BOARD_PORT:-8787}"
+fi
 PUBLIC="${HUB_PUBLIC_URL:-http://127.0.0.1:${PORT}}"
 PUBLIC="${PUBLIC%/}"
 

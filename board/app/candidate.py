@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 from app.auth import Principal, require_admin
 from app.permissions import ensure_can_resume
@@ -23,14 +23,25 @@ from app.profile import (
 )
 from app.settings import Settings
 
+NO_STORE = {"Cache-Control": "no-store"}
+
+
+def _fresh_json(payload: dict[str, Any]) -> JSONResponse:
+    revision = payload.get("revision")
+    headers = dict(NO_STORE)
+    if revision:
+        headers["ETag"] = f'"{revision}"'
+    return JSONResponse(payload, headers=headers)
+
 
 def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter:
     router = APIRouter(tags=["candidate"])
 
     @router.get("/api/candidate/status")
-    def candidate_status_endpoint(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
+    def candidate_status_endpoint(principal: Principal = Depends(principal_dep)) -> JSONResponse:
         del principal
-        return candidate_status(settings)
+        payload = candidate_status(settings)
+        return _fresh_json(payload)
 
     @router.get("/api/candidate/template")
     def candidate_template(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
@@ -38,9 +49,10 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
         return {"template": EMPTY_TEMPLATE, "example_rejected": True}
 
     @router.get("/api/candidate/public")
-    def candidate_public(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
+    def candidate_public(principal: Principal = Depends(principal_dep)) -> JSONResponse:
         del principal
-        return public_candidate_for_settings(settings)
+        payload = public_candidate_for_settings(settings)
+        return _fresh_json(payload)
 
     @router.get("/api/candidate/resume")
     def candidate_resume(principal: Principal = Depends(principal_dep)) -> FileResponse:
@@ -54,7 +66,7 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
     async def candidate_put(
         request: Request,
         principal: Principal = Depends(principal_dep),
-    ) -> dict[str, Any]:
+    ) -> JSONResponse:
         require_admin(principal)
         raw = await request.body()
         if not raw.strip():
@@ -83,13 +95,13 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
             note="stored gitignored hub candidate.yaml",
         )
         status = candidate_status(settings)
-        return {"ok": True, "present": True, "path": "hub-data/profiles/candidate.yaml", **status}
+        return _fresh_json({"ok": True, "present": True, "path": "hub-data/profiles/candidate.yaml", **status})
 
     @router.put("/api/candidate/resume")
     async def candidate_resume_put(
         request: Request,
         principal: Principal = Depends(principal_dep),
-    ) -> dict[str, Any]:
+    ) -> JSONResponse:
         require_admin(principal)
         dest = hub_resume_path(settings)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -104,7 +116,7 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
             action="resume_put",
             note="stored gitignored hub resume PDF",
         )
-        return {"ok": True, "resume_url": "/api/candidate/resume", **candidate_status(settings)}
+        return _fresh_json({"ok": True, "resume_url": "/api/candidate/resume", **candidate_status(settings)})
 
     @router.get("/api/candidate")
     def candidate_admin_get(principal: Principal = Depends(principal_dep)) -> PlainTextResponse:
@@ -115,6 +127,10 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
                 status_code=404,
                 detail="profiles/candidate.yaml missing; open /onboarding — do not invent one",
             )
-        return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="text/yaml")
+        return PlainTextResponse(
+            path.read_text(encoding="utf-8"),
+            media_type="text/yaml",
+            headers=dict(NO_STORE),
+        )
 
     return router

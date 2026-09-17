@@ -18,6 +18,11 @@ export HUB_REPO_ROOT="${HUB_REPO_ROOT:-/app}"
 export JOBOS_NONINTERACTIVE=1
 export PATH="/usr/local/bin:/app/board/.venv/bin:${PATH}"
 
+# Railway / Render inject PORT. Bind Hub there so healthchecks hit the process.
+if [[ -n "${PORT:-}" ]]; then
+  export BOARD_PORT="$PORT"
+fi
+
 if [[ -z "${HUB_PUBLIC_URL:-}" && -n "${HUB_PUBLIC_HOST:-}" ]]; then
   host="${HUB_PUBLIC_HOST%/}"
   if [[ "$host" == *"://"* ]]; then

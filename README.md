@@ -9,8 +9,12 @@
 [![GitHub](https://img.shields.io/badge/GitHub-unownone%2Fjobos-181717?style=for-the-badge&logo=github)](https://github.com/unownone/jobos)
 [![Install Hub](https://img.shields.io/badge/Install-Hub-2ea44f?style=for-the-badge)](docs/install.md)
 [![Feature demo](https://img.shields.io/badge/Feature-demo-6f42c1?style=for-the-badge)](docs/demo/README.md)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/unownone/jobos)
+[![Deploy with Coolify](https://img.shields.io/badge/Deploy-Coolify-6c5ce7?style=for-the-badge)](docs/install.md#coolify)
 
 **jobOS** is a **job harness** — the only harness you need to find a job. It can be distributed among multiple agents for an efficient loop and better recon.
+
+One-click / easy deploy uses this repo’s Hub image (`Dockerfile`) and Compose (`docker-compose.yml`, Hub on **8787**). **Railway:** button above → `railway.json` + root `Dockerfile` (maps PaaS `PORT` to Hub). **Coolify:** new Docker Compose resource → GitHub `unownone/jobos` → compose file `docker-compose.yml` → persist volume `hub-data` → set `HUB_PUBLIC_URL` to the Coolify FQDN. Same stack as local Compose, not a second image. Details: [`docs/install.md`](docs/install.md).
 
 Not a single auto-apply bot. One repo. Four owners today (three job-search roles plus a seldom maintainer). One shared ledger. A live Hub when agents share a host. Airgap still works.
 

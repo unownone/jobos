@@ -41,6 +41,7 @@ PROTECTED_ROUTE_PATHS = frozenset(
         "/",
         "/admin",
         "/admin/invites",
+        "/admin/data",
         "/admin/users",
         "/onboarding",
         "/api/jobs",
@@ -170,6 +171,8 @@ def test_unauthenticated_health_and_agent_card_do_not_leak_secrets_or_pii(
         "/agents.txt",
         "/.well-known/llms.txt",
         "/.well-known/agents.txt",
+        "/brand/mascot.png",
+        "/brand/logo.png",
     ):
         res = seeded.unauth.get(path)
         body = res.text or ""
