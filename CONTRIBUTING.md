@@ -1,6 +1,6 @@
 # Contributing to the template
 
-This repo is the **operating system**, not a live job search. Keep PII and live ledgers out of public history.
+This repo is **jobOS**, a job harness — not a live job search. Keep PII and live ledgers out of public history.
 
 ## Change the process, then the skills
 

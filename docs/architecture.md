@@ -1,6 +1,6 @@
 # Architecture
 
-Job Apply OS is a **multi-agent workflow with a file-backed bus**. The repo is the airgap coordination plane. When a hunt has a shared machine, maintainer also runs an optional live board (`board/`) as the practical overlay. The git ledger is not deleted.
+jobOS is a **job harness**: a multi-agent workflow with a file-backed bus and an optional live Hub. The repo is the airgap coordination plane. When a hunt has a shared machine, maintainer also runs the Hub (`board/`) as the practical overlay. The git ledger is not deleted.
 
 ## Goals
 

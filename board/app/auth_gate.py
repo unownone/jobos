@@ -37,6 +37,8 @@ _PUBLIC_EXACT = frozenset(
         "/api/auth/join",
         "/a2a",
         "/api/registry/catalog",
+        "/llms.txt",
+        "/agents.txt",
     }
 )
 

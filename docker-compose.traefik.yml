@@ -1,0 +1,49 @@
+# Job Hub behind Traefik. From repo root:
+#   HUB_PUBLIC_HOST=hunt.example.com bash scripts/hub_docker.sh
+# Traefik listens on 80 and 443. The board is served at /.
+# Default Hub-only compose (no Traefik): docker compose up -d --build  (port 8787)
+#
+# First operator step after signup is always /onboarding.
+#
+# HUB_PUBLIC_HOST may be a hostname, IPv4, or IP:port (invites use that origin).
+
+name: jobos-traefik
+
+services:
+  traefik:
+    image: traefik:v3.3
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8787:8787"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    restart: unless-stopped
+    depends_on:
+      hub:
+        condition: service_healthy
+
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      JOBOS_NONINTERACTIVE: "1"
+      BOARD_HOST: "0.0.0.0"
+      BOARD_PORT: "8787"
+      HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
+      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
+    volumes:
+      - hub-data:/data
+    expose:
+      - "8787"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  hub-data:

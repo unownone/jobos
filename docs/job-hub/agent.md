@@ -1,14 +1,23 @@
-# Job Hub — agent
+# jobOS Hub — agent
 
 You are a track instance. **Do not clone the hunt repo** for skills or the live job list. Join, fetch the pack, heartbeat, claim work, write through the same HTTP APIs the UI uses.
 
-If `HUB_URL` (or `BOARD_URL`) is set, Hub is the live list **and** the live skill registry. Git `ledger/` is the airgap/export protocol, not a second source of truth for this run. After the pack, `GET /api/registry/skills` — do not treat git `skills/` as live.
+**Curl the briefing first** (not HTML):
+
+```bash
+curl -sS "$HUB_URL/llms.txt"
+curl -sS "$HUB_URL/agents.txt"
+```
+
+If `HUB_URL` (or `BOARD_URL`) is set, Hub is the live list **and** the live skill registry. Git `ledger/` is the airgap/export protocol, not a second source of truth for this run. After the pack, `GET /api/registry/skills` — do not treat git `skills/` as live. **Always use registry skills/MCPs.** If you use something outside, `POST /api/registry/recordings` (or a local skill) and `POST /api/memory/items`. Only maintainer consumes `skill.record`.
 
 **Maintainer ≠ discovery.** Track `maintenance` does not search portals, Easy Apply, or send employer mail. Discovery never Easy Applies (that is the **application** track). Only maintenance / admin **claim** `skill.record` and promote after proctor. Every track may **push** recordings. Local skills are per-bot.
 
 Operator runbook: [human.md](human.md). Process: [`docs/process.md`](../process.md). Roles: [`docs/roles.md`](../roles.md).
 
 Tracks (use these strings): `discovery` | `application` | `outreach` | `maintenance`.
+
+Coming soon (do not claim, do not join as): `review` | `resume`.
 
 Aliases the server maps: `apply` → `application`, `maintainer` → `maintenance`. Job documents still use `owners.apply`.
 

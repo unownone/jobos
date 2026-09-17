@@ -26,7 +26,8 @@ from app.bootstrap import (
 )
 from app.candidate import create_candidate_router
 from app.gates import CandidateGateMiddleware
-from app.constants import METADATA_KNOWN_KEYS, ROLES, STATUSES, TRACKS
+from app.briefing import create_briefing_router
+from app.constants import COMING_SOON_ROLES, METADATA_KNOWN_KEYS, ROLES, STATUSES, TRACKS
 from app.db import BoardDB, public_user
 from app.export import create_export_router
 from app.identity import (
@@ -353,6 +354,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+    app.include_router(create_briefing_router(settings))
     app.include_router(create_onboarding_router(settings, db, pack, principal_dep))
 
     @app.get("/", response_model=None)
@@ -685,6 +687,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "statuses": list(STATUSES),
             "roles": list(ROLES),
             "tracks": list(TRACKS),
+            "coming_soon_roles": [dict(row) for row in COMING_SOON_ROLES],
+            "briefing": {
+                "llms_txt": "/llms.txt",
+                "agents_txt": "/agents.txt",
+                "well_known_llms": "/.well-known/llms.txt",
+                "well_known_agents": "/.well-known/agents.txt",
+            },
             "capabilities": capabilities(principal.role),
             "owner": "maintainer",
             "heartbeat_s": 10,

@@ -1,16 +1,18 @@
-# Get That Job hunt board
+# jobOS Hub
 
-Private **live coordination plane** for a multi-agent job hunt. FastAPI + SQLite + an admin web UI.
+Private **live coordination plane** for a multi-agent job hunt. FastAPI + SQLite + an operator web UI.
 
-**Maintainer owns and maintains this board** (skill-maintainer / `maintenance` role): process hygiene, token issuance and rotation, uptime, schema, benchmarks, and share/tunnel setup. Discovery, apply, and outreach **consume** it. They do not own it.
+**jobOS** is a job harness. **Maintainer owns and maintains this Hub** (skill-maintainer / `maintenance` role): process hygiene, token issuance and rotation, uptime, schema, benchmarks, and share/tunnel setup. Discovery, apply, and outreach **consume** it. They do not own it.
+
+Agents: `curl -sS "$HUB_URL/llms.txt"` and `curl -sS "$HUB_URL/agents.txt"`. Do not scrape HTML for protocol.
 
 This is not a replacement for the git ledger in `ledger/`. See [Architecture](#architecture).
 
 **Job Hub docs:** operator [`docs/job-hub/human.md`](../docs/job-hub/human.md) (deploy, signup, invites, export); agents [`docs/job-hub/agent.md`](../docs/job-hub/agent.md) (`$HUB_KEY`, join, onboarding, heartbeat, queue, memory). Memory pods: [`docs/job-hub/memory.md`](../docs/job-hub/memory.md). Maintainer owns this process; maintainer is not discovery.
 
-![Admin dashboard — job list](docs/01-dashboard.png)
+Primary auth is a Hub session cookie (human admin) or Bearer `$HUB_KEY` (`jh_own_` / `jh_agt_`). Compat headers `X-Role` + `X-Token` still list jobs but `GET /api/whoami` returns `compat_deprecated: true`.
 
-The admin UI after **Connect**: one shared list, status pills, filter bar, stats (`N shown · N total · role …`). Open a row to edit, **Pause** (freeze, keep status), or **Stop** (withdraw). Tokens stay in the header password field and are never committed.
+The admin UI after **Connect** (or an admin cookie): one shared job list, status pills, filter bar, stats. Open a row to edit, **Pause** (freeze, keep status), or **Stop** (withdraw). Tokens stay in the header password field and are never committed. Operator data tables for people / candidate / registry / memory live on the Hub admin pages.
 
 ## Architecture
 
@@ -19,7 +21,7 @@ We run the hunt on **one shared board**, not a Sheet or CSV mirror.
 - **Live plane:** this process. Sibling agents on the same host read and write through HTTP. Humans use the admin UI.
 - **Airgap plane:** `ledger/` YAML + `INDEX.md` + `events.jsonl`. Template protocol. Bots with no shared server still use git. If the board is down, fall back here.
 - **Owner:** maintainer. Starts the process, generates gitignored per-role tokens, rotates them, imports history, runs hygiene and [benchmarks](BENCHMARKS.md). Discovery/apply/outreach get a token; they do not change schema or uptime.
-- **Auth:** headers `X-Role` + `X-Token`. Tokens are generated (`scripts/board_gen_tokens.py`), never hardcoded, never committed.
+- **Auth:** Hub Bearer `$HUB_KEY` or admin session cookie. Compat `X-Role` + `X-Token` from `scripts/board_gen_tokens.py` still works and is deprecated. Tokens are never hardcoded, never committed.
 - **Lanes:** discovery **creates** the card and may finish discovery-owned fields while the job is still in the discovery lane. Apply **advances** apply fields only. Outreach **advances** outreach fields only. Admin can pause, stop, edit, or delete.
 - **Share:** default `http://127.0.0.1:8787/` on the hunt machine (server binds `0.0.0.0`). Optional temporary tunnel — see [How to share](#how-to-share-with-humans).
 
@@ -47,7 +49,7 @@ Status enum is the Job Apply OS contract (`discovered` → … → `offer` / `cl
 
 ## UI walkthrough (admin)
 
-Use these steps on `http://127.0.0.1:8787/`. Role token comes from the maintainer (`board/.env`). Do not paste tokens into git or group chat. Screenshots: `docs/01-dashboard.png`, `docs/02-filters.png`, `docs/03-detail.png` (refresh with `bash board/scripts/capture_readme_shots.sh`).
+Use these steps on `http://127.0.0.1:8787/`. Role token comes from the maintainer (`board/.env`) **or** log in as the human admin (session cookie). Do not paste tokens into git or group chat. Optional screenshot refresh: `bash board/scripts/capture_readme_shots.sh` (writes under `board/docs/` when those files exist).
 
 1. **Connect.** Header stays on screen: Role `admin`, paste the admin token (password field), **Connect**. The green **connected** pill appears. Other roles can connect too: they see the same list but Save/Pause/Stop/Delete follow their permissions.
 

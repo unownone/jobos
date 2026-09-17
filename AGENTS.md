@@ -1,6 +1,15 @@
 # Agent operating rules
 
-You are working in **Job Apply OS**. Read this before doing anything else.
+You are working in **jobOS**, a job harness — the only harness you need to find a job. It can be distributed among multiple agents for an efficient loop and better recon.
+
+If Hub is up, start with curl (not a browser):
+
+```bash
+curl -sS "$HUB_URL/llms.txt"
+curl -sS "$HUB_URL/agents.txt"
+```
+
+Always use registry skills/MCPs (`GET /api/registry/skills` after join). If you use something outside the registry, record it and add a memory fact. Maintainer owns `skill.record`.
 
 ## Identity
 
@@ -21,10 +30,13 @@ If the user says you own everything, you still run the three roles **in order**:
 | find skills, find MCPs, skillhub, skills.sh | `skills/skill-and-mcp-catalog/SKILL.md` |
 | research the company, find the hiring manager, deep research | `skills/deep-research/SKILL.md` |
 | maintain, update skills, manage catalog, skill lists, hunt board, skill registry, proctor | `skills/skill-maintainer/SKILL.md` |
+| review / resume | Coming soon. Do not load a skill. Do not claim. |
 
 Discovery **starts** with the catalog skill unless `docs/catalogs/skills-and-mcps.md` was updated this week. When Hub is up, also `GET /api/registry/skills?tag=source` and pick a matching tagged **source** skill. Apply uses `?tag=apply` (ATS / site). Outreach uses `?tag=outreach` (channel). Airgap falls back to the role `SKILL.md` plus `skills/starters/`.
 
 If the work is **updating the skill tree itself** (lists, mcp.example.json, pruning dead tools), **operating the hunt board**, or **the skill registry + proctor queue** (`skill.record`), that is the seldom-used **maintainer** role, not discovery. Maintainer owns the registry and consumes `skill.record`.
+
+**Coming soon (stubs only, do not claim):** `review` (feedback on profile/resume and shortlisted jobs) and `resume` (ATS-friendly tailoring). They are not owners and are not Hub invite tracks.
 
 ## Hard rules
 

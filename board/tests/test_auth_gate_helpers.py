@@ -18,6 +18,10 @@ def test_path_is_public_allowlist() -> None:
     assert path_is_public("/a2a") is True
     assert path_is_public("/a2a/application/agent-card.json") is True
     assert path_is_public("/api/registry/catalog") is True
+    assert path_is_public("/llms.txt") is True
+    assert path_is_public("/agents.txt") is True
+    assert path_is_public("/.well-known/llms.txt") is True
+    assert path_is_public("/.well-known/agents.txt") is True
 
 
 def test_path_is_public_rejects_sensitive_surfaces() -> None:

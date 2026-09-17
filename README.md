@@ -1,4 +1,4 @@
-# Job Apply OS
+# jobOS
 
 [![CI](https://github.com/unownone/jobos/actions/workflows/ci.yml/badge.svg)](https://github.com/unownone/jobos/actions/workflows/ci.yml)
 [![Deploy check](https://github.com/unownone/jobos/actions/workflows/deploy-check.yml/badge.svg)](https://github.com/unownone/jobos/actions/workflows/deploy-check.yml)
@@ -9,60 +9,70 @@
 [![GitHub](https://img.shields.io/badge/GitHub-unownone%2Fjobos-181717?style=for-the-badge&logo=github)](https://github.com/unownone/jobos)
 [![Install Hub](https://img.shields.io/badge/Install-Hub-2ea44f?style=for-the-badge)](docs/install.md)
 [![Feature demo](https://img.shields.io/badge/Feature-demo-6f42c1?style=for-the-badge)](docs/demo/README.md)
-[![Deploy on push](https://img.shields.io/badge/Deploy-on%20push%20to%20main-1f883d?style=for-the-badge)](docs/deploy.md)
 
-A template for a **distributed job search**, not a single auto-apply bot.
+**jobOS** is a **job harness** — the only harness you need to find a job. It can be distributed among multiple agents for an efficient loop and better recon.
 
-One repo. Three exclusive job-search roles, plus a seldom-used maintainer. One shared ledger. Bots can be airgapped.
+Not a single auto-apply bot. One repo. Four owners today (three job-search roles plus a seldom maintainer). One shared ledger. A live Hub when agents share a host. Airgap still works.
 
 ```
 Discovery finds and shortlists.
 Apply submits with writing worth reading.
 Outreach follows up by email and LinkedIn only.
 Maintainer (seldom) updates skills/MCP lists, owns the Hub registry, and proctors recordings.
-Nobody jumps the queue.
+Review and resume roles are coming soon (stubs only).
+Nobody jumps the queue. Discovery never Easy Applies.
 ```
 
-This is the agent-facing operating system: how to pick a role, which skills and MCPs to attach, how to share work without hosting a server, and how to hand off a job so another bot can finish it.
+Agents: do not scrape Hub HTML for the protocol.
 
-For a live multi-agent hunt on a shared machine, maintainer also runs the private **Get That Job** board (`board/`): FastAPI + SQLite + admin UI (Job Hub). That board is the live coordination plane. The git ledger remains the template and airgap protocol. See [`board/README.md`](board/README.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md).
+```bash
+curl -sS "$HUB_URL/llms.txt"
+curl -sS "$HUB_URL/agents.txt"
+```
+
+Git copies: [`llms.txt`](llms.txt), [`agents.txt`](agents.txt), [`docs/llms.txt`](docs/llms.txt), [`docs/agents.txt`](docs/agents.txt). Hub also serves `/.well-known/llms.txt` and `/.well-known/agents.txt` as `text/plain`.
+
+The live coordination plane is **jobOS Hub** (`board/`): FastAPI + SQLite + operator UI. Maintainer owns it. Git `ledger/` remains the airgap protocol. See [`board/README.md`](board/README.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md).
 
 ## Start here
 
 **Onboard the candidate before anything else.** The Hub will not let you hunt, invite agents, or send A2A messages until a truthful profile exists. Do not invent one. Do not ship `candidate.example.yaml` as live data.
 
 1. **Install the Hub** — [`docs/install.md`](docs/install.md) / [`INSTALL.md`](INSTALL.md).
-   - Plain Docker Compose: `docker compose -f docker-compose.plain.yml up -d --build`
-   - Traefik (80/443): `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh`
+   - Default Compose (Hub on **8787**): `docker compose up -d --build`
+   - Same image, named project: `docker compose -f docker-compose.plain.yml up -d --build`
+   - Traefik (80/443): `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` (uses [`docker-compose.traefik.yml`](docker-compose.traefik.yml))
    - `docker run` and uv/bare metal are in the same guide.
-   - **This host:** push to `main` deploys automatically — [`docs/deploy.md`](docs/deploy.md). Feature walkthrough: [`docs/demo/README.md`](docs/demo/README.md).
+   - **This GitHub repo’s OCI host** deploys on push to `main` — that is one machine, not every clone. Details: [`docs/deploy.md`](docs/deploy.md). Feature walkthrough of that host: [`docs/demo/README.md`](docs/demo/README.md).
 2. **Create the admin** at the printed `/admin/signup` URL (one-time).
 3. **Fill `/onboarding`** (identity, titles, locations, resume PDF). This is mandatory.
-4. Read [`docs/process.md`](docs/process.md). Pick a role in [`AGENTS.md`](AGENTS.md).
+4. Read [`docs/process.md`](docs/process.md). Pick a role in [`AGENTS.md`](AGENTS.md) / [`docs/roles.md`](docs/roles.md).
 5. Discovery runs catalog → research → shortlist. **No Easy Apply.**
 6. Apply and outreach consume packets. Cross-agent talk is **A2A** ([`docs/job-hub/a2a.md`](docs/job-hub/a2a.md)) plus the Hub inbox.
 
-Airgapped bots without a Hub still copy [`profiles/candidate.example.yaml`](profiles/candidate.example.yaml) to `profiles/candidate.yaml` locally, put PDFs in [`assets/resume/`](assets/resume/), and write [`ledger/`](ledger/README.md). Git remains the airgap protocol.
+**Always use Hub registry skills and MCPs** when the Hub is up (`GET /api/registry/skills`, after join). If you use a tool outside the registry, record it and add a memory fact. Maintainer still owns `skill.record` proctor.
 
-Live multi-agent hunt: [`board/README.md`](board/README.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md).
+Airgapped bots without a Hub still copy [`profiles/candidate.example.yaml`](profiles/candidate.example.yaml) to `profiles/candidate.yaml` locally, put PDFs in [`assets/resume/`](assets/resume/), and write [`ledger/`](ledger/README.md). Git remains the airgap protocol.
 
 ## Why this is split
 
-Combined “search and Easy Apply” agents optimize for volume. This template optimizes for **reproducible shortlists**, **attractive applications**, and **human follow-up**.
+Combined “search and Easy Apply” agents optimize for volume. This harness optimizes for **reproducible shortlists**, **attractive applications**, and **human follow-up**.
 
 | Role | Allowed | Forbidden |
 | --- | --- | --- |
 | Discovery | Find, enrich, score, shortlist, write an apply packet | Easy Apply, form submit, outreach |
 | Apply | Submit using the packet, write the message, log proof | Inventing jobs, cold outreach, skipping the packet |
 | Outreach | Email + LinkedIn DM after apply (or when there is no portal) | SMS, WhatsApp, spam, applying |
-| Maintainer (seldom) | Search registries, vet, write `skills/lists/`, patch example MCP config, **own the hunt board** (tokens, uptime, schema, hygiene), **own the skill registry** (seed GitHub starters, consume `skill.record`, proctor, promote). Workers may push recordings. | Discovering jobs, applying, sending mail |
+| Maintainer (seldom) | Search registries, vet, write `skills/lists/`, patch example MCP config, **own the hunt board**, **own the skill registry** (seed, consume `skill.record`, proctor, promote). Workers may push recordings. | Discovering jobs, applying, sending mail |
+| Review (coming soon) | Stub. Will review profile/resume and shortlisted jobs. | Not an owner yet. Do not claim. |
+| Resume (coming soon) | Stub. Will tailor ATS-friendly resumes. | Not an owner yet. Do not claim. |
 
 Roles can be subdivided:
 
 - Discovery by portal (Indeed vs YC vs Amazon careers)
 - Apply by ATS (Greenhouse vs Workday vs LinkedIn)
 - Outreach by channel (email vs LinkedIn DM)
-- Maintainer is not subdivided; it is rare and repo-wide
+- Maintainer may be claimed as `maintainer`, `maintainer/lists`, `maintainer/board`, or `maintainer/registry` — still one owner, seldom used
 
 The ledger stays the same. That is the point.
 
@@ -76,7 +86,7 @@ flowchart TD
   research[Deep research]
   discovery[Discovery role]
   ledger[Git ledger airgap]
-  board[Hunt board live]
+  board[Hub hunt board live]
   apply[Apply role]
   outreach[Outreach role]
   maintainer[Maintainer seldom]
@@ -105,27 +115,27 @@ flowchart TD
   outreach --> board
 ```
 
-Full writeup: [`docs/architecture.md`](docs/architecture.md).
+Full writeup: [`docs/architecture.md`](docs/architecture.md). Domain names: [`CONTEXT.md`](CONTEXT.md).
 
-## Shared list: git ledger vs live board
+## Shared list: git ledger vs live Hub
 
 Bots may have no shared network except git. The **git ledger is the airgap protocol** (YAML per job). It stays.
 
-When several agents share a host, maintainer runs the **hunt board / Job Hub** as the live coordination UI/API. Discovery/apply/outreach consume it; they do not own it. If `HUB_URL` is set, that is the live list — see [`docs/job-hub/human.md`](docs/job-hub/human.md) (operator) and [`docs/job-hub/agent.md`](docs/job-hub/agent.md) (join, pack, queue). **Maintainer ≠ discovery.**
+When several agents share a host, maintainer runs **jobOS Hub** as the live coordination UI/API. Discovery/apply/outreach consume it; they do not own it. If `HUB_URL` is set, that is the live list — see [`docs/job-hub/human.md`](docs/job-hub/human.md) (operator) and [`docs/job-hub/agent.md`](docs/job-hub/agent.md) (join, pack, queue). **Maintainer ≠ discovery.**
 
 | Layer | What it is | When to use |
 | --- | --- | --- |
 | Airgap / template | One YAML file per job under `ledger/jobs/` | Always the file protocol; required if no server |
 | Human git view | [`ledger/INDEX.md`](ledger/INDEX.md) | Always in git |
 | Git audit | Append-only `ledger/events.jsonl` | Always in git |
-| **Live hunt board** | [`board/`](board/README.md) FastAPI + SQLite + admin UI | Shared machine; maintainer-owned |
+| **Live Hub** | [`board/`](board/README.md) FastAPI + SQLite + admin UI | Shared machine; maintainer-owned |
 | Optional overlay | Google Drive / Sheet | Only if someone wants a spreadsheet; not source of truth |
 
-Discovery still owns the **git** ledger portal (conflicts, INDEX, schema). **Maintainer** owns the live board (tokens, uptime, hygiene, tunnels). Details: [`docs/sharing.md`](docs/sharing.md) and [`board/README.md`](board/README.md).
+Discovery still owns the **git** ledger portal (conflicts, INDEX, schema). **Maintainer** owns the live Hub (tokens, uptime, hygiene, tunnels). Details: [`docs/sharing.md`](docs/sharing.md) and [`board/README.md`](board/README.md).
 
 ## Skills in this repo
 
-GitHub `skills/` (role playbooks) and `skills/starters/` (tagged platform YAML) are the **defaults**. Hub writes them into the registry DB on boot / pack rebuild. Live agents prefer `GET /api/registry/skills`. Contract: [`docs/catalogs/skill-outline.md`](docs/catalogs/skill-outline.md).
+GitHub `skills/` (role playbooks) and `skills/starters/` (tagged platform YAML) are the **defaults**. Hub writes them into the registry DB on boot / pack rebuild. Live agents prefer `GET /api/registry/skills` (Bearer after join). Contract: [`docs/catalogs/skill-outline.md`](docs/catalogs/skill-outline.md).
 
 | Skill | Owner | Job |
 | --- | --- | --- |
@@ -157,7 +167,7 @@ Attach what you have. Degrade if you do not.
 
 Do not scrape behind logins you do not own. Do not build exploit PoCs. Prefer official APIs, public feeds, and career pages.
 
-## Portals this template already names
+## Portals this harness already names
 
 Job boards and feeds: LinkedIn Jobs, Indeed, Wellfound, Work at a Startup, Google Jobs / dorks, RemoteOK, Hiring Cafe, Weekday, Roro Remote.
 
@@ -189,30 +199,33 @@ Discovery may set `skipped`. Apply may set `apply_blocked` with a reason and a p
 
 ```
 AGENTS.md                 How a bot picks a role and behaves
+CONTEXT.md                Domain names (jobOS, Hub, Candidate Profile, …)
+llms.txt / agents.txt     Agent briefing (curl these; Hub serves the same paths)
 docs/process.md           The full contract
 docs/architecture.md      Components and data flow
 docs/roles.md             Split / combine / subdivide roles
 docs/sharing.md           Airgapped ledger protocol
 docs/catalogs/            Platforms, MCPs, career sites, research
-docs/catalogs/skill-outline.md  Skill registry contract (starters, local vs shared, proctor)
+docs/catalogs/skill-outline.md  Skill registry contract
 docs/research/            Build plans (MCP coverage, deep-research wrap)
+docs/install.md           Docker / Compose / uv / TLS
+docs/deploy.md            Optional: this GitHub repo’s OCI host deploy
+docs/demo/                Screenshots + video of that live Hub (when present)
 skills/                   Agent Skills (SKILL.md) — canonical OS skills
 skills/starters/          Tagged platform YAML seeded into the Hub registry
 .agents/skills/           Downloaded third-party Agent Skills (npx skills add)
 .claude/skills/<name>     Per-skill symlink for Claude Code
 .cursor/skills/<name>     Per-skill symlink for Cursor
 skills/lists/             Maintainer lists: adopted / wanted / rejected YAML
-board/                    Live hunt board (FastAPI + SQLite). Maintainer-owned.
+board/                    Live Hub (FastAPI + SQLite). Maintainer-owned.
 vendor/mcp/PINNED.txt     uvx / git SHA pins for local MCPs (no source trees)
 mcp/hosted/               Copy-paste hosted MCP snippets
 mcp/SETUP.md              How to attach local vs hosted MCPs
 .cursor/environment.json  Cloud-agent install (clones open-deep-research)
-.github/workflows/        CI on PR; Deploy on push to main (this host)
-docs/deploy.md            Host deploy (Actions runner + watcher)
-docs/demo/                Screenshots + video of the live Hub
-ledger/                   Shared live list
+.github/workflows/        CI on PR; Deploy on push to main (this GitHub’s host)
+ledger/                   Shared live list (airgap)
 ledger/schema/skill.schema.json  Skill JSON Schema
-profiles/                 Candidate profile (example committed)
+profiles/                 Candidate profile (example committed; live file gitignored)
 mcp/                      Example MCP config
 handoffs/                 Packet templates
 assets/                   Resumes (local) + writing templates
@@ -220,6 +233,9 @@ scripts/rebuild_index.py  Optional INDEX.md generator
 scripts/rebuild_skill_index.py  skills/lists/INDEX.md from YAML
 scripts/setup_deep_research.sh  Clone dzhng/open-deep-research
 scripts/run_deep_research.py    Non-interactive research API wrapper
+docker-compose.yml        Default Hub image on :8787
+docker-compose.plain.yml  Same Hub, Compose project name jobos-plain
+docker-compose.traefik.yml Traefik on 80/443 wrapping the same image
 ```
 
 ## Run a cycle
@@ -229,8 +245,9 @@ scripts/run_deep_research.py    Non-interactive research API wrapper
 uv run scripts/rebuild_index.py
 uv run scripts/rebuild_skill_index.py
 
-# live hunt board (maintainer): generates gitignored tokens on first start
+# live Hub (maintainer): generates gitignored tokens on first start
 bash board/start.sh
+# or: docker compose up -d --build
 ```
 
 Then, in the agent:
@@ -238,7 +255,7 @@ Then, in the agent:
 - Discovery: “Run the discovery skill for this candidate. Do not apply.”
 - Apply: “Apply only to jobs in apply_ready. Write like a human worth reading.”
 - Outreach: “Work outreach_ready. Email + LinkedIn only. Attach the PDF on email.”
-- Maintainer (seldom): “Refresh skills/lists. Find MCPs. Do not discover jobs.” Owns the hunt board: tokens, uptime, hygiene. Consumes `skill.record`, proctors against the outline rubric, promotes only on pass. Workers may enqueue recordings.
+- Maintainer (seldom): “Refresh skills/lists. Find MCPs. Do not discover jobs.” Owns the Hub: tokens, uptime, hygiene. Consumes `skill.record`, proctors against the outline rubric, promotes only on pass. Workers may enqueue recordings.
 
 ## Public template
 

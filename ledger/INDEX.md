@@ -6,6 +6,7 @@ Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts
 
 | role | name | scope | since |
 | --- | --- | --- | --- |
+| maintainer | cursor-cloud-agent (jobos-product-pass) | product pass: jobOS identity, agent briefing, Hub operator UX (no discovery/apply/outreach) | 2026-09-17 |
 | discovery | cursor-cloud-agent | catalog + research (no apply, no Easy Apply) | 2026-09-06 |
 | apply | _unclaimed_ | all ATS | |
 | outreach | _unclaimed_ | email + linkedin_dm | |
@@ -24,6 +25,8 @@ Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts
 | maintainer | cursor-cloud-agent (skill-registry-memory) | merge memory pods onto registry; solidify track/common facts into origin=memory recordings | 2026-09-13 |
 | maintainer | cursor-cloud-agent (skill-memory-e2e) | in-process e2e for registry + memory solidify + catalog refresh unlock | 2026-09-15 |
 | maintainer | cursor-cloud-agent (ssh-deploy-runner) | GitHub SSH-over-443 deploy keys + PR deploy-check workflow (no discovery/apply/outreach) | 2026-09-15 |
+| review | _coming_soon_ | Will review profile/resume and shortlisted jobs. Stub only. Do not claim. | |
+| resume | _coming_soon_ | Will tailor ATS-friendly resumes. Stub only. Do not claim. | |
 
 ## Jobs
 

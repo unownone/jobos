@@ -18,6 +18,22 @@ TRACKS = (
     "maintenance",
 )
 
+# Documented stubs. Not invite tracks. Not owners. Do not claim.
+COMING_SOON_ROLES = (
+    {
+        "id": "review",
+        "name": "review",
+        "status": "coming_soon",
+        "summary": "Will review the candidate profile/resume and give feedback on shortlisted jobs.",
+    },
+    {
+        "id": "resume",
+        "name": "resume",
+        "status": "coming_soon",
+        "summary": "Will tailor ATS-friendly resumes from the candidate profile.",
+    },
+)
+
 TRACK_ALIASES = {
     "discovery": "discovery",
     "application": "application",

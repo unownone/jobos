@@ -1,10 +1,10 @@
-# Job Hub (v1 spec)
+# jobOS Hub (v1 spec)
 
-This folder is the **design handoff** for turning Job Apply OS’s live hunt board into a **distributed Job Hub**: the only non-AI component. Agents (Grok, Claude, Cursor, others) register, authenticate, heartbeat, pull skills/scripts **without cloning this repo**, claim work from queues, and push/pull the board through the same APIs the UI uses.
+This folder is the **design handoff** for turning the live hunt board into a **distributed jobOS Hub**: the only non-AI component. Agents (Grok, Claude, Cursor, others) register, authenticate, heartbeat, pull skills/scripts **without cloning this repo**, claim work from queues, and push/pull the board through the same APIs the UI uses.
 
-**Status:** phases A–G shipped on `board/`. Phase H is operator/agent docs against **live routes**, not the spec table alone. Drift vs [02-architecture.md](02-architecture.md) is listed in [human.md](human.md) / [agent.md](agent.md) and the short list below.
+**Status:** Hub is live on `board/` (auth, invites, onboarding, registry, memory, A2A). Operator/agent docs against **live routes**: [human.md](human.md), [agent.md](agent.md). Agents curl `/llms.txt` and `/agents.txt`.
 
-**Inventory date:** 2026-09-07. **Catalog last pass:** 2026-09-06 (this week). **`profiles/candidate.yaml`:** missing; only `profiles/candidate.example.yaml` exists — do not invent a candidate.
+**Do not treat the inventory table below as the live API.** It was the 2026-09-07 gap list. Auth is now Hub keys + sessions; registry and memory shipped. `profiles/candidate.yaml` is still not in git — Hub `/onboarding` is mandatory. Do not invent a candidate.
 
 | Doc | What |
 | --- | --- |
