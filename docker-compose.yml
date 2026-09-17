@@ -11,19 +11,6 @@
 name: jobos
 
 services:
-  traefik:
-    image: traefik:v3.3
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8787:8787"
-    volumes:
-      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
-    restart: unless-stopped
-    depends_on:
-      hub:
-        condition: service_healthy
 
   hub:
     build:
@@ -37,8 +24,8 @@ services:
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
     volumes:
       - hub-data:/data
-    expose:
-      - "8787"
+    ports:
+      - "8787:8787"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
