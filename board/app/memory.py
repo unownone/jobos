@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth import Principal
 from app.memory_policy import (
@@ -70,10 +70,10 @@ class MemoryPatch(BaseModel):
 
 
 class MemoryMoveIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     pod: str
-    copy: bool = False
+    keep_original: bool = Field(default=False, alias="copy")
     kind: str | None = None
 
 
@@ -250,7 +250,12 @@ def create_memory_router(principal_dep) -> APIRouter:
         db = request.app.state.db
         try:
             item = move_item(
-                db, principal, item_id, pod=body.pod, copy=body.copy, kind=body.kind
+                db,
+                principal,
+                item_id,
+                pod=body.pod,
+                copy=body.keep_original,
+                kind=body.kind,
             )
         except MemoryError as exc:
             _raise_memory(exc)
@@ -259,11 +264,11 @@ def create_memory_router(principal_dep) -> APIRouter:
             job_id=item.get("job_id"),
             actor_role=principal.role,
             actor=principal.actor,
-            action="memory_copy" if body.copy else "memory_move",
+            action="memory_copy" if body.keep_original else "memory_move",
             note=item.get("pod") or body.pod,
             fields={"memory_id": item.get("id"), "from": item_id, "pod": item.get("pod")},
         )
-        return {"item": item, "copied": body.copy}
+        return {"item": item, "copied": body.keep_original}
 
     @router.post("/api/memory/items/{item_id}/solidify")
     def memory_solidify(
