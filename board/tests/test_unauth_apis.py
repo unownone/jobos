@@ -314,3 +314,5 @@ def test_unauthenticated_cannot_write_registry_or_memory(seeded: SeededHub) -> N
     assert_unauthenticated_denied(mem, what="POST /api/memory/items")
     solid = seeded.unauth.post("/api/memory/items/mem_missing/solidify", json={})
     assert_unauthenticated_denied(solid, what="POST /api/memory/items/{id}/solidify")
+    moved = seeded.unauth.post("/api/memory/items/mem_missing/move", json={"pod": "common"})
+    assert_unauthenticated_denied(moved, what="POST /api/memory/items/{id}/move")

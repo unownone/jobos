@@ -82,6 +82,7 @@ PROTECTED_ROUTE_PATHS = frozenset(
         "/api/memory/recall",
         "/api/memory/items",
         "/api/memory/items/{item_id}",
+        "/api/memory/items/{item_id}/move",
         "/api/memory/items/{item_id}/solidify",
         "/api/memory/pods",
         "/admin/memory",

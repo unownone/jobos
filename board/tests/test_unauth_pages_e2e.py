@@ -118,3 +118,5 @@ def test_authenticated_session_can_open_skills_and_memory_pages(
     assert memory.status_code == 200, memory.text
     assert "Memory pods" in memory.text
     assert "data-solidify" in memory.text
+    assert 'id="add-item"' in memory.text
+    assert "data-delete" in memory.text

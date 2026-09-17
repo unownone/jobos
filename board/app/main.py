@@ -730,6 +730,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "memory": {
                 "recall": "/api/memory/recall",
                 "write": "/api/memory/items",
+                "move": "/api/memory/items/{id}/move",
                 "solidify": "/api/memory/items/{id}/solidify",
                 "pods": ["worker", "track", "common"],
                 "docs": "/api/docs/docs/job-hub/memory.md",

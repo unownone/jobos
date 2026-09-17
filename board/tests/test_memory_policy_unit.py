@@ -32,12 +32,14 @@ def _principal(**kwargs):
     return SimpleNamespace(**data)
 
 
-def test_worker_and_track_and_common_pods_are_visible() -> None:
-    p = _principal()
-    pods = visible_pod_ids(p)
-    assert pods[0] == "worker:usr_disc1"
-    assert "track:discovery" in pods
+def test_inspector_default_visibility_includes_all_tracks() -> None:
+    admin = _principal(role="admin", kind="admin", track=None, user_id="usr_admin")
+    pods = visible_pod_ids(admin)
     assert "common" in pods
+    assert "track:discovery" in pods
+    assert "track:outreach" in pods
+    worker = _principal()
+    assert "track:outreach" not in visible_pod_ids(worker)
 
 
 def test_applicator_alias_writes_application_track() -> None:
