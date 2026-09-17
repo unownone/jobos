@@ -409,7 +409,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def join_page(invite_id: str) -> FileResponse:
         return FileResponse(STATIC_DIR / "join.html")
 
-    @app.get("/favicon.ico")
+    @app.get("/favicon.ico", response_model=None)
     def favicon() -> FileResponse | Response:
         icon = STATIC_DIR / "brand" / "favicon.png"
         if icon.is_file():
