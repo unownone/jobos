@@ -143,6 +143,15 @@ Admin/maintenance: `POST /api/packs/rebuild` (also re-seeds GitHub starters into
 
 After the pack, **Hub agents `GET /api/registry/skills`**. The zip is the Cursor-loadable role playbooks. Tagged source / apply / outreach skills are registry rows. Query `tag`, `role`, `platform`, `ats`, `url`, `scope`. You see **shared approved** plus **your own local**. Another bot’s `scope=local` is invisible — do not try to load it.
 
+Always use registry skills and MCPs. Approved shared catalog is public (no auth):
+
+```bash
+curl -sS "$HUB_URL/api/registry/catalog"
+curl -sS "$HUB_URL/api/registry/catalog?tag=source"
+```
+
+Local drafts are not in that list. Full rows including your locals: `GET /api/registry/skills` with Bearer. If you use something outside the catalog, register it and store a memory fact. Maintainer owns `skill.record` proctor.
+
 ```bash
 curl -sS "$HUB_URL/api/registry/skills?tag=source" \
   -H "Authorization: Bearer $HUB_KEY"
