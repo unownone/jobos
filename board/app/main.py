@@ -20,6 +20,7 @@ from app.bootstrap import (
     ensure_bootstrap,
     env_path_for,
     format_signup_line,
+    public_base,
     sha256_hex,
     tokens_json_path_for,
     verify_password,
@@ -30,6 +31,7 @@ from app.briefing import create_briefing_router
 from app.constants import COMING_SOON_ROLES, METADATA_KNOWN_KEYS, ROLES, STATUSES, TRACKS
 from app.db import BoardDB, public_user
 from app.export import create_export_router
+from app.invite_prompt import render_agent_prompt
 from app.identity import (
     COOKIE_SESSION,
     clear_session_cookies,
@@ -315,8 +317,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
-        title="Job Hub",
-        description="Private live coordination plane. Maintainer owns tokens, schema, and uptime.",
+        title="jobOS Hub",
+        description="Job harness coordination plane. Maintainer owns tokens, schema, and uptime.",
         version="0.5.0",
     )
     app.add_middleware(CandidateGateMiddleware)
@@ -353,6 +355,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+        brand_dir = STATIC_DIR / "brand"
+        if brand_dir.is_dir():
+            app.mount("/brand", StaticFiles(directory=brand_dir), name="brand")
 
     app.include_router(create_briefing_router(settings))
     app.include_router(create_onboarding_router(settings, db, pack, principal_dep))
@@ -395,12 +400,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def login_page() -> FileResponse:
         return FileResponse(STATIC_DIR / "login.html")
 
+    @app.get("/admin/data")
+    def admin_data(principal: Principal = Depends(principal_dep)) -> FileResponse:
+        del principal
+        return FileResponse(STATIC_DIR / "data.html")
+
     @app.get("/join/{invite_id}")
     def join_page(invite_id: str) -> FileResponse:
         return FileResponse(STATIC_DIR / "join.html")
 
-    @app.get("/favicon.ico")
-    def favicon() -> Response:
+    @app.get("/favicon.ico", response_model=None)
+    def favicon() -> FileResponse | Response:
+        icon = STATIC_DIR / "brand" / "favicon.png"
+        if icon.is_file():
+            return FileResponse(icon, media_type="image/png")
         return Response(status_code=204)
 
     @app.get("/health")
@@ -529,6 +542,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             created_by=principal.user_id or principal.actor,
         )
         url = join_url(settings, row["id"], secret)
+        prompt = render_agent_prompt(
+            hub_url=public_base(settings),
+            join_url=url,
+            track=row["track"],
+            mode=row["mode"],
+            invite_id=row["id"],
+            secret=secret,
+        )
         db.add_event(
             job_id=None,
             actor_role=principal.role,
@@ -540,6 +561,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "invite": public_invite(row),
             "secret": secret,
             "join_url": url,
+            "agent_prompt": prompt,
             "token": f"jh_inv_{row['id']}.{secret}",
             "shown_once": True,
         }

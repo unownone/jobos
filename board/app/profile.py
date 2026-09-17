@@ -6,6 +6,7 @@ Stored next to the Hub sqlite file so Docker `/data` volumes keep it.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -184,6 +185,16 @@ def public_candidate_at(path: Path | None) -> dict[str, Any]:
     return public_slice_from_text(text)
 
 
+def candidate_revision(settings: Settings) -> str | None:
+    """Bump when the hub/repo candidate file bytes change. Agents must re-fetch."""
+    path = resolve_candidate_path(settings)
+    if path is None or not path.is_file():
+        return None
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+    mtime = int(path.stat().st_mtime)
+    return f"{mtime}-{digest}"
+
+
 def public_candidate_for_settings(settings: Settings) -> dict[str, Any]:
     path = resolve_candidate_path(settings)
     payload = public_candidate_at(path)
@@ -195,6 +206,7 @@ def public_candidate_for_settings(settings: Settings) -> dict[str, Any]:
         payload["source"] = "missing"
     resume = resolve_resume_path(settings)
     payload["resume_url"] = "/api/candidate/resume" if resume else None
+    payload["revision"] = candidate_revision(settings)
     return payload
 
 
@@ -329,6 +341,7 @@ def candidate_status(settings: Settings) -> dict[str, Any]:
         "source": "hub-data"
         if path == hub_candidate_path(settings)
         else ("repo" if path else "missing"),
+        "revision": candidate_revision(settings),
     }
 
 

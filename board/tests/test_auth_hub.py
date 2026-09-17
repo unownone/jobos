@@ -112,6 +112,9 @@ def test_invite_create_join_owner_then_agent(hub: tuple[TestClient, Settings]) -
     invite_id = payload["invite"]["id"]
     secret = payload["secret"]
     assert payload["join_url"] == f"https://hub.example.test/join/{invite_id}?s={secret}"
+    assert "jobOS" in payload["agent_prompt"]
+    assert "/llms.txt" in payload["agent_prompt"]
+    assert "Never Easy Apply" in payload["agent_prompt"]
     listed = client.get("/api/invites")
     assert listed.status_code == 200
     assert "secret" not in listed.json()["invites"][0]
@@ -410,7 +413,7 @@ def test_key_rotation_and_disable(hub: tuple[TestClient, Settings]) -> None:
 def test_login_pages_exist(hub: tuple[TestClient, Settings]) -> None:
     client, _settings = hub
     assert client.get("/login").status_code == 200
-    assert "Admin login" in client.get("/login").text
+    assert "jobOS login" in client.get("/login").text
     denied = client.get("/admin/invites")
     assert denied.status_code == 401
     bootstrap_admin(client)

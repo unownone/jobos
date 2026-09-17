@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Job Hub — Login</title>
+  <title>jobOS — Login</title>
+  <link rel="icon" href="/brand/favicon.png" type="image/png" />
   <style>
     :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; }
     * { box-sizing: border-box; }
@@ -20,8 +21,14 @@
 </head>
 <body>
   <main>
-    <h1>Admin login</h1>
-    <p>Human Hub owner. Agents use API keys, not this form.</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <img src="/brand/mascot.png" alt="jobOS Stitch" width="40" height="40" />
+      <div>
+        <h1>jobOS login</h1>
+        <p style="margin:0">Human operator. Agents use API keys, not this form.</p>
+      </div>
+    </div>
+    <p>Session lasts 12 hours of idle. Email is remembered on this browser only.</p>
     <form id="form">
       <label for="email">Email</label>
       <input id="email" type="email" autocomplete="username" required />
@@ -31,9 +38,22 @@
       <div class="err" id="err"></div>
     </form>
     <p id="signupWrap" hidden><a id="signupLink" href="/admin/signup">Create the first admin</a></p>
+    <p class="muted" style="color:var(--muted);font-size:13px">
+      Deploy this Hub:
+      <a href="https://railway.com/new/template?template=https://github.com/unownone/jobos">Railway</a>
+      ·
+      <a href="https://github.com/unownone/jobos/blob/main/docs/install.md#coolify">Coolify</a> (Compose: <code>docker-compose.yml</code>)
+    </p>
   </main>
   <script>
     const requested = new URLSearchParams(location.search).get("next") || "";
+    const savedEmail = localStorage.getItem("jobos_admin_email") || "";
+    if (savedEmail) document.getElementById("email").value = savedEmail;
+    fetch("/api/auth/me").then((r) => {
+      if (r.ok) {
+        location.href = requested || "/";
+      }
+    }).catch(() => {});
     fetch("/health").then((r) => r.json()).then((h) => {
       const wrap = document.getElementById("signupWrap");
       if (wrap) wrap.hidden = Boolean(h.admin_bootstrapped);
@@ -42,11 +62,12 @@
       ev.preventDefault();
       const err = document.getElementById("err");
       err.textContent = "";
+      const email = document.getElementById("email").value;
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: document.getElementById("email").value,
+          email,
           password: document.getElementById("password").value,
         }),
       });
@@ -55,12 +76,13 @@
         err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
         return;
       }
+      try { localStorage.setItem("jobos_admin_email", email); } catch (e) {}
       const status = await fetch("/api/candidate/status").then((r) => r.json()).catch(() => ({}));
       if (!status.onboarded) {
         location.href = "/onboarding";
         return;
       }
-      location.href = requested || "/admin";
+      location.href = requested || "/";
     });
   </script>
 </body>

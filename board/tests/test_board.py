@@ -292,8 +292,7 @@ def test_ui_is_served(client: TestClient) -> None:
     assert "Select a job" not in denied.text
     res = client.get("/", headers=h("admin"))
     assert res.status_code == 200
-    assert "Get That Job" in res.text
-    assert "Job Hunt Board" in res.text
+    assert "jobOS" in res.text
     assert "All statuses" in res.text
     assert "Select a job" in res.text
 

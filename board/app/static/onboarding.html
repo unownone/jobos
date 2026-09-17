@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Job Hub — Candidate onboarding</title>
+  <title>jobOS — Candidate onboarding</title>
+  <link rel="icon" href="/brand/favicon.png" type="image/png" />
   <style>
     :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
     * { box-sizing: border-box; }
@@ -31,7 +32,8 @@
 </head>
 <body>
   <header>
-    <h1>Candidate onboarding</h1>
+        <h1>Candidate onboarding</h1>
+        <p id="revLine" class="muted" style="margin:0.35rem 0 0;color:var(--muted);font-size:12px"></p>
   </header>
   <main>
     <p>This is the first Hub step after creating the admin. Agents cannot join, hunt, apply, or talk over A2A until a <strong>truthful</strong> profile exists. Do not paste the example Ada Example file.</p>
@@ -252,7 +254,9 @@
         err.textContent = (detail && (detail.message || JSON.stringify(detail.missing || detail))) || res.statusText;
         return;
       }
-      ok.textContent = "Profile saved. Upload a resume PDF next.";
+      ok.textContent = "Profile saved. Revision " + (body.revision || "updated") + ". Agents must re-fetch GET /api/candidate/public (Cache-Control: no-store). curl: curl -sS \"$HUB_URL/api/candidate/public\" -H \"Authorization: Bearer $HUB_KEY\"";
+      const rev = document.getElementById("revLine");
+      if (rev) rev.textContent = "revision " + (body.revision || "") + " · Cache-Control: no-store · heartbeat returns candidate_revision";
       show("step4");
     });
     document.getElementById("uploadResume").addEventListener("click", async () => {

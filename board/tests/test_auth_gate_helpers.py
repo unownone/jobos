@@ -22,6 +22,8 @@ def test_path_is_public_allowlist() -> None:
     assert path_is_public("/agents.txt") is True
     assert path_is_public("/.well-known/llms.txt") is True
     assert path_is_public("/.well-known/agents.txt") is True
+    assert path_is_public("/brand/mascot.png") is True
+    assert path_is_public("/brand/logo.png") is True
 
 
 def test_path_is_public_rejects_sensitive_surfaces() -> None:
@@ -30,6 +32,7 @@ def test_path_is_public_rejects_sensitive_surfaces() -> None:
         "/onboarding",
         "/admin",
         "/admin/invites",
+        "/admin/data",
         "/admin/users",
         "/admin/skills",
         "/admin/memory",

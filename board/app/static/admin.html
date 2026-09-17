@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Job Hub — Admin</title>
+  <title>jobOS — Invites</title>
+  <link rel="icon" href="/brand/favicon.png" type="image/png" />
   <style>
     :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
     * { box-sizing: border-box; }
@@ -29,9 +30,11 @@
 </head>
 <body>
   <header>
-    <h1>Job Hub — Invites</h1>
+    <h1 style="display:flex;align-items:center;gap:10px"><img src="/brand/mascot.png" alt="" width="32" height="32" /> jobOS — Invites</h1>
     <div>
       <a href="/">Board</a>
+      &nbsp;·&nbsp;
+      <a href="/admin/data">Data</a>
       &nbsp;·&nbsp;
       <a href="/onboarding">Candidate</a>
       &nbsp;·&nbsp;
@@ -84,6 +87,25 @@
       </form>
       <p class="err" id="err"></p>
       <p class="ok" id="created"></p>
+      <div id="promptBox" hidden>
+        <label for="prompt">Agent prompt (copy this with the join link)</label>
+        <textarea id="prompt" readonly style="width:100%;min-height:12rem;background:#0e1218;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:0.6rem;font:12px/1.4 ui-monospace,monospace"></textarea>
+        <button type="button" class="secondary" id="copyPrompt">Copy prompt</button>
+        <button type="button" class="secondary" id="copyLink">Copy join URL</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Coming soon</h2>
+      <p>Review and resume roles are stubs. Do not mint invites for them.</p>
+      <ul id="soon" style="color:var(--muted)"></ul>
+    </div>
+    <div class="panel">
+      <h2>Deploy</h2>
+      <p>
+        <a href="https://railway.com/new/template?template=https://github.com/unownone/jobos">Deploy on Railway</a>
+        ·
+        <a href="https://coolify.io">Deploy with Coolify</a> using this repo’s <code>docker-compose.yml</code> (Hub on 8787). Set <code>HUB_PUBLIC_URL</code> to the Coolify FQDN.
+      </p>
     </div>
     <div class="panel">
       <h2>Existing invites</h2>
@@ -163,6 +185,10 @@
       }
       const url = body.join_url;
       document.getElementById("created").innerHTML = "Copy this join link (secret shown once):<br><code id='url'>" + url + "</code>";
+      const box = document.getElementById("promptBox");
+      const ta = document.getElementById("prompt");
+      ta.value = body.agent_prompt || "";
+      box.hidden = !ta.value;
       try { await navigator.clipboard.writeText(url); } catch (e) {}
       loadInvites();
     });
@@ -183,6 +209,26 @@
       pingHeartbeat();
       setInterval(pingHeartbeat, 10000);
       loadInvites();
+      fetch("/api/meta").then((r) => r.json()).then((meta) => {
+        const soon = document.getElementById("soon");
+        (meta.coming_soon_roles || [
+          { id: "review", summary: "Will review the candidate profile/resume and give feedback on shortlisted jobs." },
+          { id: "resume", summary: "Will tailor ATS-friendly resumes from the candidate profile." },
+        ]).forEach((row) => {
+          const li = document.createElement("li");
+          li.textContent = row.id + " — " + (row.summary || "coming soon");
+          soon.appendChild(li);
+        });
+      }).catch(() => {});
+    });
+    document.getElementById("copyPrompt").addEventListener("click", async () => {
+      const text = document.getElementById("prompt").value;
+      try { await navigator.clipboard.writeText(text); } catch (e) {}
+    });
+    document.getElementById("copyLink").addEventListener("click", async () => {
+      const url = document.getElementById("url");
+      if (!url) return;
+      try { await navigator.clipboard.writeText(url.textContent); } catch (e) {}
     });
   </script>
 </body>

@@ -327,6 +327,9 @@ curl -sS "$HUB_URL/api/whoami" -H "Authorization: Bearer $HUB_KEY"
 curl -sS "$HUB_URL/api/meta" -H "Authorization: Bearer $HUB_KEY"
 curl -sS "$HUB_URL/api/jobs" -H "Authorization: Bearer $HUB_KEY"
 curl -sS "$HUB_URL/api/candidate/public" -H "Authorization: Bearer $HUB_KEY"
+# Look at revision. It bumps when hub-data YAML bytes change.
+# Response Cache-Control: no-store. Heartbeat also returns candidate_revision.
+# Do not cache the public slice across rounds. If present is false, stop — do not invent a candidate.
 ```
 
 | Action | discovery | application | outreach | maintenance | admin |

@@ -20,6 +20,7 @@ from app.constants import ROLE_TO_TRACK, role_for_track
 from app.db import BoardDB
 from app.message_store import count_unread
 from app.memory_store import safe_compact_recall
+from app.profile import candidate_status
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -552,6 +553,8 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             principal,
             job_id=(payload.job_id or "").strip() or None,
         )
+        settings = request.app.state.settings
+        cand = candidate_status(settings)
         return {
             "ok": True,
             "status": computed,
@@ -560,6 +563,8 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             "last_seen": now_iso,
             "pending_messages": count_unread(db, principal),
             "memory": memory,
+            "candidate_revision": cand.get("revision"),
+            "candidate_onboarded": cand.get("onboarded"),
             "self": self_row,
         }
 

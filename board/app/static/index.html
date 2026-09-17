@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Job Hub — Board</title>
+  <title>jobOS — Board</title>
+  <link rel="icon" href="/brand/favicon.png" type="image/png" />
   <style>
     :root {
       --bg: #0e1218;
@@ -126,19 +127,19 @@
 <body>
   <header class="app">
     <div class="brand">
-      <div class="logo">GTJ</div>
+      <img class="logo" src="/brand/mascot.png" alt="jobOS" width="36" height="36" style="width:36px;height:36px;border-radius:8px" />
       <div>
-        <h1>Job Hunt Board</h1>
-        <div class="sub">Get That Job 2.0 · humans and agents share <code>/api/jobs</code></div>
+        <h1>jobOS board</h1>
+        <div class="sub">Job harness · humans and agents share <code>/api/jobs</code></div>
         <div class="sub" id="hubLinks">
-          <a href="/onboarding">Candidate onboarding</a> ·
+          <a href="/onboarding">Candidate</a> ·
           <a href="/login">Login</a> ·
-          <a href="/admin">Admin</a> ·
+          <a href="/admin">Invites</a> ·
+          <a href="/admin/data">Data</a> ·
           <a href="/admin/users">Presence</a> ·
           <a href="/admin/skills">Skills</a> ·
           <a href="/admin/memory">Memory</a> ·
-          <a href="/.well-known/agent-card.json">A2A Agent Card</a> ·
-          <a href="/api/onboarding">Onboarding JSON</a>
+          <a href="/.well-known/agent-card.json">A2A</a>
         </div>
       </div>
     </div>
@@ -153,7 +154,7 @@
         </select>
       </label>
       <label for="token">Token
-        <input id="token" type="password" autocomplete="off" placeholder="role token or agent key" />
+        <input id="token" type="password" autocomplete="off" placeholder="optional if you already logged in" />
       </label>
       <button id="connectBtn" type="submit">Connect</button>
       <span id="connStatus" class="status"><span class="dot"></span><span id="connLabel">disconnected</span></span>
