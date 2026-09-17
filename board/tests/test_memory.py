@@ -558,6 +558,12 @@ def test_move_track_fact_to_common_and_copy_across_tracks(
     titles = [row["title"] for row in apply_recall.json()["items"]]
     assert "Greenhouse work-auth radio" in titles
 
+    admin_list = client.get("/api/memory/items", headers=csrf_headers(client))
+    assert admin_list.status_code == 200, admin_list.text
+    admin_pods = {row["pod"] for row in admin_list.json()["items"]}
+    assert "common" in admin_pods
+    assert "track:outreach" in admin_pods
+
 
 def test_move_worker_note_onto_own_track(hub: tuple[TestClient, Settings]) -> None:
     client, _settings = hub

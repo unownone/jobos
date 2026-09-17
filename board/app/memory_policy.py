@@ -250,6 +250,11 @@ def visible_pod_ids(principal: Any) -> list[str]:
     own = own_track_pod_id(principal)
     if own:
         pods.insert(1, own)
+    if is_inspector(principal):
+        for track in TRACKS:
+            pod = f"{POD_KIND_TRACK}:{track}"
+            if pod not in pods:
+                pods.append(pod)
     return pods
 
 

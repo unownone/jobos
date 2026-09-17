@@ -228,7 +228,7 @@ def pod_catalog(principal: MemoryPrincipal) -> list[dict[str, Any]]:
                 {
                     "id": pod,
                     "scope": POD_KIND_TRACK,
-                    "label": f"{track} track (inspect)",
+                    "label": f"{track} track (shared)" if admin else f"{track} track (inspect)",
                     "shared": True,
                     "inspect": True,
                     "writable": admin,

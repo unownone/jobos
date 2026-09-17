@@ -374,7 +374,8 @@
       fillKinds(document.getElementById("write-kind"), scopeOf(document.getElementById("write-pod").value));
     });
     document.getElementById("share-pod").addEventListener("change", () => {
-      fillKinds(document.getElementById("share-kind"), scopeOf(document.getElementById("share-pod").value));
+      const prev = document.getElementById("share-kind").value;
+      fillKinds(document.getElementById("share-kind"), scopeOf(document.getElementById("share-pod").value), prev);
     });
     document.getElementById("add-item").addEventListener("click", addItem);
     document.getElementById("save-item").addEventListener("click", saveItem);
