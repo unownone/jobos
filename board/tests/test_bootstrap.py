@@ -79,7 +79,7 @@ def test_signup_url_uses_hub_public_url(hub: tuple[TestClient, Settings]) -> Non
     assert url == f"https://hub.example.test/admin/signup#bootstrap={token}"
     page = client.get("/admin/signup")
     assert page.status_code == 200
-    assert "jobOS" in page.text
+    assert "jobOS Harness" in page.text
 
 
 def test_bootstrap_creates_admin_once_and_wipes_plaintext(
