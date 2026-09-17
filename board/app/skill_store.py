@@ -658,6 +658,7 @@ class SkillStore:
             "created_by": fields.get("created_by") or "github",
         }
         if existing is None:
+            payload["id"] = fields.get("id") or f"skl_{slug}"
             stored = self.insert(payload)
             return stored, "inserted"
         if existing.get("origin") != "github":
