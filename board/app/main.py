@@ -314,8 +314,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
-        title="jobOS Hub",
-        description="Job harness coordination plane. Durable state lives in PostgreSQL. Maintainer owns tokens, schema, and uptime.",
+        title="jobOS Harness",
+        description="jobOS Harness helps find jobs. Private live coordination plane. Durable state lives in PostgreSQL. Maintainer owns tokens, schema, and uptime.",
         version="0.5.0",
     )
     app.add_middleware(CandidateGateMiddleware)
