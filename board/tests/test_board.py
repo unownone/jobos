@@ -292,9 +292,12 @@ def test_ui_is_served(client: TestClient) -> None:
     assert "Select a job" not in denied.text
     res = client.get("/", headers=h("admin"))
     assert res.status_code == 200
-    assert "jobOS" in res.text
+    assert "jobOS Harness" in res.text
+    assert "helps find jobs" in res.text
     assert "All statuses" in res.text
     assert "Select a job" in res.text
+    assert 'id="connectForm"' not in res.text
+    assert "Connect</button>" not in res.text
 
 
 def test_env_example_has_empty_placeholders() -> None:

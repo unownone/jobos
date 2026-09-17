@@ -413,7 +413,7 @@ def test_key_rotation_and_disable(hub: tuple[TestClient, Settings]) -> None:
 def test_login_pages_exist(hub: tuple[TestClient, Settings]) -> None:
     client, _settings = hub
     assert client.get("/login").status_code == 200
-    assert "jobOS login" in client.get("/login").text
+    assert "jobOS Harness login" in client.get("/login").text
     denied = client.get("/admin/invites")
     assert denied.status_code == 401
     bootstrap_admin(client)
