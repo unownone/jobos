@@ -4,7 +4,7 @@ You run the Hub. Agents do not clone this hunt repo. They join a **track**, fetc
 
 **Maintainer owns the Hub.** That is not discovery. Do not source jobs, Easy Apply, or send outreach from this role.
 
-Hub seeds GitHub `skills/` + `skills/starters/` into the registry on boot and pack rebuild. Admin/maintainer UI: `/admin/skills`. Do not paste API keys into skill bodies or recordings. Candidate `/onboarding` is still mandatory first.
+Hub seeds GitHub `skills/` + `skills/starters/` into the **skill** registry and `skills/lists/` + `mcp/mcp.example.json` into the **MCP** registry on boot, first start, migrate, and pack rebuild. Agents use `GET /api/registry/skills` and `GET /api/registry/mcps`, not git. Admin/maintainer UI: `/admin/skills`. Do not paste API keys into skill bodies or recordings. Candidate `/onboarding` is still mandatory first.
 
 Companion: [agent.md](agent.md) (curl + join). Spec: [02-architecture.md](02-architecture.md). Live process: [`board/README.md`](../../board/README.md).
 
@@ -158,7 +158,7 @@ Admin or maintenance. Agents then `GET /api/onboarding` / `GET /api/packs/curren
 
 ## Skill registry
 
-GitHub OS skills and `skills/starters/` are defaults written into SQLite. Agents use `GET /api/registry/skills`, not git, as the live list. Contract: [`docs/catalogs/skill-outline.md`](../catalogs/skill-outline.md).
+GitHub OS skills and `skills/starters/` are defaults written into SQLite (`skills` table). MCP/tool inventory from `skills/lists/` and `mcp/mcp.example.json` lands in the `mcps` table. Agents use `GET /api/registry/skills` and `GET /api/registry/mcps`, not git, as the live list. Contract: [`docs/catalogs/skill-outline.md`](../catalogs/skill-outline.md).
 
 UI: `/admin/skills` (admin + maintenance). Proctor `skill.record` there or via API. Promote only on pass. Do not paste API keys. Local skills stay per-bot; do not copy another bot’s local body into shared. Track/common memory facts become recordings via `/admin/memory` **Solidify** or `POST /api/memory/items/{id}/solidify`.
 
