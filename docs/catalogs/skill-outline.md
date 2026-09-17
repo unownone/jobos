@@ -120,6 +120,7 @@ Auth: session, Bearer / `X-Hub-Key`, or compat role token. Unauthenticated → 4
 | PATCH | `/api/registry/skills/{id}` | owner: local only. Maintainer/admin: shared |
 | POST | `/api/registry/skills/{id}/fork` | copy shared (or own) → new local |
 | POST | `/api/registry/recordings` | **any track** submits a recording; enqueues `skill.record` |
+| POST | `/api/memory/items/{id}/move` | author or inspector: move or copy onto another pod |
 | POST | `/api/memory/items/{id}/solidify` | author or maintainer: snapshot a track/common fact into a recording |
 | GET | `/api/registry/recordings` | submitter: own. Maintainer/admin: all |
 | POST | `/api/registry/recordings/{id}/proctor` | **maintainer/admin** after claim: `pass` \| `fail` |

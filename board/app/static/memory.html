@@ -13,18 +13,31 @@
     main { max-width: 72rem; margin: 1.5rem auto; padding: 0 1rem 3rem; }
     a { color: var(--accent); }
     h1 { font-size: 1.15rem; margin: 0; }
-    h2 { font-size: 0.95rem; margin: 1.25rem 0 0.5rem; }
+    h2 { font-size: 0.95rem; margin: 0 0 0.65rem; }
     p, label { color: var(--muted); }
     .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1rem; }
     .row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 0.75rem; align-items: end; }
-    input, select { width: 100%; padding: 0.5rem 0.65rem; border-radius: 8px; border: 1px solid var(--line); background: #0e1218; color: var(--text); }
+    .compose { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
+    .span-3 { grid-column: 1 / -1; }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+    input, select, textarea { width: 100%; padding: 0.5rem 0.65rem; border-radius: 8px; border: 1px solid var(--line); background: #0e1218; color: var(--text); }
+    textarea { min-height: 5.5rem; resize: vertical; }
     button { padding: 0.55rem 0.9rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
     button.ghost { background: #1c2430; border: 1px solid var(--line); }
+    button.danger { background: #7f1d1d; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     th, td { text-align: left; padding: 0.45rem 0.4rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    td.ops { white-space: nowrap; }
+    td.ops button { margin: 0 0 0.25rem 0; }
     .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 650; background: #2a3344; }
     .err { color: var(--bad); }
+    .ok { color: var(--good); }
     .muted { color: var(--muted); font-size: 12px; }
+    .share { display: none; gap: 0.75rem; align-items: end; margin-top: 0.75rem; }
+    .share.open { display: grid; grid-template-columns: 1fr 1fr auto auto; }
+    .check { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 13px; }
+    .check input { width: auto; }
   </style>
 </head>
 <body>
@@ -46,7 +59,38 @@
   </header>
   <main>
     <p id="who">Checking session…</p>
-    <p>Worker pods are private. Track pods are shared on a lane. Common is shared by every track. Recall freely; store only durable facts. Solidify a track/common fact to enqueue <code>skill.record</code> for the maintainer.</p>
+    <p>Worker pods are private. Track pods are shared on a lane. Common is shared by every track. Add, edit, remove, or move a fact onto another track. Solidify a track/common fact to enqueue <code>skill.record</code> for the maintainer.</p>
+    <div class="panel">
+      <h2 id="compose-title">Add a fact</h2>
+      <div class="compose">
+        <div>
+          <label for="write-pod">Pod</label>
+          <select id="write-pod"></select>
+        </div>
+        <div>
+          <label for="write-kind">Kind</label>
+          <select id="write-kind"></select>
+        </div>
+        <div>
+          <label for="write-company">Company (optional)</label>
+          <input id="write-company" placeholder="Acme" />
+        </div>
+        <div class="span-3">
+          <label for="write-title">Title</label>
+          <input id="write-title" placeholder="Greenhouse work-auth radio" />
+        </div>
+        <div class="span-3">
+          <label for="write-body">Fact</label>
+          <textarea id="write-body" placeholder="One durable fact another worker would need tomorrow."></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="add-item" type="button">Add</button>
+        <button id="save-item" type="button" class="ghost" disabled>Save</button>
+        <button id="cancel-edit" type="button" class="ghost" disabled>Cancel</button>
+      </div>
+      <p class="muted" id="compose-status"></p>
+    </div>
     <div class="panel">
       <div class="row">
         <div>
@@ -68,6 +112,18 @@
     <div class="panel">
       <h2>Items</h2>
       <p class="err" id="err"></p>
+      <div id="share-box" class="share">
+        <div>
+          <label for="share-pod">Move / share onto</label>
+          <select id="share-pod"></select>
+        </div>
+        <div>
+          <label for="share-kind">Kind on destination</label>
+          <select id="share-kind"></select>
+        </div>
+        <label class="check"><input id="share-copy" type="checkbox" /> copy (leave original)</label>
+        <button id="share-go" type="button" data-share="pending">Share</button>
+      </div>
       <table>
         <thead>
           <tr>
@@ -79,6 +135,11 @@
     </div>
   </main>
   <script>
+    const KIND_BY_SCOPE = { worker: [], track: [], common: [] };
+    let PODS = [];
+    let editingId = "";
+    let sharingId = "";
+
     function csrfHeaders(extra) {
       const hit = document.cookie.split("; ").find((c) => c.startsWith("hub_csrf="));
       const val = hit ? decodeURIComponent(hit.split("=").slice(1).join("=")) : "";
@@ -97,19 +158,154 @@
       }
       return data;
     }
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+    function scopeOf(podId) {
+      if (!podId || podId === "worker" || String(podId).startsWith("worker:")) return "worker";
+      if (podId === "common" || String(podId).startsWith("common")) return "common";
+      return "track";
+    }
+    function fillSelect(sel, pods, includeAll) {
+      const prefix = includeAll ? '<option value="">visible pods</option>' : "";
+      sel.innerHTML = prefix + pods.map((p) =>
+        '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.label) + "</option>"
+      ).join("");
+    }
+    function fillKinds(sel, scope, preferred) {
+      const kinds = KIND_BY_SCOPE[scope] || KIND_BY_SCOPE.worker;
+      sel.innerHTML = kinds.map((k) =>
+        '<option value="' + escapeHtml(k) + '">' + escapeHtml(k) + "</option>"
+      ).join("");
+      if (preferred && kinds.indexOf(preferred) >= 0) sel.value = preferred;
+    }
+    function writablePods() {
+      return PODS.filter((p) => p.writable !== false);
+    }
+    function resetCompose() {
+      editingId = "";
+      document.getElementById("compose-title").textContent = "Add a fact";
+      document.getElementById("write-title").value = "";
+      document.getElementById("write-body").value = "";
+      document.getElementById("write-company").value = "";
+      document.getElementById("save-item").disabled = true;
+      document.getElementById("cancel-edit").disabled = true;
+      document.getElementById("add-item").disabled = false;
+      document.getElementById("compose-status").textContent = "";
+    }
+    function closeShare() {
+      sharingId = "";
+      document.getElementById("share-box").classList.remove("open");
+    }
     async function boot() {
       const me = await api("/api/auth/me");
       document.getElementById("who").textContent =
         ((me.user && me.user.display_name) || me.actor || me.user_id || "signed in") +
         " · " + (me.track || me.role || "");
       const pods = await api("/api/memory/pods");
-      const sel = document.getElementById("pod");
-      sel.innerHTML = '<option value="">visible pods</option>' +
-        (pods.pods || []).map((p) => '<option value="' + p.id + '">' + p.label + "</option>").join("");
+      PODS = pods.pods || [];
+      Object.assign(KIND_BY_SCOPE, pods.kinds || {});
+      fillSelect(document.getElementById("pod"), PODS, true);
+      fillSelect(document.getElementById("write-pod"), writablePods(), false);
+      fillSelect(document.getElementById("share-pod"), writablePods(), false);
+      fillKinds(document.getElementById("write-kind"), scopeOf(document.getElementById("write-pod").value));
+      fillKinds(document.getElementById("share-kind"), scopeOf(document.getElementById("share-pod").value));
       const policy = pods.write_policy || {};
       document.getElementById("policy").textContent =
         (policy.store_when || "") + " Caps / 15m: " + JSON.stringify(policy.caps || {});
       await load();
+    }
+    function composePayload() {
+      return {
+        pod: document.getElementById("write-pod").value,
+        kind: document.getElementById("write-kind").value,
+        title: document.getElementById("write-title").value.trim(),
+        body: document.getElementById("write-body").value.trim(),
+        company: document.getElementById("write-company").value.trim() || null,
+      };
+    }
+    async function addItem() {
+      document.getElementById("compose-status").textContent = "";
+      try {
+        const data = await api("/api/memory/items", {
+          method: "POST",
+          body: JSON.stringify(composePayload()),
+        });
+        document.getElementById("compose-status").textContent =
+          data.status === "exists" ? "Already stored." : "Stored.";
+        document.getElementById("compose-status").className = "ok";
+        resetCompose();
+        fillKinds(document.getElementById("write-kind"), scopeOf(document.getElementById("write-pod").value));
+        await load();
+      } catch (err) {
+        document.getElementById("compose-status").textContent = String(err.message || err);
+        document.getElementById("compose-status").className = "err";
+      }
+    }
+    async function saveItem() {
+      if (!editingId) return;
+      document.getElementById("compose-status").textContent = "";
+      try {
+        const payload = composePayload();
+        await api("/api/memory/items/" + editingId, {
+          method: "PATCH",
+          body: JSON.stringify({ title: payload.title, body: payload.body }),
+        });
+        document.getElementById("compose-status").textContent = "Updated.";
+        document.getElementById("compose-status").className = "ok";
+        resetCompose();
+        fillKinds(document.getElementById("write-kind"), scopeOf(document.getElementById("write-pod").value));
+        await load();
+      } catch (err) {
+        document.getElementById("compose-status").textContent = String(err.message || err);
+        document.getElementById("compose-status").className = "err";
+      }
+    }
+    function startEdit(item) {
+      editingId = item.id;
+      closeShare();
+      document.getElementById("compose-title").textContent = "Edit " + item.id;
+      const podSel = document.getElementById("write-pod");
+      if ([].some.call(podSel.options, (opt) => opt.value === item.pod)) podSel.value = item.pod;
+      fillKinds(document.getElementById("write-kind"), scopeOf(podSel.value), item.kind);
+      document.getElementById("write-title").value = item.title || "";
+      document.getElementById("write-body").value = item.body || "";
+      document.getElementById("write-company").value = item.company || "";
+      document.getElementById("save-item").disabled = false;
+      document.getElementById("cancel-edit").disabled = false;
+      document.getElementById("add-item").disabled = true;
+      document.getElementById("compose-status").textContent = "";
+      document.getElementById("write-title").focus();
+    }
+    function startShare(item) {
+      sharingId = item.id;
+      const box = document.getElementById("share-box");
+      box.classList.add("open");
+      const dest = document.getElementById("share-pod");
+      fillSelect(dest, writablePods().filter((p) => p.id !== item.pod), false);
+      fillKinds(document.getElementById("share-kind"), scopeOf(dest.value), item.kind);
+      document.getElementById("share-copy").checked = false;
+      document.getElementById("share-go").dataset.share = item.id;
+    }
+    async function shareGo() {
+      if (!sharingId) return;
+      document.getElementById("err").textContent = "";
+      try {
+        await api("/api/memory/items/" + sharingId + "/move", {
+          method: "POST",
+          body: JSON.stringify({
+            pod: document.getElementById("share-pod").value,
+            copy: document.getElementById("share-copy").checked,
+            kind: document.getElementById("share-kind").value || null,
+          }),
+        });
+        closeShare();
+        await load();
+      } catch (err) {
+        document.getElementById("err").textContent = String(err.message || err);
+      }
     }
     async function load() {
       document.getElementById("err").textContent = "";
@@ -135,19 +331,32 @@
             "<td>" + escapeHtml(item.body) +
             (item.company ? '<div class="muted">' + escapeHtml(item.company) + "</div>" : "") +
             "</td>" +
-            "<td>" +
+            '<td class="ops">' +
+            '<button class="ghost" type="button" data-edit="' + item.id + '">Edit</button> ' +
+            '<button class="ghost" type="button" data-share="' + item.id + '">Share</button> ' +
             (canSolidify
               ? '<button class="ghost" type="button" data-solidify="' + item.id + '">Solidify</button> '
               : (item.recording_id ? '<span class="muted">' + escapeHtml(solidLabel) + "</span> " : "")) +
-            '<button class="ghost" type="button" data-id="' + item.id + '">Forget</button></td>';
+            '<button class="ghost" type="button" data-forget="' + item.id + '">Forget</button> ' +
+            '<button class="danger" type="button" data-delete="' + item.id + '">Delete</button></td>';
+          tr.querySelector("[data-edit]").addEventListener("click", () => startEdit(item));
+          tr.querySelector("[data-share]").addEventListener("click", () => startShare(item));
           tb.appendChild(tr);
         });
-        tb.querySelectorAll("button[data-id]").forEach((btn) => {
+        tb.querySelectorAll("button[data-forget]").forEach((btn) => {
           btn.addEventListener("click", async () => {
-            await api("/api/memory/items/" + btn.dataset.id, {
+            await api("/api/memory/items/" + btn.dataset.forget, {
               method: "PATCH",
               body: JSON.stringify({ forget: true }),
             });
+            await load();
+          });
+        });
+        tb.querySelectorAll("button[data-delete]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            await api("/api/memory/items/" + btn.dataset.delete, { method: "DELETE" });
+            if (editingId === btn.dataset.delete) resetCompose();
+            if (sharingId === btn.dataset.delete) closeShare();
             await load();
           });
         });
@@ -161,11 +370,20 @@
         document.getElementById("err").textContent = String(err.message || err);
       }
     }
-    function escapeHtml(value) {
-      return String(value || "").replace(/[&<>"']/g, (ch) => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-      }[ch]));
-    }
+    document.getElementById("write-pod").addEventListener("change", () => {
+      fillKinds(document.getElementById("write-kind"), scopeOf(document.getElementById("write-pod").value));
+    });
+    document.getElementById("share-pod").addEventListener("change", () => {
+      const prev = document.getElementById("share-kind").value;
+      fillKinds(document.getElementById("share-kind"), scopeOf(document.getElementById("share-pod").value), prev);
+    });
+    document.getElementById("add-item").addEventListener("click", addItem);
+    document.getElementById("save-item").addEventListener("click", saveItem);
+    document.getElementById("cancel-edit").addEventListener("click", () => {
+      resetCompose();
+      fillKinds(document.getElementById("write-kind"), scopeOf(document.getElementById("write-pod").value));
+    });
+    document.getElementById("share-go").addEventListener("click", shareGo);
     document.getElementById("load").addEventListener("click", load);
     document.getElementById("logout").addEventListener("click", async (ev) => {
       ev.preventDefault();

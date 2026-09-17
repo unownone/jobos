@@ -369,6 +369,8 @@ def test_e2e_authenticated_admin_opens_skills_and_memory_pages(hub: TestClient) 
     assert "Memory pods" in memory_page.text
     assert "/admin/skills" in memory_page.text
     assert "data-solidify" in memory_page.text
+    assert 'id="add-item"' in memory_page.text
+    assert "data-share" in memory_page.text
 
     listed = client.get("/api/registry/skills")
     assert listed.status_code == 200, listed.text
