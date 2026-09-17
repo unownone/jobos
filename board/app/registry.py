@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth import Principal
+from app.catalog import public_catalog
 from app.db import utc_now
 from app.memory_store import set_solidify_status
 from app.queue import QueueService, claimant_id
@@ -188,6 +189,18 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
     def skills_page(principal: Principal = Depends(principal_dep)) -> FileResponse:
         del principal
         return FileResponse(STATIC_DIR / "skills.html")
+
+    @router.get("/api/registry/catalog")
+    def list_public_catalog(
+        request: Request,
+        tag: str | None = None,
+        role: str | None = None,
+        limit: int = 200,
+    ) -> dict[str, Any]:
+        """Approved shared skills + hosted MCP names. No auth."""
+        if role and role not in SKILL_ROLES:
+            raise HTTPException(status_code=422, detail=f"unknown role {role!r}")
+        return public_catalog(_store(request), tag=tag, role=role, limit=limit)
 
     @router.get("/api/registry/skills")
     def list_skills(

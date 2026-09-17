@@ -417,6 +417,42 @@ class SkillStore:
         row = cur.fetchone()
         return row_to_skill(row) if row else None
 
+    def list_approved_shared(
+        self,
+        *,
+        tag: str | None = None,
+        role: str | None = None,
+        platform: str | None = None,
+        ats: str | None = None,
+        url: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Approved shared catalog only. No local drafts. Safe for unauth CatalogQuery."""
+        limit = max(1, min(int(limit), 500))
+        cur = self.db.conn.execute(
+            """
+            SELECT * FROM skills
+            WHERE scope = 'shared' AND status = 'approved'
+            ORDER BY updated_at DESC LIMIT ?
+            """,
+            (limit,),
+        )
+        out: list[dict[str, Any]] = []
+        for row in cur.fetchall():
+            skill = row_to_skill(row)
+            if skill_matches_query(
+                skill,
+                tag=tag,
+                role=role,
+                platform=platform,
+                ats=ats,
+                url=url,
+                scope="shared",
+                status="approved",
+            ):
+                out.append(skill)
+        return out
+
     def list_visible(
         self,
         principal: Principal,
