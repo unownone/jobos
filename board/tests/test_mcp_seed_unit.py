@@ -36,10 +36,11 @@ def test_example_json_attaches_config() -> None:
 
 def test_fresh_db_seed_is_nonempty_and_idempotent(tmp_path: Path) -> None:
     db = BoardDB(tmp_path / "board.db")
+    first = seed_hub_registries(db)
+    assert first["skills"]["inserted"] > 0
+    assert first["mcps"]["inserted"] > 0
     n_skills = int(db.conn.execute("SELECT COUNT(*) AS n FROM skills").fetchone()["n"])
     n_mcps = int(db.conn.execute("SELECT COUNT(*) AS n FROM mcps").fetchone()["n"])
-    assert n_skills > 0
-    assert n_mcps > 0
     skill_ids = {row["id"] for row in db.conn.execute("SELECT id FROM skills")}
     mcp_ids = {row["id"] for row in db.conn.execute("SELECT id FROM mcps")}
     slugs = {row["slug"] for row in db.conn.execute("SELECT slug FROM mcps")}

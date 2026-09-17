@@ -7,8 +7,6 @@ import json
 import re
 from typing import Any
 
-from fastapi import HTTPException
-
 from app.db import utc_now
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
@@ -255,14 +253,14 @@ class McpStore:
         now = utc_now()
         slug = str(fields["slug"]).strip().lower()
         if not SLUG_RE.match(slug):
-            raise HTTPException(status_code=422, detail="mcp slug is invalid")
+            raise ValueError("mcp slug is invalid")
         mcp_id = fields.get("id") or stable_mcp_id(slug)
         kind = str(fields.get("kind") or "mcp")
         if kind not in MCP_KINDS:
-            raise HTTPException(status_code=422, detail=f"unknown mcp kind {kind!r}")
+            raise ValueError(f"unknown mcp kind {kind!r}")
         status = str(fields.get("status") or "adopted")
         if status not in MCP_STATUSES:
-            raise HTTPException(status_code=422, detail=f"unknown mcp status {status!r}")
+            raise ValueError(f"unknown mcp status {status!r}")
         origin = str(fields.get("origin") or "github")
         if origin not in MCP_ORIGINS:
             origin = "github"
@@ -317,7 +315,7 @@ class McpStore:
     def update(self, mcp_id: str, fields: dict[str, Any], *, commit: bool = True) -> dict[str, Any]:
         current = self.get(mcp_id)
         if current is None:
-            raise HTTPException(status_code=404, detail="mcp not found")
+            raise KeyError(mcp_id)
         merged = dict(current)
         merged.update(fields)
         merged["content_hash"] = content_hash_for(merged)
@@ -361,7 +359,7 @@ class McpStore:
             self.db.conn.commit()
         stored = self.get(mcp_id)
         if stored is None:
-            raise HTTPException(status_code=404, detail="mcp not found")
+            raise KeyError(mcp_id)
         return stored
 
     def upsert_github(self, fields: dict[str, Any]) -> tuple[dict[str, Any], str]:

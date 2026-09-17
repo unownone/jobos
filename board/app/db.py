@@ -209,12 +209,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     ensure_messages_schema(conn)
     ensure_a2a_schema(conn)
     ensure_memory_schema(conn)
-    # Skill/MCP tables live in dedicated modules; import here to avoid
-    # circular imports (those modules import utc_now from this file).
+    # MCP schema only — skill_store imports FastAPI and must not load during
+    # hub_ensure_bootstrap / other sqlite-only scripts.
     from app.mcp_store import ensure_mcp_schema
-    from app.skill_store import ensure_skill_schema
 
-    ensure_skill_schema(conn)
     ensure_mcp_schema(conn)
 
 
@@ -266,11 +264,6 @@ class BoardDB:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.conn = connect(db_path)
-        # Schema migrate is connect()/_migrate. Seed git registries on first
-        # open so a fresh DB is non-empty without waiting for FastAPI routes.
-        from app.registry_seed import seed_hub_registries
-
-        seed_hub_registries(self)
 
     def close(self) -> None:
         self.conn.close()
