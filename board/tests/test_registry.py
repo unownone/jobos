@@ -105,6 +105,8 @@ def test_github_starters_seed_on_boot(hub: tuple[TestClient, Settings]) -> None:
     assert "job-apply" in slugs
     assert "job-outreach" in slugs
     assert "skill-maintainer" in slugs
+    assert "compose-outreach" in slugs
+    assert "playwright-cli-skill" in slugs
     assert "apply-workday" in slugs
     assert "source-indeed" in slugs
     assert "outreach-email" in slugs
@@ -115,12 +117,68 @@ def test_github_starters_seed_on_boot(hub: tuple[TestClient, Settings]) -> None:
     assert "source" in discovery["tags"]
 
 
+def test_mcp_registry_seeded_on_boot(hub: tuple[TestClient, Settings]) -> None:
+    client, _ = hub
+    res = client.get("/api/registry/mcps", headers=h("discovery"))
+    assert res.status_code == 200, res.text
+    payload = res.json()
+    assert payload["count"] > 0
+    slugs = {row["slug"] for row in payload["mcps"]}
+    assert "exa-mcp" in slugs
+    assert "gmail-mcp" in slugs
+    assert "indeed-mcp" in slugs
+    assert "playwright-mcp" in slugs
+    adopted = client.get(
+        "/api/registry/mcps",
+        headers=h("discovery"),
+        params={"status": "adopted", "kind": "mcp"},
+    )
+    assert adopted.status_code == 200
+    assert adopted.json()["count"] > 0
+    assert all(row["kind"] == "mcp" and row["status"] == "adopted" for row in adopted.json()["mcps"])
+    one = client.get("/api/registry/mcps/exa-mcp", headers=h("discovery"))
+    assert one.status_code == 200, one.text
+    mcp = one.json()["mcp"]
+    assert mcp["id"] == "mcp_exa-mcp"
+    assert mcp["origin"] == "github"
+    assert mcp["status"] == "adopted"
+    assert mcp["config"]
+    rejected = client.get(
+        "/api/registry/mcps",
+        headers=h("discovery"),
+        params={"status": "rejected", "kind": "mcp"},
+    )
+    assert rejected.json()["count"] > 0
+
+
+def test_registry_seed_upsert_is_idempotent(hub: tuple[TestClient, Settings]) -> None:
+    client, _ = hub
+    maint_keys = mint_track_agents(client, "maintenance", ["maint-seed-idemp"])
+    skills = client.get("/api/registry/skills", headers=bearer(maint_keys[0]))
+    mcps = client.get("/api/registry/mcps", headers=bearer(maint_keys[0]))
+    assert skills.json()["count"] > 0
+    assert mcps.json()["count"] > 0
+    skill_ids = sorted(row["id"] for row in skills.json()["skills"])
+    mcp_ids = sorted(row["id"] for row in mcps.json()["mcps"])
+    seeded = client.post("/api/registry/seed", headers=bearer(maint_keys[0]))
+    assert seeded.status_code == 200, seeded.text
+    assert seeded.json()["skills"]["inserted"] == 0
+    assert seeded.json()["mcps"]["inserted"] == 0
+    again_skills = client.get("/api/registry/skills", headers=bearer(maint_keys[0]))
+    again_mcps = client.get("/api/registry/mcps", headers=bearer(maint_keys[0]))
+    assert sorted(row["id"] for row in again_skills.json()["skills"]) == skill_ids
+    assert sorted(row["id"] for row in again_mcps.json()["mcps"]) == mcp_ids
+    assert again_skills.json()["count"] == skills.json()["count"]
+    assert again_mcps.json()["count"] == mcps.json()["count"]
+
+
 def test_meta_lists_skill_record_kind(hub: tuple[TestClient, Settings]) -> None:
     client, _ = hub
     res = client.get("/api/meta", headers=h("discovery"))
     assert res.status_code == 200
     assert "skill.record" in res.json()["queue_kinds"]
     assert res.json()["registry"] == "/api/registry/skills"
+    assert res.json()["mcp_registry"] == "/api/registry/mcps"
 
 
 def test_local_skill_is_invisible_to_other_bots(hub: tuple[TestClient, Settings]) -> None:

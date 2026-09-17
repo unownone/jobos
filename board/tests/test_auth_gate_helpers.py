@@ -45,6 +45,7 @@ def test_path_is_public_rejects_sensitive_surfaces() -> None:
         "/api/users",
         "/api/meta",
         "/api/registry/skills",
+        "/api/registry/mcps",
         "/api/memory/recall",
         "/docs",
         "/openapi.json",
