@@ -23,7 +23,7 @@ export BOARD_PORT="${BOARD_PORT:-8787}"
 echo "Job Hub deploy"
 echo "  bind: ${BOARD_HOST}:${BOARD_PORT}"
 echo "  gitignored secrets: ${BOARD}/.env ${BOARD}/tokens.local.json"
-echo "  sqlite: ${BOARD}/data/board.db"
+echo "  postgres: ${DATABASE_URL:-set DATABASE_URL}"
 if [[ -n "${HUB_PUBLIC_URL:-}" ]]; then
   echo "  public url: ${HUB_PUBLIC_URL}"
 fi

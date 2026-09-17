@@ -1,7 +1,7 @@
 """Candidate profile persistence, public slice, and onboarding validation.
 
 Never invent a live candidate. The example profile is rejected as production data.
-Stored next to the Hub sqlite file so Docker `/data` volumes keep it.
+Stored in Postgres `hub_blobs` so Hub containers stay stateless.
 """
 
 from __future__ import annotations
@@ -14,6 +14,20 @@ from typing import Any
 import yaml
 
 from app.settings import Settings
+
+CANDIDATE_BLOB_KEY = "candidate.yaml"
+RESUME_BLOB_KEY = "candidate-resume.pdf"
+
+_blob_store: Any | None = None
+
+
+def bind_blob_store(store: Any | None) -> None:
+    global _blob_store
+    _blob_store = store
+
+
+def blob_store() -> Any | None:
+    return _blob_store
 
 CANDIDATE_PUBLIC_FIELDS = [
     "target.titles",
@@ -96,6 +110,72 @@ def repo_candidate_path(settings: Settings) -> Path:
 def repo_resume_dir(settings: Settings) -> Path:
     root = settings.repo_root or settings.board_dir.parent
     return root / "assets" / "resume"
+
+
+def _as_bytes(content: Any) -> bytes:
+    if isinstance(content, memoryview):
+        return content.tobytes()
+    if isinstance(content, bytearray):
+        return bytes(content)
+    if isinstance(content, bytes):
+        return content
+    if isinstance(content, str):
+        return content.encode("utf-8")
+    return bytes(content)
+
+
+def _store(db: Any | None) -> Any | None:
+    return db if db is not None else _blob_store
+
+
+def candidate_blob_text(db: Any | None = None) -> str | None:
+    store = _store(db)
+    if store is None:
+        return None
+    blob = store.get_blob(CANDIDATE_BLOB_KEY)
+    if not blob or not blob.get("content"):
+        return None
+    return _as_bytes(blob["content"]).decode("utf-8")
+
+
+def resume_blob_bytes(db: Any | None = None) -> bytes | None:
+    store = _store(db)
+    if store is None:
+        return None
+    blob = store.get_blob(RESUME_BLOB_KEY)
+    if not blob or not blob.get("content"):
+        return None
+    return _as_bytes(blob["content"])
+
+
+def write_candidate_yaml(settings: Settings, text: str, db: Any | None = None) -> None:
+    store = _store(db)
+    if store is None:
+        raise RuntimeError("Hub database is required to store the candidate profile")
+    store.put_blob(
+        CANDIDATE_BLOB_KEY,
+        text.encode("utf-8"),
+        content_type="text/yaml",
+        filename="candidate.yaml",
+    )
+    dest = hub_candidate_path(settings)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(text, encoding="utf-8")
+
+
+def write_resume_pdf(settings: Settings, raw: bytes, db: Any | None = None) -> None:
+    store = _store(db)
+    if store is None:
+        raise RuntimeError("Hub database is required to store the resume PDF")
+    store.put_blob(
+        RESUME_BLOB_KEY,
+        raw,
+        content_type="application/pdf",
+        filename="candidate-resume.pdf",
+    )
+    dest = hub_resume_path(settings)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(raw)
 
 
 def resolve_candidate_path(settings: Settings) -> Path | None:
@@ -185,8 +265,12 @@ def public_candidate_at(path: Path | None) -> dict[str, Any]:
     return public_slice_from_text(text)
 
 
-def candidate_revision(settings: Settings) -> str | None:
-    """Bump when the hub/repo candidate file bytes change. Agents must re-fetch."""
+def candidate_revision(settings: Settings, db: Any | None = None) -> str | None:
+    """Bump when postgres blob or hub/repo candidate file bytes change. Agents must re-fetch."""
+    text = candidate_blob_text(db)
+    if text is not None and text.strip():
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        return f"postgres-{digest}"
     path = resolve_candidate_path(settings)
     if path is None or not path.is_file():
         return None
@@ -195,18 +279,23 @@ def candidate_revision(settings: Settings) -> str | None:
     return f"{mtime}-{digest}"
 
 
-def public_candidate_for_settings(settings: Settings) -> dict[str, Any]:
-    path = resolve_candidate_path(settings)
-    payload = public_candidate_at(path)
-    if path is not None and path == hub_candidate_path(settings):
-        payload["source"] = "hub-data"
-    elif path is not None:
-        payload["source"] = "repo"
+def public_candidate_for_settings(settings: Settings, db: Any | None = None) -> dict[str, Any]:
+    text = candidate_blob_text(db)
+    if text is not None and text.strip():
+        payload = public_slice_from_text(text)
+        payload["source"] = "postgres"
     else:
-        payload["source"] = "missing"
-    resume = resolve_resume_path(settings)
+        path = resolve_candidate_path(settings)
+        payload = public_candidate_at(path)
+        if path is not None and path == hub_candidate_path(settings):
+            payload["source"] = "postgres"
+        elif path is not None:
+            payload["source"] = "repo"
+        else:
+            payload["source"] = "missing"
+    resume = resume_blob_bytes(db) is not None or resolve_resume_path(settings) is not None
     payload["resume_url"] = "/api/candidate/resume" if resume else None
-    payload["revision"] = candidate_revision(settings)
+    payload["revision"] = candidate_revision(settings, db)
     return payload
 
 
@@ -308,14 +397,29 @@ def parse_candidate_body(raw: bytes, content_type: str) -> dict[str, Any]:
     return normalize_profile(loaded)
 
 
-def candidate_status(settings: Settings) -> dict[str, Any]:
+def candidate_status(settings: Settings, db: Any | None = None) -> dict[str, Any]:
+    text = candidate_blob_text(db)
     path = resolve_candidate_path(settings)
-    resume = resolve_resume_path(settings)
+    resume = resume_blob_bytes(db)
+    resume_present = resume is not None or resolve_resume_path(settings) is not None
     missing: list[str] = ["profiles/candidate.yaml"]
     onboarded = False
     present = False
-    if path is not None and path.is_file():
+    source = "missing"
+    if text is not None and text.strip():
         present = True
+        source = "postgres"
+        try:
+            loaded = yaml.safe_load(text)
+            data = normalize_profile(loaded if isinstance(loaded, dict) else {})
+            missing = validate_profile(data)
+            onboarded = not missing
+        except (yaml.YAMLError, ValueError):
+            missing = ["unreadable_candidate_yaml"]
+            onboarded = False
+    elif path is not None and path.is_file():
+        present = True
+        source = "postgres" if path == hub_candidate_path(settings) else "repo"
         try:
             data = normalize_profile(load_profile_dict(path))
             missing = validate_profile(data)
@@ -323,8 +427,8 @@ def candidate_status(settings: Settings) -> dict[str, Any]:
         except (OSError, yaml.YAMLError, ValueError):
             missing = ["unreadable_candidate_yaml"]
             onboarded = False
-    ready = onboarded and resume is not None
-    if onboarded and resume is None:
+    ready = onboarded and resume_present
+    if onboarded and not resume_present:
         next_step = "resume"
     elif not onboarded:
         next_step = "onboarding"
@@ -333,15 +437,13 @@ def candidate_status(settings: Settings) -> dict[str, Any]:
     return {
         "present": present,
         "onboarded": onboarded,
-        "resume_present": resume is not None,
+        "resume_present": resume_present,
         "ready_for_agents": ready,
         "missing": missing,
         "onboarding_url": "/onboarding",
         "next_step": next_step,
-        "source": "hub-data"
-        if path == hub_candidate_path(settings)
-        else ("repo" if path else "missing"),
-        "revision": candidate_revision(settings),
+        "source": source,
+        "revision": candidate_revision(settings, db),
     }
 
 

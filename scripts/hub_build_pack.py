@@ -4,6 +4,7 @@
 # dependencies = [
 #   "argon2-cffi>=23",
 #   "pyyaml>=6",
+#   "psycopg[binary]>=3.2",
 # ]
 # ///
 """Build an immutable Job Hub skill/MCP pack from the operator checkout."""

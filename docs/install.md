@@ -1,6 +1,6 @@
 # Install and host jobOS Hub
 
-jobOS Hub is the live coordination plane for the job harness. One FastAPI process. SQLite on a volume. Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
+jobOS Hub is the live coordination plane for the job harness. One FastAPI process. PostgreSQL for durable state (not a Hub volume). Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
 
 **Onboarding is the first thing you do after the process is up.** Until a truthful candidate profile exists, jobs, invites, queues, messages, and A2A sends return `409 candidate_required`. Do not copy `profiles/candidate.example.yaml` into production.
 
@@ -39,7 +39,7 @@ curl -sS -X POST "$HUB_URL/api/jobs" -H "X-Role: discovery" ...
 
 ## Docker Compose (plain)
 
-Hub only. Binds **8787**. Persistence is the `hub-data` volume (`/data` in the container: sqlite including **memory pods**, packs, candidate yaml, resume, `.env`). There is no separate vector database.
+Hub only. Binds **8787**. Persistence is PostgreSQL in the Compose file (no Hub volume). Postgres has **no published ports**. Data files live on the host at `~/.jobos/pgdata` (override with `JOBOS_PGDATA`). Packs rebuild into `/tmp`. There is no separate vector database.
 
 ```bash
 cd /path/to/jobos
@@ -56,7 +56,7 @@ Open `http://127.0.0.1:8787/admin/signup`. After signup, `/onboarding`.
 
 Override the published port with `HUB_PORT=343` if 8787 is taken (`http://127.0.0.1:343` — also set `HUB_PUBLIC_HOST` / `HUB_PUBLIC_URL` to match).
 
-Stop: `docker compose -f docker-compose.plain.yml down` (keeps the volume). Destroy data: `down -v`.
+Stop: `docker compose -f docker-compose.plain.yml down` (keeps `~/.jobos/pgdata`). Destroy data: delete that directory (Hub named volumes are not used).
 
 ## Docker Compose + Traefik (public host)
 
@@ -77,9 +77,9 @@ Put a real TLS certificate in front if you need one (Traefik `websecure` already
 Coolify has no universal one-click URL. Create a **Docker Compose** resource pointed at this GitHub repo.
 
 1. Source: `https://github.com/unownone/jobos` (branch `main`).
-2. Compose file: `docker-compose.yml` (Hub on 8787, volume `hub-data`). Do not invent a second stack.
+2. Compose file: `docker-compose.yml` (Hub on 8787 plus internal Postgres). Do not invent a second stack.
 3. Set `HUB_PUBLIC_URL` (and usually `HUB_PUBLIC_HOST`) to the Coolify FQDN, e.g. `https://hub.example.com`.
-4. Persist the named volume. Onboarding YAML and sqlite live under `/data`.
+4. Persist host bind `JOBOS_PGDATA` (default `~/.jobos/pgdata`). The Hub container has no volume.
 5. After first boot, open `/admin/signup` then `/onboarding`. Healthcheck is `GET /health` on 8787 inside the container.
 
 Same image as Railway and local Compose (`Dockerfile` at repo root).
@@ -96,24 +96,18 @@ HUB_PUBLIC_HOST=<your-railway-domain>
 JOBOS_NONINTERACTIVE=1
 ```
 
-Mount a volume at `/data` (sqlite, candidate yaml, resume, secrets). Healthcheck path is `/health`. Do not require `ready_for_agents` for the probe — that stays false until onboarding.
+Provide `DATABASE_URL` to PostgreSQL (Railway plugin or a private instance). Do not publish Postgres. Healthcheck path is `/health`. Do not require `ready_for_agents` for the probe — that stays false until onboarding.
 
 ## Docker (no Compose)
 
 ```bash
 docker build -t jobos-hub .
-docker run -d --name jobos-hub --restart unless-stopped \
-  -p 8787:8787 \
-  -e JOBOS_NONINTERACTIVE=1 \
-  -e HUB_PUBLIC_HOST=127.0.0.1:8787 \
-  -e HUB_PUBLIC_URL=http://127.0.0.1:8787 \
-  -v jobos-data:/data \
-  jobos-hub
-
-docker logs -f jobos-hub   # copy the Admin signup URL
+# Compose is the supported path (Hub + internal Postgres). A lone
+# `docker run` needs DATABASE_URL to a Postgres that is not published
+# to the internet, plus the same env as docker-compose.yml.
 ```
 
-Same image as Compose. Same `/data` layout. Same onboarding gate.
+Compose is required for a full install. The Hub image is stateless.
 
 ## Bare metal (uv)
 
@@ -125,7 +119,7 @@ export HUB_PUBLIC_HOST=127.0.0.1:8787
 bash scripts/hub_deploy.sh
 ```
 
-Listens on `0.0.0.0:8787`. Secrets: gitignored `board/.env` and `board/tokens.local.json`. SQLite: `board/data/board.db`. Dry run: `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
+Listens on `0.0.0.0:8787`. Secrets: gitignored `board/.env` and `board/tokens.local.json`. Set `DATABASE_URL` to PostgreSQL. Dry run: `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
 
 ## Reverse proxy / TLS
 
@@ -134,21 +128,23 @@ Plain Compose already publishes 8787. For a hostname:
 - **Caddy** (example): `hunt.example.com { reverse_proxy 127.0.0.1:8787 }`
 - **nginx**: `proxy_pass http://127.0.0.1:8787;` plus WebSocket-unrelated HTTP/1.1
 - **Cloudflare Tunnel / Tailscale**: point at 8787; set `HUB_PUBLIC_URL` to the public origin so invite links work
-- **Traefik template**: repo-root `docker-compose.yml`
+- **Traefik template**: repo-root `docker-compose.traefik.yml`
 
 Always set `HUB_PUBLIC_URL` (or `HUB_PUBLIC_HOST`) to the origin browsers and agents actually use. Never put `jh_boot_` / `jh_agt_` / `BOARD_TOKEN_*` in that URL.
 
 ## Persistence and backups
 
-| Path in container | What |
-| --- | --- |
-| `/data/board.db` | Jobs, users, queue, messages, A2A tasks/peers |
-| `/data/packs/` | Skill/MCP zip snapshots |
-| `/data/profiles/candidate.yaml` | Live candidate (not git) |
-| `/data/candidate-resume.pdf` | Resume PDF |
-| `/data/hub.env` + `tokens.local.json` | Role + bootstrap secrets |
+The Hub container stores nothing durable on disk. PostgreSQL is the database.
 
-Backup the Docker volume (`docker volume inspect jobos-plain_hub-data` or `jobos_hub-data`). Airgap export for git: admin `GET /api/export/ledger`.
+| Where | What |
+| --- | --- |
+| Postgres (internal Compose service) | Jobs, users, sessions, queue, messages, A2A, memory pods, candidate YAML, resume PDF, bootstrap token, token-burn metrics |
+| `/tmp/jobos-packs/` in Hub | Skill/MCP zip snapshots (rebuilt on start) |
+| Host `~/.jobos/pgdata` | Postgres files (bind mount, not a named Docker volume) |
+
+Backup `~/.jobos/pgdata` (or `JOBOS_PGDATA`) while Postgres is stopped, or `pg_dump` from the Hub network. Airgap export for git: admin `GET /api/export/ledger`.
+
+Postgres is **not** published on the host. Do not add a `ports:` mapping for it.
 
 ## Health
 
@@ -185,13 +181,13 @@ See [`docs/job-hub/a2a.md`](job-hub/a2a.md).
 | `409 candidate_required` | Finish `/onboarding`. Example Ada Example YAML is rejected. |
 | Invite URLs point at 127.0.0.1 | Set `HUB_PUBLIC_HOST` / `HUB_PUBLIC_URL` to the public origin and recreate the container. |
 | Agents invent a candidate | Hub `candidate.present` is false — they must stop. |
-| Lost admin password | Restore `/data` from backup. Do not invent `candidate.yaml` to “unblock”. |
+| Lost admin password | Restore `~/.jobos/pgdata` (or `JOBOS_PGDATA`) from backup. Do not invent `candidate.yaml` to “unblock”. |
 | Docker healthcheck failing | `docker compose logs hub`. `/health` must answer on 8787 inside the container. |
 | Traefik 404 | Confirm `traefik/dynamic.yml` service URL is `http://hub:8787` and the `hub` service is healthy. |
 
 ## Deploy on push (this host)
 
-GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose + Traefik, volume preserved). Pull requests run **Deploy check** first (SSH wiring; no ship). GitHub SSH uses `ssh.github.com:443` and `~/.ssh/jobos_deploy`. Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
+GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose, Postgres bind at `~/.jobos/pgdata`). Pull requests run **Deploy check** first (SSH wiring; no ship). GitHub SSH uses `ssh.github.com:443` and `~/.ssh/jobos_deploy`. Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
 
 ```bash
 bash scripts/hub_host_deploy.sh   # manual ship of origin/main on the host

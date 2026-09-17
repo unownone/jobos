@@ -2,9 +2,10 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "pyyaml>=6",
+#   "psycopg[binary]>=3.2",
 # ]
 # ///
-"""Import ledger/jobs YAML (+ optional events.jsonl) into the hunt board SQLite DB.
+"""Import ledger/jobs YAML (+ optional events.jsonl) into the hunt board Postgres DB.
 
 Maintainer / maintenance hygiene. Skips `_*.yaml`. Does not copy resume PDFs or secrets.
 """

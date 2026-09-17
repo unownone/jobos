@@ -276,7 +276,7 @@ def create_export_router(principal_dep: Any) -> APIRouter:
                 "people": people,
                 "events": events,
                 "files": sorted(files),
-                "source": "hub-sqlite",
+                "source": "hub-postgres",
             }
         payload = tar_bytes(files)
         return StreamingResponse(

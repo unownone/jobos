@@ -1,4 +1,4 @@
-"""SQLite FTS memory pods: worker (private), track (shared), common."""
+"""Postgres memory pods: worker (private), track (shared), common."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
 
 from app.constants import TRACKS
+from app.sql import column_names as sql_column_names
 from app.memory_policy import (
     HEARTBEAT_LIMIT,
     POD_COMMON,
@@ -78,32 +79,6 @@ CREATE INDEX IF NOT EXISTS idx_memory_created_by ON memory_items(created_by, cre
 CREATE INDEX IF NOT EXISTS idx_memory_recording ON memory_items(recording_id);
 """
 
-FTS_SCHEMA = """
-CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
-    title, body, company, tags,
-    content='memory_items',
-    content_rowid='rowid'
-);
-"""
-
-FTS_TRIGGERS = """
-CREATE TRIGGER IF NOT EXISTS memory_ai AFTER INSERT ON memory_items BEGIN
-  INSERT INTO memory_fts(rowid, title, body, company, tags)
-  VALUES (new.rowid, new.title, new.body, COALESCE(new.company, ''), COALESCE(new.tags_json, ''));
-END;
-CREATE TRIGGER IF NOT EXISTS memory_ad AFTER DELETE ON memory_items BEGIN
-  INSERT INTO memory_fts(memory_fts, rowid, title, body, company, tags)
-  VALUES ('delete', old.rowid, old.title, old.body, COALESCE(old.company, ''), COALESCE(old.tags_json, ''));
-END;
-CREATE TRIGGER IF NOT EXISTS memory_au AFTER UPDATE ON memory_items BEGIN
-  INSERT INTO memory_fts(memory_fts, rowid, title, body, company, tags)
-  VALUES ('delete', old.rowid, old.title, old.body, COALESCE(old.company, ''), COALESCE(old.tags_json, ''));
-  INSERT INTO memory_fts(rowid, title, body, company, tags)
-  VALUES (new.rowid, new.title, new.body, COALESCE(new.company, ''), COALESCE(new.tags_json, ''));
-END;
-"""
-
-
 class MemoryPrincipal(Protocol):
     role: str
     actor: str
@@ -132,7 +107,10 @@ def _iso_future(days: int, now: datetime | None = None) -> str:
 
 
 def _column_names(conn: Any, table: str) -> set[str]:
-    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    try:
+        return sql_column_names(conn, table)
+    except Exception:
+        return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
 
 
 def ensure_memory_schema(conn: Any) -> None:
@@ -144,12 +122,6 @@ def ensure_memory_schema(conn: Any) -> None:
         )
     if "recording_id" not in cols:
         conn.execute("ALTER TABLE memory_items ADD COLUMN recording_id TEXT")
-    try:
-        conn.executescript(FTS_SCHEMA)
-        conn.executescript(FTS_TRIGGERS)
-    except Exception:
-        # FTS5 is optional. LIKE fallback still works.
-        pass
 
 
 def _load_tags(raw: str | None) -> list[str]:
@@ -347,20 +319,6 @@ def list_items(
 
     match = fts_match_query(q)
     if match:
-        try:
-            sql = f"""
-                SELECT memory_items.* FROM memory_items
-                JOIN memory_fts ON memory_fts.rowid = memory_items.rowid
-                WHERE {' AND '.join(clauses)} AND memory_fts MATCH ?
-                ORDER BY pinned DESC, importance DESC, memory_items.updated_at DESC
-                LIMIT ?
-            """
-            cur = db.conn.execute(sql, [*args, match, cap])
-            rows = cur.fetchall()
-            if rows:
-                return [row_to_item(row, compact=compact) for row in rows]
-        except Exception:
-            pass
         like = f"%{q.strip()}%"
         clauses.append("(title LIKE ? OR body LIKE ? OR COALESCE(company, '') LIKE ?)")
         args.extend([like, like, like])

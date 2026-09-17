@@ -1,6 +1,6 @@
 # jobOS Hub
 
-Private **live coordination plane** for a multi-agent job hunt. FastAPI + SQLite + an operator web UI.
+Private **live coordination plane** for a multi-agent job hunt. FastAPI + PostgreSQL + an operator web UI.
 
 **jobOS** is a job harness. **Maintainer owns and maintains this Hub** (skill-maintainer / `maintenance` role): process hygiene, token issuance and rotation, uptime, schema, benchmarks, and share/tunnel setup. Discovery, apply, and outreach **consume** it. They do not own it.
 
@@ -28,9 +28,9 @@ We run the hunt on **one shared board**, not a Sheet or CSV mirror.
 ```mermaid
 flowchart LR
   subgraph maintainer [Maintainer owns]
-    board[Hunt board FastAPI + SQLite]
+    board[Hunt board FastAPI + Postgres]
     tokens[gitignored role tokens]
-    metrics[metrics.sqlite token burn]
+    metrics[token_burn in Postgres]
   end
 
   tokens --> board
@@ -248,7 +248,7 @@ curl -sS "$BOARD_URL/api/metrics/token_burn" \
   }'
 ```
 
-Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admin/maintenance. Storage is gitignored `board/data/metrics.sqlite` + `metrics.jsonl`.
+Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admin/maintenance. Storage is the Hub PostgreSQL `token_burn` table.
 
 ## Maintainer runbook
 
@@ -257,6 +257,7 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 3. Issue each bot its token from `board/.env` / `--print`. Do not commit that file.
 4. Optional: import git history  
    `uv run scripts/board_import_ledger.py --db board/data/board.db`  
+   (`DATABASE_URL` selects Postgres; `--db` is only a schema key in tests)  
    (skips `_example.yaml`; no resume PDFs).
 5. Keep the process up. Rotate a token if a bot leaks it (`--rotate ROLE`).
 6. Periodically: `uv run board/scripts/benchmark.py --url http://127.0.0.1:8787` and read [`BENCHMARKS.md`](BENCHMARKS.md).

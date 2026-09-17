@@ -19,6 +19,7 @@ from app.urls import resolve_public_url
 
 BOOTSTRAP_PREFIX = "jh_boot_"
 BOOTSTRAP_META_KEY = "bootstrap"
+BOOTSTRAP_PLAIN_KEY = "bootstrap.token"
 BOOTSTRAP_TTL = timedelta(days=7)
 SESSION_IDLE = timedelta(hours=12)
 PASSWORD_MIN_LEN = 8
@@ -138,7 +139,7 @@ def upsert_tokens_json(path: Path, *, bootstrap: str | None, remove_bootstrap: b
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def wipe_bootstrap_plaintext(settings: Settings) -> None:
+def wipe_bootstrap_plaintext(settings: Settings, db: BoardDB | None = None) -> None:
     env_file = env_path_for(settings)
     if env_file.is_file():
         upsert_env_file(
@@ -151,6 +152,8 @@ def wipe_bootstrap_plaintext(settings: Settings) -> None:
     json_file = tokens_json_path_for(settings)
     if json_file.is_file():
         upsert_tokens_json(json_file, bootstrap=None, remove_bootstrap=True)
+    if db is not None:
+        db.delete_kv(BOOTSTRAP_PLAIN_KEY)
 
 
 def _parse_ts(raw: str | None) -> datetime | None:
@@ -176,7 +179,7 @@ def _token_expired(created_at: str | None) -> bool:
 def ensure_bootstrap(settings: Settings, db: BoardDB) -> str | None:
     """Mint or reuse unused bootstrap token. Returns plaintext if still unused."""
     if db.admin_bootstrapped():
-        wipe_bootstrap_plaintext(settings)
+        wipe_bootstrap_plaintext(settings, db)
         return None
 
     meta = db.get_secret_meta(BOOTSTRAP_META_KEY)
@@ -185,17 +188,21 @@ def ensure_bootstrap(settings: Settings, db: BoardDB) -> str | None:
         env_file = env_path_for(settings)
         if env_file.is_file():
             env_token = parse_env_file(env_file).get(TOKEN_ENV_KEY, "").strip()
+    if not env_token:
+        env_token = (db.get_kv(BOOTSTRAP_PLAIN_KEY) or "").strip()
 
     if meta and meta.get("used_at"):
+        db.delete_kv(BOOTSTRAP_PLAIN_KEY)
         return None
 
     if meta and not _token_expired(str(meta.get("created_at") or "")):
         stored_hash = str(meta.get("value_hash") or "")
         if env_token and sha256_hex(env_token) == stored_hash:
+            _persist_plaintext(settings, env_token, db)
             return env_token
         if env_token and sha256_hex(env_token) != stored_hash:
             db.upsert_secret_meta(BOOTSTRAP_META_KEY, sha256_hex(env_token))
-            _persist_plaintext(settings, env_token)
+            _persist_plaintext(settings, env_token, db)
             return env_token
         return env_token or None
 
@@ -203,11 +210,11 @@ def ensure_bootstrap(settings: Settings, db: BoardDB) -> str | None:
     if token and not token.startswith(BOOTSTRAP_PREFIX):
         token = BOOTSTRAP_PREFIX + token
     db.upsert_secret_meta(BOOTSTRAP_META_KEY, sha256_hex(token))
-    _persist_plaintext(settings, token)
+    _persist_plaintext(settings, token, db)
     return token
 
 
-def _persist_plaintext(settings: Settings, token: str) -> None:
+def _persist_plaintext(settings: Settings, token: str, db: BoardDB | None = None) -> None:
     env_file = env_path_for(settings)
     extras: dict[str, str | None] = {TOKEN_ENV_KEY: token, USED_ENV_KEY: None}
     if settings.public_url:
@@ -217,6 +224,8 @@ def _persist_plaintext(settings: Settings, token: str) -> None:
     extras.setdefault("BOARD_PORT", str(settings.port))
     upsert_env_file(env_file, extras)
     upsert_tokens_json(tokens_json_path_for(settings), bootstrap=token)
+    if db is not None:
+        db.put_kv(BOOTSTRAP_PLAIN_KEY, token)
 
 
 def validate_signup(email: str, password: str) -> str | None:
@@ -265,6 +274,7 @@ def consume_bootstrap(
         display_name="admin",
     )
     db.mark_secret_used(BOOTSTRAP_META_KEY)
+    wipe_bootstrap_plaintext(settings, db)
     session_plain = secrets.token_urlsafe(32)
     csrf_plain = secrets.token_urlsafe(32)
     expires = datetime.now(timezone.utc) + SESSION_IDLE
@@ -275,7 +285,6 @@ def consume_bootstrap(
         expires_at=expires.strftime("%Y-%m-%dT%H:%M:%SZ"),
         csrf_hash=sha256_hex(csrf_plain),
     )
-    wipe_bootstrap_plaintext(settings)
     db.add_event(
         job_id=None,
         actor_role="admin",

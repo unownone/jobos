@@ -4,6 +4,7 @@
 #   "fastapi>=0.115",
 #   "httpx>=0.27",
 #   "python-multipart>=0.0.12",
+#   "psycopg[binary]>=3.2",
 # ]
 # ///
 """Maintainer benchmark suite for the hunt board.

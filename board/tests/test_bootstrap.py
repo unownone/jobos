@@ -199,7 +199,7 @@ def test_hub_ensure_bootstrap_prints_signup_url(tmp_path: Path) -> None:
 def test_hub_deploy_dry_run_prints_paths(tmp_path: Path) -> None:
     result = subprocess.run(
         ["bash", str(DEPLOY)],
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
         env={
@@ -210,6 +210,7 @@ def test_hub_deploy_dry_run_prints_paths(tmp_path: Path) -> None:
         },
     )
     combined = result.stdout + result.stderr
+    assert result.returncode == 0, combined
     assert "gitignored secrets" in combined.lower() or "Gitignored secrets" in combined
     assert "8787" in combined
     assert "HUB_DEPLOY_DRY_RUN=1" in combined

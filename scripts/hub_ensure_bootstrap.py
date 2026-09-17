@@ -2,9 +2,11 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "argon2-cffi>=23",
+#   "psycopg[binary]>=3.2",
+#   "pyyaml>=6",
 # ]
 # ///
-"""Mint unused HUB_BOOTSTRAP_TOKEN (jh_boot_*) and persist SHA-256 in SQLite.
+"""Mint unused HUB_BOOTSTRAP_TOKEN (jh_boot_*) and persist SHA-256 in PostgreSQL.
 
 Prints the admin signup URL. Does not start the server.
 """
@@ -57,6 +59,7 @@ def settings_for_board(board_dir: Path) -> Settings:
         bootstrap_token=(merged.get("HUB_BOOTSTRAP_TOKEN") or "").strip(),
         env_path=env_path,
         tokens_json_path=json_path,
+        database_url=(merged.get("DATABASE_URL") or merged.get("TEST_DATABASE_URL") or "").strip(),
     )
 
 
@@ -70,7 +73,7 @@ def main() -> int:
     args = parser.parse_args()
     board_dir = Path(args.dir).resolve()
     settings = settings_for_board(board_dir)
-    db = BoardDB(settings.db_path)
+    db = BoardDB(settings.db_path, settings.database_url or None)
     try:
         if db.admin_bootstrapped():
             print("admin already bootstrapped; bootstrap token disabled")

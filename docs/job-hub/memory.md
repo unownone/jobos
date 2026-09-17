@@ -2,7 +2,7 @@
 
 Shared **working memory** for Job Apply OS agents. Not the job ledger. Not chat. Not embeddings-as-a-product.
 
-Lives **inside the Hub SQLite** (`hub-data` / `board/data/board.db`). Same Compose file, same volume, no extra container, no paid API, no GPU.
+Lives **inside Hub PostgreSQL**. Same Compose file. Postgres is not published on the host. No Hub volume, no extra vector-DB container, no paid API, no GPU.
 
 ## Why this, not Mem0 / Qdrant / Ollama
 
@@ -12,7 +12,7 @@ Lives **inside the Hub SQLite** (`hub-data` / `board/data/board.db`). Same Compo
 | Qdrant + Ollama | Extra Compose services, RAM, and an embedding model for facts that are already short text. |
 | Hosted memory SaaS | Not self-hosted. Secrets would leave the hunt host. |
 
-Job Hub is already the only non-AI component. Agents already heartbeat every 10s and claim queue work. Recall piggybacks those calls. Retrieval is SQLite **FTS5** (LIKE fallback). That is the efficient fit.
+Job Hub is already the only non-AI component. Agents already heartbeat every 10s and claim queue work. Recall piggybacks those calls. Retrieval is PostgreSQL `ILIKE` over short facts. That is the efficient fit.
 
 ## Pods
 

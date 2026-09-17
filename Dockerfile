@@ -10,8 +10,8 @@ ENV UV_COMPILE_BYTECODE=1 \
     HUB_REPO_ROOT=/app \
     BOARD_HOST=0.0.0.0 \
     BOARD_PORT=8787 \
-    BOARD_DB=/data/board.db \
-    HUB_PACKS_DIR=/data/packs
+    BOARD_DB=/tmp/board.db \
+    HUB_PACKS_DIR=/tmp/jobos-packs
 
 COPY board/pyproject.toml board/uv.lock /app/board/
 WORKDIR /app/board
@@ -27,8 +27,7 @@ COPY mcp ./mcp
 COPY handoffs ./handoffs
 COPY profiles/candidate.example.yaml ./profiles/candidate.example.yaml
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh /app/board/start.sh \
-    && mkdir -p /data
+RUN chmod +x /docker-entrypoint.sh /app/board/start.sh
 
 EXPOSE 8787
 WORKDIR /app/board

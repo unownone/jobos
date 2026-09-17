@@ -65,6 +65,7 @@ class Settings:
     tokens_json_path: Path | None = None
     repo_root: Path | None = None
     packs_dir: Path | None = None
+    database_url: str = ""
 
 
 def load_settings() -> Settings:
@@ -83,6 +84,7 @@ def load_settings() -> Settings:
         listen_port=int(port_raw),
     )
     bootstrap_token = (merged.get("HUB_BOOTSTRAP_TOKEN") or "").strip()
+    database_url = (merged.get("DATABASE_URL") or merged.get("TEST_DATABASE_URL") or "").strip()
     repo_raw = (merged.get("HUB_REPO_ROOT") or "").strip()
     packs_raw = (merged.get("HUB_PACKS_DIR") or "").strip()
     repo_root = Path(repo_raw) if repo_raw else BOARD_DIR.parent
@@ -104,4 +106,5 @@ def load_settings() -> Settings:
         tokens_json_path=TOKENS_JSON_PATH,
         repo_root=repo_root,
         packs_dir=packs_dir,
+        database_url=database_url,
     )

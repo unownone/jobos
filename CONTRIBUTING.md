@@ -41,4 +41,4 @@ Hunt board (maintainer-owned):
 make -C board test
 ```
 
-Do not commit `board/.env`, `*.local.json`, or `board/data/*.db`.
+Do not commit `board/.env`, `*.local.json`, or leftover `board/data/*.db`. Hub durable state is PostgreSQL (`DATABASE_URL`).

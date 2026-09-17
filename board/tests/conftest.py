@@ -2,9 +2,32 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(scope="session", autouse=True)
+def postgres_server(tmp_path_factory: pytest.TempPathFactory) -> str:
+    """Embedded Postgres for the whole pytest process. Hub no longer uses SQLite."""
+    existing = (os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL") or "").strip()
+    if existing:
+        os.environ["TEST_DATABASE_URL"] = existing
+        os.environ["DATABASE_URL"] = existing
+        yield existing
+        return
+    import pgserver
+
+    data_dir = tmp_path_factory.mktemp("pgdata")
+    server = pgserver.get_server(data_dir, cleanup_mode="stop")
+    uri = server.get_uri()
+    os.environ["TEST_DATABASE_URL"] = uri
+    os.environ["DATABASE_URL"] = uri
+    try:
+        yield uri
+    finally:
+        server.cleanup()
 
 MINIMAL_CANDIDATE = """\
 identity:
