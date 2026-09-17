@@ -41,6 +41,15 @@ class SqlCursor:
         self._i = len(self._rows)
         return rest
 
+    def __iter__(self) -> SqlCursor:
+        return self
+
+    def __next__(self) -> Any:
+        row = self.fetchone()
+        if row is None:
+            raise StopIteration
+        return row
+
 
 class SqlConnection:
     """Thin psycopg wrapper so existing `?` / `:name` SQL keeps working."""

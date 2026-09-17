@@ -267,32 +267,33 @@ def public_candidate_at(path: Path | None) -> dict[str, Any]:
 
 def candidate_revision(settings: Settings, db: Any | None = None) -> str | None:
     """Bump when postgres blob or hub/repo candidate file bytes change. Agents must re-fetch."""
+    path = resolve_candidate_path(settings)
+    if path is not None and path.is_file():
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+        mtime = int(path.stat().st_mtime)
+        return f"{mtime}-{digest}"
     text = candidate_blob_text(db)
     if text is not None and text.strip():
         digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
         return f"postgres-{digest}"
-    path = resolve_candidate_path(settings)
-    if path is None or not path.is_file():
-        return None
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
-    mtime = int(path.stat().st_mtime)
-    return f"{mtime}-{digest}"
+    return None
 
 
 def public_candidate_for_settings(settings: Settings, db: Any | None = None) -> dict[str, Any]:
+    path = resolve_candidate_path(settings)
     text = candidate_blob_text(db)
-    if text is not None and text.strip():
+    if path is not None and path.is_file():
+        payload = public_candidate_at(path)
+        if path == hub_candidate_path(settings):
+            payload["source"] = "postgres"
+        else:
+            payload["source"] = "repo"
+    elif text is not None and text.strip():
         payload = public_slice_from_text(text)
         payload["source"] = "postgres"
     else:
-        path = resolve_candidate_path(settings)
-        payload = public_candidate_at(path)
-        if path is not None and path == hub_candidate_path(settings):
-            payload["source"] = "postgres"
-        elif path is not None:
-            payload["source"] = "repo"
-        else:
-            payload["source"] = "missing"
+        payload = public_candidate_at(None)
+        payload["source"] = "missing"
     resume = resume_blob_bytes(db) is not None or resolve_resume_path(settings) is not None
     payload["resume_url"] = "/api/candidate/resume" if resume else None
     payload["revision"] = candidate_revision(settings, db)
