@@ -274,6 +274,49 @@ def test_admin_users_directory_and_page(hub: tuple[TestClient, Settings, Clock])
     page = client.get("/admin/users")
     assert page.status_code == 200
     assert "Directory" in page.text
+
+
+def test_presence_detail_includes_memories_tools_and_events(
+    hub: tuple[TestClient, Settings, Clock],
+) -> None:
+    client, _settings, _clock = hub
+    bootstrap_admin(client)
+    disc = invite_join(client, track="discovery", display_name="scout-bot")
+    key = disc["api_key"]
+    headers = {"Authorization": f"Bearer {key}"}
+    client.post("/api/presence/heartbeat", headers=headers, json={"status_hint": "working", "job_id": "gh__1", "task_id": "gh__1", "task_kind": "job"})
+    mem = client.post(
+        "/api/memory/items",
+        headers=headers,
+        json={
+            "pod": "track",
+            "kind": "portal_quirk",
+            "title": "Greenhouse work-auth radio",
+            "body": (
+                "Acme Greenhouse asks a work-authorization radio that is missing from the "
+                "apply packet. Bounce to discovery instead of guessing the legal answer."
+            ),
+            "company": "Acme",
+        },
+    )
+    assert mem.status_code in {200, 201}, mem.text
+    burn = client.post(
+        "/api/metrics/token_burn",
+        headers=headers,
+        json={"tool_name": "exa-mcp", "skill": "discovery", "prompt_tokens": 11, "completion_tokens": 4},
+    )
+    assert burn.status_code == 201, burn.text
+    listed = client.get("/api/presence")
+    row = next(u for u in listed.json()["users"] if u["display_name"] == "scout-bot")
+    detail = client.get(f"/api/presence/{row['user_id']}")
+    assert detail.status_code == 200, detail.text
+    body = detail.json()
+    assert body["user"]["display_name"] == "scout-bot"
+    assert any(m["title"] == "Greenhouse work-auth radio" for m in body["memories"])
+    assert any(t["tool_name"] == "exa-mcp" for t in body["tools"])
+    assert "jh_agt_" not in detail.text
+    missing = client.get("/api/presence/does-not-exist")
+    assert missing.status_code == 404
     as_owner = client.post(
         "/api/auth/join",
         json={
