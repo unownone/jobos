@@ -62,6 +62,7 @@ PROTECTED_ROUTE_PATHS = frozenset(
         "/api/queue",
         "/api/queue/mine",
         "/api/presence",
+        "/api/presence/{user_id}",
         "/api/users",
         "/api/agents",
         "/api/invites",
