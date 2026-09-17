@@ -152,6 +152,7 @@ PROTECTED_GETS = (
     ("/api/auth/me", "session /api/auth/me"),
     ("/api/onboarding", "onboarding pack (skills/MCP)"),
     ("/api/registry/skills", "skill registry list"),
+    ("/api/registry/mcps", "mcp registry list"),
     ("/api/registry/recordings", "skill recordings"),
     ("/api/a2a/directory", "A2A peer directory"),
     ("/api/a2a/peers", "A2A peers"),

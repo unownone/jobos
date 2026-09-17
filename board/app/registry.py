@@ -1,4 +1,4 @@
-"""Live skill registry HTTP API. GitHub seeds; maintainer proctors recordings."""
+"""Live skill + MCP registry HTTP API. GitHub seeds; maintainer proctors recordings."""
 
 from __future__ import annotations
 
@@ -13,8 +13,9 @@ from app.auth import Principal
 from app.catalog import public_catalog
 from app.db import utc_now
 from app.memory_store import set_solidify_status
+from app.mcp_store import McpStore, public_mcp
 from app.queue import QueueService, claimant_id
-from app.skill_seed import seed_github_skills
+from app.registry_seed import seed_hub_registries
 from app.skill_store import (
     SKILL_ROLES,
     SkillStore,
@@ -104,6 +105,14 @@ def _store(request: Request) -> SkillStore:
     if store is None:
         store = SkillStore(request.app.state.db)
         request.app.state.skills = store
+    return store
+
+
+def _mcp_store(request: Request) -> McpStore:
+    store = getattr(request.app.state, "mcps", None)
+    if store is None:
+        store = McpStore(request.app.state.db)
+        request.app.state.mcps = store
     return store
 
 
@@ -230,6 +239,42 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
             limit=limit,
         )
         return {"skills": [public_skill(item) for item in items], "count": len(items)}
+
+    @router.get("/api/registry/mcps")
+    def list_mcps(
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+        status_filter: Annotated[str | None, Query(alias="status")] = None,
+        kind: str | None = None,
+        role: str | None = None,
+        capability: str | None = None,
+        platform: str | None = None,
+        limit: int = 500,
+    ) -> dict[str, Any]:
+        del principal
+        store = _mcp_store(request)
+        items = store.list_visible(
+            status=status_filter,
+            kind=kind,
+            role=role,
+            capability=capability,
+            platform=platform,
+            limit=limit,
+        )
+        return {"mcps": [public_mcp(item) for item in items], "count": len(items)}
+
+    @router.get("/api/registry/mcps/{mcp_id}")
+    def get_mcp(
+        mcp_id: str,
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+    ) -> dict[str, Any]:
+        del principal
+        store = _mcp_store(request)
+        item = store.get_by_id_or_slug(mcp_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="mcp not found")
+        return {"mcp": public_mcp(item)}
 
     @router.get("/api/registry/skills/{skill_id}")
     def get_skill(
@@ -614,14 +659,19 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         _require_maintainer(principal)
         pack = getattr(request.app.state, "pack", None)
         repo_root = pack.repo_root if pack is not None else None
-        counts = seed_github_skills(request.app.state.db, repo_root, settings=request.app.state.settings)
+        result = seed_hub_registries(request.app.state.db, repo_root, settings=request.app.state.settings)
         request.app.state.db.add_event(
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
-            action="skill_seed",
-            fields=counts,
+            action="registry_seed",
+            fields=result,
         )
-        return {"ok": True, "counts": counts}
+        return {
+            "ok": True,
+            "counts": result["skills"],
+            "skills": result["skills"],
+            "mcps": result["mcps"],
+        }
 
     return router

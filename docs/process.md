@@ -22,7 +22,7 @@ Goal: know which skills and MCPs this workspace can actually use.
 4. Write the chosen stack into `docs/catalogs/skills-and-mcps.md` with install notes.
 5. If the pass is a platform/MCP coverage refresh, also update `docs/research/platform-mcp-build-plan.md`.
 6. If the work is **updating the skill tree** (lists, pruning, example MCP config), load [`skills/skill-maintainer`](../skills/skill-maintainer/SKILL.md) and write `skills/lists/` — that is not a discovery cycle.
-7. GitHub starters (`skills/starters/*.yaml` and role `SKILL.md`) seed the Hub registry (`scope=shared`, `status=approved`, `origin=github`) on boot / pack rebuild. [`skills/lists/`](../skills/lists/) remain the MCP/tool inventory (adopted / wanted / rejected) — not runnable skills.
+7. GitHub starters (`skills/starters/*.yaml` and role `SKILL.md`) plus adopted in-repo skills seed the Hub **skill** registry (`scope=shared`, `status=approved`, `origin=github`) on boot / pack rebuild / migrate. [`skills/lists/`](../skills/lists/) plus `mcp/mcp.example.json` seed the **MCP** registry (`GET /api/registry/mcps`). Lists remain the git inventory — live selection is the Hub DB.
 8. When Hub is up, live selection is `GET /api/registry/skills`, not git. Do not install an auto-apply skill into the discovery bot.
 
 ## 2. Profile freeze

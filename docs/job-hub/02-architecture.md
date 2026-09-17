@@ -22,7 +22,7 @@ flowchart TB
   subgraph hub [Job Hub — only non-AI component]
     api[FastAPI same origin]
     ui[Board + Admin + Onboarding + Presence + Invites]
-    db[(SQLite jobs events queue users presence A2A skills recordings memory)]
+    db[(SQLite jobs events queue users presence A2A skills mcps recordings memory)]
     pack[Skill/MCP/docs pack]
     a2a[A2A JSON-RPC + Agent Cards]
     secrets[gitignored .env + encrypted connectors]
@@ -267,6 +267,8 @@ Auth: session, Bearer / `X-Hub-Key`, or compat role token. Unauthenticated → 4
 | --- | --- | --- | --- |
 | GET | `/api/registry/skills` | any_user | Shared approved + **own local**. Query `tag`, `role`, `platform`, `ats`, `url`, `scope` |
 | GET | `/api/registry/skills/{id}` | any_user | Same visibility |
+| GET | `/api/registry/mcps` | any_user | Seeded MCP/tool inventory. Query `status`, `kind`, `role`, `capability`, `platform` |
+| GET | `/api/registry/mcps/{id}` | any_user | Id or slug |
 | POST | `/api/registry/skills` | any_user | Create **local** draft / mutation |
 | PATCH | `/api/registry/skills/{id}` | owner: local only. maintenance/admin: shared | |
 | POST | `/api/registry/skills/{id}/fork` | any_user | Copy shared (or own) → new local |
@@ -274,7 +276,7 @@ Auth: session, Bearer / `X-Hub-Key`, or compat role token. Unauthenticated → 4
 | GET | `/api/registry/recordings` | submitter: own. maintenance/admin: all | |
 | POST | `/api/registry/recordings/{id}/proctor` | maintenance, admin | After claim: `pass` \| `fail` |
 | POST | `/api/registry/recordings/{id}/promote` | maintenance, admin | Only after pass |
-| POST | `/api/registry/seed` | maintenance, admin | Re-seed GitHub starters (does not overwrite promoted non-github shared slugs) |
+| POST | `/api/registry/seed` | maintenance, admin | Re-seed GitHub starters + MCP lists (does not overwrite promoted non-github shared slugs) |
 
 ### Presence and directory
 

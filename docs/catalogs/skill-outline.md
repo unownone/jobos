@@ -15,7 +15,7 @@ Hardcoded “sources / apply methods / outreach” do not scale. A Workday apply
 | Local registry rows (`scope=local`) | the owning bot | **only** that bot |
 | Maintainer queue (`skill.record`) | any track may **push** | **only** maintainer / admin **consume** |
 
-Git is not deleted. Airgapped bots still load `skills/`. When `HUB_URL` is set, prefer `GET /api/registry/skills`.
+Git is not deleted. Airgapped bots still load `skills/`. When `HUB_URL` is set, prefer `GET /api/registry/skills` and `GET /api/registry/mcps`. If you use something outside those tables, register it and add a Hub memory fact — do not treat git lists as the live inventory.
 
 ## Attributes
 
@@ -114,6 +114,8 @@ Auth: session, Bearer / `X-Hub-Key`, or compat role token. Unauthenticated → 4
 | --- | --- | --- |
 | GET | `/api/registry/skills` | any user: **shared approved** + **own local**. Query `tag`, `role`, `platform`, `ats`, `url`, `scope` |
 | GET | `/api/registry/skills/{id}` | same visibility |
+| GET | `/api/registry/mcps` | any user: seeded MCP/tool inventory (`skills/lists/` + `mcp.example.json`). Query `status`, `kind`, `role`, `capability`, `platform` |
+| GET | `/api/registry/mcps/{id}` | same; id or slug |
 | POST | `/api/registry/skills` | create **local** draft / mutation |
 | PATCH | `/api/registry/skills/{id}` | owner: local only. Maintainer/admin: shared |
 | POST | `/api/registry/skills/{id}/fork` | copy shared (or own) → new local |
@@ -122,7 +124,7 @@ Auth: session, Bearer / `X-Hub-Key`, or compat role token. Unauthenticated → 4
 | GET | `/api/registry/recordings` | submitter: own. Maintainer/admin: all |
 | POST | `/api/registry/recordings/{id}/proctor` | **maintainer/admin** after claim: `pass` \| `fail` |
 | POST | `/api/registry/recordings/{id}/promote` | **maintainer/admin**, only after pass |
-| POST | `/api/registry/seed` | maintainer/admin: re-seed GitHub starters (does not overwrite promoted non-github shared slugs) |
+| POST | `/api/registry/seed` | maintainer/admin: re-seed GitHub starters + MCP lists (does not overwrite promoted non-github shared slugs) |
 
 Queue kind `skill.record`: produce = every track; consume = **maintenance** and admin only.
 
@@ -132,8 +134,9 @@ Queue kind `skill.record`: produce = every track; consume = **maintenance** and 
 | --- | --- |
 | `skills/<role-skill>/SKILL.md` | Cursor-loadable role playbooks (discovery, apply, outreach, …) |
 | `skills/starters/<slug>.yaml` | Tagged platform playbooks seeded into the DB |
-| `skills/lists/` | MCP/tool inventory (adopted / wanted / rejected) — not runnable skills |
-| Hub `skills` table | Live registry after seed + proctor |
+| `skills/lists/` | Git MCP/tool inventory (adopted / wanted / rejected); Hub seeds this into SQLite |
+| Hub `skills` table | Live skill registry after seed + proctor |
+| Hub `mcps` table | Live MCP registry after seed |
 
 Role skills tell the bot to **select a matching tagged skill from the registry** when Hub is up, then fall back to the role playbook when airgapped.
 

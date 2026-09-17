@@ -49,6 +49,7 @@ from app.identity import (
 from app.messages import create_messages_router
 from app.memory import create_memory_router
 from app.metrics import MetricsStore
+from app.mcp_store import McpStore
 from app.onboarding import create_onboarding_router
 from app.pack import PackStore
 from app.people import create_people_router
@@ -67,7 +68,7 @@ from app.profile import candidate_onboarded, candidate_status
 from app.presence import mount_presence
 from app.queue import QUEUE_KINDS, QueueService, register_queue_routes
 from app.registry import create_registry_router
-from app.skill_seed import seed_github_skills
+from app.registry_seed import seed_hub_registries
 from app.skill_store import SkillStore
 from app.settings import Settings, load_settings
 
@@ -308,7 +309,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     pack.ensure_current()
     queue = QueueService(db, pack=pack)
     skills = SkillStore(db)
-    seed_github_skills(db, pack.repo_root, settings=settings)
+    mcps = McpStore(db)
+    seed_hub_registries(db, pack.repo_root, settings=settings)
     minted = ensure_bootstrap(settings, db)
 
     app = FastAPI(
@@ -329,6 +331,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.metrics = metrics
     app.state.queue = queue
     app.state.skills = skills
+    app.state.mcps = mcps
     app.state.pack = pack
     app.state.bootstrap_token = minted
     register_queue_routes(app, queue=queue, principal_dep=principal_dep)
@@ -688,6 +691,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "queue_kinds": list(QUEUE_KINDS),
             "queue_lease_m": 15,
             "registry": "/api/registry/skills",
+            "mcp_registry": "/api/registry/mcps",
             "catalog_updated_at": pack.meta_without_ensure().catalog_updated_at,
             "catalog_max_age_days": 7,
             "a2a": {

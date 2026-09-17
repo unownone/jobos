@@ -602,6 +602,7 @@ class PackStore:
             "candidate": public_candidate_for_settings(self.settings),
             "catalog_updated_at": meta.catalog_updated_at,
             "registry": "/api/registry/skills",
+            "mcp_registry": "/api/registry/mcps",
             "pack": {
                 "git_sha": meta.git_sha,
                 "pack_sha": meta.pack_sha,
@@ -624,6 +625,7 @@ def join_onboarding_section(settings: Settings, invite: dict[str, Any]) -> dict[
         "docs": "/api/docs/{path}",
         "skills": "/api/skills/{name}/{file}",
         "registry": "/api/registry/skills",
+        "mcp_registry": "/api/registry/mcps",
         "scripts": "/api/scripts/{name}",
         "hosted_mcp": "/api/mcp/hosted/{name}.json",
         "pack_sha": meta.pack_sha,

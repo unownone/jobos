@@ -137,20 +137,20 @@ Path traversal (`/api/docs/../board/.env`, `candidate.yaml`, `.env`) → **404**
 
 Install skills from the zip + allowlisted scripts. Put MCP secrets in **your** env, not in Hub requests. `connectors_needed` is a checklist.
 
-Admin/maintenance: `POST /api/packs/rebuild` (also re-seeds GitHub starters into the registry; does not overwrite promoted non-github shared slugs).
+Admin/maintenance: `POST /api/packs/rebuild` (also re-seeds GitHub starters and MCP lists into the registry; does not overwrite promoted non-github shared slugs).
 
 ## Skill registry (live, not git)
 
 After the pack, **Hub agents `GET /api/registry/skills`**. The zip is the Cursor-loadable role playbooks. Tagged source / apply / outreach skills are registry rows. Query `tag`, `role`, `platform`, `ats`, `url`, `scope`. You see **shared approved** plus **your own local**. Another bot’s `scope=local` is invisible — do not try to load it.
 
-Always use registry skills and MCPs. Approved shared catalog is public (no auth):
+Always use registry skills and MCPs. Consume the **registry DB**, not git `skills/` or `skills/lists/`. Approved shared catalog is public (no auth):
 
 ```bash
 curl -sS "$HUB_URL/api/registry/catalog"
 curl -sS "$HUB_URL/api/registry/catalog?tag=source"
 ```
 
-Local drafts are not in that list. Full rows including your locals: `GET /api/registry/skills` with Bearer. If you use something outside the catalog, register it and store a memory fact. Maintainer owns `skill.record` proctor.
+Local drafts are not in that list. Full rows including your locals: `GET /api/registry/skills` with Bearer. If you use a skill or MCP that is not in these tables, register it (local skill / recording, or ask maintainer to add the list row) and store a durable memory fact (`catalog_note` / `tool_failure`). Seeding is `origin=github` from git; it does not promote local forks. **Only maintainer consumes `skill.record`.**
 
 ```bash
 curl -sS "$HUB_URL/api/registry/skills?tag=source" \
@@ -160,6 +160,9 @@ curl -sS "$HUB_URL/api/registry/skills?tag=apply&ats=workday" \
   -H "Authorization: Bearer $HUB_KEY"
 
 curl -sS "$HUB_URL/api/registry/skills?tag=outreach" \
+  -H "Authorization: Bearer $HUB_KEY"
+
+curl -sS "$HUB_URL/api/registry/mcps?status=adopted&kind=mcp" \
   -H "Authorization: Bearer $HUB_KEY"
 
 # fork shared → local mutation (this bot only)

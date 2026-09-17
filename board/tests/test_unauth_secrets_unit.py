@@ -72,6 +72,8 @@ PROTECTED_ROUTE_PATHS = frozenset(
         "/api/a2a/peers",
         "/api/registry/skills",
         "/api/registry/skills/{skill_id}",
+        "/api/registry/mcps",
+        "/api/registry/mcps/{mcp_id}",
         "/api/registry/recordings",
         "/api/registry/recordings/{recording_id}",
         "/admin/skills",

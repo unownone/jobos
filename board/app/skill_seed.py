@@ -144,9 +144,100 @@ def parse_starter_yaml(path: Path, *, repo_root: Path) -> dict[str, Any] | None:
     return starter_to_fields(raw, origin_ref=origin_ref, slug_fallback=path.stem)
 
 
+def _role_from_list(roles: Any) -> str:
+    mapped = {
+        "discovery": "discovery",
+        "apply": "apply",
+        "outreach": "outreach",
+        "maintainer": "maintain",
+        "maintain": "maintain",
+        "research": "research",
+    }
+    items = _as_list(roles)
+    for item in items:
+        key = item.strip().lower()
+        if key in mapped:
+            return mapped[key]
+    if "all" in [item.strip().lower() for item in items]:
+        return "research"
+    return ""
+
+
+def _skill_md_from_source(repo_root: Path, source: str) -> Path | None:
+    text = (source or "").strip()
+    if not text or "://" in text:
+        return None
+    path = (repo_root / text).resolve()
+    try:
+        path.relative_to(repo_root.resolve())
+    except ValueError:
+        return None
+    if path.is_dir():
+        candidate = path / "SKILL.md"
+        return candidate if candidate.is_file() else None
+    if path.is_file() and path.suffix.lower() in {".md", ".markdown"}:
+        return path
+    return None
+
+
+def parse_adopted_skill(raw: dict[str, Any], *, repo_root: Path) -> dict[str, Any] | None:
+    """Approved shared SKILL.md that lives in-repo (including .agents/skills)."""
+    if str(raw.get("kind") or "skill").strip().lower() != "skill":
+        return None
+    source_path = _skill_md_from_source(repo_root, str(raw.get("source") or ""))
+    if source_path is None:
+        return None
+    parsed = parse_skill_md(source_path, repo_root=repo_root)
+    if parsed is not None:
+        return parsed
+    text = source_path.read_text(encoding="utf-8")
+    front, body = split_frontmatter(text)
+    slug = str(raw.get("id") or front.get("slug") or source_path.parent.name).strip().lower()
+    tags = _as_list(front.get("tags") or raw.get("capability"))
+    if not tags:
+        role_guess = _role_from_list(raw.get("roles"))
+        tags = [role_guess] if role_guess else ["research"]
+    merged = {
+        "slug": slug,
+        "name": front.get("name") or raw.get("name") or slug,
+        "kind": "skill",
+        "role": front.get("role") or _role_from_list(raw.get("roles")),
+        "tags": tags,
+        "platform": front.get("platform") or "",
+        "match": front.get("match") or {},
+        "inputs": front.get("inputs") or [],
+        "outputs": front.get("outputs") or [],
+        "reproducible": front.get("reproducible", True),
+        "body": body or text.strip(),
+    }
+    origin_ref = source_path.relative_to(repo_root).as_posix()
+    return starter_to_fields(merged, origin_ref=origin_ref, slug_fallback=slug)
+
+
+def iter_adopted_shared_skills(repo_root: Path) -> list[dict[str, Any]]:
+    path = repo_root / "skills" / "lists" / "adopted.yaml"
+    if not path.is_file():
+        return []
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        return []
+    items = payload.get("items") or []
+    if not isinstance(items, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for raw in items:
+        if not isinstance(raw, dict):
+            continue
+        parsed = parse_adopted_skill(raw, repo_root=repo_root)
+        if parsed:
+            out.append(parsed)
+    return out
+
+
 def iter_github_starters(repo_root: Path) -> list[dict[str, Any]]:
     skills_dir = repo_root / "skills"
     out: list[dict[str, Any]] = []
+    seen: set[str] = set()
     if not skills_dir.is_dir():
         return out
     for child in sorted(skills_dir.iterdir()):
@@ -158,16 +249,24 @@ def iter_github_starters(repo_root: Path) -> list[dict[str, Any]]:
         parsed = parse_skill_md(skill_md, repo_root=repo_root)
         if parsed:
             out.append(parsed)
+            seen.add(parsed["slug"])
     starters = skills_dir / "starters"
     if starters.is_dir():
         for path in sorted(starters.glob("*.yaml")):
             parsed = parse_starter_yaml(path, repo_root=repo_root)
             if parsed:
                 out.append(parsed)
+                seen.add(parsed["slug"])
         for path in sorted(starters.glob("*.yml")):
             parsed = parse_starter_yaml(path, repo_root=repo_root)
             if parsed:
                 out.append(parsed)
+                seen.add(parsed["slug"])
+    for parsed in iter_adopted_shared_skills(repo_root):
+        if parsed["slug"] in seen:
+            continue
+        out.append(parsed)
+        seen.add(parsed["slug"])
     return out
 
 

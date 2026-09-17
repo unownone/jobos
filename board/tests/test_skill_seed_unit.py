@@ -30,6 +30,7 @@ def test_iter_starters_includes_role_skills() -> None:
     slugs = {row["slug"] for row in iter_github_starters(repo)}
     assert {"job-discovery", "job-apply", "job-outreach", "skill-maintainer"} <= slugs
     assert {"apply-workday", "source-linkedin", "outreach-email"} <= slugs
+    assert {"compose-outreach", "draft-outreach", "playwright-cli-skill"} <= slugs
 
 
 def test_url_matches_workday_host() -> None:

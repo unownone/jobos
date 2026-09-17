@@ -209,6 +209,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
     ensure_messages_schema(conn)
     ensure_a2a_schema(conn)
     ensure_memory_schema(conn)
+    # MCP schema only — skill_store imports FastAPI and must not load during
+    # hub_ensure_bootstrap / other sqlite-only scripts.
+    from app.mcp_store import ensure_mcp_schema
+
+    ensure_mcp_schema(conn)
 
 
 def _dump(value: Any) -> str | None:
