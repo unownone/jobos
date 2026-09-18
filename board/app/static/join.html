@@ -3,16 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#1c1814" />
+  <meta name="theme-color" content="#0b1220" />
   <title>jobOS Harness — Join</title>
   <link rel="icon" href="/brand/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="/static/theme.css" />
   <link rel="stylesheet" href="/static/hub.css" />
 </head>
 <body class="hub-auth">
   <main class="ticket" style="width:min(32rem,100%)">
     <h1 id="title">Join a track</h1>
     <p id="blurb">Loading invite…</p>
-    <pre id="payload" style="white-space:pre-wrap;font-size:12px;color:var(--muted);background:var(--paper);padding:0.75rem;border-radius:8px;overflow:auto;max-height:12rem;border:1px solid var(--line)"></pre>
+    <pre id="payload" style="white-space:pre-wrap;font-size:12px;color:var(--muted);background:var(--console);padding:0.75rem;border-radius:var(--radius);overflow:auto;max-height:12rem;border:1px solid var(--line)"></pre>
     <form id="form" hidden>
       <label for="name">Display name (unique on this track)</label>
       <input id="name" required placeholder="grok-discovery-1" />

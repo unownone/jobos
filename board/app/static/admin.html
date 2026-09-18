@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#1c1814" />
+  <meta name="theme-color" content="#0b1220" />
   <title>jobOS Harness — Invites</title>
   <link rel="icon" href="/brand/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="/static/theme.css" />
   <link rel="stylesheet" href="/static/hub.css" />
   
 </head>
@@ -73,7 +74,7 @@
       <p class="ok" id="created"></p>
       <div id="promptBox" hidden>
         <label for="prompt">Agent prompt (copy this with the join link)</label>
-        <textarea id="prompt" readonly style="width:100%;min-height:12rem;background:#0e1218;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:0.6rem;font:12px/1.4 ui-monospace,monospace"></textarea>
+        <textarea id="prompt" readonly style="width:100%;min-height:12rem;background:var(--console);color:var(--text);border:1px solid var(--line);border-radius:var(--radius);padding:0.6rem;font:12px/1.4 var(--mono)"></textarea>
         <button type="button" class="secondary" id="copyPrompt">Copy prompt</button>
         <button type="button" class="secondary" id="copyLink">Copy join URL</button>
       </div>

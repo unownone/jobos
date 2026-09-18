@@ -2,7 +2,7 @@
 
 This is the contract. Skills implement slices of it. If a skill and this document disagree, fix the skill.
 
-jobOS is the job harness. Agents curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt` (not HTML) for identity and next steps. **Always use registry skills/MCPs** when Hub is up. If you use something outside, record it and add a memory fact. `review` and `resume` roles are coming soon — stubs only, not part of this contract’s owners.
+jobOS is the job harness. Agents curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt` (not HTML) for identity and next steps. **Always use registry skills/MCPs** when Hub is up. If you use something outside, record it and add a memory fact. `review` and `resume` roles are coming soon — stubs only, not part of this contract’s owners. **Deployed agents** (advanced browser handling, cheaper hosted workers) are also coming soon — not shipped, not a claimable track.
 
 ## 0. Preconditions
 

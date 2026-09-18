@@ -1,4 +1,4 @@
-"""Static Hub UI shell: shared blotter CSS on every operator page."""
+"""Static Hub UI shell: shared theme + operator CSS on every operator page."""
 
 from pathlib import Path
 
@@ -25,10 +25,18 @@ def test_every_html_page_uses_shared_shell() -> None:
         text = (STATIC / name).read_text(encoding="utf-8")
         if "/static/hub.css" not in text:
             missing_css.append(name)
+        if "/static/theme.css" not in text:
+            missing_css.append(f"{name}:theme")
         if "viewport-fit=cover" not in text:
             missing_viewport.append(name)
     assert not missing_css, f"pages missing hub.css: {missing_css}"
     assert not missing_viewport, f"pages missing viewport-fit: {missing_viewport}"
+
+
+def test_hub_css_blocks_are_balanced() -> None:
+    text = (STATIC / "hub.css").read_text(encoding="utf-8")
+    assert text.count("{") == text.count("}"), "hub.css has an unclosed rule; later layouts nest and drop"
+    assert "}\n.drop .menu button" in text.replace("\r\n", "\n")
 
 
 def test_authenticated_pages_have_mobile_dock() -> None:

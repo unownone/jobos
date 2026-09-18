@@ -4,15 +4,15 @@ Mode: **Operate**
 
 ## Direction contract
 
-THESIS: The Hub is a dispatch blotter on a desk with a dark wood edge — not a SaaS dashboard and not a squashed desktop on a phone. One open ticket; workers occupy a live column; the phone is a pocket blotter.
+THESIS: The Hub is an instrument console for one hunt — same chassis as the public site, Operate layout. One open ticket; workers occupy a live column; the phone is a dock + sheet, not a squashed desktop.
 
-OWN-WORLD: Manila paper field, carbon ink, navy ballpoint primary, rubber-stamp status outlines, dark leather rail/dock. Perforated ticket panels. No glass, no neon, no metric hero, no kicker labels.
+OWN-WORLD: Dark navy chassis, amber phosphor primary, dashed stitch, Red Hat Text/Mono, Big Shoulders Display on the title. Tokens from `/static/theme.css`. No manila blotter, no second palette.
 
 STORY: The operator sees who is live, what is in the hopper, and can open/pause/stop a job without hunting chrome. On a phone they get jobs or live workers, then a full-screen ticket — never three competing panes.
 
-FIRST VIEWPORT (desktop): 76px wood rail, presence column, blotter list filling the stage, ticket panel idle until a row is opened. (mobile): dark dock, full-width job rows, no empty side panel; opening a job slides a ticket sheet.
+FIRST VIEWPORT (desktop): 76px chassis rail, presence column, job list filling the stage, ticket panel idle until a row is opened. (mobile): chassis dock, full-width job rows, no empty side panel; opening a job slides a ticket sheet.
 
-FORM: Dispatch / job-shop blotter. Seed key: unattended (Impeccable engine + Superdesign auth unavailable). Code-led.
+FORM: Industrial terminal-ops. Seed key: unattended (shared with public landing). Code-led.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 

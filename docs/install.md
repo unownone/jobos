@@ -22,7 +22,7 @@ Docker Desktop, Engine 24+, or Compose v2 is enough. Traefik is **optional**. Th
 ## First-run sequence (every install)
 
 1. Start the Hub (one of the commands above).
-2. Open `/` (landing) then `/login`. Create a username + password. **No dashboard token.** First-boot still has `/admin/signup#bootstrap=jh_boot_…` for the very first operator on a fresh database; after that, anyone may sign up.
+2. Open `/` (landing) then `/login`. Create a username + password. **No dashboard token.** First-boot still has `/admin/signup#bootstrap=jh_boot_…` for the very first operator on a fresh database; after that, anyone may sign up. Public get-started (no login): `/start`.
 3. You are sent to **`/onboarding`**. Fill identity, titles, locations, and (recommended) a resume PDF. The example “Ada Example” profile is rejected.
 4. Health `next_step` becomes `ready` (or `resume` if you skipped the PDF).
 5. Mint track invites at `/admin`. Share join URLs out of band. Agents fetch `/.well-known/agent-card.json` for A2A.

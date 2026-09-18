@@ -71,6 +71,16 @@ Combined “search and Easy Apply” agents optimize for volume. This harness op
 | Review (coming soon) | Stub. Will review profile/resume and shortlisted jobs. | Not an owner yet. Do not claim. |
 | Resume (coming soon) | Stub. Will tailor ATS-friendly resumes. | Not an owner yet. Do not claim. |
 
+## Coming soon
+
+These are **not shipped**. Do not claim them. Do not mint Hub invites for them.
+
+- **Deployed agents** — use advanced jobOS agents who have a better handling of the browser and are cheaper. Future capability only.
+- **Review** — feedback on the candidate profile/resume and shortlisted jobs. Stub.
+- **Resume** — ATS-friendly tailoring from the truthful profile. Stub.
+
+Public get-started (same Hub origin): `/start`.
+
 Roles can be subdivided:
 
 - Discovery by portal (Indeed vs YC vs Amazon careers)
@@ -266,4 +276,4 @@ Then, in the agent:
 
 This repo is meant to be copied, then maintained. Keep process changes in `docs/`, keep skill instructions executable, keep live candidate data out of git.
 
-License: [MIT](LICENSE).
+License: [MIT](LICENSE). Made by [unownone](https://github.com/unownone). Source: [github.com/unownone/jobos](https://github.com/unownone/jobos).

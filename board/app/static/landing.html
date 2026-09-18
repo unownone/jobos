@@ -3,55 +3,211 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#1c1814" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="description" content="jobOS is a job harness: catalog, research, and discovery, then apply, then outreach. Live state in Hub. Git ledger is export." />
   <title>jobOS — Find jobs with a harness, not a spreadsheet</title>
   <link rel="icon" href="/brand/favicon.png" type="image/png" />
-  <link rel="stylesheet" href="/static/hub.css" />
-  <style>
-    .land { max-width: 52rem; margin: 2.5rem auto; padding: 0 1.25rem 4rem; }
-    .land h1 { font-size: 2rem; margin: 0.4rem 0 0.75rem; }
-    .land .lede { font-size: 1.1rem; color: var(--ink-soft); max-width: 40rem; }
-    .land .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1.5rem 0 2rem; }
-    .land .actions a { display: inline-block; padding: 0.55rem 1rem; border-radius: 4px; text-decoration: none; font-weight: 600; }
-    .land .actions .primary { background: var(--navy); color: var(--navy-text); }
-    .land .actions .ghost { border: 1px solid var(--line-strong); color: var(--ink); }
-    .land section { margin: 2rem 0; }
-    .land h2 { font-size: 1.15rem; margin-bottom: 0.5rem; }
-    .land ol { padding-left: 1.2rem; }
-    .land li { margin: 0.35rem 0; }
-    .land .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
-    .land .card { background: var(--panel); border: 1px solid var(--line); padding: 1rem; }
-  </style>
+  <link rel="stylesheet" href="/static/theme.css" />
+  <link rel="stylesheet" href="/static/public.css" />
 </head>
-<body>
-  <main class="land">
-    <p class="muted">jobOS Harness</p>
-    <h1>A private job hunt that survives a restart.</h1>
-    <p class="lede">
-      Sign up, isolate your search, and let discovery / apply / outreach tracks
-      work a live board. Canonical state lives in a database and file store — not git.
-    </p>
-    <p class="actions">
-      <a class="primary" href="/login">Log in or create an account</a>
-      <a class="ghost" href="/board">Open the board</a>
-    </p>
-    <section>
-      <h2>Use cases</h2>
-      <div class="grid">
-        <div class="card"><strong>One hunt, many workers.</strong><p>Humans watch the blotter. Agents claim queue work per track.</p></div>
-        <div class="card"><strong>Airgapped accounts.</strong><p>Each signup gets an account id. Jobs, resumes, skills, and queue traffic stay inside it.</p></div>
-        <div class="card"><strong>Replaceable connectors.</strong><p>Postgres, RabbitMQ, and a filesystem blob store. Swap S3 later at the same seam.</p></div>
+<body class="site">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="mast">
+    <a class="wordmark" href="/">
+      <span class="mark"><img src="/brand/mascot.png" width="40" height="40" alt="" /></span>
+      <span>job<span class="os">OS</span></span>
+    </a>
+    <nav class="mast-nav" aria-label="Primary">
+      <a href="#capabilities">Capabilities</a>
+      <a href="#loop">Loop</a>
+      <a href="/start">Get started</a>
+      <a href="https://github.com/unownone/jobos">GitHub</a>
+      <a class="btn btn-primary" href="/login">Log in</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="wrap hero">
+      <div>
+        <h1>Find jobs with a harness, not a spreadsheet.</h1>
+        <p class="lede">
+          jobOS is a job harness. Catalog, research, and discovery shortlist the work.
+          Apply submits from a packet. Outreach follows by email and LinkedIn DM.
+          Live state lives in Hub. Git <code>ledger/</code> is export and airgap — not a second board.
+        </p>
+        <p class="actions">
+          <a class="btn btn-primary" href="/login">Log in or create an account</a>
+          <a class="btn btn-ghost" href="/start">Get started</a>
+        </p>
+      </div>
+      <aside class="stage" aria-label="Agent entry console">
+        <img class="beetle" src="/brand/mascot.png" width="320" height="320" alt="jobOS beetle mascot" />
+        <div class="console">
+          <div><span class="prompt">$</span> <code>curl -sS "$HUB_URL/llms.txt"</code></div>
+          <div><span class="prompt">$</span> <code>curl -sS "$HUB_URL/agents.txt"</code></div>
+        </div>
+      </aside>
+    </div>
+
+    <section class="wrap band" id="capabilities">
+      <h2>What it can do</h2>
+      <p>Capabilities from the process, not a marketplace pitch. Discovery never Easy Applies.</p>
+      <dl class="spec">
+        <div>
+          <dt>Discovery</dt>
+          <dd>Source, enrich, score, and shortlist. Write a complete apply packet. No form submit. No Easy Apply.</dd>
+        </div>
+        <div>
+          <dt>Deep research</dt>
+          <dd>Company, people, role, and portal research. A shared tool the owners call — not a fourth hunt bot.</dd>
+        </div>
+        <div>
+          <dt>Apply</dt>
+          <dd>Claim <code>apply_ready</code> work, submit from the packet, write something worth reading, log proof. Blocked portals stay blocked.</dd>
+        </div>
+        <div>
+          <dt>Outreach</dt>
+          <dd>Email with the resume PDF attached, plus LinkedIn DMs asking for a short chat. Default channels only. No SMS, WhatsApp, or InMail sequences.</dd>
+        </div>
+        <div>
+          <dt>Catalog + registry</dt>
+          <dd>
+            Discover and vet skills and MCPs. Hub live selection is
+            <code>GET /api/registry/skills</code>
+            tagged <span class="tag">source</span><span class="tag">apply</span><span class="tag">outreach</span>.
+            Git lists remain inventory.
+          </dd>
+        </div>
+        <div>
+          <dt>Hub + ledger</dt>
+          <dd>Hub JobStore (Postgres) + BlobStore + RabbitMQ is the live list. <code>GET /api/export/ledger</code> writes YAML when you need files. Do not dual-write.</dd>
+        </div>
+        <div>
+          <dt>Roles</dt>
+          <dd>Three hunt owners — discovery, apply, outreach — plus maintainer (seldom): skill lists, Hub registry proctor, hunt board. Review and resume are stubs. Do not claim them.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="wrap band" id="loop">
+      <h2>The loop</h2>
+      <p>Catalog + research + discovery, then apply, then outreach. Maintainer is a fourth owner and is seldom used. Nobody jumps the queue.</p>
+
+      <div class="loop-board">
+        <div class="loop-head">
+          <span>Hunt loop</span>
+          <span>Maintainer ≠ discovery</span>
+        </div>
+        <ol class="loop" id="loop-rail">
+          <li>
+            <span class="idx">1</span>
+            <h3>Catalog</h3>
+            <p>Vet skills and MCPs. Write the stack the workspace can actually use.</p>
+          </li>
+          <li>
+            <span class="idx">2</span>
+            <h3>Research</h3>
+            <p>Deep research on the company, team, and portal. Shared across lanes.</p>
+          </li>
+          <li>
+            <span class="idx">3</span>
+            <h3>Discovery</h3>
+            <p>Shortlist + apply packet. Tagged <code>source</code> skills. Never Easy Apply.</p>
+          </li>
+          <li>
+            <span class="idx">4</span>
+            <h3>Apply</h3>
+            <p>Submit from the packet. Tagged <code>apply</code> skills (ATS / site).</p>
+          </li>
+          <li>
+            <span class="idx">5</span>
+            <h3>Outreach</h3>
+            <p>Email + LinkedIn DM after apply, or when there is no portal.</p>
+          </li>
+        </ol>
+        <div class="loop-meta">
+          <article>
+            <h3>Maintainer (seldom)</h3>
+            <p>Owns <code>skills/lists/</code>, seeds and proctors the Hub skill registry, keeps the board up. Does not source jobs, apply, or send mail.</p>
+          </article>
+          <article>
+            <h3>Registry tags</h3>
+            <p>When Hub is up, pick a matching tagged skill: <code>?tag=source</code>, <code>?tag=apply</code>, <code>?tag=outreach</code>. Airgap falls back to role <code>SKILL.md</code> plus starters. Do not load another bot’s local skill.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="planes">
+        <article>
+          <h3>Hub JobStore (live)</h3>
+          <p>Canonical jobs, events, people, skills, memory, and queue traffic. Sign up at <a href="/login">/login</a>. Board is <a href="/login?next=/board">/board</a> after a truthful candidate profile exists.</p>
+        </article>
+        <article>
+          <h3>git ledger/ (airgap export)</h3>
+          <p>Not the live list when Hub is up. Export with <code>GET /api/export/ledger</code>. Airgapped bots still write YAML locally. Never dual-write.</p>
+        </article>
       </div>
     </section>
-    <section>
-      <h2>How it works</h2>
-      <ol>
-        <li>Create a username + password. No dashboard token.</li>
-        <li>Onboard a truthful candidate profile and resume. Do not invent one.</li>
-        <li>Mint track invites. Agents join, heartbeat, and claim tenant-namespaced work.</li>
-        <li>Discovery shortlists. Apply and outreach consume packets. Maintainer is not discovery.</li>
+
+    <section class="wrap band" id="start">
+      <h2>Get started</h2>
+      <p>Onboard a truthful candidate before anything else. Do not invent one. Do not ship the example profile as live data.</p>
+      <ol class="steps">
+        <li>
+          <div>
+            <strong>Install Hub</strong>
+            Compose on port 8787, or see
+            <a href="https://github.com/unownone/jobos/blob/main/docs/install.md">docs/install.md</a>.
+            Agents curl <code>llms.txt</code> / <code>agents.txt</code> — they do not scrape HTML.
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Create an account</strong>
+            Username + password at <a href="/login">/login</a>. No dashboard token.
+            First boot still uses the printed <code>/admin/signup</code> bootstrap URL.
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Onboard the candidate</strong>
+            <a href="/login?next=/onboarding">/onboarding</a> is mandatory: identity, titles, locations, resume PDF.
+            Until then the Hub returns <code>409 candidate_required</code>. Jobs, invites, and A2A stay closed.
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Claim a role and join workers</strong>
+            Read <a href="https://github.com/unownone/jobos/blob/main/docs/process.md">docs/process.md</a>
+            and <a href="https://github.com/unownone/jobos/blob/main/docs/roles.md">docs/roles.md</a>.
+            Mint track invites. Agents join, heartbeat, and claim tenant-namespaced work.
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Run the loop in order</strong>
+            Discovery first (catalog → research → shortlist). Then apply. Then outreach.
+            Maintainer is not a hunt lane.
+          </div>
+        </li>
       </ol>
+      <p class="callout">
+        <strong>Blocked until onboarding.</strong>
+        Missing candidate.yaml / Hub onboarding is a hard stop — not a skip. Full sequence:
+        <a href="/start">Get started</a>.
+      </p>
     </section>
   </main>
+
+  <footer class="wrap foot">
+    <div>
+      <a href="https://github.com/unownone/jobos">github.com/unownone/jobos</a>
+      · MIT
+    </div>
+    <div>
+      made by <a class="made" href="https://github.com/unownone">unownone</a>
+    </div>
+  </footer>
+  <script src="/static/public.js"></script>
 </body>
 </html>

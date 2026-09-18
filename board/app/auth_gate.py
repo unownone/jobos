@@ -28,6 +28,7 @@ _SECRET_DETAIL_KEYS = frozenset(
 _PUBLIC_EXACT = frozenset(
     {
         "/",
+        "/start",
         "/health",
         "/ready",
         "/favicon.ico",

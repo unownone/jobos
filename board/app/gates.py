@@ -15,6 +15,7 @@ CANDIDATE_REQUIRED_CODE = "candidate_required"
 _ALLOW_EXACT = frozenset(
     {
         "/",
+        "/start",
         "/health",
         "/ready",
         "/favicon.ico",
