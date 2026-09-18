@@ -7,7 +7,6 @@ from pathlib import Path
 from app.db import BoardDB
 from app.metrics import MetricsStore
 from app.sql import adapt_sql, schema_name_for_path
-from app.tenant import TenantContext
 
 
 def test_adapt_sql_qmark_and_named() -> None:

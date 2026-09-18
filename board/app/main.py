@@ -23,7 +23,6 @@ from app.bootstrap import (
     public_base,
     sha256_hex,
     tokens_json_path_for,
-    verify_password,
 )
 from app.candidate import create_candidate_router
 from app.gates import CandidateGateMiddleware
@@ -854,7 +853,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         if db.get_job(principal.tenant, job_id):
             raise HTTPException(status_code=409, detail=f"job id already exists: {job_id}")
-        dup = db.find_duplicate(principal.tenant, 
+        dup = db.find_duplicate(principal.tenant,
             apply_url=str(payload.get("apply_url") or ""),
             company=payload["company"],
             title=payload["title"],
@@ -924,7 +923,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         current = db.get_job(principal.tenant, job_id)
         if current is None:
             raise HTTPException(status_code=404, detail="job not found")
-        stored = db.update_job(principal.tenant, 
+        stored = db.update_job(principal.tenant,
             job_id,
             {
                 "stopped": True,
@@ -954,7 +953,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         current = db.get_job(principal.tenant, job_id)
         if current is None:
             raise HTTPException(status_code=404, detail="job not found")
-        stored = db.update_job(principal.tenant, 
+        stored = db.update_job(principal.tenant,
             job_id,
             {
                 "stopped": True,
@@ -982,7 +981,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         current = db.get_job(principal.tenant, job_id)
         if current is None:
             raise HTTPException(status_code=404, detail="job not found")
-        stored = db.update_job(principal.tenant, 
+        stored = db.update_job(principal.tenant,
             job_id,
             {
                 "stopped": False,
