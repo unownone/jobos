@@ -2,51 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1c1814" />
   <title>jobOS Harness — Skill registry</title>
   <link rel="icon" href="/brand/favicon.png" type="image/png" />
-  <style>
-    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
-    header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
-    main { max-width: 72rem; margin: 1.5rem auto; padding: 0 1rem 3rem; }
-    a { color: var(--accent); }
-    h1 { font-size: 1.15rem; margin: 0; }
-    h2 { font-size: 1rem; margin: 1.5rem 0 0.75rem; }
-    p { color: var(--muted); }
-    .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
-    select, input, button { font: inherit; }
-    select, input { background: #0e1218; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 0.45rem 0.65rem; }
-    button { padding: 0.45rem 0.8rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
-    button.secondary { background: #1c2430; border: 1px solid var(--line); }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-    th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 650; background: #2a3344; margin-right: 4px; }
-    .err { color: var(--bad); }
-    .ok { color: var(--good); }
-    code { font-size: 0.78rem; }
-  </style>
+  <link rel="stylesheet" href="/static/hub.css" />
+  
 </head>
-<body>
-  <header>
-    <h1>jobOS Harness — Skill registry</h1>
+<body class="hub-app">
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="hub-rail" aria-label="Hub">
+    <a class="hub-brand" href="/"><img src="/brand/mascot.png" width="36" height="36" alt="jobOS" /></a>
+    <a class="hub-nav-item" data-icon="board" data-nav="/" href="/">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
+    <a class="hub-nav-item" data-icon="data" data-nav="/admin/data" href="/admin/data">Data</a>
+    <a class="hub-nav-item" data-icon="skills" data-nav="/admin/skills" href="/admin/skills">Skills</a>
+    <a class="hub-nav-item" data-icon="memory" data-nav="/admin/memory" href="/admin/memory">Memory</a>
+    <a class="hub-nav-item" data-icon="candidate" data-nav="/onboarding" href="/onboarding">Candidate</a>
+    <span class="hub-rail-spacer"></span>
+    <button class="hub-nav-item" type="button" data-icon="logout" data-hub-logout>Log out</button>
+  </nav>
+  <div class="hub-stage">
+
+  <header class="hub-top">
     <div>
-      <a href="/">Board</a>
-      &nbsp;·&nbsp;
-      <a href="/admin">Invites</a>
-      &nbsp;·&nbsp;
-      <a href="/admin/users">Directory</a>
-      &nbsp;·&nbsp;
-      <a href="/admin/data">Data</a>
-      &nbsp;·&nbsp;
-      <a href="/admin/memory">Memory</a>
-      &nbsp;·&nbsp;
-      <a href="#" id="logout">Log out</a>
+      <h1>jobOS Harness — Skill registry</h1>
+      <p id="who" class="sub">Checking session…</p>
     </div>
+    <button class="secondary" type="button" id="logout">Log out</button>
   </header>
-  <main>
-    <p id="who">Checking session…</p>
+  <main class="hub-page" id="main">
     <p>GitHub starters seed shared skills. Local forks stay on the owning bot. Only maintainer consumes <code>skill.record</code> after proctor.</p>
     <div class="row">
       <select id="tag">
@@ -67,14 +53,14 @@
     </div>
     <p id="msg" class="ok"></p>
     <h2>Skills</h2>
-    <table>
+    <table class="hub-cards">
       <thead>
         <tr><th>Slug</th><th>Role</th><th>Tags</th><th>Scope</th><th>Origin</th><th>Status</th></tr>
       </thead>
       <tbody id="skills"></tbody>
     </table>
     <h2>Recordings</h2>
-    <table>
+    <table class="hub-cards">
       <thead>
         <tr><th>Id</th><th>Slug</th><th>Status</th><th>Submitted by</th><th>Queue</th></tr>
       </thead>
@@ -106,12 +92,12 @@
       const data = await api("/api/registry/skills?" + q.toString());
       document.getElementById("skills").innerHTML = (data.skills || []).map((s) =>
         `<tr>
-          <td><code>${cell(s.slug)}</code></td>
-          <td>${cell(s.role)}</td>
-          <td>${(s.tags || []).map((t) => `<span class="pill">${cell(t)}</span>`).join("")}</td>
-          <td>${cell(s.scope)}</td>
-          <td>${cell(s.origin)}</td>
-          <td>${cell(s.status)}</td>
+          <td data-label="Slug"><code>${cell(s.slug)}</code></td>
+          <td data-label="Role">${cell(s.role)}</td>
+          <td data-label="Tags">${(s.tags || []).map((t) => `<span class="pill">${cell(t)}</span>`).join("")}</td>
+          <td data-label="Scope">${cell(s.scope)}</td>
+          <td data-label="Origin">${cell(s.origin)}</td>
+          <td data-label="Status">${cell(s.status)}</td>
         </tr>`
       ).join("") || `<tr><td colspan="6" class="muted">none</td></tr>`;
     }
@@ -161,5 +147,23 @@
     };
     boot();
   </script>
+
+  </div>
+  <nav class="hub-dock" aria-label="Primary">
+    <a class="hub-nav-item" data-icon="board" data-nav="/" href="/">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
+    <button class="hub-nav-item" type="button" data-icon="more" data-hub-more>More</button>
+  </nav>
+  <div class="hub-more" id="hubMore">
+    <a href="/admin/data">Data</a>
+    <a href="/admin/skills">Skills</a>
+    <a href="/admin/memory">Memory</a>
+    <a href="/onboarding">Candidate</a>
+    <button type="button" data-hub-logout>Log out</button>
+    <button type="button" class="secondary" data-hub-more-close>Close</button>
+  </div>
+
+  <script src="/static/hub.js"></script>
 </body>
 </html>

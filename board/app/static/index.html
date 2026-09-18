@@ -2,145 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1c1814" />
   <title>jobOS Harness — Board</title>
   <link rel="icon" href="/brand/favicon.png" type="image/png" />
-  <style>
-    :root {
-      --bg: #0e1218;
-      --panel: #151b24;
-      --panel-2: #1c2430;
-      --line: #2a3444;
-      --text: #e7edf6;
-      --muted: #8b97ab;
-      --accent: #3b82f6;
-      --accent-text: #f8fbff;
-      --good: #5dcea6;
-      --warn: #e0b25c;
-      --bad: #e07a7a;
-      --stop: #c45c5c;
-      --orange: #f0a05a;
-      --teal: #3dbeb0;
-      --grey: #7f8ea3;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 14px/1.45 ui-sans-serif, system-ui, sans-serif; }
-    a { color: #7cb4ff; }
-    button, input, select, textarea { font: inherit; }
-    header.app {
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
-      padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--panel);
-      position: sticky; top: 0; z-index: 5;
-    }
-    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-    .logo {
-      width: 36px; height: 36px; border-radius: 8px; flex: none;
-      display: grid; place-items: center; font-weight: 800; letter-spacing: .04em;
-      background: #1d4ed8; color: #fff; font-size: 12px;
-    }
-    header.app h1 { margin: 0; font-size: 16px; font-weight: 700; }
-    header.app .sub { color: var(--muted); font-size: 12px; }
-    .connect { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .connect label { margin: 0; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 6px; }
-    input, select, textarea {
-      background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
-      border-radius: 6px; padding: 7px 10px;
-    }
-    button {
-      background: var(--accent); color: var(--accent-text); border: 0; border-radius: 6px;
-      padding: 7px 12px; font-weight: 650; cursor: pointer;
-    }
-    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
-    button.danger { background: var(--bad); color: #1a0b0b; }
-    button.warn { background: #8b5cf6; color: #f5f3ff; }
-    button:disabled { opacity: .45; cursor: not-allowed; }
-    .status {
-      display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted);
-    }
-    .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #5a6578; }
-    .status.on { color: var(--good); }
-    .status.on .dot { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.18); }
-    .filters {
-      padding: 10px 18px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-      border-bottom: 1px solid var(--line); background: var(--bg);
-    }
-    .filters .grow { flex: 1; min-width: 180px; }
-    .stats { margin-left: auto; color: var(--muted); font-size: 12px; }
-    .drop { position: relative; }
-    .drop .menu {
-      position: absolute; top: calc(100% + 4px); left: 0; z-index: 8;
-      min-width: 240px; max-height: min(70vh, 560px); overflow: auto;
-      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-      box-shadow: 0 12px 32px rgba(0,0,0,.35); padding: 6px;
-    }
-    .drop .menu button {
-      display: block; width: 100%; text-align: left; background: transparent; color: var(--text);
-      font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px;
-    }
-    .drop .menu button:hover, .drop .menu button.active { background: var(--panel-2); }
-    main { display: grid; grid-template-columns: 220px minmax(0, 1fr) 380px; height: calc(100vh - 109px); }
-    #presenceRail { border-right: 1px solid var(--line); background: var(--panel); padding: 12px; overflow: auto; }
-    #presenceRail h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-    #presenceRail .who { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12px; cursor: pointer; }
-    #presenceRail .who.active { background: var(--panel-2); margin: 0 -8px; padding: 8px; border-radius: 6px; }
-    #presenceRail .who .name { font-weight: 650; }
-    #presenceRail .muted { color: var(--muted); font-size: 11px; }
-    #presenceRail .mem { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
-    #presenceRail .mem .kind { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-    #list { overflow: auto; }
-    .side { border-left: 1px solid var(--line); background: var(--panel); padding: 16px; overflow: auto; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 650; position: sticky; top: 0; background: var(--bg); }
-    tbody tr { cursor: pointer; }
-    tbody tr:hover, tbody tr.active { background: var(--panel-2); }
-    .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 650; background: #2a3344; color: #c9d4e4; }
-    .pill.discovered, .pill.enriching, .pill.shortlisted { background: #243044; color: #9db4d4; }
-    .pill.apply_ready, .pill.applied, .pill.offer, .pill.outreach_ready { background: #163832; color: var(--teal); }
-    .pill.applying, .pill.waiting, .pill.chatting, .pill.interview { background: #3a2e14; color: var(--warn); }
-    .pill.outreaching { background: #3a2814; color: var(--orange); }
-    .pill.apply_blocked { background: #2a3344; color: var(--grey); }
-    .pill.skipped, .pill.closed_rejected, .pill.closed_expired { background: #3a2228; color: var(--bad); }
-    .pill.stopped, .pill.closed_withdrawn { background: #3a1d1d; color: var(--stop); }
-    .pill.logged_in, .pill.idle { background: #163832; color: var(--teal); }
-    .pill.working, .pill.producing { background: #3a2e14; color: var(--warn); }
-    .pill.stale, .pill.offline { background: #2a3344; color: var(--grey); }
-    .side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-    .side h2 { margin: 0; font-size: 15px; }
-    .iconx { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); width: 28px; height: 28px; padding: 0; }
-    label { display: block; color: var(--muted); font-size: 11px; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
-    textarea, input[type="text"], input[type="number"], input[type="url"], .side select { width: 100%; }
-    textarea { min-height: 72px; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .events { margin-top: 18px; }
-    .event { font-size: 12px; color: var(--muted); padding: 6px 0; border-bottom: 1px solid var(--line); }
-    .warnbox { background: #3a2e14; color: var(--warn); padding: 8px 10px; border-radius: 6px; font-size: 12px; margin: 8px 0; }
-    .empty { color: var(--muted); padding: 40px 20px; }
-    .err { color: var(--bad); font-size: 12px; }
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    @media (max-width: 960px) {
-      main { grid-template-columns: 1fr; height: auto; }
-      #presenceRail { border-right: 0; border-bottom: 1px solid var(--line); max-height: 28vh; }
-      .side { border-left: 0; border-top: 1px solid var(--line); min-height: 50vh; }
-    }
-  </style>
+  <link rel="stylesheet" href="/static/hub.css" />
 </head>
-<body>
-  <header class="app">
+<body class="hub-app">
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="hub-rail" aria-label="Hub">
+    <a class="hub-brand" href="/"><img src="/brand/mascot.png" width="36" height="36" alt="jobOS" /></a>
+    <a class="hub-nav-item" data-icon="board" data-nav="/" href="/">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
+    <a class="hub-nav-item" data-icon="data" data-nav="/admin/data" href="/admin/data">Data</a>
+    <a class="hub-nav-item" data-icon="skills" data-nav="/admin/skills" href="/admin/skills">Skills</a>
+    <a class="hub-nav-item" data-icon="memory" data-nav="/admin/memory" href="/admin/memory">Memory</a>
+    <a class="hub-nav-item" data-icon="candidate" data-nav="/onboarding" href="/onboarding">Candidate</a>
+    <span class="hub-rail-spacer"></span>
+    <button class="hub-nav-item" type="button" data-icon="logout" data-hub-logout>Log out</button>
+  </nav>
+  <div class="hub-stage">
+  <header class="hub-top">
     <div class="brand">
-      <img class="logo" src="/brand/mascot.png" alt="jobOS" width="36" height="36" style="width:36px;height:36px;border-radius:8px" />
       <div>
         <h1>jobOS Harness</h1>
         <div class="sub">helps find jobs · workers run the tracks · you watch presence</div>
-        <div class="sub" id="hubLinks">
-          <a href="/onboarding">Candidate</a> ·
-          <a href="/admin">Invites</a> ·
-          <a href="/admin/data">Data</a> ·
-          <a href="/admin/users">Presence</a> ·
-          <a href="/admin/skills">Skills</a> ·
-          <a href="/admin/memory">Memory</a> ·
-          <a href="/.well-known/agent-card.json">A2A</a>
-        </div>
       </div>
     </div>
     <div id="sessionBar" class="connect">
@@ -149,7 +36,11 @@
       <button id="logoutBtn" class="secondary" type="button">Log out</button>
     </div>
   </header>
-  <div class="filters">
+  <div class="hub-toolbar filters">
+    <div class="hub-switch" role="tablist" aria-label="Board pane">
+      <button type="button" class="on" data-board-pane="jobs">Jobs</button>
+      <button type="button" data-board-pane="presence">Live</button>
+    </div>
     <input id="q" class="grow" placeholder="Search company / title / not" />
     <div class="drop" id="statusDrop">
       <button class="secondary" id="statusBtn" type="button">All statuses</button>
@@ -168,7 +59,8 @@
     <span class="sub" id="queueLabel">Queue</span>
     <span class="stats" id="queueStats"></span>
   </div>
-  <main>
+  <div class="hub-backdrop" id="ticketBackdrop" hidden></div>
+  <main class="hub-board" id="main">
     <aside id="presenceRail">
       <h2>Presence</h2>
       <div class="muted" id="presenceEmpty">Workers appear here when they heartbeat. Click one to see what they are doing.</div>
@@ -180,7 +72,24 @@
     <section id="list"><div class="empty">Sign in as the Hub admin to load the board. Workers use API keys, not this page.</div></section>
     <aside class="side" id="side"></aside>
   </main>
+  </div>
+  <nav class="hub-dock" aria-label="Primary">
+    <a class="hub-nav-item" data-icon="board" data-nav="/" href="/">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
+    <button class="hub-nav-item" type="button" data-icon="more" data-hub-more>More</button>
+  </nav>
+  <div class="hub-more" id="hubMore">
+    <a href="/admin/data">Data</a>
+    <a href="/admin/skills">Skills</a>
+    <a href="/admin/memory">Memory</a>
+    <a href="/onboarding">Candidate</a>
+    <a href="/.well-known/agent-card.json">A2A</a>
+    <button type="button" data-hub-logout>Log out</button>
+    <button type="button" class="secondary" data-hub-more-close>Close</button>
+  </div>
 
+  <script src="/static/hub.js"></script>
   <script>
     let caps = null;
     let jobs = [];
@@ -274,6 +183,7 @@
         <label>Apply URL</label><input disabled />
       `;
       document.getElementById("closeSide").onclick = () => { selectedId = null; emptySide(); renderTable(); };
+      if (window.Hub) Hub.setTicketOpen(false);
     }
 
     function stopPresenceLoop() {
@@ -373,6 +283,7 @@
         emptySide();
         loadPresence();
       };
+      if (window.Hub) Hub.setTicketOpen(true);
     }
 
     async function loadPresence() {
@@ -482,7 +393,7 @@
           <td class="muted">${escapeHtml((j.claim && (j.claim.claimed_by || j.claim.kind)) || "")}</td>
         </tr>`).join("");
       document.getElementById("list").innerHTML = `
-        <table>
+        <table class="hub-board-table">
           <thead><tr><th>ID</th><th>Company</th><th>Title</th><th>Status</th><th>Claim</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
@@ -552,6 +463,7 @@
       document.getElementById("stopBtn").onclick = () => stopJob(job.id);
       document.getElementById("resumeBtn").onclick = () => resumeJob(job.id);
       document.getElementById("delBtn").onclick = () => deleteJob(job.id);
+      if (window.Hub) Hub.setTicketOpen(true);
     }
 
     function parseJSONField(id, fallback) {
@@ -664,6 +576,20 @@
         alert(JSON.stringify(report, null, 2));
       } catch (e) { alert(e.message); }
     });
+    document.querySelectorAll("[data-board-pane]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (window.Hub) Hub.setBoardPane(btn.dataset.boardPane);
+      });
+    });
+    const backdrop = document.getElementById("ticketBackdrop");
+    if (backdrop) {
+      backdrop.addEventListener("click", () => {
+        selectedId = null;
+        selectedPresenceId = null;
+        emptySide();
+        renderTable();
+      });
+    }
     emptySide();
     boot();
   </script>
