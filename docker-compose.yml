@@ -22,7 +22,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: jobos
-      POSTGRES_PASSWORD: ${JOBOS_PG_PASSWORD:-jobos}
+      POSTGRES_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       POSTGRES_DB: jobos
     volumes:
       - ${JOBOS_PGDATA:-${HOME}/.jobos/pgdata}:/var/lib/postgresql/data
