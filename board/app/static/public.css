@@ -1,82 +1,6 @@
-@font-face {
-  font-family: "Big Shoulders Display";
-  src: url("/static/fonts/big-shoulders-display-700.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Big Shoulders Display";
-  src: url("/static/fonts/big-shoulders-display-800.woff2") format("woff2");
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Red Hat Text";
-  src: url("/static/fonts/red-hat-text-400.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Red Hat Text";
-  src: url("/static/fonts/red-hat-text-400-italic.woff2") format("woff2");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Red Hat Text";
-  src: url("/static/fonts/red-hat-text-500.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Red Hat Text";
-  src: url("/static/fonts/red-hat-text-600.woff2") format("woff2");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Red Hat Mono";
-  src: url("/static/fonts/red-hat-mono-400.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Red Hat Mono";
-  src: url("/static/fonts/red-hat-mono-500.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
+@import url("/static/theme.css");
 
 :root {
-  --chassis: #0b1220;
-  --chassis-2: #101827;
-  --panel: #172033;
-  --bezel: #243044;
-  --ink: #f3eee3;
-  --ink-dim: #cbb892;
-  --amber: #e0992d;
-  --amber-hot: #f3bc5a;
-  --amber-deep: #b57516;
-  --good: #3f9d7a;
-  --warn: #c9893a;
-  --bad: #c45c4a;
-  --line: rgba(224, 153, 45, 0.32);
-  --line-soft: rgba(243, 238, 227, 0.1);
-  --shadow: 0 18px 40px rgba(4, 8, 14, 0.45);
-  --font-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
-  --font-body: "Red Hat Text", "Segoe UI", sans-serif;
-  --font-mono: "Red Hat Mono", ui-monospace, monospace;
-  --space: 1rem;
-  --measure: 70ch;
-  --radius: 2px;
   --mast-h: 4.25rem;
 }
 
@@ -89,7 +13,6 @@
 html {
   background: var(--chassis);
   color: var(--ink);
-  scrollbar-color: var(--amber) var(--chassis-2);
   scroll-behavior: smooth;
 }
 
@@ -101,19 +24,9 @@ body.site {
   line-height: 1.5;
   color: var(--ink);
   background:
-    radial-gradient(900px 420px at 88% -8%, rgba(224, 153, 45, 0.16), transparent 58%),
-    radial-gradient(700px 380px at -10% 20%, rgba(63, 157, 122, 0.07), transparent 50%),
+    radial-gradient(900px 420px at 88% -8%, color-mix(in srgb, var(--amber) 16%, transparent), transparent 58%),
+    radial-gradient(700px 380px at -10% 20%, color-mix(in srgb, var(--good) 7%, transparent), transparent 50%),
     linear-gradient(180deg, var(--chassis-2), var(--chassis) 28%);
-}
-
-::selection {
-  background: var(--amber);
-  color: var(--chassis);
-}
-
-:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 3px;
 }
 
 a {
@@ -231,7 +144,7 @@ a:hover {
 .btn-primary {
   background: var(--amber);
   color: var(--chassis);
-  box-shadow: 0 10px 22px rgba(176, 117, 22, 0.28);
+  box-shadow: var(--elev-amber);
 }
 .btn-primary:hover {
   background: var(--amber-hot);
@@ -332,13 +245,13 @@ main {
   object-fit: cover;
   object-position: 52% 46%;
   margin: 0.2rem 0 0;
-  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.45));
+  filter: drop-shadow(var(--shadow));
 }
 
 .console {
   margin: 0 1rem 1rem;
   padding: 0.85rem 1rem 1rem;
-  background: #070b12;
+  background: var(--console);
   border-top: 1px dashed var(--amber);
   font-family: var(--font-mono);
   font-size: 0.82rem;
@@ -633,7 +546,7 @@ main {
   margin: 1rem 0;
   padding: 0.9rem 1rem;
   overflow: auto;
-  background: #070b12;
+  background: var(--console);
   border: 1px solid var(--line);
   color: var(--amber-hot);
   font-family: var(--font-mono);
