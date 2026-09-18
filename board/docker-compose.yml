@@ -1,5 +1,5 @@
 # Prefer repo-root: docker compose up -d --build
-# Postgres is internal-only. Hub is stateless. Data: ${JOBOS_PGDATA:-$HOME/.jobos/pgdata}
+# Postgres is internal-only. Data: named volume pgdata (Coolify-safe).
 name: jobos
 
 services:
@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${JOBOS_PG_PASSWORD:-jobos}
       POSTGRES_DB: jobos
     volumes:
-      - ${JOBOS_PGDATA:-${HOME}/.jobos/pgdata}:/var/lib/postgresql/data
+      - "pgdata:/var/lib/postgresql/data"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
       interval: 5s
@@ -44,3 +44,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+
+volumes:
+  pgdata:

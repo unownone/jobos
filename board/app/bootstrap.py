@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from app.db import BoardDB, utc_now
-from app.passwords import PASSWORD_MIN_LEN, hash_password, verify_password
+from app.passwords import PASSWORD_MIN_LEN, hash_password
 from app.settings import Settings, parse_env_file
 from app.tenant import AccountStore, TenantContext
 from app.urls import resolve_public_url

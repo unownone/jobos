@@ -2,11 +2,10 @@
 #   docker compose up -d --build
 # Hub listens on http://127.0.0.1:8787
 #
-# Durable state is PostgreSQL (not a Hub volume). Postgres is not published
-# on the host — only the Hub container can reach it.
-# Postgres files live on the host bind ${JOBOS_PGDATA:-$HOME/.jobos/pgdata}
-# so compose project-name changes cannot wipe the database.
-# Resumes live on ${JOBOS_BLOBS:-$HOME/.jobos/blobs}. Queue is RabbitMQ.
+# Durable state is PostgreSQL + RabbitMQ + blobs on named Docker volumes
+# (pgdata, rabbitmq, blobs). Coolify rejects ${...} in volume sources and
+# wipes ~/ bind mounts on each helper checkout — see docs/coolify.md.
+# docker compose down keeps volumes; docker compose down -v deletes them.
 #
 # Traefik (80/443): HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh
 #   uses docker-compose.traefik.yml
@@ -26,7 +25,7 @@ services:
       POSTGRES_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       POSTGRES_DB: jobos
     volumes:
-      - ~/.jobos/pgdata:/var/lib/postgresql/data
+      - "pgdata:/var/lib/postgresql/data"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
       interval: 5s
@@ -40,7 +39,7 @@ services:
       RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
       RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
     volumes:
-      - ${JOBOS_AMQPDATA:-${HOME}/.jobos/rabbitmq}:/var/lib/rabbitmq
+      - "rabbitmq:/var/lib/rabbitmq"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -68,7 +67,7 @@ services:
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
-      - ${JOBOS_BLOBS:-${HOME}/.jobos/blobs}:/var/lib/jobos/blobs
+      - "blobs:/var/lib/jobos/blobs"
     ports:
       - "8787:8787"
     depends_on:
@@ -82,3 +81,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+
+volumes:
+  pgdata:
+  rabbitmq:
+  blobs:

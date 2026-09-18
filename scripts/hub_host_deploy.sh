@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Deploy Job Hub on this host from GitHub main (or a pinned SHA).
 # Intended for the live clone at $JOBOS_REPO (default: $HOME/jobos-live),
-# not the agent's working tree. Postgres data lives on the host bind
-# JOBOS_PGDATA (default: ~/.jobos/pgdata). Hub has no Docker volume.
+# not the agent's working tree. Durable data is named Docker volumes
+# (pgdata, blobs, rabbitmq). Coolify forbids ${...} in volume sources and
+# would wipe ~/ binds on each helper checkout. See docs/coolify.md.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,8 +34,8 @@ Env (optional file: $HOME/.jobos/deploy.env):
   JOBOS_COMPOSE_FILE    Compose file (default: docker-compose.yml)
   HUB_PUBLIC_HOST       Hostname, IP, or IP:port for invite URLs
   HUB_PUBLIC_URL        Full origin (wins over HUB_PUBLIC_HOST)
-  JOBOS_PGDATA         Host directory for Postgres files (default: ~/.jobos/pgdata)
   JOBOS_PG_PASSWORD    Postgres password (default: jobos). Not published; Hub-only.
+                       Durable data is named volumes pgdata, blobs, rabbitmq.
 EOF
 }
 
@@ -62,8 +63,6 @@ COMPOSE_FILE="${JOBOS_COMPOSE_FILE:-docker-compose.yml}"
 HEALTH_URL="${JOBOS_HEALTH_URL:-http://127.0.0.1:8787/health}"
 STATE_DIR="${JOBOS_STATE_DIR:-${HOME}/.jobos}"
 mkdir -p "$STATE_DIR"
-export JOBOS_PGDATA="${JOBOS_PGDATA:-${STATE_DIR}/pgdata}"
-mkdir -p "$JOBOS_PGDATA"
 
 if [[ ! -d "$REPO/.git" ]]; then
   echo "hub_host_deploy: $REPO is not a git clone" >&2
@@ -88,7 +87,7 @@ echo "Job Hub host deploy"
 echo "  repo: $REPO"
 echo "  sha:  $DEPLOYED_SHA"
 echo "  compose: $COMPOSE_FILE"
-echo "  postgres data: $JOBOS_PGDATA"
+echo "  postgres volume: pgdata (compose project named volume)"
 if [[ -n "${HUB_PUBLIC_URL:-}" ]]; then
   echo "  public: $HUB_PUBLIC_URL"
 elif [[ -n "${HUB_PUBLIC_HOST:-}" ]]; then

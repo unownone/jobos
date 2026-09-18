@@ -4,7 +4,10 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-BOARD="${JOBHUB_BOARD_DIR:-$REPO/board}"
+# Python project + venv always live in repo board/. JOBHUB_BOARD_DIR is the
+# secrets/data dir (defaults to that same package) so tests can isolate .env.
+BOARD_PKG="$REPO/board"
+BOARD="${JOBHUB_BOARD_DIR:-$BOARD_PKG}"
 export PATH="$HOME/.local/bin:$PATH"
 
 if ! command -v uv >/dev/null 2>&1; then
@@ -28,16 +31,16 @@ if [[ -n "${HUB_PUBLIC_URL:-}" ]]; then
   echo "  public url: ${HUB_PUBLIC_URL}"
 fi
 
-if [[ ! -x "$BOARD/.venv/bin/python" ]]; then
-  uv sync --project "$BOARD" --frozen --no-dev
+if [[ ! -x "$BOARD_PKG/.venv/bin/python" ]]; then
+  uv sync --project "$BOARD_PKG" --frozen --no-dev
 fi
-"$BOARD/.venv/bin/python" "$REPO/scripts/board_gen_tokens.py" --dir "$BOARD"
-"$BOARD/.venv/bin/python" "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$BOARD"
-"$BOARD/.venv/bin/python" "$REPO/scripts/hub_build_pack.py" --dir "$BOARD" --repo "$REPO"
+"$BOARD_PKG/.venv/bin/python" "$REPO/scripts/board_gen_tokens.py" --dir "$BOARD"
+"$BOARD_PKG/.venv/bin/python" "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$BOARD"
+"$BOARD_PKG/.venv/bin/python" "$REPO/scripts/hub_build_pack.py" --dir "$BOARD" --repo "$REPO"
 
 if [[ "${HUB_DEPLOY_DRY_RUN:-}" == "1" ]]; then
   echo "HUB_DEPLOY_DRY_RUN=1 — not starting gunicorn"
   exit 0
 fi
 
-exec bash "$BOARD/start.sh"
+exec bash "$BOARD_PKG/start.sh"

@@ -42,7 +42,7 @@ SQL and blob keys are namespaced by `account_id`. Queue routing keys are `{accou
 ```bash
 docker compose up -d --build
 # Hub http://127.0.0.1:8787
-# Postgres + RabbitMQ + blob volume ~/.jobos/blobs
+# Postgres + RabbitMQ + blob named volume
 ```
 
 Open `/`, then `/login`, create two usernames, confirm each board is empty of the other's jobs.

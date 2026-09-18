@@ -23,7 +23,7 @@ GitHub main ──push──► Actions (runner: jobos)
                  └──git fetch (ssh.github.com:443)──► /home/opc/jobos-live ──compose──► Traefik + Hub
 ```
 
-SQLite and Hub Docker volumes are gone. Durable state is PostgreSQL. Postgres files stay on the host bind `JOBOS_PGDATA` (default `~/.jobos/pgdata`). The Hub container has **no** volume. Deploys do **not** publish Postgres ports.
+SQLite and Hub Docker bind mounts are gone. Durable state is PostgreSQL, RabbitMQ, and blobs on **named Docker volumes** (`pgdata`, `rabbitmq`, `blobs`). Coolify forbids `${...}` in volume sources and would wipe `~` binds on each helper checkout — [`docs/coolify.md`](coolify.md). Deploys do **not** publish Postgres ports.
 
 ## Deploy keys (SSH)
 
@@ -108,7 +108,7 @@ Feature branches never auto-deploy. Merge (or push) to `main` only after **Deplo
 
 ## Secrets
 
-Do not put Hub tokens, bootstrap URLs, `board/.env`, or deploy **private** keys in git or in workflow YAML. Host env is `~/.jobos/deploy.env` (mode 600) plus Postgres under `~/.jobos/pgdata`. The SSH private key is `~/.ssh/jobos_deploy`. Optional Actions secret: `JOBOS_DEPLOY_KEY`.
+Do not put Hub tokens, bootstrap URLs, `board/.env`, or deploy **private** keys in git or in workflow YAML. Host env is `~/.jobos/deploy.env` (mode 600) plus named volumes `pgdata` / `blobs` / `rabbitmq`. The SSH private key is `~/.ssh/jobos_deploy`. Optional Actions secret: `JOBOS_DEPLOY_KEY`.
 
 ## Troubleshooting
 

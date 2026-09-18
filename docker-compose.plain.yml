@@ -2,8 +2,8 @@
 #   docker compose -f docker-compose.plain.yml up -d --build
 # Hub listens on http://127.0.0.1:8787
 #
-# Durable state is PostgreSQL. Files are volumized under ${JOBOS_BLOBS}.
-# Queue is RabbitMQ. Postgres/RabbitMQ have no published ports.
+# Durable state: named volumes pgdata, rabbitmq, blobs (Coolify-safe).
+# Postgres/RabbitMQ have no published ports. See docs/coolify.md.
 #
 # First visit: /login (username + password) → /onboarding → invites/agents.
 
@@ -17,7 +17,7 @@ services:
       POSTGRES_PASSWORD: ${JOBOS_PG_PASSWORD:-jobos}
       POSTGRES_DB: jobos
     volumes:
-      - ${JOBOS_PGDATA:-${HOME}/.jobos/pgdata}:/var/lib/postgresql/data
+      - "pgdata:/var/lib/postgresql/data"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
       interval: 5s
@@ -31,7 +31,7 @@ services:
       RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
       RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
     volumes:
-      - ${JOBOS_AMQPDATA:-${HOME}/.jobos/rabbitmq}:/var/lib/rabbitmq
+      - "rabbitmq:/var/lib/rabbitmq"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -61,7 +61,7 @@ services:
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
-      - ${JOBOS_BLOBS:-${HOME}/.jobos/blobs}:/var/lib/jobos/blobs
+      - "blobs:/var/lib/jobos/blobs"
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,3 +73,8 @@ services:
       timeout: 5s
       retries: 12
     restart: unless-stopped
+
+volumes:
+  pgdata:
+  rabbitmq:
+  blobs:

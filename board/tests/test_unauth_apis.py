@@ -25,7 +25,6 @@ from tests.unauth_support import (
     SeededHub,
     assert_unauthenticated_denied,
     make_seeded_hub,
-    role_headers,
 )
 
 

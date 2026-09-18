@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from app.sql import SqlConnection
 from app.tenant import account_id_of
 
 SCHEMA = """

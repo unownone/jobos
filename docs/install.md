@@ -14,6 +14,7 @@ Full operator API: [`docs/job-hub/human.md`](job-hub/human.md). Agents: [`docs/j
 | **Docker Compose + Traefik** | Public host, ports 80/443 | `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` (file: `docker-compose.traefik.yml`) |
 | **`docker build` / `docker run`** | One container, no Compose | See [Docker (no Compose)](#docker-no-compose) |
 | **uv / bare metal** | Cursor Cloud, no Docker | `bash scripts/hub_deploy.sh` |
+| **Coolify** | Self-hosted PaaS, Compose from GitHub | [`docs/coolify.md`](coolify.md) — named volumes, no `${...}` in volume sources |
 | **Push to `main`** | This OCI host (Traefik + Hub already up) | [Deploy on push](deploy.md) |
 
 Docker Desktop, Engine 24+, or Compose v2 is enough. Traefik is **optional**. This GitHub repo deploys to the hunt machine on every push to `main` — see [`docs/deploy.md`](deploy.md). Feature screenshots: [`docs/demo/README.md`](demo/README.md).
@@ -39,7 +40,7 @@ curl -sS -X POST "$HUB_URL/api/jobs" -H "X-Role: discovery" ...
 
 ## Docker Compose (plain)
 
-Hub only. Binds **8787**. Persistence is PostgreSQL. Files are volumized at `~/.jobos/blobs` (`JOBOS_BLOBS`). Queue is RabbitMQ. Postgres/RabbitMQ have **no published ports**. Postgres files live on the host at `~/.jobos/pgdata` (`JOBOS_PGDATA`). Packs rebuild into `/tmp`. There is no separate vector database.
+Hub only. Binds **8787**. Persistence is PostgreSQL + RabbitMQ + blobs on **named Docker volumes** (`pgdata`, `rabbitmq`, `blobs`). Postgres/RabbitMQ have **no published ports**. Packs rebuild into `/tmp`. There is no separate vector database. Volume sources are named volumes (no `${...}`, no `~`) so Coolify continuous deploys keep data — see [`docs/coolify.md`](coolify.md).
 
 ```bash
 cd /path/to/jobos
@@ -56,7 +57,7 @@ Open `http://127.0.0.1:8787/` then `/login`. After signup, `/onboarding`. Board 
 
 Override the published port with `HUB_PORT=343` if 8787 is taken (`http://127.0.0.1:343` — also set `HUB_PUBLIC_HOST` / `HUB_PUBLIC_URL` to match).
 
-Stop: `docker compose -f docker-compose.plain.yml down` (keeps `~/.jobos/pgdata`). Destroy data: delete that directory (Hub named volumes are not used).
+Stop: `docker compose -f docker-compose.plain.yml down` (keeps named volumes). Destroy data: `docker compose -f docker-compose.plain.yml down -v`.
 
 ## Docker Compose + Traefik (public host)
 
@@ -74,12 +75,12 @@ Put a real TLS certificate in front if you need one (Traefik `websecure` already
 
 ## Coolify
 
-Coolify has no universal one-click URL. Create a **Docker Compose** resource pointed at this GitHub repo.
+Coolify has no universal one-click URL. Create a **Docker Compose** resource pointed at this GitHub repo. Full notes (including why volume sources cannot use `${...}`): [`docs/coolify.md`](coolify.md).
 
 1. Source: `https://github.com/unownone/jobos` (branch `main`).
 2. Compose file: `docker-compose.yml` (Hub on 8787 plus internal Postgres). Do not invent a second stack.
 3. Set `HUB_PUBLIC_URL` (and usually `HUB_PUBLIC_HOST`) to the Coolify FQDN, e.g. `https://hub.example.com`.
-4. Persist host bind `JOBOS_PGDATA` (default `~/.jobos/pgdata`). The Hub container has no volume.
+4. Confirm Persistent Storage lists named volumes `pgdata`, `rabbitmq`, and `blobs` (Coolify prefixes them). Do not convert them to `${...}` or `~` binds.
 5. After first boot, open `/login` (or `/admin/signup` if the database is empty) then `/onboarding`. Healthcheck is `GET /health` on 8787 inside the container.
 6. OpenTelemetry logs go to container stdout (`OTEL_LOGS_EXPORTER=console`). No collector or OTLP endpoint. `OTEL_SDK_DISABLED=true` or `OTEL_LOGS_EXPORTER=none` turns them off.
 
@@ -141,9 +142,11 @@ The Hub container stores nothing durable on disk. PostgreSQL is the database.
 | --- | --- |
 | Postgres (internal Compose service) | Jobs, users, sessions, queue, messages, A2A, memory pods, candidate YAML, resume PDF, bootstrap token, token-burn metrics |
 | `/tmp/jobos-packs/` in Hub | Skill/MCP zip snapshots (rebuilt on start) |
-| Host `~/.jobos/pgdata` | Postgres files (bind mount, not a named Docker volume) |
+| Named volume `pgdata` | Postgres files |
+| Named volume `blobs` | Resume PDFs and other blob files |
+| Named volume `rabbitmq` | RabbitMQ durable queue state |
 
-Backup `~/.jobos/pgdata` (or `JOBOS_PGDATA`) while Postgres is stopped, or `pg_dump` from the Hub network. Airgap export for git: admin `GET /api/export/ledger`.
+Backup the `pgdata` volume while Postgres is stopped, or `pg_dump` from the Hub network. Airgap export for git: admin `GET /api/export/ledger`.
 
 Postgres is **not** published on the host. Do not add a `ports:` mapping for it.
 
@@ -182,13 +185,15 @@ See [`docs/job-hub/a2a.md`](job-hub/a2a.md).
 | `409 candidate_required` | Finish `/onboarding`. Example Ada Example YAML is rejected. |
 | Invite URLs point at 127.0.0.1 | Set `HUB_PUBLIC_HOST` / `HUB_PUBLIC_URL` to the public origin and recreate the container. |
 | Agents invent a candidate | Hub `candidate.present` is false — they must stop. |
-| Lost admin password | Restore `~/.jobos/pgdata` (or `JOBOS_PGDATA`) from backup. Do not invent `candidate.yaml` to “unblock”. |
+| Lost admin password | Restore the `pgdata` volume from backup. Do not invent `candidate.yaml` to “unblock”. |
+| Coolify: `Invalid volume source: contains forbidden character '${'` | Volume sources must be named volumes, not `${VAR:-...}` binds. See [`docs/coolify.md`](coolify.md). |
+| Coolify redeploy emptied Postgres/RabbitMQ | Bind mounts under `~` or `/artifacts` reset each deploy. Use named volumes. |
 | Docker healthcheck failing | `docker compose logs hub`. `/health` must answer on 8787 inside the container. |
 | Traefik 404 | Confirm `traefik/dynamic.yml` service URL is `http://hub:8787` and the `hub` service is healthy. |
 
 ## Deploy on push (this host)
 
-GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose, Postgres bind at `~/.jobos/pgdata`). Pull requests run **Deploy check** first (SSH wiring; no ship). GitHub SSH uses `ssh.github.com:443` and `~/.ssh/jobos_deploy`. Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
+GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose, named volumes `pgdata` / `blobs` / `rabbitmq`). Pull requests run **Deploy check** first (SSH wiring; no ship). GitHub SSH uses `ssh.github.com:443` and `~/.ssh/jobos_deploy`. Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
 
 ```bash
 bash scripts/hub_host_deploy.sh   # manual ship of origin/main on the host
