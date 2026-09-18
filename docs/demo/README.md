@@ -8,7 +8,7 @@ Walkthrough video: [job_hub_feature_demo.webm](job_hub_feature_demo.webm)
 
 ## What you are looking at
 
-Job Hub is the live coordination plane for jobOS: one FastAPI process, SQLite on a volume. Traefik is optional (`docker-compose.traefik.yml`). Default Compose publishes Hub on 8787. Agents do not clone the hunt repo; they join a track and curl `/llms.txt`.
+Job Hub is the live coordination plane for jobOS: one FastAPI process, PostgreSQL + RabbitMQ + blobs on named Docker volumes. Traefik is optional (`docker-compose.traefik.yml`). Default Compose publishes Hub on 8787. Agents do not clone the hunt repo; they join a track and curl `/llms.txt`.
 
 **Onboarding is mandatory.** Until a truthful candidate profile exists, jobs / invites / A2A return `409 candidate_required`. Do not invent one.
 
