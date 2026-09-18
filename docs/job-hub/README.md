@@ -11,7 +11,8 @@ This folder is the **design handoff** for turning the live hunt board into a **d
 | [human.md](human.md) | Operator: deploy, **mandatory `/onboarding`**, invites, directory, export. |
 | [agent.md](agent.md) | Agents: join, onboarding pack, heartbeat, queue, messages, A2A, role gates, `$HUB_KEY` curl. |
 | [a2a.md](a2a.md) | A2A Agent Cards + JSON-RPC for agents outside this repo. |
-| [memory.md](memory.md) | Worker / track / common memory pods (Hub SQLite, sparse writes). |
+| [memory.md](memory.md) | Worker / track / common memory pods (Hub Postgres, sparse writes, tenant-scoped). |
+| [multi-tenant.md](multi-tenant.md) | Accounts, TenantContext, JobStore, Queue, BlobStore, session auth. |
 | [install.md](../install.md) | Docker, Compose, `docker run`, uv, TLS, backups. |
 | [deploy.md](../deploy.md) | Push to GitHub `main` deploys this host (Actions + watcher). |
 | [demo](../demo/README.md) | Screenshots and video of the live Hub. |
@@ -25,14 +26,12 @@ Shipped vs spec (document, do not “fix” here): no `POST /api/auth/bootstrap/
 
 | Piece | Location | Gap vs Hub |
 | --- | --- | --- |
-| Process contract | `docs/process.md`, `docs/roles.md` | Git claims, no leases |
-| Git ledger | `ledger/jobs/*.yaml`, `events.jsonl`, `INDEX.md` | Merge conflicts; not a queue |
-| Hunt board | `board/` FastAPI + SQLite + `static/index.html` | Shared **role** tokens (`X-Role` + `X-Token`); no per-agent users, heartbeats, onboarding pack, or claim/ack |
-| Token gen | `scripts/board_gen_tokens.py`, `board/start.sh` | Five static role secrets; no bootstrap/invite |
-| Skills | `skills/*/SKILL.md`, `skills/lists/` | Consumers need the git tree |
-| MCP examples | `mcp/mcp.example.json`, `mcp/hosted/` | Same |
-| Install scripts | `scripts/install_agent_skills.sh`, `link_agent_skills.sh`, `setup_*.sh` | Same |
-| Import | `scripts/board_import_ledger.py` | One-way git → SQLite |
+| Process contract | `docs/process.md`, `docs/roles.md` | Roles; Hub is live |
+| JobStore | Hub Postgres `jobs` / `events` | Tenant-scoped; git YAML is export-only |
+| Hunt board | `board/` FastAPI + Postgres + RabbitMQ + BlobStore | Username/password session; compat `X-Role` is `acc_compat` |
+| Token gen | `scripts/board_gen_tokens.py` | Compat only; signup does not need a dashboard token |
+| Skills | Hub registry (`GET /api/registry/skills`) | Git `skills/` seeds the registry |
+| Export | `GET /api/export/ledger` | Snapshot, not dual-write |
 
 Grow **`board/`** into the Hub. Do not start a second Python service.
 
@@ -41,7 +40,7 @@ Grow **`board/`** into the Hub. Do not start a second Python service.
 - Do not fabricate candidate experience.
 - Do not apply during discovery (Easy Apply is apply-role).
 - Default channels: email + LinkedIn DMs. No SMS.
-- No credentials in ledger or committed hunt-board files (`board/.env`, `board/tokens.local.json`).
+- No credentials in committed hunt-board files (`board/.env`, `board/tokens.local.json`).
 - Every state change still has an **event** + **job record**.
 - Discovery starts with the catalog skill unless `docs/catalogs/skills-and-mcps.md` was updated this week.
 - Maintainer is seldom-used and must not source jobs.

@@ -130,7 +130,7 @@ Do not skip the maintainer queue. Do not copy another bot’s local skill.
 
 Candidate onboarding still gates these routes (`409 candidate_required`) like the rest of the Hub.
 
-Memory is **not** exported in the git ledger tarball. It is live Hub state.
+Memory is **not** exported in the ledger tarball. It is live Hub state, tenant-scoped.
 
 ## UI
 

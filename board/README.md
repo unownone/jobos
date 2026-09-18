@@ -6,7 +6,7 @@ Private **live coordination plane** for a multi-agent job hunt. FastAPI + Postgr
 
 Agents: `curl -sS "$HUB_URL/llms.txt"` and `curl -sS "$HUB_URL/agents.txt"`. Do not scrape HTML for protocol.
 
-This is not a replacement for the git ledger in `ledger/`. See [Architecture](#architecture).
+This is not a git ledger. Canonical state is Postgres + BlobStore. See [Architecture](#architecture) and [`docs/job-hub/multi-tenant.md`](../docs/job-hub/multi-tenant.md).
 
 **Job Hub docs:** operator [`docs/job-hub/human.md`](../docs/job-hub/human.md) (deploy, signup, invites, export); agents [`docs/job-hub/agent.md`](../docs/job-hub/agent.md) (`$HUB_KEY`, join, onboarding, heartbeat, queue, memory). Memory pods: [`docs/job-hub/memory.md`](../docs/job-hub/memory.md). Maintainer owns this process; maintainer is not discovery.
 
@@ -18,10 +18,11 @@ The admin UI after **Connect** (or an admin cookie): one shared job list, status
 
 We run the hunt on **one shared board**, not a Sheet or CSV mirror.
 
-- **Live plane:** this process. Sibling agents on the same host read and write through HTTP. Humans use the admin UI.
-- **Airgap plane:** `ledger/` YAML + `INDEX.md` + `events.jsonl`. Template protocol. Bots with no shared server still use git. If the board is down, fall back here.
-- **Owner:** maintainer. Starts the process, generates gitignored per-role tokens, rotates them, imports history, runs hygiene and [benchmarks](BENCHMARKS.md). Discovery/apply/outreach get a token; they do not change schema or uptime.
-- **Auth:** Hub Bearer `$HUB_KEY` or admin session cookie. Compat `X-Role` + `X-Token` from `scripts/board_gen_tokens.py` still works and is deprecated. Tokens are never hardcoded, never committed.
+- **Live plane:** this process. Sibling agents read and write through HTTP. Humans use `/login` then `/board`.
+- **Export:** `GET /api/export/ledger` writes YAML when you need files. Not dual-write.
+- **Owner:** maintainer. Starts the process, schema, uptime. Discovery/apply/outreach consume it.
+- **Auth:** username + password session, or Hub Bearer `$HUB_KEY`. Compat `X-Role` + `X-Token` maps to a reserved `acc_compat` tenant and is deprecated.
+- **Tenancy:** every row is namespaced by `account_id`. Queue routing is `{account_id}.{kind}`.
 - **Lanes:** discovery **creates** the card and may finish discovery-owned fields while the job is still in the discovery lane. Apply **advances** apply fields only. Outreach **advances** outreach fields only. Admin can pause, stop, edit, or delete.
 - **Share:** default `http://127.0.0.1:8787/` on the hunt machine (server binds `0.0.0.0`). Optional temporary tunnel — see [How to share](#how-to-share-with-humans).
 
@@ -42,16 +43,15 @@ flowchart LR
   apply -->|token burn| metrics
   out -->|token burn| metrics
   board --> metrics
-  ledger[Git ledger airgap] -.->|import / fallback| board
 ```
 
 Status enum is the Job Apply OS contract (`discovered` → … → `offer` / `closed_*`). Bind address is `0.0.0.0` so sibling agents on this host can reach it.
 
 ## UI walkthrough (admin)
 
-Use these steps on `http://127.0.0.1:8787/`. Role token comes from the maintainer (`board/.env`) **or** log in as the human admin (session cookie). Do not paste tokens into git or group chat. Optional screenshot refresh: `bash board/scripts/capture_readme_shots.sh` (writes under `board/docs/` when those files exist).
+Use these steps on `http://127.0.0.1:8787/`. Create an account at `/login` (username + password). No dashboard token. Optional screenshot refresh: `bash board/scripts/capture_readme_shots.sh` (writes under `board/docs/` when those files exist).
 
-1. **Connect.** Header stays on screen: Role `admin`, paste the admin token (password field), **Connect**. The green **connected** pill appears. Other roles can connect too: they see the same list but Save/Pause/Stop/Delete follow their permissions.
+1. **Sign up / log in.** Open `/`, then `/login`. Create a username. You land on `/onboarding` until a truthful candidate exists, then `/board`.
 
 2. **List.** Columns are ID, company, title, status pill. Search matches company / title / id / URL / notes. Stats on the right show how many rows are in view vs the whole board.
 
@@ -82,14 +82,14 @@ What each role sees vs admin:
 
 Side panel on an open job: packets, events, Pause / Stop / Resume. Discovery/apply/outreach connecting here can read the same row but their Save button only sends fields their role may patch.
 
-## Board vs git ledger
+## Board vs export
 
 | Plane | What it is | When |
 | --- | --- | --- |
-| **This board** | Live private UI + API. SQLite on the hunt box. | Multi-agent hunt on a shared machine. Practical overlay. |
-| **Git ledger** (`ledger/`) | Template + airgap protocol. YAML per job, `INDEX.md`, `events.jsonl`. | Always the documented file protocol. Bots with no shared server still use git. |
+| **This board** | Live private UI + API. PostgreSQL + RabbitMQ + BlobStore. | Production. Multi-tenant. |
+| **Export tarball** | `GET /api/export/ledger` YAML snapshot | Airgap copy. Not the live list. |
 
-Do not delete the ledger design. Maintainer may import ledger history (`scripts/board_import_ledger.py`).
+Do not write live jobs into git `ledger/`. Maintainer may import a snapshot (`scripts/board_import_ledger.py`) into a tenant.
 
 ## Secrets (no tokens in git)
 
