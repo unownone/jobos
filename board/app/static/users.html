@@ -2,47 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1c1814" />
   <title>jobOS Harness — Presence</title>
   <link rel="icon" href="/brand/favicon.png" type="image/png" />
-  <style>
-    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
-    header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
-    main { max-width: 72rem; margin: 1.5rem auto; padding: 0 1rem 3rem; }
-    a { color: var(--accent); }
-    h1 { font-size: 1.15rem; margin: 0; }
-    p { color: var(--muted); }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-    th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--line); }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 650; background: #2a3344; }
-    .pill.logged_in, .pill.idle { color: var(--good); }
-    .pill.working, .pill.producing { color: #e0b25c; }
-    .pill.stale, .pill.offline { color: var(--muted); }
-  </style>
+  <link rel="stylesheet" href="/static/hub.css" />
+  
 </head>
-<body>
-  <header>
-    <h1>jobOS Harness — Directory</h1>
+<body class="hub-app">
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="hub-rail" aria-label="Hub">
+    <a class="hub-brand" href="/"><img src="/brand/mascot.png" width="36" height="36" alt="jobOS" /></a>
+    <a class="hub-nav-item" data-icon="board" data-nav="/" href="/">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
+    <a class="hub-nav-item" data-icon="data" data-nav="/admin/data" href="/admin/data">Data</a>
+    <a class="hub-nav-item" data-icon="skills" data-nav="/admin/skills" href="/admin/skills">Skills</a>
+    <a class="hub-nav-item" data-icon="memory" data-nav="/admin/memory" href="/admin/memory">Memory</a>
+    <a class="hub-nav-item" data-icon="candidate" data-nav="/onboarding" href="/onboarding">Candidate</a>
+    <span class="hub-rail-spacer"></span>
+    <button class="hub-nav-item" type="button" data-icon="logout" data-hub-logout>Log out</button>
+  </nav>
+  <div class="hub-stage">
+
+  <header class="hub-top">
     <div>
-      <a href="/">Board</a>
-      &nbsp;·&nbsp;
-      <a href="/admin">Invites</a>
-      &nbsp;·&nbsp;
-      <a href="/admin/data">Data</a>
-      &nbsp;·&nbsp;
-      <a href="/admin/skills">Skills</a>
-      &nbsp;·&nbsp;
-      <a href="/admin/memory">Memory</a>
-      &nbsp;·&nbsp;
-      <a href="#" id="logout">Log out</a>
+      <h1>jobOS Harness — Directory</h1>
+      <p id="who" class="sub">Checking session…</p>
     </div>
+    <button class="secondary" type="button" id="logout">Log out</button>
   </header>
-  <main>
-    <p id="who">Checking session…</p>
+  <main class="hub-page" id="main">
     <p>Logged in and heartbeating operators. API keys are never shown.</p>
-    <table>
+    <table class="hub-cards">
       <thead>
         <tr>
           <th>Name</th><th>Kind</th><th>Track / role</th><th>Status</th>
@@ -83,15 +75,15 @@
         const tr = document.createElement("tr");
         const task = u.current_task && u.current_task.id ? u.current_task.id : "";
         tr.innerHTML =
-          "<td>" + (u.display_name || u.user_id) + "</td>" +
-          "<td>" + (u.kind || "") + "</td>" +
-          "<td>" + (u.track || "") + " / " + (u.role || "") + "</td>" +
-          "<td><span class='pill " + (u.status || "") + "'>" + (u.status || "") + "</span></td>" +
-          "<td>" + (u.model || "") + "</td>" +
-          "<td>" + (u.harness || "") + "</td>" +
-          "<td>" + (u.bed || "") + "</td>" +
-          "<td>" + (u.last_seen || "") + "</td>" +
-          "<td>" + task + "</td>";
+          "<td data-label='Name'>" + (u.display_name || u.user_id) + "</td>" +
+          "<td data-label='Kind'>" + (u.kind || "") + "</td>" +
+          "<td data-label='Track'>" + (u.track || "") + " / " + (u.role || "") + "</td>" +
+          "<td data-label='Status'><span class='pill " + (u.status || "") + "'>" + (u.status || "") + "</span></td>" +
+          "<td data-label='Model'>" + (u.model || "") + "</td>" +
+          "<td data-label='Harness'>" + (u.harness || "") + "</td>" +
+          "<td data-label='Bed'>" + (u.bed || "") + "</td>" +
+          "<td data-label='Last seen'>" + (u.last_seen || "") + "</td>" +
+          "<td data-label='Task'>" + task + "</td>";
         tb.appendChild(tr);
       });
     }
@@ -113,5 +105,23 @@
       setInterval(async () => { await ping(); await load(); }, 10000);
     });
   </script>
+
+  </div>
+  <nav class="hub-dock" aria-label="Primary">
+    <a class="hub-nav-item" data-icon="board" data-nav="/" href="/">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
+    <button class="hub-nav-item" type="button" data-icon="more" data-hub-more>More</button>
+  </nav>
+  <div class="hub-more" id="hubMore">
+    <a href="/admin/data">Data</a>
+    <a href="/admin/skills">Skills</a>
+    <a href="/admin/memory">Memory</a>
+    <a href="/onboarding">Candidate</a>
+    <button type="button" data-hub-logout>Log out</button>
+    <button type="button" class="secondary" data-hub-more-close>Close</button>
+  </div>
+
+  <script src="/static/hub.js"></script>
 </body>
 </html>

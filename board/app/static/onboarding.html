@@ -2,40 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1c1814" />
   <title>jobOS Harness — Candidate</title>
   <link rel="icon" href="/brand/favicon.png" type="image/png" />
-  <style>
-    :root { --bg:#0e1218; --panel:#151b24; --text:#e7edf6; --muted:#8b97ab; --accent:#3b82f6; --line:#2a3444; --bad:#f87171; --good:#5dcea6; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
-    header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
-    h1 { font-size: 1.15rem; margin: 0; }
-    main { max-width: 44rem; margin: 1.5rem auto; padding: 0 1rem 3rem; }
-    p, label { color: var(--muted); }
-    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1rem; }
-    label { display: block; font-size: 0.8rem; margin: 0.65rem 0 0.25rem; }
-    input, textarea, select { width: 100%; padding: 0.5rem 0.65rem; border-radius: 8px; border: 1px solid var(--line); background: #0e1218; color: var(--text); }
-    textarea { min-height: 4.5rem; font: inherit; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-    button { margin-top: 0.85rem; padding: 0.55rem 0.9rem; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
-    button.secondary { background: #1c2430; border: 1px solid var(--line); }
-    .err { color: var(--bad); min-height: 1.2em; }
-    .ok { color: var(--good); }
-    .steps { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0 0 1rem; }
-    .steps span { font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
-    .steps span.on { border-color: var(--accent); color: var(--text); }
-    code { font-size: 0.85rem; }
-    a { color: var(--accent); }
-    @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
-  </style>
+  <link rel="stylesheet" href="/static/hub.css" />
+  
 </head>
-<body>
-  <header>
-        <h1>Candidate onboarding</h1>
-        <p id="revLine" class="muted" style="margin:0.35rem 0 0;color:var(--muted);font-size:12px"></p>
+<body class="hub-app">
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="hub-rail" aria-label="Hub">
+    <a class="hub-brand" href="/"><img src="/brand/mascot.png" width="36" height="36" alt="jobOS" /></a>
+    <a class="hub-nav-item" data-icon="board" data-nav="/" href="/">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
+    <a class="hub-nav-item" data-icon="data" data-nav="/admin/data" href="/admin/data">Data</a>
+    <a class="hub-nav-item" data-icon="skills" data-nav="/admin/skills" href="/admin/skills">Skills</a>
+    <a class="hub-nav-item" data-icon="memory" data-nav="/admin/memory" href="/admin/memory">Memory</a>
+    <a class="hub-nav-item" data-icon="candidate" data-nav="/onboarding" href="/onboarding">Candidate</a>
+    <span class="hub-rail-spacer"></span>
+    <button class="hub-nav-item" type="button" data-icon="logout" data-hub-logout>Log out</button>
+  </nav>
+  <div class="hub-stage">
+
+  <header class="hub-top">
+    <div>
+      <h1>Candidate onboarding</h1>
+      <p id="revLine" class="sub"></p>
+    </div>
   </header>
-  <main>
+  <main class="hub-page" id="main">
     <p>This is the first Hub step after creating the admin. Agents cannot join, hunt, apply, or talk over A2A until a <strong>truthful</strong> profile exists. Do not paste the example Ada Example file.</p>
     <div class="steps">
       <span id="s1" class="on">1. Identity</span>
@@ -287,5 +283,23 @@
     });
     me();
   </script>
+
+  </div>
+  <nav class="hub-dock" aria-label="Primary">
+    <a class="hub-nav-item" data-icon="board" data-nav="/" href="/">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
+    <button class="hub-nav-item" type="button" data-icon="more" data-hub-more>More</button>
+  </nav>
+  <div class="hub-more" id="hubMore">
+    <a href="/admin/data">Data</a>
+    <a href="/admin/skills">Skills</a>
+    <a href="/admin/memory">Memory</a>
+    <a href="/onboarding">Candidate</a>
+    <button type="button" data-hub-logout>Log out</button>
+    <button type="button" class="secondary" data-hub-more-close>Close</button>
+  </div>
+
+  <script src="/static/hub.js"></script>
 </body>
 </html>

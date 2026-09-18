@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "world": "dispatch-blotter",
+  "mode": "operate",
+  "colorStrategy": "restrained",
+  "tokens": {
+    "paper": "#ebe6dc",
+    "ink": "#1a1714",
+    "navy": "#1e3a5f",
+    "wood": "#1c1814",
+    "muted": "#5c564c"
+  }
+}
