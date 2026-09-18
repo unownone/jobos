@@ -14,7 +14,7 @@
 
 **jobOS** is a **job harness** — the only harness you need to find a job. It can be distributed among multiple agents for an efficient loop and better recon.
 
-One-click / easy deploy uses this repo’s Hub image (`Dockerfile`) and Compose (`docker-compose.yml`, Hub on **8787**). **Railway:** button above → `railway.json` + root `Dockerfile` (maps PaaS `PORT` to Hub). **Coolify:** new Docker Compose resource → GitHub `unownone/jobos` → compose file `docker-compose.yml` → persist `~/.jobos/pgdata`, `~/.jobos/blobs`, and `~/.jobos/rabbitmq` → set `HUB_PUBLIC_URL` to the Coolify FQDN. Volume sources must be literal paths (no `${...}`). Same stack as local Compose, not a second image. Details: [`docs/coolify.md`](docs/coolify.md), [`docs/install.md`](docs/install.md).
+One-click / easy deploy uses this repo’s Hub image (`Dockerfile`) and Compose (`docker-compose.yml`, Hub on **8787**). **Railway:** button above → `railway.json` + root `Dockerfile` (maps PaaS `PORT` to Hub). **Coolify:** new Docker Compose resource → GitHub `unownone/jobos` → compose file `docker-compose.yml` → keep named volumes `pgdata`, `blobs`, and `rabbitmq` → set `HUB_PUBLIC_URL` to the Coolify FQDN. Volume sources must be named volumes (no `${...}`, no `~`). Same stack as local Compose, not a second image. Details: [`docs/coolify.md`](docs/coolify.md), [`docs/install.md`](docs/install.md).
 
 Not a single auto-apply bot. One repo. Four owners today (three job-search roles plus a seldom maintainer). Canonical state lives in Hub Postgres + a volumized BlobStore. Git `ledger/` is export-only.
 
@@ -240,7 +240,7 @@ scripts/run_deep_research.py    Non-interactive research API wrapper
 docker-compose.yml        Default Hub image on :8787
 docker-compose.plain.yml  Same Hub, Compose project name jobos-plain
 docker-compose.traefik.yml Traefik on 80/443 wrapping the same image
-docs/coolify.md           Coolify: no ${...} in volume sources
+docs/coolify.md           Coolify: named volumes, no ${...} in volume sources
 ```
 
 ## Run a cycle
