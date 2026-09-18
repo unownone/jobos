@@ -4,9 +4,11 @@
 #
 # Durable state is PostgreSQL (not a Hub volume). Postgres is not published
 # on the host — only the Hub container can reach it.
-# Postgres files live on the host bind ${JOBOS_PGDATA:-$HOME/.jobos/pgdata}
-# so compose project-name changes cannot wipe the database.
-# Resumes live on ${JOBOS_BLOBS:-$HOME/.jobos/blobs}. Queue is RabbitMQ.
+# Postgres files live on the host bind ~/.jobos/pgdata so compose
+# project-name changes cannot wipe the database.
+# Resumes live on ~/.jobos/blobs. Queue is RabbitMQ (~/.jobos/rabbitmq).
+# Volume sources must be literal paths (no ${...}). Coolify rejects
+# interpolation in volume sources as command-injection risk — see docs/coolify.md.
 #
 # Traefik (80/443): HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh
 #   uses docker-compose.traefik.yml
@@ -40,7 +42,7 @@ services:
       RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
       RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
     volumes:
-      - ${JOBOS_AMQPDATA:-${HOME}/.jobos/rabbitmq}:/var/lib/rabbitmq
+      - ~/.jobos/rabbitmq:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -68,7 +70,7 @@ services:
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
-      - ${JOBOS_BLOBS:-${HOME}/.jobos/blobs}:/var/lib/jobos/blobs
+      - ~/.jobos/blobs:/var/lib/jobos/blobs
     ports:
       - "8787:8787"
     depends_on:

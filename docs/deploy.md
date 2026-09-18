@@ -23,7 +23,7 @@ GitHub main ──push──► Actions (runner: jobos)
                  └──git fetch (ssh.github.com:443)──► /home/opc/jobos-live ──compose──► Traefik + Hub
 ```
 
-SQLite and Hub Docker volumes are gone. Durable state is PostgreSQL. Postgres files stay on the host bind `JOBOS_PGDATA` (default `~/.jobos/pgdata`). The Hub container has **no** volume. Deploys do **not** publish Postgres ports.
+SQLite and Hub Docker volumes are gone. Durable state is PostgreSQL. Postgres files stay on the host bind `~/.jobos/pgdata` (Compose uses that literal path; Coolify forbids `${...}` in volume sources — [`docs/coolify.md`](coolify.md)). Blobs: `~/.jobos/blobs`. RabbitMQ: `~/.jobos/rabbitmq`. Deploys do **not** publish Postgres ports.
 
 ## Deploy keys (SSH)
 

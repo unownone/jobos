@@ -4,7 +4,8 @@
 # Default Hub-only compose (no Traefik): docker compose up -d --build  (port 8787)
 #
 # Durable state is PostgreSQL + volumized blobs + RabbitMQ.
-# Postgres files live on ${JOBOS_PGDATA:-$HOME/.jobos/pgdata}.
+# Host binds: ~/.jobos/pgdata, ~/.jobos/blobs, ~/.jobos/rabbitmq.
+# Do not put ${...} in volume sources (Coolify rejects it). See docs/coolify.md.
 #
 # First operator step after signup is always /onboarding.
 #
@@ -20,7 +21,7 @@ services:
       POSTGRES_PASSWORD: ${JOBOS_PG_PASSWORD:-jobos}
       POSTGRES_DB: jobos
     volumes:
-      - ${JOBOS_PGDATA:-${HOME}/.jobos/pgdata}:/var/lib/postgresql/data
+      - ~/.jobos/pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
       interval: 5s
@@ -34,7 +35,7 @@ services:
       RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
       RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
     volumes:
-      - ${JOBOS_AMQPDATA:-${HOME}/.jobos/rabbitmq}:/var/lib/rabbitmq
+      - ~/.jobos/rabbitmq:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -76,7 +77,7 @@ services:
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
-      - ${JOBOS_BLOBS:-${HOME}/.jobos/blobs}:/var/lib/jobos/blobs
+      - ~/.jobos/blobs:/var/lib/jobos/blobs
     expose:
       - "8787"
     depends_on:
