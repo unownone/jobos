@@ -14,6 +14,7 @@ from app.constants import ROLE_TO_TRACK, ROLES, role_for_track
 from app.db import BoardDB
 from app.identity import session_expiry
 from app.settings import Settings
+from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,11 @@ class Principal:
     kind: str | None = None
     auth: str = "compat_role"
     csrf_ok: bool = True
+    account_id: str | None = None
+
+    @property
+    def tenant(self) -> TenantContext:
+        return TenantContext(self.account_id or COMPAT_ACCOUNT_ID)
 
 
 def _unauthorized(detail: str) -> HTTPException:
@@ -95,6 +101,7 @@ def _principal_from_user(user: dict, *, auth: str, actor_override: str | None = 
         track=track,
         kind=kind,
         auth=auth,
+        account_id=str(user.get("account_id") or COMPAT_ACCOUNT_ID),
     )
 
 
@@ -126,6 +133,7 @@ def authenticate_compat(
         track=ROLE_TO_TRACK.get(role),
         kind="compat",
         auth="compat_role",
+        account_id=COMPAT_ACCOUNT_ID,
     )
 
 
@@ -201,6 +209,7 @@ def authenticate(
             kind=principal.kind,
             auth="session",
             csrf_ok=csrf_ok,
+            account_id=principal.account_id,
         )
 
     return authenticate_compat(settings, x_role, x_token, x_actor)

@@ -46,8 +46,8 @@ def test_unauthenticated_browser_cannot_open_sensitive_page(
 def test_unauthenticated_direct_url_job_board_is_not_a_200_with_board_ui(
     seeded: SeededHub,
 ) -> None:
-    res = seeded.unauth.get("/", headers=BROWSER_HEADERS)
-    assert_unauthenticated_denied(res, what="job board /")
+    res = seeded.unauth.get("/board", headers=BROWSER_HEADERS)
+    assert_unauthenticated_denied(res, what="job board /board")
     body = (res.text or "").lower()
     if res.status_code == 200:
         assert "job hub" not in body, "unauthenticated job board page returned 200 with Job Hub UI"

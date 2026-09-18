@@ -7,6 +7,7 @@ from pathlib import Path
 from app.db import BoardDB
 from app.metrics import MetricsStore
 from app.sql import adapt_sql, schema_name_for_path
+from app.tenant import TenantContext
 
 
 def test_adapt_sql_qmark_and_named() -> None:
@@ -31,26 +32,28 @@ def test_schema_names_differ_per_path(tmp_path: Path) -> None:
 
 def test_jobs_and_events_roundtrip(tmp_path: Path) -> None:
     db = BoardDB(tmp_path / "board.db")
-    job = db.insert_job({"id": "gh__pg1", "company": "Acme", "title": "Staff"})
+    tenant = db.compat_tenant
+    job = db.insert_job(tenant, {"id": "gh__pg1", "company": "Acme", "title": "Staff"})
     assert job["id"] == "gh__pg1"
     event = db.add_event(
+        tenant,
         job_id=job["id"],
         actor_role="discovery",
         actor="pytest",
         action="created",
     )
     assert event["id"]
-    assert db.get_job("gh__pg1")["company"] == "Acme"
-    assert db.list_events(job_id="gh__pg1")[0]["action"] == "created"
+    assert db.get_job(tenant, "gh__pg1")["company"] == "Acme"
+    assert db.list_events(tenant, job_id="gh__pg1")[0]["action"] == "created"
     db.close()
 
 
 def test_schema_isolation(tmp_path: Path) -> None:
     a = BoardDB(tmp_path / "a.db")
     b = BoardDB(tmp_path / "b.db")
-    a.insert_job({"id": "gh__only_a", "company": "A", "title": "One"})
-    assert b.get_job("gh__only_a") is None
-    assert a.get_job("gh__only_a") is not None
+    a.insert_job(a.compat_tenant, {"id": "gh__only_a", "company": "A", "title": "One"})
+    assert b.get_job(b.compat_tenant, "gh__only_a") is None
+    assert a.get_job(a.compat_tenant, "gh__only_a") is not None
     a.close()
     b.close()
 
@@ -58,11 +61,16 @@ def test_schema_isolation(tmp_path: Path) -> None:
 def test_blobs_and_kv_survive_reconnect(tmp_path: Path) -> None:
     path = tmp_path / "board.db"
     db = BoardDB(path)
-    db.put_blob("candidate.yaml", b"identity:\n  full_name: Test\n", content_type="text/yaml")
+    db.put_blob(
+        db.compat_tenant,
+        "candidate.yaml",
+        b"identity:\n  full_name: Test\n",
+        content_type="text/yaml",
+    )
     db.put_kv("bootstrap.token", "jh_boot_keepme")
     db.close()
     again = BoardDB(path)
-    blob = again.get_blob("candidate.yaml")
+    blob = again.get_blob(again.compat_tenant, "candidate.yaml")
     assert blob is not None
     assert b"full_name: Test" in blob["content"]
     assert again.get_kv("bootstrap.token") == "jh_boot_keepme"

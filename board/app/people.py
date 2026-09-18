@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth import Principal
 from app.permissions import ensure_can_people
+from app.tenant import TenantContext
 
 ID_RE = re.compile(r"^[a-z0-9]+__[a-zA-Z0-9._-]+$")
 SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -29,7 +30,8 @@ SECRET_FRAGMENTS = (
 
 PEOPLE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS people (
-    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    id TEXT NOT NULL,
     name TEXT NOT NULL,
     title TEXT,
     company TEXT,
@@ -41,11 +43,12 @@ CREATE TABLE IF NOT EXISTS people (
     touches_json TEXT,
     notes TEXT,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (account_id, id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_people_job ON people(job_id);
-CREATE INDEX IF NOT EXISTS idx_people_company ON people(company);
+CREATE INDEX IF NOT EXISTS idx_people_job ON people(account_id, job_id);
+CREATE INDEX IF NOT EXISTS idx_people_company ON people(account_id, company);
 """
 
 
@@ -123,15 +126,24 @@ class PersonPatch(BaseModel):
     notes: str | None = None
 
 
-def get_person(db: Any, person_id: str) -> dict[str, Any] | None:
-    cur = db.conn.execute("SELECT * FROM people WHERE id = ?", (person_id,))
+def get_person(db: Any, tenant: TenantContext, person_id: str) -> dict[str, Any] | None:
+    cur = db.conn.execute(
+        "SELECT * FROM people WHERE account_id = ? AND id = ?",
+        (tenant.account_id, person_id),
+    )
     row = cur.fetchone()
     return row_to_person(row) if row else None
 
 
-def list_people(db: Any, *, job_id: str | None = None, q: str | None = None) -> list[dict[str, Any]]:
-    sql = "SELECT * FROM people WHERE 1=1"
-    args: list[Any] = []
+def list_people(
+    db: Any,
+    tenant: TenantContext,
+    *,
+    job_id: str | None = None,
+    q: str | None = None,
+) -> list[dict[str, Any]]:
+    sql = "SELECT * FROM people WHERE account_id = ?"
+    args: list[Any] = [tenant.account_id]
     if job_id:
         sql += " AND job_id = ?"
         args.append(job_id)
@@ -144,16 +156,17 @@ def list_people(db: Any, *, job_id: str | None = None, q: str | None = None) -> 
     return [row_to_person(row) for row in cur.fetchall()]
 
 
-def insert_person(db: Any, payload: dict[str, Any]) -> dict[str, Any]:
+def insert_person(db: Any, tenant: TenantContext, payload: dict[str, Any]) -> dict[str, Any]:
     now = _now()
     db.conn.execute(
         """
         INSERT INTO people (
-            id, name, title, company, job_id, linkedin_url, email, email_confidence,
+            account_id, id, name, title, company, job_id, linkedin_url, email, email_confidence,
             do_not_contact, touches_json, notes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
+            tenant.account_id,
             payload["id"],
             payload["name"],
             payload.get("title") or "",
@@ -170,13 +183,15 @@ def insert_person(db: Any, payload: dict[str, Any]) -> dict[str, Any]:
         ),
     )
     db.conn.commit()
-    stored = get_person(db, payload["id"])
+    stored = get_person(db, tenant, payload["id"])
     assert stored is not None
     return stored
 
 
-def update_person(db: Any, person_id: str, patch: dict[str, Any]) -> dict[str, Any]:
-    current = get_person(db, person_id)
+def update_person(
+    db: Any, tenant: TenantContext, person_id: str, patch: dict[str, Any]
+) -> dict[str, Any]:
+    current = get_person(db, tenant, person_id)
     if current is None:
         raise HTTPException(status_code=404, detail="person not found")
     merged = {**current, **patch}
@@ -185,7 +200,7 @@ def update_person(db: Any, person_id: str, patch: dict[str, Any]) -> dict[str, A
         UPDATE people SET
             name=?, title=?, company=?, job_id=?, linkedin_url=?, email=?,
             email_confidence=?, do_not_contact=?, touches_json=?, notes=?, updated_at=?
-        WHERE id=?
+        WHERE account_id=? AND id=?
         """,
         (
             merged["name"],
@@ -199,11 +214,12 @@ def update_person(db: Any, person_id: str, patch: dict[str, Any]) -> dict[str, A
             json.dumps(merged.get("touches") or [], ensure_ascii=False),
             merged.get("notes") or "",
             _now(),
+            tenant.account_id,
             person_id,
         ),
     )
     db.conn.commit()
-    stored = get_person(db, person_id)
+    stored = get_person(db, tenant, person_id)
     assert stored is not None
     return stored
 
@@ -220,7 +236,7 @@ def create_people_router(principal_dep: Any) -> APIRouter:
     ) -> dict[str, Any]:
         ensure_can_people(principal.role)
         db: Any = request.app.state.db
-        people = list_people(db, job_id=job_id, q=q)
+        people = list_people(db, principal.tenant, job_id=job_id, q=q)
         return {"people": people, "count": len(people)}
 
     @router.post("/api/people", status_code=201)
@@ -239,11 +255,12 @@ def create_people_router(principal_dep: Any) -> APIRouter:
         )
         if not ID_RE.match(person_id):
             raise HTTPException(status_code=422, detail="id must match {source}__{stable_id}")
-        if get_person(db, person_id):
+        if get_person(db, principal.tenant, person_id):
             raise HTTPException(status_code=409, detail=f"person id already exists: {person_id}")
         payload["id"] = person_id
-        stored = insert_person(db, payload)
+        stored = insert_person(db, principal.tenant, payload)
         event = db.add_event(
+            principal.tenant,
             job_id=stored.get("job_id"),
             actor_role=principal.role,
             actor=principal.actor,
@@ -261,7 +278,7 @@ def create_people_router(principal_dep: Any) -> APIRouter:
     ) -> dict[str, Any]:
         ensure_can_people(principal.role)
         db: Any = request.app.state.db
-        stored = get_person(db, person_id)
+        stored = get_person(db, principal.tenant, person_id)
         if stored is None:
             raise HTTPException(status_code=404, detail="person not found")
         return {"person": stored}
@@ -277,8 +294,9 @@ def create_people_router(principal_dep: Any) -> APIRouter:
         patch = body.model_dump(exclude_none=True)
         _reject_secrets(patch)
         db: Any = request.app.state.db
-        stored = update_person(db, person_id, patch)
+        stored = update_person(db, principal.tenant, person_id, patch)
         event = db.add_event(
+            principal.tenant,
             job_id=stored.get("job_id"),
             actor_role=principal.role,
             actor=principal.actor,

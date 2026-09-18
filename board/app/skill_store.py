@@ -14,6 +14,8 @@ from fastapi import HTTPException
 from app.auth import Principal
 from app.bootstrap import new_id
 from app.db import utc_now
+from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
+from app.tenant_schema import ensure_tenant_schema
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
 TAG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
@@ -29,7 +31,8 @@ MOTION_TAGS = ("source", "apply", "outreach", "research", "maintain")
 
 SKILL_SCHEMA = """
 CREATE TABLE IF NOT EXISTS skills (
-    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    id TEXT NOT NULL,
     slug TEXT NOT NULL,
     name TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'skill',
@@ -56,21 +59,23 @@ CREATE TABLE IF NOT EXISTS skills (
     approved_by TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    created_by TEXT
+    created_by TEXT,
+    PRIMARY KEY (account_id, id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_shared_slug
-    ON skills(slug) WHERE scope = 'shared';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_account_shared_slug
+    ON skills(account_id, slug) WHERE scope = 'shared';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_local_slug
-    ON skills(owner_user_id, slug) WHERE scope = 'local';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_account_local_slug
+    ON skills(account_id, owner_user_id, slug) WHERE scope = 'local';
 
 CREATE INDEX IF NOT EXISTS idx_skills_role_status ON skills(role, status);
 CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(owner_user_id);
 CREATE INDEX IF NOT EXISTS idx_skills_origin ON skills(origin);
 
 CREATE TABLE IF NOT EXISTS skill_recordings (
-    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    id TEXT NOT NULL,
     skill_id TEXT,
     submitted_by TEXT NOT NULL,
     payload_json TEXT NOT NULL,
@@ -80,16 +85,18 @@ CREATE TABLE IF NOT EXISTS skill_recordings (
     proctor_evidence_json TEXT,
     reviewed_by TEXT,
     reviewed_at TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (account_id, id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_skill_recordings_status ON skill_recordings(status);
-CREATE INDEX IF NOT EXISTS idx_skill_recordings_submitter ON skill_recordings(submitted_by);
+CREATE INDEX IF NOT EXISTS idx_skill_recordings_status ON skill_recordings(account_id, status);
+CREATE INDEX IF NOT EXISTS idx_skill_recordings_submitter ON skill_recordings(account_id, submitted_by);
 """
 
 
 def ensure_skill_schema(conn: Any) -> None:
     conn.executescript(SKILL_SCHEMA)
+    ensure_tenant_schema(conn)
 
 
 def owner_key(principal: Principal) -> str:
@@ -391,28 +398,39 @@ def validate_skill_fields(payload: dict[str, Any], *, partial: bool = False) -> 
 
 
 class SkillStore:
-    def __init__(self, db: Any) -> None:
+    def __init__(self, db: Any, tenant: TenantContext | None = None) -> None:
         self.db = db
+        self.tenant = tenant or TenantContext(COMPAT_ACCOUNT_ID)
         ensure_skill_schema(self.db.conn)
         self.db.conn.commit()
 
+    @property
+    def account_id(self) -> str:
+        return self.tenant.account_id
+
+    def for_tenant(self, tenant: TenantContext) -> SkillStore:
+        return SkillStore(self.db, tenant)
+
     def get(self, skill_id: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute("SELECT * FROM skills WHERE id = ?", (skill_id,))
+        cur = self.db.conn.execute(
+            "SELECT * FROM skills WHERE id = ? AND account_id = ?",
+            (skill_id, self.account_id),
+        )
         row = cur.fetchone()
         return row_to_skill(row) if row else None
 
     def get_shared_by_slug(self, slug: str) -> dict[str, Any] | None:
         cur = self.db.conn.execute(
-            "SELECT * FROM skills WHERE scope = 'shared' AND slug = ?",
-            (slug,),
+            "SELECT * FROM skills WHERE account_id = ? AND scope = 'shared' AND slug = ?",
+            (self.account_id, slug),
         )
         row = cur.fetchone()
         return row_to_skill(row) if row else None
 
     def get_local_by_slug(self, owner_user_id: str, slug: str) -> dict[str, Any] | None:
         cur = self.db.conn.execute(
-            "SELECT * FROM skills WHERE scope = 'local' AND owner_user_id = ? AND slug = ?",
-            (owner_user_id, slug),
+            "SELECT * FROM skills WHERE account_id = ? AND scope = 'local' AND owner_user_id = ? AND slug = ?",
+            (self.account_id, owner_user_id, slug),
         )
         row = cur.fetchone()
         return row_to_skill(row) if row else None
@@ -432,10 +450,10 @@ class SkillStore:
         cur = self.db.conn.execute(
             """
             SELECT * FROM skills
-            WHERE scope = 'shared' AND status = 'approved'
+            WHERE account_id = ? AND scope = 'shared' AND status = 'approved'
             ORDER BY updated_at DESC LIMIT ?
             """,
-            (limit,),
+            (self.account_id, limit),
         )
         out: list[dict[str, Any]] = []
         for row in cur.fetchall():
@@ -470,27 +488,30 @@ class SkillStore:
         limit = max(1, min(int(limit), 500))
         if is_admin(principal):
             cur = self.db.conn.execute(
-                "SELECT * FROM skills ORDER BY updated_at DESC LIMIT ?",
-                (limit,),
+                "SELECT * FROM skills WHERE account_id = ? ORDER BY updated_at DESC LIMIT ?",
+                (self.account_id, limit),
             )
         elif is_maintainer(principal):
             cur = self.db.conn.execute(
                 """
                 SELECT * FROM skills
-                WHERE scope = 'shared' OR owner_user_id = ?
+                WHERE account_id = ? AND (scope = 'shared' OR owner_user_id = ?)
                 ORDER BY updated_at DESC LIMIT ?
                 """,
-                (who, limit),
+                (self.account_id, who, limit),
             )
         else:
             cur = self.db.conn.execute(
                 """
                 SELECT * FROM skills
-                WHERE (scope = 'shared' AND status = 'approved')
-                   OR (scope = 'local' AND owner_user_id = ?)
+                WHERE account_id = ?
+                  AND (
+                    (scope = 'shared' AND status = 'approved')
+                    OR (scope = 'local' AND owner_user_id = ?)
+                  )
                 ORDER BY updated_at DESC LIMIT ?
                 """,
-                (who, limit),
+                (self.account_id, who, limit),
             )
         out: list[dict[str, Any]] = []
         for row in cur.fetchall():
@@ -523,13 +544,13 @@ class SkillStore:
         self.db.conn.execute(
             """
             INSERT INTO skills (
-                id, slug, name, kind, role, tags_json, scope, owner_user_id, status,
+                id, account_id, slug, name, kind, role, tags_json, scope, owner_user_id, status,
                 platform, match_json, inputs_json, outputs_json, body_md, origin,
                 origin_ref, parent_skill_id, version, content_hash, reproducible,
                 proctor_status, proctor_note, proctor_evidence_json, approved_at,
                 approved_by, created_at, updated_at, created_by
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
@@ -538,6 +559,7 @@ class SkillStore:
             """,
             (
                 skill_id,
+                self.account_id,
                 slug,
                 fields["name"],
                 fields.get("kind") or "skill",
@@ -689,7 +711,7 @@ class SkillStore:
         return updated, "updated"
 
     def get_recording(self, recording_id: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute("SELECT * FROM skill_recordings WHERE id = ?", (recording_id,))
+        cur = self.db.conn.execute("SELECT * FROM skill_recordings WHERE id = ? AND account_id = ?", (recording_id, self.account_id))
         row = cur.fetchone()
         return row_to_recording(row) if row else None
 
@@ -700,8 +722,8 @@ class SkillStore:
         status: str | None = None,
         limit: int = 200,
     ) -> list[dict[str, Any]]:
-        clauses: list[str] = []
-        args: list[Any] = []
+        clauses: list[str] = ["account_id = ?"]
+        args: list[Any] = [self.account_id]
         if submitted_by:
             clauses.append("submitted_by = ?")
             args.append(submitted_by)
@@ -729,12 +751,13 @@ class SkillStore:
         self.db.conn.execute(
             """
             INSERT INTO skill_recordings (
-                id, skill_id, submitted_by, payload_json, status, queue_item_id,
+                id, account_id, skill_id, submitted_by, payload_json, status, queue_item_id,
                 proctor_note, proctor_evidence_json, reviewed_by, reviewed_at, created_at
-            ) VALUES (?, ?, ?, ?, 'queued', ?, '', '{}', NULL, NULL, ?)
+            ) VALUES (?, ?, ?, ?, ?, 'queued', ?, '', '{}', NULL, NULL, ?)
             """,
             (
                 recording_id,
+                self.account_id,
                 skill_id,
                 submitted_by,
                 json.dumps(payload, ensure_ascii=False),
@@ -774,9 +797,9 @@ class SkillStore:
             values.append(json.dumps(fields["proctor_evidence"] or {}, ensure_ascii=False))
         if not assignments:
             return current
-        values.append(recording_id)
+        values.extend([recording_id, self.account_id])
         self.db.conn.execute(
-            f"UPDATE skill_recordings SET {', '.join(assignments)} WHERE id = ?",
+            f"UPDATE skill_recordings SET {', '.join(assignments)} WHERE id = ? AND account_id = ?",
             values,
         )
         self.db.conn.commit()

@@ -20,6 +20,11 @@ from app.db import BoardDB, public_user, utc_now
 from app.pack import hub_pack_fields, join_onboarding_section
 from app.profile import candidate_status, public_candidate_for_settings
 from app.settings import Settings
+from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
+
+
+def _tenant_of_user(user: dict[str, Any]) -> TenantContext:
+    return TenantContext(str(user.get("account_id") or COMPAT_ACCOUNT_ID))
 
 COOKIE_SESSION = "hub_session"
 COOKIE_CSRF = "hub_csrf"
@@ -192,6 +197,7 @@ def create_invite(
     ttl_hours: float | None,
     allow_multiple_owners: bool,
     created_by: str | None,
+    account_id: str,
 ) -> tuple[dict[str, Any], str]:
     canon = canonical_track(track)
     if canon not in TRACKS:
@@ -216,13 +222,15 @@ def create_invite(
         expires_at=iso_future(hours),
         created_by=created_by,
         allow_multiple_owners=allow_multiple_owners,
+        account_id=account_id,
     )
     return row, secret
 
 
 def _choose_join_kind(db: BoardDB, invite: dict[str, Any]) -> str:
     mode = invite["mode"]
-    owners = db.count_owners(invite["track"])
+    tenant = TenantContext(invite["account_id"])
+    owners = db.count_owners(tenant, invite["track"])
     if mode == "owner_only":
         if owners and not invite["allow_multiple_owners"]:
             raise HTTPException(
@@ -274,8 +282,9 @@ def join_with_invite(
         if kind not in {"owner", "agent"}:
             db.rollback()
             raise HTTPException(status_code=422, detail="invalid kind")
+        tenant = TenantContext(invite["account_id"])
         if kind == "owner":
-            owners = db.count_owners(invite["track"])
+            owners = db.count_owners(tenant, invite["track"])
             if owners and not invite["allow_multiple_owners"]:
                 db.rollback()
                 raise HTTPException(
@@ -288,7 +297,7 @@ def join_with_invite(
         if invite["mode"] == "agents_only" and kind == "owner":
             db.rollback()
             raise HTTPException(status_code=403, detail="invite is agents_only")
-        if db.display_name_taken(invite["track"], name):
+        if db.display_name_taken(tenant, invite["track"], name):
             db.rollback()
             raise HTTPException(status_code=409, detail="display_name already used on this track")
         user_id = new_id("usr_")
@@ -301,6 +310,7 @@ def join_with_invite(
             display_name=name,
             metadata=meta,
             created_by=created_by or invite["created_by"],
+            account_id=invite["account_id"],
             commit=False,
         )
         plain = mint_owner_key(invite["track"]) if kind == "owner" else mint_agent_key(user_id)
@@ -320,6 +330,7 @@ def join_with_invite(
         db.rollback()
         raise
     db.add_event(
+        TenantContext(invite["account_id"]),
         job_id=None,
         actor_role=role_for_track(invite["track"]) or "admin",
         actor=name,
@@ -362,7 +373,8 @@ def mint_agent_for_owner(
         target_track = owner["track"]
         if track and canonical_track(track) != target_track:
             raise HTTPException(status_code=403, detail="owner cannot mint agents for another track")
-    if db.display_name_taken(target_track, name):
+    tenant = _tenant_of_user(owner)
+    if db.display_name_taken(tenant, target_track, name):
         raise HTTPException(status_code=409, detail="display_name already used on this track")
     user_id = new_id("usr_")
     user = db.insert_user(
@@ -374,6 +386,7 @@ def mint_agent_for_owner(
         display_name=name,
         metadata=normalize_metadata(metadata),
         created_by=owner["id"],
+        account_id=tenant.account_id,
     )
     plain = mint_agent_key(user_id)
     db.insert_api_key(
@@ -381,8 +394,10 @@ def mint_agent_for_owner(
         user_id=user_id,
         prefix=key_prefix(plain),
         key_hash=sha256_hex(plain),
+        account_id=tenant.account_id,
     )
     db.add_event(
+        tenant,
         job_id=None,
         actor_role=role_for_track(target_track) or "admin",
         actor=owner.get("display_name") or owner.get("email") or owner["id"],
@@ -414,6 +429,7 @@ def rotate_user_key(db: BoardDB, user: dict[str, Any]) -> dict[str, Any]:
         key_hash=sha256_hex(plain),
     )
     db.add_event(
+        _tenant_of_user(user),
         job_id=None,
         actor_role=role_for_track(user.get("track")) or "admin",
         actor=user.get("display_name") or user["id"],
@@ -432,6 +448,7 @@ def disable_agent(db: BoardDB, user: dict[str, Any]) -> dict[str, Any]:
     db.revoke_user_keys(user["id"])
     stored = db.disable_user(user["id"])
     db.add_event(
+        _tenant_of_user(user),
         job_id=None,
         actor_role=role_for_track(user.get("track")) or "admin",
         actor=user.get("display_name") or user["id"],

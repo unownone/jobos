@@ -7,9 +7,12 @@ import secrets
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
+from app.tenant import account_id_of
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS a2a_tasks (
     id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
     context_id TEXT NOT NULL,
     state TEXT NOT NULL,
     skill_id TEXT,
@@ -26,6 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_a2a_tasks_state ON a2a_tasks(state);
 
 CREATE TABLE IF NOT EXISTS a2a_peers (
     id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
     name TEXT,
     card_url TEXT NOT NULL UNIQUE,
     agent_url TEXT,
@@ -77,19 +81,22 @@ def insert_task(
     request: dict[str, Any] | None = None,
     result: dict[str, Any] | None = None,
     task_id: str | None = None,
+    tenant: Any | None = None,
 ) -> dict[str, Any]:
     now = _now()
     tid = task_id or _new_id("task_")
     ctx = context_id or _new_id("ctx_")
+    aid = account_id_of(tenant)
     db.conn.execute(
         """
         INSERT INTO a2a_tasks (
-            id, context_id, state, skill_id, from_user_id, message_id,
+            id, account_id, context_id, state, skill_id, from_user_id, message_id,
             request_json, result_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             tid,
+            aid,
             ctx,
             state,
             skill_id,
@@ -102,7 +109,7 @@ def insert_task(
         ),
     )
     db.conn.commit()
-    stored = get_task(db, tid)
+    stored = get_task(db, tid, tenant=tenant)
     assert stored is not None
     return stored
 
@@ -114,8 +121,9 @@ def update_task(
     state: str | None = None,
     result: dict[str, Any] | None = None,
     message_id: str | None = None,
+    tenant: Any | None = None,
 ) -> dict[str, Any] | None:
-    stored = get_task(db, task_id)
+    stored = get_task(db, task_id, tenant=tenant)
     if stored is None:
         return None
     now = _now()
@@ -126,33 +134,39 @@ def update_task(
         """
         UPDATE a2a_tasks
            SET state = ?, result_json = ?, message_id = ?, updated_at = ?
-         WHERE id = ?
+         WHERE id = ? AND account_id = ?
         """,
-        (next_state, result_json, next_message, now, task_id),
+        (next_state, result_json, next_message, now, task_id, account_id_of(tenant)),
     )
     db.conn.commit()
-    return get_task(db, task_id)
+    return get_task(db, task_id, tenant=tenant)
 
 
-def get_task(db: HasConn, task_id: str) -> dict[str, Any] | None:
-    cur = db.conn.execute("SELECT * FROM a2a_tasks WHERE id = ?", (task_id,))
+def get_task(db: HasConn, task_id: str, *, tenant: Any | None = None) -> dict[str, Any] | None:
+    cur = db.conn.execute(
+        "SELECT * FROM a2a_tasks WHERE id = ? AND account_id = ?",
+        (task_id, account_id_of(tenant)),
+    )
     row = cur.fetchone()
     if row is None:
         return None
     return _task_row(row)
 
 
-def list_tasks(db: HasConn, *, limit: int = 50, state: str | None = None) -> list[dict[str, Any]]:
+def list_tasks(
+    db: HasConn, *, limit: int = 50, state: str | None = None, tenant: Any | None = None
+) -> list[dict[str, Any]]:
     limit = max(1, min(limit, 200))
+    aid = account_id_of(tenant)
     if state:
         cur = db.conn.execute(
-            "SELECT * FROM a2a_tasks WHERE state = ? ORDER BY created_at DESC LIMIT ?",
-            (state, limit),
+            "SELECT * FROM a2a_tasks WHERE account_id = ? AND state = ? ORDER BY created_at DESC LIMIT ?",
+            (aid, state, limit),
         )
     else:
         cur = db.conn.execute(
-            "SELECT * FROM a2a_tasks ORDER BY created_at DESC LIMIT ?",
-            (limit,),
+            "SELECT * FROM a2a_tasks WHERE account_id = ? ORDER BY created_at DESC LIMIT ?",
+            (aid, limit),
         )
     return [_task_row(row) for row in cur.fetchall()]
 
@@ -190,16 +204,18 @@ def insert_peer(
     card_url: str,
     agent_url: str | None,
     card: dict[str, Any],
+    tenant: Any | None = None,
 ) -> dict[str, Any]:
     now = _now()
     peer_id = _new_id("peer_")
     db.conn.execute(
         """
-        INSERT INTO a2a_peers (id, name, card_url, agent_url, card_json, created_at, last_ok_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO a2a_peers (id, account_id, name, card_url, agent_url, card_json, created_at, last_ok_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             peer_id,
+            account_id_of(tenant),
             name,
             card_url,
             agent_url,
@@ -209,36 +225,45 @@ def insert_peer(
         ),
     )
     db.conn.commit()
-    stored = get_peer(db, peer_id)
+    stored = get_peer(db, peer_id, tenant=tenant)
     assert stored is not None
     return stored
 
 
-def get_peer(db: HasConn, peer_id: str) -> dict[str, Any] | None:
-    cur = db.conn.execute("SELECT * FROM a2a_peers WHERE id = ?", (peer_id,))
+def get_peer(db: HasConn, peer_id: str, *, tenant: Any | None = None) -> dict[str, Any] | None:
+    cur = db.conn.execute(
+        "SELECT * FROM a2a_peers WHERE id = ? AND account_id = ?",
+        (peer_id, account_id_of(tenant)),
+    )
     row = cur.fetchone()
     if row is None:
         return None
     return _peer_row(row)
 
 
-def get_peer_by_card_url(db: HasConn, card_url: str) -> dict[str, Any] | None:
-    cur = db.conn.execute("SELECT * FROM a2a_peers WHERE card_url = ?", (card_url,))
+def get_peer_by_card_url(db: HasConn, card_url: str, *, tenant: Any | None = None) -> dict[str, Any] | None:
+    cur = db.conn.execute(
+        "SELECT * FROM a2a_peers WHERE card_url = ? AND account_id = ?",
+        (card_url, account_id_of(tenant)),
+    )
     row = cur.fetchone()
     if row is None:
         return None
     return _peer_row(row)
 
 
-def list_peers(db: HasConn) -> list[dict[str, Any]]:
-    cur = db.conn.execute("SELECT * FROM a2a_peers ORDER BY created_at DESC")
+def list_peers(db: HasConn, *, tenant: Any | None = None) -> list[dict[str, Any]]:
+    cur = db.conn.execute(
+        "SELECT * FROM a2a_peers WHERE account_id = ? ORDER BY created_at DESC",
+        (account_id_of(tenant),),
+    )
     return [_peer_row(row) for row in cur.fetchall()]
 
 
-def touch_peer(db: HasConn, peer_id: str) -> None:
+def touch_peer(db: HasConn, peer_id: str, *, tenant: Any | None = None) -> None:
     db.conn.execute(
-        "UPDATE a2a_peers SET last_ok_at = ? WHERE id = ?",
-        (_now(), peer_id),
+        "UPDATE a2a_peers SET last_ok_at = ? WHERE id = ? AND account_id = ?",
+        (_now(), peer_id, account_id_of(tenant)),
     )
     db.conn.commit()
 

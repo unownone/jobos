@@ -66,6 +66,10 @@ class Settings:
     repo_root: Path | None = None
     packs_dir: Path | None = None
     database_url: str = ""
+    amqp_url: str = ""
+    queue_adapter: str = "memory"
+    blob_root: Path | None = None
+    blob_adapter: str = "filesystem"
 
 
 def load_settings() -> Settings:
@@ -94,6 +98,16 @@ def load_settings() -> Settings:
             packs_dir = BOARD_DIR / packs_dir
     else:
         packs_dir = db_path.parent / "packs"
+    amqp_url = (merged.get("AMQP_URL") or merged.get("RABBITMQ_URL") or "").strip()
+    queue_adapter = (merged.get("QUEUE_ADAPTER") or ("rabbitmq" if amqp_url else "memory")).strip().lower()
+    blob_adapter = (merged.get("BLOB_ADAPTER") or "filesystem").strip().lower()
+    blob_raw = (merged.get("BLOB_ROOT") or "").strip()
+    if blob_raw:
+        blob_root = Path(blob_raw)
+        if not blob_root.is_absolute():
+            blob_root = BOARD_DIR / blob_root
+    else:
+        blob_root = db_path.parent / "blobs"
     return Settings(
         board_dir=BOARD_DIR,
         db_path=db_path,
@@ -107,4 +121,8 @@ def load_settings() -> Settings:
         repo_root=repo_root,
         packs_dir=packs_dir,
         database_url=database_url,
+        amqp_url=amqp_url,
+        queue_adapter=queue_adapter,
+        blob_root=blob_root,
+        blob_adapter=blob_adapter,
     )

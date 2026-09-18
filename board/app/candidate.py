@@ -40,9 +40,11 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
     router = APIRouter(tags=["candidate"])
 
     @router.get("/api/candidate/status")
-    def candidate_status_endpoint(principal: Principal = Depends(principal_dep)) -> JSONResponse:
-        del principal
-        payload = candidate_status(settings)
+    def candidate_status_endpoint(
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+    ) -> JSONResponse:
+        payload = candidate_status(settings, db=request.app.state.db, tenant=principal.tenant)
         return _fresh_json(payload)
 
     @router.get("/api/candidate/template")
@@ -51,15 +53,22 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
         return {"template": EMPTY_TEMPLATE, "example_rejected": True}
 
     @router.get("/api/candidate/public")
-    def candidate_public(principal: Principal = Depends(principal_dep)) -> JSONResponse:
-        del principal
-        payload = public_candidate_for_settings(settings)
+    def candidate_public(
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+    ) -> JSONResponse:
+        payload = public_candidate_for_settings(
+            settings, db=request.app.state.db, tenant=principal.tenant
+        )
         return _fresh_json(payload)
 
     @router.get("/api/candidate/resume")
-    def candidate_resume(principal: Principal = Depends(principal_dep)) -> Response:
+    def candidate_resume(
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+    ) -> Response:
         ensure_can_resume(principal.role)
-        raw = resume_blob_bytes()
+        raw = resume_blob_bytes(db=request.app.state.db, tenant=principal.tenant)
         filename = "candidate-resume.pdf"
         if raw is None:
             path = resolve_resume_path(settings)
@@ -95,16 +104,22 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
                     "missing": missing,
                 },
             )
-        write_candidate_yaml(settings, dump_profile_yaml(data), db=request.app.state.db)
+        write_candidate_yaml(
+            settings,
+            dump_profile_yaml(data),
+            db=request.app.state.db,
+            tenant=principal.tenant,
+        )
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
             action="candidate_put",
-            note="stored candidate.yaml in postgres hub_blobs",
+            note="stored candidate.yaml in tenant blob store",
         )
-        status = candidate_status(settings, db=request.app.state.db)
-        return _fresh_json({"ok": True, "present": True, "path": "postgres:hub_blobs/candidate.yaml", **status})
+        status = candidate_status(settings, db=request.app.state.db, tenant=principal.tenant)
+        return _fresh_json({"ok": True, "present": True, "path": "blob:candidate.yaml", **status})
 
     @router.put("/api/candidate/resume")
     async def candidate_resume_put(
@@ -115,22 +130,30 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
         raw = await request.body()
         if not raw:
             raise HTTPException(status_code=422, detail="empty resume")
-        write_resume_pdf(settings, raw, db=request.app.state.db)
+        write_resume_pdf(settings, raw, db=request.app.state.db, tenant=principal.tenant)
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
             action="resume_put",
-            note="stored resume PDF in postgres hub_blobs",
+            note="stored resume PDF in tenant blob store",
         )
         return _fresh_json(
-            {"ok": True, "resume_url": "/api/candidate/resume", **candidate_status(settings, db=request.app.state.db)}
+            {
+                "ok": True,
+                "resume_url": "/api/candidate/resume",
+                **candidate_status(settings, db=request.app.state.db, tenant=principal.tenant),
+            }
         )
 
     @router.get("/api/candidate")
-    def candidate_admin_get(principal: Principal = Depends(principal_dep)) -> PlainTextResponse:
+    def candidate_admin_get(
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+    ) -> PlainTextResponse:
         require_admin(principal)
-        text = candidate_blob_text()
+        text = candidate_blob_text(db=request.app.state.db, tenant=principal.tenant)
         if text is None:
             path = resolve_candidate_path(settings)
             if path is None:

@@ -10,6 +10,7 @@ import yaml
 from app.pack import default_repo_root, repo_root_for
 from app.skill_store import SkillStore, _normalize_match, content_hash_for
 from app.settings import Settings
+from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 
 ROLE_DEFAULTS: dict[str, dict[str, Any]] = {
     "job-discovery": {
@@ -284,9 +285,10 @@ def seed_github_skills(
     repo_root: Path | None = None,
     *,
     settings: Settings | None = None,
+    tenant: Any | None = None,
 ) -> dict[str, int]:
     root = repo_root or repo_root_from_db(db, settings)
-    store = SkillStore(db)
+    store = SkillStore(db, tenant or TenantContext(COMPAT_ACCOUNT_ID))
     counts = {"inserted": 0, "updated": 0, "unchanged": 0, "skipped": 0}
     for fields in iter_github_starters(root):
         _skill, action = store.upsert_github(fields)
