@@ -9,5 +9,19 @@
     "navy": "#1e3a5f",
     "wood": "#1c1814",
     "muted": "#5c564c"
+  },
+  "surfaces": {
+    "public-landing": {
+      "world": "industrial-terminal-ops",
+      "mode": "persuade",
+      "colorStrategy": "committed",
+      "tokens": {
+        "chassis": "#0b1220",
+        "ink": "#f3eee3",
+        "inkDim": "#cbb892",
+        "amber": "#e0992d",
+        "panel": "#172033"
+      }
+    }
   }
 }

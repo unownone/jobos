@@ -165,10 +165,19 @@ a:hover {
   color: var(--ink);
   min-height: 44px;
 }
-.wordmark img {
+.mark {
   width: 40px;
   height: 40px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+}
+.mark img {
+  width: 74px;
+  height: 74px;
   display: block;
+  object-fit: cover;
 }
 .wordmark span {
   font-family: var(--font-display);
@@ -276,6 +285,11 @@ main {
   font-size: 1.12rem;
   color: var(--ink-dim);
 }
+:not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  white-space: nowrap;
+}
 
 .actions {
   display: flex;
@@ -313,8 +327,11 @@ main {
 
 .beetle {
   display: block;
-  width: min(100%, 22rem);
-  margin: 1.4rem auto 0.4rem;
+  width: 100%;
+  height: 15rem;
+  object-fit: cover;
+  object-position: 52% 46%;
+  margin: 0.2rem 0 0;
   filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.45));
 }
 
