@@ -38,7 +38,7 @@ STATIC_SECRET_RE = re.compile("|".join(secret_like_patterns()))
 # HTML/API paths that must not be callable without a principal / onboarding guard.
 PROTECTED_ROUTE_PATHS = frozenset(
     {
-        "/",
+        "/board",
         "/admin",
         "/admin/invites",
         "/admin/data",

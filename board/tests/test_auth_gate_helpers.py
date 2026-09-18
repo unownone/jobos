@@ -6,11 +6,12 @@ from app.auth_gate import path_is_public, redact_secrets, safe_next_path
 
 
 def test_path_is_public_allowlist() -> None:
+    assert path_is_public("/") is True
     assert path_is_public("/health") is True
     assert path_is_public("/ready") is True
     assert path_is_public("/login") is True
     assert path_is_public("/admin/signup") is True
-    assert path_is_public("/api/auth/login") is True
+    assert path_is_public("/api/auth/signup") is True
     assert path_is_public("/api/auth/join") is True
     assert path_is_public("/join/inv_123") is True
     assert path_is_public("/api/join/inv_123") is True
@@ -28,7 +29,7 @@ def test_path_is_public_allowlist() -> None:
 
 def test_path_is_public_rejects_sensitive_surfaces() -> None:
     for path in (
-        "/",
+        "/board",
         "/onboarding",
         "/admin",
         "/admin/invites",

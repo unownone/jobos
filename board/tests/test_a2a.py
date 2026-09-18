@@ -162,7 +162,7 @@ def test_a2a_handoff_lands_in_track_inbox(tmp_path: Path) -> None:
     assert inbox.json()["messages"][0]["type"] == "handoff"
     fetched = client.post(
         "/a2a",
-        headers=h("admin"),
+        headers={"Authorization": f"Bearer {discovery['api_key']}"},
         json={"jsonrpc": "2.0", "id": "2", "method": "tasks/get", "params": {"id": task["id"]}},
     )
     assert fetched.json()["result"]["id"] == task["id"]
@@ -172,7 +172,7 @@ def test_track_endpoint_defaults_destination(tmp_path: Path) -> None:
     client = hub(tmp_path)
     bootstrap_admin(client)
     discovery = invite_join(client, "discovery", "disc-a2a-track")
-    invite_join(client, "outreach", "out-a2a")
+    outreach = invite_join(client, "outreach", "out-a2a")
     sent = client.post(
         "/a2a/outreach",
         headers={"Authorization": f"Bearer {discovery['api_key']}"},
@@ -191,7 +191,10 @@ def test_track_endpoint_defaults_destination(tmp_path: Path) -> None:
     )
     assert sent.status_code == 200, sent.text
     assert sent.json()["result"]["status"]["state"] == "completed"
-    inbox = client.get("/api/messages", headers=h("outreach"))
+    inbox = client.get(
+        "/api/messages",
+        headers={"Authorization": f"Bearer {outreach['api_key']}"},
+    )
     assert inbox.json()["count"] == 1
 
 

@@ -6,9 +6,12 @@ import secrets
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
+from app.tenant import account_id_of
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
     from_user_id TEXT,
     to_user_id TEXT,
     to_track TEXT,
@@ -74,8 +77,9 @@ def is_hub_admin(principal: InboxPrincipal) -> bool:
 
 
 def inbound_where(principal: InboxPrincipal) -> tuple[str, list[Any]]:
+    aid = account_id_of(principal)
     if is_hub_admin(principal):
-        return "1=1", []
+        return "account_id = ?", [aid]
     clauses: list[str] = []
     args: list[Any] = []
     if principal.user_id:
@@ -86,8 +90,8 @@ def inbound_where(principal: InboxPrincipal) -> tuple[str, list[Any]]:
         clauses.append("to_track = ?")
         args.append(track)
     if not clauses:
-        return "0=1", []
-    return "(" + " OR ".join(clauses) + ")", args
+        return "account_id = ? AND 0=1", [aid]
+    return "account_id = ? AND (" + " OR ".join(clauses) + ")", [aid, *args]
 
 
 def can_see(principal: InboxPrincipal, row: dict[str, Any]) -> bool:
@@ -149,8 +153,8 @@ def list_messages(
     where, args = inbound_where(principal)
     if sent:
         if is_hub_admin(principal):
-            where = "1=1"
-            args = []
+            where = "account_id = ?"
+            args = [account_id_of(principal)]
         else:
             where = f"({where} OR from_user_id = ?)"
             args = [*args, sender_id(principal)]
@@ -195,27 +199,44 @@ def insert_message(
     job_id: str | None,
     msg_type: str,
     body: str,
+    principal: InboxPrincipal | None = None,
 ) -> dict[str, Any]:
     now = _now()
     msg_id = _new_id("msg_")
     db.conn.execute(
         """
         INSERT INTO messages (
-            id, from_user_id, to_user_id, to_track, job_id, type, body, created_at, read_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            id, account_id, from_user_id, to_user_id, to_track, job_id, type, body, created_at, read_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         """,
-        (msg_id, from_user_id, to_user_id, to_track, job_id or None, msg_type, body, now),
+        (
+            msg_id,
+            account_id_of(principal),
+            from_user_id,
+            to_user_id,
+            to_track,
+            job_id or None,
+            msg_type,
+            body,
+            now,
+        ),
     )
     db.conn.commit()
-    cur = db.conn.execute("SELECT * FROM messages WHERE id = ?", (msg_id,))
+    cur = db.conn.execute(
+        "SELECT * FROM messages WHERE id = ? AND account_id = ?",
+        (msg_id, account_id_of(principal)),
+    )
     row = cur.fetchone()
     if row is None:
         raise RuntimeError("message insert did not persist")
     return row_to_message(row, read=False)
 
 
-def get_message(db: HasConn, msg_id: str) -> dict[str, Any] | None:
-    cur = db.conn.execute("SELECT * FROM messages WHERE id = ?", (msg_id,))
+def get_message(db: HasConn, msg_id: str, *, principal: InboxPrincipal | None = None) -> dict[str, Any] | None:
+    cur = db.conn.execute(
+        "SELECT * FROM messages WHERE id = ? AND account_id = ?",
+        (msg_id, account_id_of(principal)),
+    )
     row = cur.fetchone()
     if row is None:
         return None
@@ -231,7 +252,7 @@ class MessageForbidden(PermissionError):
 
 
 def mark_read(db: HasConn, principal: InboxPrincipal, msg_id: str) -> dict[str, Any]:
-    stored = get_message(db, msg_id)
+    stored = get_message(db, msg_id, principal=principal)
     if stored is None:
         raise MessageNotFound(msg_id)
     if not can_see(principal, stored):
@@ -252,7 +273,7 @@ def mark_read(db: HasConn, principal: InboxPrincipal, msg_id: str) -> dict[str, 
             (now, msg_id),
         )
     db.conn.commit()
-    fresh = get_message(db, msg_id)
+    fresh = get_message(db, msg_id, principal=principal)
     if fresh is None:
         raise RuntimeError("message vanished")
     return row_to_message(fresh, read=True)

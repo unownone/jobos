@@ -107,7 +107,7 @@ BROWSER_HEADERS = {
 }
 
 PROTECTED_PAGES = (
-    ("/", "job board page"),
+    ("/board", "job board page"),
     ("/admin", "admin dashboard"),
     ("/admin/invites", "admin invites page"),
     ("/admin/data", "operator data view"),
@@ -227,7 +227,7 @@ def seed_sensitive_records(client: TestClient) -> str:
     """Create job, person, metrics, and an A2A task. Returns A2A task id (may be empty)."""
     created = client.post(
         "/api/jobs",
-        headers=role_headers("discovery"),
+        headers=csrf_headers(client),
         json={
             "id": JOB_ID,
             "company": JOB_COMPANY,
@@ -247,7 +247,7 @@ def seed_sensitive_records(client: TestClient) -> str:
 
     person = client.post(
         "/api/people",
-        headers=role_headers("outreach"),
+        headers=csrf_headers(client),
         json={
             "id": PERSON_ID,
             "name": PERSON_NAME,
@@ -263,7 +263,7 @@ def seed_sensitive_records(client: TestClient) -> str:
 
     burn = client.post(
         "/api/metrics/token_burn",
-        headers=role_headers("discovery"),
+        headers=csrf_headers(client),
         json={
             "tool_name": "canary-exa-search",
             "skill": "job-discovery",
@@ -276,7 +276,7 @@ def seed_sensitive_records(client: TestClient) -> str:
 
     a2a = client.post(
         "/a2a",
-        headers=role_headers("discovery"),
+        headers=csrf_headers(client),
         json={
             "jsonrpc": "2.0",
             "id": "seed-task",

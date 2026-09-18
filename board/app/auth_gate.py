@@ -27,6 +27,7 @@ _SECRET_DETAIL_KEYS = frozenset(
 
 _PUBLIC_EXACT = frozenset(
     {
+        "/",
         "/health",
         "/ready",
         "/favicon.ico",
@@ -34,11 +35,13 @@ _PUBLIC_EXACT = frozenset(
         "/admin/signup",
         "/api/auth/bootstrap",
         "/api/auth/login",
+        "/api/auth/signup",
         "/api/auth/join",
         "/a2a",
         "/api/registry/catalog",
         "/llms.txt",
         "/agents.txt",
+        "/static/hub.css",
     }
 )
 

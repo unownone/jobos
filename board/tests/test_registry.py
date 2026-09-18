@@ -92,7 +92,6 @@ def mint_track_agents(client: TestClient, track: str, names: list[str]) -> list[
         )
         assert joined.status_code == 200, joined.text
         keys.append(joined.json()["api_key"])
-    client.cookies.clear()
     return keys
 
 
@@ -314,7 +313,7 @@ def test_apply_can_push_skill_record_but_not_claim(hub: tuple[TestClient, Settin
         json={"skill_id": created.json()["skill"]["id"]},
     )
     assert submitted.status_code == 200, submitted.text
-    listed = client.get("/api/queue?kind=skill.record", headers=h("admin"))
+    listed = client.get("/api/queue?kind=skill.record")
     kinds = {row["kind"] for row in listed.json()["items"]}
     assert "skill.record" in kinds
 

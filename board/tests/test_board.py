@@ -287,10 +287,13 @@ def test_maintenance_hygiene_and_import(client: TestClient) -> None:
 
 
 def test_ui_is_served(client: TestClient) -> None:
-    denied = client.get("/")
+    landing = client.get("/")
+    assert landing.status_code == 200
+    assert "jobOS" in landing.text
+    denied = client.get("/board")
     assert denied.status_code == 401
     assert "Select a job" not in denied.text
-    res = client.get("/", headers=h("admin"))
+    res = client.get("/board", headers=h("admin"))
     assert res.status_code == 200
     assert "jobOS Harness" in res.text
     assert "helps find jobs" in res.text

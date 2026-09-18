@@ -14,6 +14,7 @@ from typing import Any
 import yaml
 
 from app.settings import Settings
+from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 
 CANDIDATE_BLOB_KEY = "candidate.yaml"
 RESUME_BLOB_KEY = "candidate-resume.pdf"
@@ -128,54 +129,89 @@ def _store(db: Any | None) -> Any | None:
     return db if db is not None else _blob_store
 
 
-def candidate_blob_text(db: Any | None = None) -> str | None:
+def _resolve_tenant(tenant: TenantContext | None) -> TenantContext:
+    return tenant or TenantContext(COMPAT_ACCOUNT_ID)
+
+
+def _compat_disk_ok(tenant: TenantContext | None) -> bool:
+    return tenant is None or tenant.account_id == COMPAT_ACCOUNT_ID
+
+
+def hydrate_tenant_candidate(
+    settings: Settings, db: Any | None, tenant: TenantContext
+) -> None:
+    """Copy on-disk candidate/resume into this tenant's BlobStore once.
+
+    Does not invent a candidate. Only hydrates files the operator already placed.
+    """
+    if candidate_blob_text(db, tenant=tenant):
+        return
+    path = resolve_candidate_path(settings)
+    if path is not None and path.is_file():
+        write_candidate_yaml(settings, path.read_text(encoding="utf-8"), db, tenant=tenant)
+    if resume_blob_bytes(db, tenant=tenant):
+        return
+    resume = resolve_resume_path(settings)
+    if resume is not None and resume.is_file():
+        write_resume_pdf(settings, resume.read_bytes(), db, tenant=tenant)
+
+
+def candidate_blob_text(db: Any | None = None, *, tenant: TenantContext | None = None) -> str | None:
     store = _store(db)
     if store is None:
         return None
-    blob = store.get_blob(CANDIDATE_BLOB_KEY)
+    blob = store.get_blob(_resolve_tenant(tenant), CANDIDATE_BLOB_KEY)
     if not blob or not blob.get("content"):
         return None
     return _as_bytes(blob["content"]).decode("utf-8")
 
 
-def resume_blob_bytes(db: Any | None = None) -> bytes | None:
+def resume_blob_bytes(db: Any | None = None, *, tenant: TenantContext | None = None) -> bytes | None:
     store = _store(db)
     if store is None:
         return None
-    blob = store.get_blob(RESUME_BLOB_KEY)
+    blob = store.get_blob(_resolve_tenant(tenant), RESUME_BLOB_KEY)
     if not blob or not blob.get("content"):
         return None
     return _as_bytes(blob["content"])
 
 
-def write_candidate_yaml(settings: Settings, text: str, db: Any | None = None) -> None:
+def write_candidate_yaml(
+    settings: Settings, text: str, db: Any | None = None, *, tenant: TenantContext | None = None
+) -> None:
     store = _store(db)
     if store is None:
         raise RuntimeError("Hub database is required to store the candidate profile")
     store.put_blob(
+        _resolve_tenant(tenant),
         CANDIDATE_BLOB_KEY,
         text.encode("utf-8"),
         content_type="text/yaml",
         filename="candidate.yaml",
     )
-    dest = hub_candidate_path(settings)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(text, encoding="utf-8")
+    if _compat_disk_ok(tenant):
+        dest = hub_candidate_path(settings)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text, encoding="utf-8")
 
 
-def write_resume_pdf(settings: Settings, raw: bytes, db: Any | None = None) -> None:
+def write_resume_pdf(
+    settings: Settings, raw: bytes, db: Any | None = None, *, tenant: TenantContext | None = None
+) -> None:
     store = _store(db)
     if store is None:
         raise RuntimeError("Hub database is required to store the resume PDF")
     store.put_blob(
+        _resolve_tenant(tenant),
         RESUME_BLOB_KEY,
         raw,
         content_type="application/pdf",
         filename="candidate-resume.pdf",
     )
-    dest = hub_resume_path(settings)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(raw)
+    if _compat_disk_ok(tenant):
+        dest = hub_resume_path(settings)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(raw)
 
 
 def resolve_candidate_path(settings: Settings) -> Path | None:
@@ -265,38 +301,39 @@ def public_candidate_at(path: Path | None) -> dict[str, Any]:
     return public_slice_from_text(text)
 
 
-def candidate_revision(settings: Settings, db: Any | None = None) -> str | None:
-    """Bump when postgres blob or hub/repo candidate file bytes change. Agents must re-fetch."""
+def candidate_revision(settings: Settings, db: Any | None = None, *, tenant: TenantContext | None = None) -> str | None:
+    """Bump when blob or hub/repo candidate file bytes change. Agents must re-fetch."""
     path = resolve_candidate_path(settings)
-    if path is not None and path.is_file():
+    if _compat_disk_ok(tenant) and path is not None and path.is_file():
         digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
         mtime = int(path.stat().st_mtime)
         return f"{mtime}-{digest}"
-    text = candidate_blob_text(db)
+    text = candidate_blob_text(db, tenant=tenant)
     if text is not None and text.strip():
         digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
-        return f"postgres-{digest}"
+        return f"blob-{digest}"
     return None
 
 
-def public_candidate_for_settings(settings: Settings, db: Any | None = None) -> dict[str, Any]:
+def public_candidate_for_settings(
+    settings: Settings, db: Any | None = None, *, tenant: TenantContext | None = None
+) -> dict[str, Any]:
+    text = candidate_blob_text(db, tenant=tenant)
     path = resolve_candidate_path(settings)
-    text = candidate_blob_text(db)
-    if path is not None and path.is_file():
+    if _compat_disk_ok(tenant) and path is not None and path.is_file():
         payload = public_candidate_at(path)
-        if path == hub_candidate_path(settings):
-            payload["source"] = "postgres"
-        else:
-            payload["source"] = "repo"
+        payload["source"] = "postgres" if path == hub_candidate_path(settings) else "repo"
     elif text is not None and text.strip():
         payload = public_slice_from_text(text)
-        payload["source"] = "postgres"
+        payload["source"] = "blob"
     else:
         payload = public_candidate_at(None)
         payload["source"] = "missing"
-    resume = resume_blob_bytes(db) is not None or resolve_resume_path(settings) is not None
+    resume = resume_blob_bytes(db, tenant=tenant) is not None or (
+        _compat_disk_ok(tenant) and resolve_resume_path(settings) is not None
+    )
     payload["resume_url"] = "/api/candidate/resume" if resume else None
-    payload["revision"] = candidate_revision(settings, db)
+    payload["revision"] = candidate_revision(settings, db, tenant=tenant)
     return payload
 
 
@@ -398,11 +435,15 @@ def parse_candidate_body(raw: bytes, content_type: str) -> dict[str, Any]:
     return normalize_profile(loaded)
 
 
-def candidate_status(settings: Settings, db: Any | None = None) -> dict[str, Any]:
-    text = candidate_blob_text(db)
+def candidate_status(
+    settings: Settings, db: Any | None = None, *, tenant: TenantContext | None = None
+) -> dict[str, Any]:
+    text = candidate_blob_text(db, tenant=tenant)
     path = resolve_candidate_path(settings)
-    resume = resume_blob_bytes(db)
-    resume_present = resume is not None or resolve_resume_path(settings) is not None
+    resume = resume_blob_bytes(db, tenant=tenant)
+    resume_present = resume is not None or (
+        _compat_disk_ok(tenant) and resolve_resume_path(settings) is not None
+    )
     missing: list[str] = ["profiles/candidate.yaml"]
     onboarded = False
     present = False
@@ -418,7 +459,7 @@ def candidate_status(settings: Settings, db: Any | None = None) -> dict[str, Any
         except (yaml.YAMLError, ValueError):
             missing = ["unreadable_candidate_yaml"]
             onboarded = False
-    elif path is not None and path.is_file():
+    elif _compat_disk_ok(tenant) and path is not None and path.is_file():
         present = True
         source = "postgres" if path == hub_candidate_path(settings) else "repo"
         try:
@@ -444,9 +485,11 @@ def candidate_status(settings: Settings, db: Any | None = None) -> dict[str, Any
         "onboarding_url": "/onboarding",
         "next_step": next_step,
         "source": source,
-        "revision": candidate_revision(settings, db),
+        "revision": candidate_revision(settings, db, tenant=tenant),
     }
 
 
-def candidate_onboarded(settings: Settings) -> bool:
-    return bool(candidate_status(settings)["onboarded"])
+def candidate_onboarded(
+    settings: Settings, db: Any | None = None, *, tenant: TenantContext | None = None
+) -> bool:
+    return bool(candidate_status(settings, db, tenant=tenant)["onboarded"])

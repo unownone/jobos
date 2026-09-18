@@ -33,8 +33,9 @@ def seed_hub_registries(
     repo_root: Path | None = None,
     *,
     settings: Settings | None = None,
+    tenant: Any | None = None,
 ) -> dict[str, dict[str, int]]:
     return {
-        "skills": seed_github_skills(db, repo_root, settings=settings),
-        "mcps": seed_github_mcps(db, repo_root, settings=settings),
+        "skills": seed_github_skills(db, repo_root, settings=settings, tenant=tenant),
+        "mcps": seed_github_mcps(db, repo_root, settings=settings, tenant=tenant),
     }

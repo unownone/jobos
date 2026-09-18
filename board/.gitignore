@@ -11,5 +11,6 @@ data/*.db-shm
 __pycache__/
 data/packs/
 data/profiles/
+data/blobs/
 data/candidate-resume.pdf
 data/packs/

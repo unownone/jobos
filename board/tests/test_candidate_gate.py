@@ -126,7 +126,7 @@ def test_example_profile_rejected_then_real_profile_unlocks(hub: tuple[TestClien
     assert health["candidate_onboarded"] is True
     created = client.post(
         "/api/jobs",
-        headers=h("discovery"),
+        headers=csrf_headers(client),
         json={
             "id": "remoteok__after-onboard",
             "company": "Acme",

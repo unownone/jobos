@@ -15,7 +15,9 @@ from app.bootstrap import new_id
 from app.db import BoardDB, utc_now
 from app.memory_store import safe_compact_recall
 from app.pack import catalog_updated_at
+from app.queue_bus import MemoryQueueBus, QueueBus
 from app.settings import BOARD_DIR
+from app.tenant import TenantContext
 
 LEASE_MINUTES = 15
 NACK_DEAD_AFTER = 5
@@ -25,6 +27,7 @@ QUEUE_STATUSES = ("open", "claimed", "acked", "dead")
 QUEUE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS queue_items (
     id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
     kind TEXT NOT NULL,
     track TEXT,
     job_id TEXT,
@@ -33,7 +36,7 @@ CREATE TABLE IF NOT EXISTS queue_items (
     claimed_by TEXT,
     lease_until TEXT,
     attempts INTEGER NOT NULL DEFAULT 0,
-    dedupe_key TEXT NOT NULL UNIQUE,
+    dedupe_key TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 
@@ -41,8 +44,8 @@ CREATE INDEX IF NOT EXISTS idx_queue_status_kind ON queue_items(status, kind);
 CREATE INDEX IF NOT EXISTS idx_queue_claimed_by ON queue_items(claimed_by);
 CREATE INDEX IF NOT EXISTS idx_queue_job ON queue_items(job_id);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_kind_job
-    ON queue_items(kind, job_id)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_account_kind_job
+    ON queue_items(account_id, kind, job_id)
     WHERE job_id IS NOT NULL AND job_id != '';
 """
 
@@ -190,23 +193,31 @@ def catalog_date_is_fresh(iso_date: str | None, now: datetime | None = None) -> 
     return age_days <= CATALOG_MAX_AGE_DAYS
 
 
-def catalog_refresh_acked_recent(db: BoardDB, now: datetime | None = None) -> bool:
+def catalog_refresh_acked_recent(
+    db: BoardDB,
+    tenant: TenantContext,
+    now: datetime | None = None,
+) -> bool:
     now = now or datetime.now(timezone.utc)
     cur = db.conn.execute(
         """
         SELECT ts FROM events
-        WHERE action = 'queue_ack' AND (note = 'catalog.refresh' OR fields_json LIKE '%catalog.refresh%')
+        WHERE account_id = ?
+          AND action = 'queue_ack'
+          AND (note = 'catalog.refresh' OR fields_json LIKE '%catalog.refresh%')
         ORDER BY id DESC LIMIT 1
-        """
+        """,
+        (tenant.account_id,),
     )
     row = cur.fetchone()
     if row is None:
         cur = db.conn.execute(
             """
             SELECT created_at FROM queue_items
-            WHERE kind = 'catalog.refresh' AND status = 'acked'
+            WHERE account_id = ? AND kind = 'catalog.refresh' AND status = 'acked'
             ORDER BY created_at DESC LIMIT 1
-            """
+            """,
+            (tenant.account_id,),
         )
         row = cur.fetchone()
         if row is None:
@@ -223,10 +234,15 @@ def catalog_refresh_acked_recent(db: BoardDB, now: datetime | None = None) -> bo
     return (now - parsed) <= timedelta(days=CATALOG_MAX_AGE_DAYS)
 
 
-def catalog_fresh_enough(db: BoardDB, pack: Any | None = None, now: datetime | None = None) -> bool:
+def catalog_fresh_enough(
+    db: BoardDB,
+    tenant: TenantContext,
+    pack: Any | None = None,
+    now: datetime | None = None,
+) -> bool:
     """Block discovery.search when catalog is older than 7 days unless catalog.refresh was acked."""
     now = now or datetime.now(timezone.utc)
-    if catalog_refresh_acked_recent(db, now):
+    if catalog_refresh_acked_recent(db, tenant, now):
         return True
     date = None
     if pack is not None:
@@ -344,26 +360,40 @@ class Clock:
 
 
 class QueueService:
-    def __init__(self, db: BoardDB, clock: Clock | None = None, pack: Any | None = None) -> None:
+    def __init__(
+        self,
+        db: BoardDB,
+        clock: Clock | None = None,
+        pack: Any | None = None,
+        bus: QueueBus | None = None,
+    ) -> None:
         self.db = db
         self.clock = clock or Clock()
         self.pack = pack
+        self.bus = bus or MemoryQueueBus()
         self._claim_lock = threading.Lock()
         ensure_queue_schema(self.db.conn)
         self.db.conn.commit()
 
-    def get(self, item_id: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute("SELECT * FROM queue_items WHERE id = ?", (item_id,))
+    def get(self, tenant: TenantContext, item_id: str) -> dict[str, Any] | None:
+        cur = self.db.conn.execute(
+            "SELECT * FROM queue_items WHERE account_id = ? AND id = ?",
+            (tenant.account_id, item_id),
+        )
         row = cur.fetchone()
         return _row_to_item(row) if row else None
 
-    def get_by_dedupe(self, key: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute("SELECT * FROM queue_items WHERE dedupe_key = ?", (key,))
+    def get_by_dedupe(self, tenant: TenantContext, key: str) -> dict[str, Any] | None:
+        cur = self.db.conn.execute(
+            "SELECT * FROM queue_items WHERE account_id = ? AND dedupe_key = ?",
+            (tenant.account_id, key),
+        )
         row = cur.fetchone()
         return _row_to_item(row) if row else None
 
     def list_items(
         self,
+        tenant: TenantContext,
         *,
         status_filter: str | None = None,
         kind: str | None = None,
@@ -371,8 +401,8 @@ class QueueService:
         claimed_by: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
-        clauses: list[str] = []
-        args: list[Any] = []
+        clauses: list[str] = ["account_id = ?"]
+        args: list[Any] = [tenant.account_id]
         if status_filter:
             clauses.append("status = ?")
             args.append(status_filter)
@@ -393,7 +423,7 @@ class QueueService:
         )
         return [_row_to_item(r) for r in cur.fetchall()]
 
-    def claims_for_jobs(self, job_ids: list[str]) -> dict[str, dict[str, Any]]:
+    def claims_for_jobs(self, tenant: TenantContext, job_ids: list[str]) -> dict[str, dict[str, Any]]:
         ids = [jid for jid in job_ids if jid]
         if not ids:
             return {}
@@ -401,9 +431,9 @@ class QueueService:
         cur = self.db.conn.execute(
             f"""
             SELECT * FROM queue_items
-            WHERE status = 'claimed' AND job_id IN ({placeholders})
+            WHERE account_id = ? AND status = 'claimed' AND job_id IN ({placeholders})
             """,
-            ids,
+            [tenant.account_id, *ids],
         )
         out: dict[str, dict[str, Any]] = {}
         for row in cur.fetchall():
@@ -420,6 +450,7 @@ class QueueService:
 
     def upsert(
         self,
+        tenant: TenantContext,
         *,
         kind: str,
         job_id: str | None,
@@ -438,7 +469,7 @@ class QueueService:
             raise HTTPException(status_code=422, detail=f"unknown queue kind {kind!r}")
         payload = dict(payload or {})
         key = dedupe_key_for(kind, job_id, payload)
-        existing = self.get_by_dedupe(key)
+        existing = self.get_by_dedupe(tenant, key)
         if existing:
             return existing
         now = self.clock.now()
@@ -447,12 +478,13 @@ class QueueService:
         self.db.conn.execute(
             """
             INSERT INTO queue_items (
-                id, kind, track, job_id, payload_json, status, claimed_by,
+                id, account_id, kind, track, job_id, payload_json, status, claimed_by,
                 lease_until, attempts, dedupe_key, created_at
-            ) VALUES (?, ?, ?, ?, ?, 'open', NULL, NULL, 0, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, 'open', NULL, NULL, 0, ?, ?)
             """,
             (
                 item_id,
+                tenant.account_id,
                 kind,
                 track,
                 (job_id or "").strip() or None,
@@ -463,12 +495,13 @@ class QueueService:
         )
         if commit:
             self.db.conn.commit()
-        stored = self.get(item_id)
+        stored = self.get(tenant, item_id)
         if stored is None:
-            stored = self.get_by_dedupe(key)
+            stored = self.get_by_dedupe(tenant, key)
         if stored is None:
             raise RuntimeError("queue insert did not persist")
         self.db.add_event(
+            tenant,
             job_id=job_id,
             actor_role=actor_role,
             actor=actor,
@@ -476,10 +509,12 @@ class QueueService:
             note=kind,
             fields={"queue_id": stored["id"], "kind": kind, "system": system, "dedupe_key": key},
         )
+        self.bus.publish(tenant, kind, public_item(stored))
         return stored
 
     def sync_system_items(
         self,
+        tenant: TenantContext,
         job: dict[str, Any],
         *,
         actor_role: str,
@@ -494,6 +529,7 @@ class QueueService:
         if status_value == "apply_ready" and packet_complete(job):
             created.append(
                 self.upsert(
+                    tenant,
                     kind="apply.ready",
                     job_id=job_id,
                     payload={"job_id": job_id},
@@ -508,6 +544,7 @@ class QueueService:
         if outreach_ok:
             created.append(
                 self.upsert(
+                    tenant,
                     kind="outreach.ready",
                     job_id=job_id,
                     payload={"job_id": job_id},
@@ -545,7 +582,9 @@ class QueueService:
             claim_kinds = [k for k in requested if k in allowed]
         else:
             claim_kinds = sorted(allowed)
-        if "discovery.search" in claim_kinds and not catalog_fresh_enough(self.db, pack=self.pack):
+        if "discovery.search" in claim_kinds and not catalog_fresh_enough(
+            self.db, principal.tenant, pack=self.pack
+        ):
             if requested == ["discovery.search"]:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -555,6 +594,7 @@ class QueueService:
         if not claim_kinds:
             return []
         who = claimant_id(principal)
+        tenant = principal.tenant
         now = self.clock.now()
         lease_until = add_minutes(now, LEASE_MINUTES)
         claimed: list[dict[str, Any]] = []
@@ -566,7 +606,8 @@ class QueueService:
                     cur = self.db.conn.execute(
                         f"""
                         SELECT * FROM queue_items
-                         WHERE status IN ('open', 'claimed')
+                         WHERE account_id = ?
+                           AND status IN ('open', 'claimed')
                            AND kind IN ({placeholders})
                            AND (
                                 status = 'open'
@@ -577,7 +618,7 @@ class QueueService:
                          ORDER BY id
                          LIMIT 1
                         """,
-                        [*claim_kinds, now],
+                        [tenant.account_id, *claim_kinds, now],
                     )
                     row = cur.fetchone()
                     if row is None:
@@ -594,19 +635,20 @@ class QueueService:
                         """
                         UPDATE queue_items
                         SET status = 'claimed', claimed_by = ?, lease_until = ?
-                        WHERE id = ?
+                        WHERE account_id = ? AND id = ?
                         """,
-                        (who, lease_until, item["id"]),
+                        (who, lease_until, tenant.account_id, item["id"]),
                     )
                     self.db.conn.commit()
                 except Exception:
                     self.db.rollback()
                     raise
-                stored = self.get(item["id"])
+                stored = self.get(tenant, item["id"])
                 if stored is None:
                     continue
                 if stolen:
                     self.db.add_event(
+                        tenant,
                         job_id=stored.get("job_id") or None,
                         actor_role=principal.role,
                         actor=principal.actor,
@@ -620,6 +662,7 @@ class QueueService:
                         },
                     )
                 self.db.add_event(
+                    tenant,
                     job_id=stored.get("job_id") or None,
                     actor_role=principal.role,
                     actor=principal.actor,
@@ -628,16 +671,17 @@ class QueueService:
                     fields={"queue_id": stored["id"], "kind": stored["kind"], "claimed_by": who},
                 )
                 if stored["kind"] in {"apply.ready", "apply.blocked_retry"} and stored.get("job_id"):
-                    job = self.db.get_job(stored["job_id"])
+                    job = self.db.get_job(tenant, stored["job_id"])
                     if job is not None:
                         owners = dict(job.get("owners") or {})
                         owners["apply"] = principal.actor or who
-                        self.db.update_job(stored["job_id"], {"owners": owners})
+                        self.db.update_job(tenant, stored["job_id"], {"owners": owners})
                 claimed.append(stored)
         return claimed
 
     def ack(self, principal: Principal, item_id: str) -> dict[str, Any]:
-        item = self.get(item_id)
+        tenant = principal.tenant
+        item = self.get(tenant, item_id)
         if item is None:
             raise HTTPException(status_code=404, detail="queue item not found")
         who = claimant_id(principal)
@@ -654,15 +698,16 @@ class QueueService:
             """
             UPDATE queue_items
             SET status = 'acked', lease_until = NULL
-            WHERE id = ?
+            WHERE account_id = ? AND id = ?
             """,
-            (item_id,),
+            (principal.tenant.account_id, item_id),
         )
         self.db.conn.commit()
-        stored = self.get(item_id)
+        stored = self.get(principal.tenant, item_id)
         if stored is None:
             raise HTTPException(status_code=404, detail="queue item not found")
         self.db.add_event(
+            principal.tenant,
             job_id=stored.get("job_id") or None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -680,7 +725,7 @@ class QueueService:
         requeue: bool = True,
         note: str | None = None,
     ) -> dict[str, Any]:
-        item = self.get(item_id)
+        item = self.get(principal.tenant, item_id)
         if item is None:
             raise HTTPException(status_code=404, detail="queue item not found")
         who = claimant_id(principal)
@@ -695,24 +740,25 @@ class QueueService:
                 """
                 UPDATE queue_items
                 SET status = 'dead', attempts = ?, lease_until = NULL
-                WHERE id = ?
+                WHERE account_id = ? AND id = ?
                 """,
-                (attempts, item_id),
+                (attempts, principal.tenant.account_id, item_id),
             )
         else:
             self.db.conn.execute(
                 """
                 UPDATE queue_items
                 SET status = 'open', attempts = ?, claimed_by = NULL, lease_until = NULL
-                WHERE id = ?
+                WHERE account_id = ? AND id = ?
                 """,
-                (attempts, item_id),
+                (attempts, principal.tenant.account_id, item_id),
             )
         self.db.conn.commit()
-        stored = self.get(item_id)
+        stored = self.get(principal.tenant, item_id)
         if stored is None:
             raise HTTPException(status_code=404, detail="queue item not found")
         self.db.add_event(
+            principal.tenant,
             job_id=stored.get("job_id") or None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -761,10 +807,11 @@ def register_queue_routes(
         existing = None
         try:
             key = dedupe_key_for(body.kind, body.job_id, body.payload)
-            existing = queue.get_by_dedupe(key)
+            existing = queue.get_by_dedupe(principal.tenant, key)
         except HTTPException:
             existing = None
         item = queue.upsert(
+            principal.tenant,
             kind=body.kind,
             job_id=body.job_id,
             payload=body.payload,
@@ -782,7 +829,7 @@ def register_queue_routes(
         job_id = items[0].get("job_id") if items else None
         company = None
         if job_id:
-            job = queue.db.get_job(job_id)
+            job = queue.db.get_job(principal.tenant, job_id)
             if job:
                 company = job.get("company") or None
         memory = safe_compact_recall(
@@ -817,7 +864,9 @@ def register_queue_routes(
     @router.get("/mine")
     def queue_mine(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
         who = claimant_id(principal)
-        items = queue.list_items(status_filter="claimed", claimed_by=who, limit=200)
+        items = queue.list_items(
+            principal.tenant, status_filter="claimed", claimed_by=who, limit=200
+        )
         return {"items": [public_item(i) for i in items], "count": len(items)}
 
     @router.get("")
@@ -834,6 +883,7 @@ def register_queue_routes(
             )
         track = principal.track if principal.kind == "owner" else None
         items = queue.list_items(
+            principal.tenant,
             status_filter=status_filter,
             kind=kind,
             track=track,

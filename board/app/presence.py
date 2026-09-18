@@ -21,6 +21,7 @@ from app.db import BoardDB
 from app.message_store import count_unread
 from app.memory_store import row_to_item, safe_compact_recall
 from app.profile import candidate_status
+from app.tenant import TenantContext
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -236,6 +237,7 @@ def _require_presence_identity(principal: Principal) -> str:
 PRESENCE_DDL = """
 CREATE TABLE IF NOT EXISTS presence (
     user_id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
     status TEXT,
     status_hint TEXT,
     last_heartbeat TEXT NOT NULL,
@@ -278,8 +280,11 @@ def get_presence_row(db: BoardDB, user_id: str) -> dict[str, Any] | None:
     return _presence_from_row(row) if row else None
 
 
-def list_presence_rows(db: BoardDB) -> list[dict[str, Any]]:
-    cur = db.conn.execute("SELECT * FROM presence ORDER BY last_heartbeat DESC")
+def list_presence_rows(db: BoardDB, tenant: TenantContext) -> list[dict[str, Any]]:
+    cur = db.conn.execute(
+        "SELECT * FROM presence WHERE account_id = ? ORDER BY last_heartbeat DESC",
+        (tenant.account_id,),
+    )
     return [_presence_from_row(r) for r in cur.fetchall()]
 
 
@@ -297,14 +302,16 @@ def upsert_presence_row(
     producing: bool,
     producing_at: str | None,
     user_agent: str | None,
+    tenant: TenantContext,
 ) -> dict[str, Any]:
     db.conn.execute(
         """
         INSERT INTO presence (
-            user_id, status, status_hint, last_heartbeat, connected_at,
+            user_id, account_id, status, status_hint, last_heartbeat, connected_at,
             task_id, task_kind, job_id, producing, producing_at, user_agent
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
+            account_id = excluded.account_id,
             status = excluded.status,
             status_hint = excluded.status_hint,
             last_heartbeat = excluded.last_heartbeat,
@@ -318,6 +325,7 @@ def upsert_presence_row(
         """,
         (
             user_id,
+            tenant.account_id,
             status,
             status_hint,
             last_heartbeat,
@@ -337,15 +345,15 @@ def upsert_presence_row(
     return stored
 
 
-def list_recent_sessions(db: BoardDB, since: str) -> list[dict[str, Any]]:
+def list_recent_sessions(db: BoardDB, since: str, tenant: TenantContext) -> list[dict[str, Any]]:
     cur = db.conn.execute(
         """
         SELECT s.id, s.user_id, s.last_seen, s.expires_at
         FROM sessions s
-        WHERE s.last_seen >= ?
+        WHERE s.last_seen >= ? AND s.account_id = ?
         ORDER BY s.last_seen DESC
         """,
-        (since,),
+        (since, tenant.account_id),
     )
     return [
         {
@@ -361,6 +369,7 @@ def list_recent_sessions(db: BoardDB, since: str) -> list[dict[str, Any]]:
 def user_activity(
     db: BoardDB,
     *,
+    tenant: TenantContext,
     user_id: str,
     user: dict[str, Any] | None,
     compat_actor: str | None = None,
@@ -377,10 +386,10 @@ def user_activity(
     event_cur = db.conn.execute(
         f"""
         SELECT * FROM events
-        WHERE actor IN ({placeholders})
+        WHERE account_id = ? AND actor IN ({placeholders})
         ORDER BY id DESC LIMIT ?
         """,
-        [*actors, limit],
+        [tenant.account_id, *actors, limit],
     )
     events = []
     for row in event_cur.fetchall():
@@ -398,22 +407,23 @@ def user_activity(
     mem_cur = db.conn.execute(
         f"""
         SELECT * FROM memory_items
-        WHERE created_by IN ({placeholders})
+        WHERE account_id = ? AND created_by IN ({placeholders})
         ORDER BY updated_at DESC LIMIT ?
         """,
-        [*actors, limit],
+        [tenant.account_id, *actors, limit],
     )
     memories = [row_to_item(row, compact=True) for row in mem_cur.fetchall()]
     tool_cur = db.conn.execute(
         f"""
         SELECT tool_name, skill, COUNT(*) AS n, COALESCE(SUM(total_tokens), 0) AS tokens
         FROM token_burn
-        WHERE actor IN ({placeholders}) OR actor_role IN ({placeholders})
+        WHERE account_id = ?
+          AND (actor IN ({placeholders}) OR actor_role IN ({placeholders}))
         GROUP BY tool_name, skill
         ORDER BY tokens DESC, n DESC
         LIMIT ?
         """,
-        [*actors, *actors, 20],
+        [tenant.account_id, *actors, *actors, 20],
     )
     tools = [
         {
@@ -427,7 +437,9 @@ def user_activity(
     return {"events": events, "memories": memories, "tools": tools}
 
 
-def user_has_event_since(db: BoardDB, user: dict[str, Any], since: str) -> bool:
+def user_has_event_since(
+    db: BoardDB, user: dict[str, Any], since: str, tenant: TenantContext
+) -> bool:
     actors = [
         a
         for a in (user.get("id"), user.get("display_name"), user.get("email"))
@@ -438,12 +450,13 @@ def user_has_event_since(db: BoardDB, user: dict[str, Any], since: str) -> bool:
     placeholders = ",".join("?" * len(actors))
     cur = db.conn.execute(
         f"""SELECT 1 FROM events
-            WHERE ts >= ?
+            WHERE account_id = ?
+              AND ts >= ?
               AND actor IN ({placeholders})
               AND job_id IS NOT NULL
               AND TRIM(job_id) != ''
             LIMIT 1""",
-        [since, *actors],
+        [tenant.account_id, since, *actors],
     )
     return cur.fetchone() is not None
 
@@ -481,14 +494,19 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
     ensure_presence_schema(db)
     router = APIRouter()
 
-    def _row_status(row: dict[str, Any], user: dict[str, Any] | None, now: datetime) -> str:
+    def _row_status(
+        row: dict[str, Any],
+        user: dict[str, Any] | None,
+        now: datetime,
+        tenant: TenantContext,
+    ) -> str:
         last_hb = parse_ts(row.get("last_heartbeat"))
         connected = parse_ts(row.get("connected_at"))
         claim = None
         if user and user.get("id"):
             claim = active_claim_for_user(db, user["id"], now)
         write_since = iso_z(now - timedelta(seconds=PRODUCING_WRITE_S))
-        recent_write = bool(user) and user_has_event_since(db, user, write_since)
+        recent_write = bool(user) and user_has_event_since(db, user, write_since, tenant)
         return derive_status(
             last_heartbeat=last_hb,
             connected_at=connected,
@@ -502,9 +520,9 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
     def _directory_rows(principal: Principal, now: datetime) -> list[dict[str, Any]]:
         seen: set[str] = set()
         out: list[dict[str, Any]] = []
-        for row in list_presence_rows(db):
+        for row in list_presence_rows(db, principal.tenant):
             user = db.get_user(row["user_id"])
-            computed = _row_status(row, user, now)
+            computed = _row_status(row, user, now, principal.tenant)
             last_seen = row.get("last_heartbeat")
             compat_role = None
             compat_actor = None
@@ -525,7 +543,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             out.append(item)
 
         grace_since = iso_z(now - timedelta(seconds=SESSION_GRACE_S))
-        for sess in list_recent_sessions(db, grace_since):
+        for sess in list_recent_sessions(db, grace_since, principal.tenant):
             uid = sess["user_id"]
             if uid in seen:
                 continue
@@ -583,7 +601,9 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
         user = db.get_user(user_id) if principal.user_id else None
         claim = active_claim_for_user(db, user_id, now) if principal.user_id else None
         write_since = iso_z(now - timedelta(seconds=PRODUCING_WRITE_S))
-        recent_write = bool(user) and user_has_event_since(db, user, write_since)
+        recent_write = bool(user) and user_has_event_since(
+            db, user, write_since, principal.tenant
+        )
         computed = derive_status(
             last_heartbeat=now,
             connected_at=parse_ts(connected_at),
@@ -606,6 +626,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             producing=bool(payload.producing) or hint == "producing",
             producing_at=producing_at,
             user_agent=request.headers.get("user-agent"),
+            tenant=principal.tenant,
         )
         self_row = public_presence(
             user_id=user_id,
@@ -671,7 +692,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             compat_actor = parts[2] if len(parts) > 2 else None
         if row is None and user is None and compat_actor is None:
             raise HTTPException(status_code=404, detail="presence not found")
-        computed = _row_status(row or {}, user, now) if row else "offline"
+        computed = _row_status(row or {}, user, now, principal.tenant) if row else "offline"
         item = public_presence(
             user_id=user_id,
             user=user,
@@ -681,13 +702,19 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             compat_actor=compat_actor,
             compat_role=compat_role,
         )
-        activity = user_activity(db, user_id=user_id, user=user, compat_actor=compat_actor)
+        activity = user_activity(
+            db,
+            tenant=principal.tenant,
+            user_id=user_id,
+            user=user,
+            compat_actor=compat_actor,
+        )
         job = None
         job_id = item.get("current_task") and item["current_task"].get("id")
         if not job_id and row:
             job_id = row.get("job_id")
         if job_id:
-            job = db.get_job(str(job_id))
+            job = db.get_job(principal.tenant, str(job_id))
             if job:
                 job = {
                     "id": job["id"],
@@ -714,12 +741,12 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
         if principal.kind != "admin" and principal.role != "admin":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin only")
         now = clock_from_request(request)()
-        presence_by_id = {row["user_id"]: row for row in list_presence_rows(db)}
+        presence_by_id = {row["user_id"]: row for row in list_presence_rows(db, principal.tenant)}
         users: list[dict[str, Any]] = []
-        for user in db.list_users(include_disabled=True):
+        for user in db.list_users(principal.tenant, include_disabled=True):
             row = presence_by_id.get(user["id"])
             if row:
-                computed = _row_status(row, user, now)
+                computed = _row_status(row, user, now, principal.tenant)
                 last_seen = row.get("last_heartbeat")
             else:
                 computed = None

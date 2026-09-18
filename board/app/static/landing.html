@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1c1814" />
+  <title>jobOS — Find jobs with a harness, not a spreadsheet</title>
+  <link rel="icon" href="/brand/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="/static/hub.css" />
+  <style>
+    .land { max-width: 52rem; margin: 2.5rem auto; padding: 0 1.25rem 4rem; }
+    .land h1 { font-size: 2rem; margin: 0.4rem 0 0.75rem; }
+    .land .lede { font-size: 1.1rem; color: var(--ink-soft); max-width: 40rem; }
+    .land .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1.5rem 0 2rem; }
+    .land .actions a { display: inline-block; padding: 0.55rem 1rem; border-radius: 4px; text-decoration: none; font-weight: 600; }
+    .land .actions .primary { background: var(--navy); color: var(--navy-text); }
+    .land .actions .ghost { border: 1px solid var(--line-strong); color: var(--ink); }
+    .land section { margin: 2rem 0; }
+    .land h2 { font-size: 1.15rem; margin-bottom: 0.5rem; }
+    .land ol { padding-left: 1.2rem; }
+    .land li { margin: 0.35rem 0; }
+    .land .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+    .land .card { background: var(--panel); border: 1px solid var(--line); padding: 1rem; }
+  </style>
+</head>
+<body>
+  <main class="land">
+    <p class="muted">jobOS Harness</p>
+    <h1>A private job hunt that survives a restart.</h1>
+    <p class="lede">
+      Sign up, isolate your search, and let discovery / apply / outreach tracks
+      work a live board. Canonical state lives in a database and file store — not git.
+    </p>
+    <p class="actions">
+      <a class="primary" href="/login">Log in or create an account</a>
+      <a class="ghost" href="/board">Open the board</a>
+    </p>
+    <section>
+      <h2>Use cases</h2>
+      <div class="grid">
+        <div class="card"><strong>One hunt, many workers.</strong><p>Humans watch the blotter. Agents claim queue work per track.</p></div>
+        <div class="card"><strong>Airgapped accounts.</strong><p>Each signup gets an account id. Jobs, resumes, skills, and queue traffic stay inside it.</p></div>
+        <div class="card"><strong>Replaceable connectors.</strong><p>Postgres, RabbitMQ, and a filesystem blob store. Swap S3 later at the same seam.</p></div>
+      </div>
+    </section>
+    <section>
+      <h2>How it works</h2>
+      <ol>
+        <li>Create a username + password. No dashboard token.</li>
+        <li>Onboard a truthful candidate profile and resume. Do not invent one.</li>
+        <li>Mint track invites. Agents join, heartbeat, and claim tenant-namespaced work.</li>
+        <li>Discovery shortlists. Apply and outreach consume packets. Maintainer is not discovery.</li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>

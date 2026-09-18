@@ -10,6 +10,7 @@ from typing import Any, Protocol
 
 from app.constants import TRACKS
 from app.sql import column_names as sql_column_names
+from app.tenant import account_id_of
 from app.memory_policy import (
     HEARTBEAT_LIMIT,
     POD_COMMON,
@@ -49,6 +50,7 @@ from app.memory_policy import (
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS memory_items (
     id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
     pod TEXT NOT NULL,
     kind TEXT NOT NULL,
     title TEXT NOT NULL,
@@ -70,8 +72,8 @@ CREATE TABLE IF NOT EXISTS memory_items (
     recording_id TEXT
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_pod_hash
-    ON memory_items(pod, content_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_account_pod_hash
+    ON memory_items(account_id, pod, content_hash);
 CREATE INDEX IF NOT EXISTS idx_memory_pod ON memory_items(pod);
 CREATE INDEX IF NOT EXISTS idx_memory_kind ON memory_items(kind);
 CREATE INDEX IF NOT EXISTS idx_memory_expires ON memory_items(expires_at);
@@ -243,21 +245,22 @@ def _visible_sql(principal: MemoryPrincipal) -> tuple[str, list[Any]]:
     return f"pod IN ({placeholders})", list(pods)
 
 
-def count_recent_writes(db: HasConn, *, writer: str, scope: str, now: datetime) -> int:
+def count_recent_writes(db: HasConn, *, writer: str, scope: str, now: datetime, principal: MemoryPrincipal) -> int:
     since = (now - timedelta(seconds=WRITE_WINDOW_S)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    aid = account_id_of(principal)
     if scope == POD_KIND_COMMON:
         pod_match = "pod = ?"
-        args: list[Any] = [writer, since, POD_COMMON]
+        args: list[Any] = [aid, writer, since, POD_COMMON]
     elif scope == POD_KIND_TRACK:
         pod_match = "pod LIKE 'track:%'"
-        args = [writer, since]
+        args = [aid, writer, since]
     else:
         pod_match = "pod LIKE 'worker:%'"
-        args = [writer, since]
+        args = [aid, writer, since]
     cur = db.conn.execute(
         f"""
         SELECT COUNT(*) AS n FROM memory_items
-        WHERE created_by = ? AND created_at >= ? AND {pod_match}
+        WHERE account_id = ? AND created_by = ? AND created_at >= ? AND {pod_match}
         """,
         args,
     )
@@ -268,7 +271,7 @@ def count_recent_writes(db: HasConn, *, writer: str, scope: str, now: datetime) 
 def _enforce_rate(db: HasConn, principal: MemoryPrincipal, scope: str) -> None:
     cap = WRITE_CAPS[scope]
     now = datetime.now(timezone.utc)
-    used = count_recent_writes(db, writer=worker_id(principal), scope=scope, now=now)
+    used = count_recent_writes(db, writer=worker_id(principal), scope=scope, now=now, principal=principal)
     if used >= cap:
         raise MemoryRateLimited(
             f"{scope} pod write budget exhausted ({used}/{cap} in {WRITE_WINDOW_S // 60}m). "
@@ -276,14 +279,20 @@ def _enforce_rate(db: HasConn, principal: MemoryPrincipal, scope: str) -> None:
         )
 
 
-def get_item(db: HasConn, item_id: str) -> dict[str, Any] | None:
-    cur = db.conn.execute("SELECT * FROM memory_items WHERE id = ?", (item_id,))
+def get_item(db: HasConn, item_id: str, *, principal: MemoryPrincipal | None = None) -> dict[str, Any] | None:
+    cur = db.conn.execute(
+        "SELECT * FROM memory_items WHERE id = ? AND account_id = ?",
+        (item_id, account_id_of(principal)),
+    )
     row = cur.fetchone()
     return dict(row) if row else None
 
 
-def public_item(db: HasConn, item_id: str, *, compact: bool = False) -> dict[str, Any]:
-    cur = db.conn.execute("SELECT * FROM memory_items WHERE id = ?", (item_id,))
+def public_item(db: HasConn, item_id: str, *, compact: bool = False, principal: MemoryPrincipal | None = None) -> dict[str, Any]:
+    cur = db.conn.execute(
+        "SELECT * FROM memory_items WHERE id = ? AND account_id = ?",
+        (item_id, account_id_of(principal)),
+    )
     row = cur.fetchone()
     if row is None:
         raise MemoryNotFound("memory item not found")
@@ -306,8 +315,8 @@ def list_items(
     purge_expired(db)
     cap = max(1, min(int(limit), RECALL_LIMIT_MAX))
     now = utc_now()
-    clauses: list[str] = []
-    args: list[Any] = []
+    clauses: list[str] = ["account_id = ?"]
+    args: list[Any] = [account_id_of(principal)]
     if pod:
         target = resolve_read_pod(principal, pod)
         clauses.append("pod = ?")
@@ -378,8 +387,8 @@ def insert_item(
         job_id=job_id,
     )
     cur = db.conn.execute(
-        "SELECT * FROM memory_items WHERE pod = ? AND content_hash = ?",
-        (target, digest),
+        "SELECT * FROM memory_items WHERE account_id = ? AND pod = ? AND content_hash = ?",
+        (account_id_of(principal), target, digest),
     )
     existing = cur.fetchone()
     if existing:
@@ -400,13 +409,14 @@ def insert_item(
     db.conn.execute(
         """
         INSERT INTO memory_items (
-            id, pod, kind, title, body, job_id, company, tags_json, importance, pinned,
+            id, account_id, pod, kind, title, body, job_id, company, tags_json, importance, pinned,
             content_hash, created_by, created_track, created_at, updated_at, expires_at,
             last_recalled_at, recall_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0)
         """,
         (
             item_id,
+            account_id_of(principal),
             target,
             stored_kind,
             title_text,
@@ -425,21 +435,22 @@ def insert_item(
         ),
     )
     db.conn.commit()
-    return public_item(db, item_id)
+    return public_item(db, item_id, principal=principal)
 
 
-def touch_recalled(db: HasConn, item_ids: list[str]) -> None:
+def touch_recalled(db: HasConn, item_ids: list[str], *, principal: MemoryPrincipal | None = None) -> None:
     if not item_ids:
         return
     now = utc_now()
+    aid = account_id_of(principal)
     for item_id in item_ids:
         db.conn.execute(
             """
             UPDATE memory_items
             SET last_recalled_at = ?, recall_count = recall_count + 1
-            WHERE id = ?
+            WHERE id = ? AND account_id = ?
             """,
-            (now, item_id),
+            (now, item_id, aid),
         )
     db.conn.commit()
 
@@ -455,7 +466,7 @@ def update_item(
     expires_at: str | None = None,
     forget: bool = False,
 ) -> dict[str, Any]:
-    stored = get_item(db, item_id)
+    stored = get_item(db, item_id, principal=principal)
     if stored is None:
         raise MemoryNotFound("memory item not found")
     if not can_read_pod(principal, stored["pod"]):
@@ -467,11 +478,11 @@ def update_item(
             raise MemoryDenied("cannot forget another worker's memory")
         now = utc_now()
         db.conn.execute(
-            "UPDATE memory_items SET expires_at = ?, updated_at = ? WHERE id = ?",
-            (now, now, item_id),
+            "UPDATE memory_items SET expires_at = ?, updated_at = ? WHERE id = ? AND account_id = ?",
+            (now, now, item_id, account_id_of(principal)),
         )
         db.conn.commit()
-        return public_item(db, item_id)
+        return public_item(db, item_id, principal=principal)
     if pinned is not None:
         if not (is_hub_admin(principal) or getattr(principal, "kind", None) == "owner"):
             raise MemoryDenied("only a track owner or admin can pin memory")
@@ -500,16 +511,16 @@ def update_item(
         """
         UPDATE memory_items
         SET title = ?, body = ?, pinned = ?, expires_at = ?, content_hash = ?, updated_at = ?
-        WHERE id = ?
+        WHERE id = ? AND account_id = ?
         """,
-        (new_title, new_body, pin_val, exp, digest, now, item_id),
+        (new_title, new_body, pin_val, exp, digest, now, item_id, account_id_of(principal)),
     )
     db.conn.commit()
-    return public_item(db, item_id)
+    return public_item(db, item_id, principal=principal)
 
 
 def delete_item(db: HasConn, principal: MemoryPrincipal, item_id: str) -> dict[str, Any]:
-    stored = get_item(db, item_id)
+    stored = get_item(db, item_id, principal=principal)
     if stored is None:
         raise MemoryNotFound("memory item not found")
     if not can_read_pod(principal, stored["pod"]):
@@ -517,7 +528,7 @@ def delete_item(db: HasConn, principal: MemoryPrincipal, item_id: str) -> dict[s
     writer = worker_id(principal)
     if stored["created_by"] != writer and not is_inspector(principal):
         raise MemoryDenied("cannot delete another worker's memory")
-    db.conn.execute("DELETE FROM memory_items WHERE id = ?", (item_id,))
+    db.conn.execute("DELETE FROM memory_items WHERE id = ? AND account_id = ?", (item_id, account_id_of(principal)))
     db.conn.commit()
     return {"ok": True, "id": item_id, "deleted": True}
 
@@ -544,7 +555,7 @@ def move_item(
     copy: bool = False,
     kind: str | None = None,
 ) -> dict[str, Any]:
-    stored = get_item(db, item_id)
+    stored = get_item(db, item_id, principal=principal)
     if stored is None:
         raise MemoryNotFound("memory item not found")
     if not can_read_pod(principal, stored["pod"]):
@@ -571,7 +582,7 @@ def move_item(
         job_id=stored.get("job_id"),
     )
     if target == stored["pod"] and stored_kind == stored["kind"] and not copy:
-        item = public_item(db, item_id)
+        item = public_item(db, item_id, principal=principal)
         item["moved"] = False
         return item
     if copy:
@@ -591,11 +602,11 @@ def move_item(
         cloned["copied_from"] = item_id
         return cloned
     existing = db.conn.execute(
-        "SELECT * FROM memory_items WHERE pod = ? AND content_hash = ?",
-        (target, digest),
+        "SELECT * FROM memory_items WHERE account_id = ? AND pod = ? AND content_hash = ?",
+        (account_id_of(principal), target, digest),
     ).fetchone()
     if existing and existing["id"] != item_id:
-        db.conn.execute("DELETE FROM memory_items WHERE id = ?", (item_id,))
+        db.conn.execute("DELETE FROM memory_items WHERE id = ? AND account_id = ?", (item_id, account_id_of(principal)))
         db.conn.commit()
         item = row_to_item(existing)
         item["deduped"] = True
@@ -606,12 +617,12 @@ def move_item(
         """
         UPDATE memory_items
         SET pod = ?, kind = ?, title = ?, body = ?, content_hash = ?, updated_at = ?
-        WHERE id = ?
+        WHERE id = ? AND account_id = ?
         """,
-        (target, stored_kind, title_text, body_text, digest, now, item_id),
+        (target, stored_kind, title_text, body_text, digest, now, item_id, account_id_of(principal)),
     )
     db.conn.commit()
-    item = public_item(db, item_id)
+    item = public_item(db, item_id, principal=principal)
     item["moved"] = True
     return item
 
@@ -635,7 +646,7 @@ def grouped_recall(
         limit=limit,
         compact=compact,
     )
-    touch_recalled(db, [item["id"] for item in items])
+    touch_recalled(db, [item["id"] for item in items], principal=principal)
     buckets = {
         POD_KIND_WORKER: [],
         POD_KIND_TRACK: [],
@@ -784,8 +795,9 @@ def set_solidify_status(
     *,
     status: str,
     recording_id: str | None = None,
+    principal: MemoryPrincipal | None = None,
 ) -> None:
-    stored = get_item(db, item_id)
+    stored = get_item(db, item_id, principal=principal)
     if stored is None:
         return
     now = utc_now()
@@ -794,9 +806,9 @@ def set_solidify_status(
         """
         UPDATE memory_items
         SET solidify_status = ?, recording_id = ?, updated_at = ?
-        WHERE id = ?
+        WHERE id = ? AND account_id = ?
         """,
-        (status, rec_id, now, item_id),
+        (status, rec_id, now, item_id, account_id_of(principal)),
     )
     db.conn.commit()
 
