@@ -410,6 +410,7 @@ code { font-family: var(--mono); font-size: 0.82em; }
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
+}
 .drop .menu button {
   display: block;
   width: 100%;

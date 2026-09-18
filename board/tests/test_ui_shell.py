@@ -33,6 +33,12 @@ def test_every_html_page_uses_shared_shell() -> None:
     assert not missing_viewport, f"pages missing viewport-fit: {missing_viewport}"
 
 
+def test_hub_css_blocks_are_balanced() -> None:
+    text = (STATIC / "hub.css").read_text(encoding="utf-8")
+    assert text.count("{") == text.count("}"), "hub.css has an unclosed rule; later layouts nest and drop"
+    assert "}\n.drop .menu button" in text.replace("\r\n", "\n")
+
+
 def test_authenticated_pages_have_mobile_dock() -> None:
     for name in ("index.html", "admin.html", "data.html", "users.html", "skills.html", "memory.html", "onboarding.html"):
         text = (STATIC / name).read_text(encoding="utf-8")
