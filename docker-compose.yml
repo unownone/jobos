@@ -6,12 +6,13 @@
 # on the host — only the Hub container can reach it.
 # Postgres files live on the host bind ${JOBOS_PGDATA:-$HOME/.jobos/pgdata}
 # so compose project-name changes cannot wipe the database.
+# Resumes live on ${JOBOS_BLOBS:-$HOME/.jobos/blobs}. Queue is RabbitMQ.
 #
 # Traefik (80/443): HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh
 #   uses docker-compose.traefik.yml
 # Named project alias: docker compose -f docker-compose.plain.yml up -d --build
 #
-# First visit: /admin/signup → /onboarding (required) → then invites/agents.
+# First visit: /login (username + password) → /onboarding → then invites/agents.
 # Agents: curl $HUB_URL/llms.txt (not HTML).
 
 name: jobos
@@ -33,6 +34,20 @@ services:
       retries: 20
     restart: unless-stopped
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
+      RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
+    volumes:
+      - ${JOBOS_AMQPDATA:-${HOME}/.jobos/rabbitmq}:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   hub:
     build:
       context: .
@@ -44,14 +59,22 @@ services:
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
       DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
+      AMQP_URL: "amqp://${JOBOS_AMQP_USER:-jobos}:${JOBOS_AMQP_PASSWORD:-jobos}@rabbitmq:5672/%2F"
+      QUEUE_ADAPTER: "rabbitmq"
+      BLOB_ROOT: "/var/lib/jobos/blobs"
+      BLOB_ADAPTER: "filesystem"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
+    volumes:
+      - ${JOBOS_BLOBS:-${HOME}/.jobos/blobs}:/var/lib/jobos/blobs
     ports:
       - "8787:8787"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
