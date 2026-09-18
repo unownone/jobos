@@ -40,6 +40,8 @@ services:
       DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-127.0.0.1:8787}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8787}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
+      OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     depends_on:
       postgres:
         condition: service_healthy

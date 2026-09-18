@@ -53,6 +53,7 @@ from app.messages import create_messages_router
 from app.memory import create_memory_router
 from app.metrics import MetricsStore
 from app.mcp_store import McpStore
+from app.otel import instrument_fastapi, setup_otel
 from app.onboarding import create_onboarding_router
 from app.pack import PackStore
 from app.people import create_people_router
@@ -300,6 +301,7 @@ def _flatten_included_routers(app: FastAPI) -> None:
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    setup_otel()
     settings = settings or load_settings()
     db = BoardDB(settings.db_path, settings.database_url or None)
     metrics = MetricsStore(db.conn)
@@ -1146,4 +1148,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     mount_presence(app, db, principal_dep)
     _flatten_included_routers(app)
+    instrument_fastapi(app)
     return app

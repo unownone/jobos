@@ -28,9 +28,12 @@ if [[ -n "${HUB_PUBLIC_URL:-}" ]]; then
   echo "  public url: ${HUB_PUBLIC_URL}"
 fi
 
-uv run --project "$BOARD" --frozen --no-dev python "$REPO/scripts/board_gen_tokens.py" --dir "$BOARD"
-uv run --project "$BOARD" --frozen --no-dev python "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$BOARD"
-uv run --project "$BOARD" --frozen --no-dev python "$REPO/scripts/hub_build_pack.py" --dir "$BOARD" --repo "$REPO"
+if [[ ! -x "$BOARD/.venv/bin/python" ]]; then
+  uv sync --project "$BOARD" --frozen --no-dev
+fi
+"$BOARD/.venv/bin/python" "$REPO/scripts/board_gen_tokens.py" --dir "$BOARD"
+"$BOARD/.venv/bin/python" "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$BOARD"
+"$BOARD/.venv/bin/python" "$REPO/scripts/hub_build_pack.py" --dir "$BOARD" --repo "$REPO"
 
 if [[ "${HUB_DEPLOY_DRY_RUN:-}" == "1" ]]; then
   echo "HUB_DEPLOY_DRY_RUN=1 — not starting gunicorn"

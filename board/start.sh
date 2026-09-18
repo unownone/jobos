@@ -104,21 +104,24 @@ path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 PY
 fi
 
-# Use the Hub project lock. `uv run --frozen path/to/script.py` looks for a
-# PEP 723 script lockfile (these scripts have `# /// script` headers).
-uv_run() {
-  uv run --project "$ROOT" --frozen --no-dev "$@"
-}
+# `exec fn` looks up a binary named fn; bash functions are not valid exec targets.
+# PEP 723 headers on scripts/ also make `uv run --frozen script.py` fail. Use the venv.
+if [[ ! -x "$ROOT/.venv/bin/python" || ! -x "$ROOT/.venv/bin/gunicorn" ]]; then
+  uv sync --project "$ROOT" --frozen --no-dev
+fi
+HUB_PY="$ROOT/.venv/bin/python"
+HUB_GUNICORN="$ROOT/.venv/bin/gunicorn"
+export PATH="$ROOT/.venv/bin:$PATH"
 
 if [[ ! -f "$ROOT/.env" && ! -f "$ROOT/tokens.local.json" ]]; then
   echo "No role tokens yet. Generating gitignored board/.env ..."
-  uv_run python "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT" --print
+  "$HUB_PY" "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT" --print
 else
-  uv_run python "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT"
+  "$HUB_PY" "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT"
 fi
 
-uv_run python "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$ROOT"
-uv_run python "$REPO/scripts/hub_build_pack.py" --dir "$ROOT" --repo "$REPO"
+"$HUB_PY" "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$ROOT"
+"$HUB_PY" "$REPO/scripts/hub_build_pack.py" --dir "$ROOT" --repo "$REPO"
 
 if [[ -f "$ROOT/.env" ]]; then
   set -a
@@ -147,4 +150,4 @@ fi
 echo "Sibling agents: ${PUBLIC}/api/jobs with Bearer keys (or X-Role + X-Token compat)"
 echo "Maintainer owns this process. Do not commit .env. Durable state is PostgreSQL."
 
-exec uv_run gunicorn --config gunicorn.conf.py
+exec "$HUB_GUNICORN" --config gunicorn.conf.py

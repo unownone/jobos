@@ -12,6 +12,9 @@ dependencies = [
   "argon2-cffi>=23",
   "pyyaml>=6",
   "psycopg[binary]>=3.2",
+  "opentelemetry-sdk>=1.44.0",
+  "opentelemetry-instrumentation-logging>=0.65b0",
+  "opentelemetry-instrumentation-fastapi>=0.65b0",
 ]
 
 [dependency-groups]

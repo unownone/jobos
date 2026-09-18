@@ -46,6 +46,8 @@ services:
       DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
+      OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     ports:
       - "8787:8787"
     depends_on:

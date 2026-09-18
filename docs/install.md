@@ -81,6 +81,7 @@ Coolify has no universal one-click URL. Create a **Docker Compose** resource poi
 3. Set `HUB_PUBLIC_URL` (and usually `HUB_PUBLIC_HOST`) to the Coolify FQDN, e.g. `https://hub.example.com`.
 4. Persist host bind `JOBOS_PGDATA` (default `~/.jobos/pgdata`). The Hub container has no volume.
 5. After first boot, open `/admin/signup` then `/onboarding`. Healthcheck is `GET /health` on 8787 inside the container.
+6. OpenTelemetry logs go to container stdout (`OTEL_LOGS_EXPORTER=console`). No collector or OTLP endpoint. `OTEL_SDK_DISABLED=true` or `OTEL_LOGS_EXPORTER=none` turns them off.
 
 Same image as Railway and local Compose (`Dockerfile` at repo root).
 
