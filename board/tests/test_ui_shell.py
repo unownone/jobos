@@ -1,4 +1,4 @@
-"""Static Hub UI shell: shared blotter CSS on every operator page."""
+"""Static Hub UI shell: shared theme + operator CSS on every operator page."""
 
 from pathlib import Path
 
@@ -25,6 +25,8 @@ def test_every_html_page_uses_shared_shell() -> None:
         text = (STATIC / name).read_text(encoding="utf-8")
         if "/static/hub.css" not in text:
             missing_css.append(name)
+        if "/static/theme.css" not in text:
+            missing_css.append(f"{name}:theme")
         if "viewport-fit=cover" not in text:
             missing_viewport.append(name)
     assert not missing_css, f"pages missing hub.css: {missing_css}"

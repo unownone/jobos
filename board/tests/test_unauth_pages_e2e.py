@@ -88,8 +88,13 @@ def test_unauthenticated_can_load_hub_css_and_js(seeded: SeededHub) -> None:
     css = seeded.unauth.get("/static/hub.css")
     assert css.status_code == 200, css.text[:200]
     assert "text/css" in css.headers.get("content-type", "")
-    assert "--paper" in css.text
+    assert 'url("/static/theme.css")' in css.text
     assert "jobOS Harness — Login" not in css.text
+    theme = seeded.unauth.get("/static/theme.css")
+    assert theme.status_code == 200
+    assert "--paper" in theme.text
+    assert "--chassis" in theme.text
+    assert "--amber" in theme.text
     js = seeded.unauth.get("/static/hub.js")
     assert js.status_code == 200, js.text[:200]
     assert "csrfToken" in js.text

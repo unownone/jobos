@@ -9,13 +9,13 @@ web
 ## Users
 
 - **Primary (inferred from repo + request):** the human Hub owner — one person running a multi-agent job hunt. They sit at a laptop to patch jobs, pause/stop rows, mint invites, and inspect presence; they also check the same Hub on a phone (commute, couch, away from the desk).
-- **Public visitors:** operators / engineers deciding whether to run the harness. They hit `/` (landing) and `/start` (get-started). Persuade + Read. Not the blotter.
+- **Public visitors:** operators / engineers deciding whether to run the harness. They hit `/` (landing) and `/start` (get-started). Persuade + Read. Same theme as Hub.
 - **Secondary:** track workers (discovery / apply / outreach / maintenance) who almost never use these HTML pages; they curl APIs. The `/join/{id}` page is the exception.
 - **Not users of this UI:** the candidate whose profile is stored here. Agents must not invent that person.
 
 ## Product Purpose
 
-jobOS Hub is the live coordination plane for one job hunt: a shared job blotter, worker presence, skill/MCP registry, memory pods, and candidate onboarding. Success is that the human can see who is working, what is in each lane, and act (filter, patch, pause, stop, invite, recall memory) without the layout fighting them on a 390px phone or a 1440px desk.
+jobOS Hub is the live coordination plane for one job hunt: a shared job list, worker presence, skill/MCP registry, memory pods, and candidate onboarding. Success is that the human can see who is working, what is in each lane, and act (filter, patch, pause, stop, invite, recall memory) without the layout fighting them on a 390px phone or a 1440px desk.
 
 ## Positioning
 
@@ -30,10 +30,10 @@ One private board for sibling agents — not a spreadsheet, not a consumer job b
 
 ## Capabilities and Constraints
 
-- Pages: `/` public landing, `/start` public get-started, `/board` blotter, `/login`, `/admin/signup`, `/onboarding`, `/admin` invites, `/admin/data`, `/admin/users`, `/admin/skills`, `/admin/memory`, `/join/{id}`.
+- Pages: `/` public landing, `/start` public get-started, `/board` operator board, `/login`, `/admin/signup`, `/onboarding`, `/admin` invites, `/admin/data`, `/admin/users`, `/admin/skills`, `/admin/memory`, `/join/{id}`.
 - Board: search/filter jobs, open a row, patch allowed fields, pause/stop/resume/delete, presence rail, memory from heartbeat, hygiene for admins.
 - **Inferred (unattended):** keep the existing HTML/JS architecture (no new SPA framework). Shared CSS/JS is allowed. Stack is already FastAPI + static HTML.
-- Visual world is a replacement (request: thorough redesign), not a polish of the current dark SaaS chrome.
+- Visual world is industrial terminal-ops for **all** HTML (landing + Hub + login). Tokens: `board/app/static/theme.css`.
 - Superdesign CLI login and Impeccable engine download were unavailable this session; direction is code-led from product truth.
 
 ## Brand Commitments

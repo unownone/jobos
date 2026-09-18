@@ -6,9 +6,9 @@ Audience: operators and engineers who will run agentic job-search loops. Not the
 
 ## Direction contract
 
-THESIS: jobOS is a night-shift instrument console for a multi-agent hunt — not a recruiting marketplace, not a SaaS metric hero, and not the Hub’s manila blotter. The first viewport is a chassis plate: condensed industrial type, the beetle, and the two curls agents actually run.
+THESIS: jobOS is a night-shift instrument console for a multi-agent hunt — not a recruiting marketplace and not a SaaS metric hero. The first viewport is a chassis plate: condensed industrial type, the beetle, and the two curls agents actually run.
 
-OWN-WORLD: Dark navy chassis (`#0b1220`) under warm instrument light; amber phosphor (`#e0992d`) at page scale (display type, primary actions, stitch dashes, live loop rail); warm paper ink (`#f3eee3`); Red Hat Text / Mono for reading and data; Big Shoulders Display for the plate. Dashed amber stitch from the mascot. No glass, no purple gradient, no kicker labels, no icon-card grid.
+OWN-WORLD: Dark navy chassis (`#0b1220`) under warm instrument light; amber phosphor (`#e0992d`) at page scale; warm paper ink (`#f3eee3`); Red Hat Text / Mono; Big Shoulders Display. Tokens from `/static/theme.css` — the same file Hub reads.
 
 STORY: A visitor understands the harness (catalog + research + discovery → apply → outreach), believes Hub is live and git ledger is export/airgap, and acts: create an account or open Get started. Honest blocker: no hunt until a truthful candidate profile exists.
 
@@ -20,4 +20,4 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 ## Constraints
 
-Do not invent capabilities, metrics, or a candidate. Discovery never Easy Applies. Do not redesign authenticated Hub pages (`hub.css` blotter stays). `/docs` remains OpenAPI — public handbook is `/start`.
+Do not invent capabilities, metrics, or a candidate. Discovery never Easy Applies. Hub operator pages share `/static/theme.css` with this surface. `/docs` remains OpenAPI — public handbook is `/start`.

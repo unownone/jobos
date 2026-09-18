@@ -38,7 +38,7 @@ def test_landing_explains_harness_and_points_home(tmp_path: Path) -> None:
     assert "Discovery" in text
     assert "Outreach" in text
     assert "Maintainer" in text
-    assert "/start" in text
+    assert "/static/theme.css" in text
     assert "/static/public.css" in text
     assert "/static/hub.css" not in text
 
@@ -53,6 +53,7 @@ def test_get_started_is_public_and_honest_about_blockers(tmp_path: Path) -> None
     assert "Deployed agents" in text
     assert "not shipped" in text.lower() or "Coming soon" in text
     assert "https://github.com/unownone/jobos" in text
+    assert "/static/theme.css" in text
     assert "/static/public.css" in text
 
 
@@ -60,9 +61,31 @@ def test_public_css_and_fonts_are_reachable(tmp_path: Path) -> None:
     client = TestClient(create_app(_settings(tmp_path)))
     css = client.get("/static/public.css")
     assert css.status_code == 200
-    assert "--amber" in css.text
-    assert "Big Shoulders Display" in css.text
+    assert 'url("/static/theme.css")' in css.text
+    theme = client.get("/static/theme.css")
+    assert theme.status_code == 200
+    assert "--amber" in theme.text
+    assert "--chassis: #0b1220" in theme.text
+    assert "Big Shoulders Display" in theme.text
     font = client.get("/static/fonts/red-hat-text-400.woff2")
     assert font.status_code == 200
     js = client.get("/static/public.js")
     assert js.status_code == 200
+
+
+def test_hub_and_public_share_one_theme_file() -> None:
+    static = Path(__file__).resolve().parents[1] / "app" / "static"
+    theme = (static / "theme.css").read_text(encoding="utf-8")
+    hub = (static / "hub.css").read_text(encoding="utf-8")
+    public = (static / "public.css").read_text(encoding="utf-8")
+    assert "@import url(\"/static/theme.css\")" in hub
+    assert "@import url(\"/static/theme.css\")" in public
+    assert "--chassis: #0b1220" in theme
+    assert "--amber: #e0992d" in theme
+    assert "--navy: var(--amber)" in theme
+    assert "--paper: var(--chassis)" in theme
+    assert "--chassis: #" not in hub
+    assert "--paper: #ebe6dc" not in hub
+    assert "--navy: #1e3a5f" not in hub
+    assert "--chassis: #" not in public
+

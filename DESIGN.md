@@ -2,82 +2,59 @@
 
 <!-- impeccable:design-schema 1 -->
 
-Two surfaces, two worlds. Authenticated Hub stays a dispatch blotter. Public `/` and `/start` are an industrial terminal-ops chassis. Do not mix them.
+One visual world: industrial terminal-ops. Public landing persuades; Hub operates. Same chassis, amber, type, and tokens. Tokens live in `board/app/static/theme.css`. Surfaces must not re-declare the palette.
 
-## Hub (Operate) — `/board` and operator pages
+## World
 
-Dispatch blotter: manila paper field, carbon ink, navy ballpoint actions, rubber-stamp status, dark wood rail and phone dock. One open ticket. The phone is a pocket blotter, not a squashed desktop.
+Night-shift instrument console. Dark navy chassis under warm instrument light. Amber phosphor at page scale (display type, primary actions, stitch dashes, live status). Dashed amber stitch from the beetle. Not a recruiting marketplace, not manila blotter, not a second theme.
 
-### Color
+## Color
 
-- Paper `--paper` `#ebe6dc`, panel `#faf7f2`, ink `#1a1714`, muted `#5c564c` (tinted from the paper, not gray).
-- Wood chrome `#1c1814` / `#2a241e`.
-- Primary `--navy` `#1e3a5f`.
-- Semantic stamp colors: good `#0f6e56`, warn `#8a5a10`, bad `#9b2c1f`.
-- Strategy: Restrained. Accent only on primary actions, selection, and live status.
+Source: `:root` in `/static/theme.css`.
 
-### Type
-
-- UI: system sans (`ui-sans-serif`, Segoe UI, Roboto). Operate mode; no display face.
-- Data/IDs: `ui-monospace`.
-- Scale is stepped rem, not fluid headings. Body ~15px / 1.45.
-
-### Layout
-
-- Desktop: 76px left rail + stage. Board is presence | blotter | ticket.
-- Phone (≤959px): rail hidden, 4-item dock, Jobs/Live switch, ticket as a bottom sheet over a backdrop.
-- Tables become labeled cards at ≤720px.
-- Safe-area padding on dock and sheets. Touch targets ≥44px.
-
-### Components
-
-- Buttons: filled navy, outlined secondary, stamp-red danger.
-- Pills: outlined stamps, transparent fill.
-- Ticket panels: perforated left edge.
-- Focus: 2px navy ring. Selection: `#d5deea`.
-- Motion: 200ms sheet ease; reduced-motion disables transitions.
-
-### Assets
-
-- Brand rasters: `/brand/mascot.png`, `/brand/logo.png`, `/brand/favicon.png`.
-- Shared CSS/JS: `/static/hub.css`, `/static/hub.js`.
-
-## Public landing (Persuade) + get-started (Read)
-
-Night-shift instrument console. Dark navy chassis, amber phosphor at page scale, dashed stitch from the beetle, condensed industrial display. Not a recruiting marketplace and not the blotter.
-
-### Color
-
-- Chassis `--chassis` `#0b1220`, `--chassis-2` `#101827`, panel `--panel` `#172033`.
+- Chassis `--chassis` `#0b1220`, `--chassis-2` `#101827`, panel `--panel` `#172033`, bezel `--bezel` `#243044`.
 - Ink `--ink` `#f3eee3`, dim `--ink-dim` `#cbb892` (amber-tinted, not gray).
-- Amber `--amber` `#e0992d`, `--amber-hot` `#f3bc5a` (committed: display, primary actions, stitch, live rail).
+- Amber `--amber` `#e0992d`, `--amber-hot` `#f3bc5a` (committed: buttons, rules, stitch, focus, selection).
 - Semantic: good `#3f9d7a`, warn `#c9893a`, bad `#c45c4a`.
-- Strategy: Committed. Amber owns regions, not only chips.
+- Aliases Hub still reads: `--paper` → chassis, `--navy` → amber, `--wood` → chassis, `--muted` → ink-dim.
+- Strategy: Committed. Amber owns regions and primary actions.
 
-### Type
+## Type
 
-- Display: self-hosted **Big Shoulders Display** 700/800. Hero `clamp(2.6rem, 7vw, 5.4rem)`, tracking ≥ `-0.03em`.
-- Body: self-hosted **Red Hat Text** 400/500/600. ~17px / 1.5, measure ~70ch.
+- Display: self-hosted **Big Shoulders Display** 700/800 (hero, Hub top title, auth h1).
+- UI/body: self-hosted **Red Hat Text** 400/500/600. Hub body ~15px / 1.45; landing ~17px / 1.5.
 - Data/commands: self-hosted **Red Hat Mono**.
 - Files: `/static/fonts/*.woff2` (OFL).
 
-### Layout
+## Layout
 
-- Sticky mast, then two-column hero (type + beetle/console) until 880px.
-- Capabilities are a datasheet (`dl.spec`), not a card grid.
-- Hunt loop is a 5-stage rail (vertical stack ≤880px) plus Hub vs git ledger planes.
-- Get started is a numbered sequence because order is the information.
-- Phone ≤520px: mast wraps; touch targets ≥44px; safe-area padding.
+- Public: sticky mast, two-column hero until 880px, datasheet capabilities, 5-stage loop rail.
+- Hub Operate: 76px left rail + stage. Board is presence | list | ticket. Phone ≤959px: rail hidden, 4-item dock, Jobs/Live switch, ticket as a bottom sheet. Tables become labeled cards at ≤720px.
+- Shared: `--radius` 2px, `--touch` 44px, safe-area padding, dashed amber rules instead of punch-holes.
 
-### Components
+## Elevation & Depth
 
-- Primary button: amber fill, chassis text, offset shadow (not a zero-blur block).
-- Ghost: amber hairline.
-- Focus: 2px amber ring. Selection: amber on chassis.
-- Console plate: dashed amber stitch, `$` prompt in good, commands in amber-hot.
-- Motion: one pipeline heat sweep when `#loop-rail` enters view; `prefers-reduced-motion` disables it.
+- `--shadow`: 0 18px 40px rgba(4, 8, 14, 0.45) — offset + blur.
+- `--elev-amber` on primary marketing buttons.
+- No zero-offset halos. No inset paper highlight.
 
-### Assets
+## Shapes
 
-- Same brand rasters. Public CSS/JS: `/static/public.css`, `/static/public.js`.
-- Do not load `hub.css` on `/` or `/start`.
+- `--radius` 2px on buttons, inputs, panels, chips.
+- `--radius-pill` only for the phone Jobs/Live switch.
+- `--radius-sheet` for the mobile ticket sheet.
+
+## Components
+
+- Primary button: amber fill, chassis text (`--navy` / `--navy-text` aliases).
+- Secondary: panel fill, amber hairline.
+- Danger: `--stamp` / `--bad`.
+- Status pills: dashed currentColor outline, semantic token colors.
+- Focus: 2px amber ring. Selection: amber on chassis. Scrollbar: amber on chassis-2.
+- Auth (`body.hub-auth`): same chassis field as landing; ticket panel with dashed stitch.
+
+## Assets
+
+- Brand rasters: `/brand/mascot.png`, `/brand/logo.png`, `/brand/favicon.png`.
+- Shared tokens: `/static/theme.css`.
+- Surfaces: `/static/public.css` (landing/start), `/static/hub.css` (operator + login/join/signup).
