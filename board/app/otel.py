@@ -9,10 +9,8 @@ import logging
 import os
 import sys
 
-from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry._logs import set_logger_provider
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.logging.handler import LoggingHandler
 from opentelemetry.sdk._logs import LoggerProvider
@@ -27,11 +25,9 @@ from opentelemetry.sdk.trace import TracerProvider
 _LOG = logging.getLogger("jobos.hub")
 _configured = False
 _logger_provider: LoggerProvider | None = None
-_instrumented_apps: set[int] = set()
 
 _SERVICE_NAME = "jobos-hub"
 _SERVICE_VERSION = "0.5.0"
-_EXCLUDED_URLS = "/health,/health/"
 
 
 def _env_flag(name: str) -> bool:
@@ -120,14 +116,9 @@ def flush_otel_logs() -> None:
         _logger_provider.force_flush()
 
 
-def instrument_fastapi(app: FastAPI) -> None:
-    if _logger_provider is None or _sdk_disabled():
-        return
-    app_id = id(app)
-    if app_id in _instrumented_apps:
-        return
-    FastAPIInstrumentor.instrument_app(app, excluded_urls=_EXCLUDED_URLS)
-    _instrumented_apps.add(app_id)
+def instrument_fastapi(app: object) -> None:
+    # Do not wrap the ASGI app. FastAPIInstrumentor breaks StaticFiles (/static/hub.css).
+    del app
 
 
 def reset_otel_for_tests() -> None:
@@ -136,7 +127,6 @@ def reset_otel_for_tests() -> None:
         _logger_provider.shutdown()
     _logger_provider = None
     _configured = False
-    _instrumented_apps.clear()
     try:
         inst = LoggingInstrumentor()
         if inst.is_instrumented_by_opentelemetry:

@@ -24,6 +24,8 @@ def test_path_is_public_allowlist() -> None:
     assert path_is_public("/.well-known/agents.txt") is True
     assert path_is_public("/brand/mascot.png") is True
     assert path_is_public("/brand/logo.png") is True
+    assert path_is_public("/static/hub.css") is True
+    assert path_is_public("/static/hub.js") is True
 
 
 def test_path_is_public_rejects_sensitive_surfaces() -> None:

@@ -49,6 +49,9 @@ _PUBLIC_PREFIXES = (
     "/a2a/",
     "/brand/",
 )
+_PUBLIC_STATIC_SUFFIXES = frozenset(
+    {".css", ".js", ".map", ".woff", ".woff2", ".png", ".svg", ".ico", ".jpg", ".webp"}
+)
 
 
 def redact_secrets(value: Any) -> Any:
@@ -73,7 +76,14 @@ def path_is_public(path: str) -> bool:
     cleaned = path.rstrip("/") or "/"
     if cleaned in _PUBLIC_EXACT or path in _PUBLIC_EXACT:
         return True
-    return any(path.startswith(prefix) for prefix in _PUBLIC_PREFIXES)
+    if any(path.startswith(prefix) for prefix in _PUBLIC_PREFIXES):
+        return True
+    if path.startswith("/static/"):
+        suffix = ""
+        if "." in path.rsplit("/", 1)[-1]:
+            suffix = "." + path.rsplit(".", 1)[-1].lower()
+        return suffix in _PUBLIC_STATIC_SUFFIXES
+    return False
 
 
 def safe_next_path(raw: str | None) -> str:

@@ -84,6 +84,19 @@ def test_login_page_stays_reachable_and_does_not_embed_canaries(
     assert "Admin login" in body or "login" in body.lower()
 
 
+def test_unauthenticated_can_load_hub_css_and_js(seeded: SeededHub) -> None:
+    css = seeded.unauth.get("/static/hub.css")
+    assert css.status_code == 200, css.text[:200]
+    assert "text/css" in css.headers.get("content-type", "")
+    assert "--paper" in css.text
+    assert "jobOS Harness — Login" not in css.text
+    js = seeded.unauth.get("/static/hub.js")
+    assert js.status_code == 200, js.text[:200]
+    assert "csrfToken" in js.text
+    html = seeded.unauth.get("/static/index.html", headers=BROWSER_HEADERS)
+    assert_unauthenticated_denied(html, what="job board static HTML")
+
+
 def test_authenticated_session_control_can_open_job_board_api(
     seeded: SeededHub,
 ) -> None:
