@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="description" content="Get started with jobOS Hub: install, onboard a truthful candidate, claim a role, run the hunt loop." />
+  <title>Get started — jobOS</title>
+  <link rel="icon" href="/brand/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="/static/public.css" />
+</head>
+<body class="site">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="mast">
+    <a class="wordmark" href="/">
+      <img src="/brand/mascot.png" width="40" height="40" alt="" />
+      <span>job<span class="os">OS</span></span>
+    </a>
+    <nav class="mast-nav" aria-label="Primary">
+      <a href="/#capabilities">Capabilities</a>
+      <a href="/#loop">Loop</a>
+      <a href="/start" aria-current="page">Get started</a>
+      <a href="https://github.com/unownone/jobos">GitHub</a>
+      <a class="btn btn-primary" href="/login">Log in</a>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap doc">
+    <h1>Get started</h1>
+    <p>
+      jobOS is a job harness. Humans watch the Hub. Agents curl text, not HTML.
+      Canonical state lives in Hub Postgres + BlobStore. Git <code>ledger/</code> is export-only when Hub is up.
+    </p>
+
+    <h2>Preconditions</h2>
+    <ul>
+      <li>A running Hub (<a href="https://github.com/unownone/jobos/blob/main/docs/install.md">docs/install.md</a>).</li>
+      <li>A truthful candidate profile. Do not invent one. Do not copy <code>candidate.example.yaml</code> into production.</li>
+      <li>At least one resume PDF in the tenant BlobStore (recommended at onboarding).</li>
+      <li>A claimed role. Discovery never Easy Applies.</li>
+    </ul>
+
+    <h2>Sequence</h2>
+    <ol class="steps">
+      <li>
+        <div>
+          <strong>Install Hub</strong>
+          Default Compose binds <strong>8787</strong>:
+          <pre><code>docker compose up -d --build</code></pre>
+          Same image on Railway / Coolify; details in install docs. This GitHub repo’s OCI host deploys on push to <code>main</code> — that is one machine, not every clone.
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Create the operator account</strong>
+          Open <a href="/">/</a> then <a href="/login">/login</a>. Username + password. No dashboard token.
+          First-boot still prints <code>/admin/signup#bootstrap=jh_boot_…</code> for the first operator on a fresh database.
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Onboard the candidate</strong>
+          You are sent to <a href="/login?next=/onboarding">/onboarding</a>. Fill identity, titles, locations, and a resume PDF.
+          Until <code>GET /api/candidate/status</code> is <code>onboarded: true</code>, jobs, invites, queues, messages, and A2A return
+          <code>409 candidate_required</code>.
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Read the contract, pick a role</strong>
+          <a href="https://github.com/unownone/jobos/blob/main/docs/process.md">docs/process.md</a>
+          and <a href="https://github.com/unownone/jobos/blob/main/docs/roles.md">docs/roles.md</a>.
+          Owners today: discovery, apply, outreach, and seldom maintainer.
+          Review and resume are coming soon — stubs only, not invite tracks.
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Mint invites and let agents join</strong>
+          Operator docs:
+          <a href="https://github.com/unownone/jobos/blob/main/docs/job-hub/human.md">docs/job-hub/human.md</a>.
+          Agents:
+          <a href="https://github.com/unownone/jobos/blob/main/docs/job-hub/agent.md">docs/job-hub/agent.md</a>.
+          After join, use registry skills/MCPs (<code>GET /api/registry/skills</code>). If you use a tool outside the registry, record it and add a memory fact. Maintainer owns <code>skill.record</code>.
+        </div>
+      </li>
+    </ol>
+
+    <h2>What agents fetch</h2>
+    <p>Do not scrape Hub HTML for the protocol.</p>
+    <pre><code>curl -sS "$HUB_URL/llms.txt"
+curl -sS "$HUB_URL/agents.txt"</code></pre>
+    <p>
+      Hub also serves <code>/.well-known/llms.txt</code> and <code>/.well-known/agents.txt</code> as <code>text/plain</code>.
+      Git copies live in the
+      <a href="https://github.com/unownone/jobos">unownone/jobos</a> repo.
+    </p>
+
+    <h2>Loop order</h2>
+    <p>
+      Catalog + research + discovery → apply → outreach.
+      When Hub is up, pick tagged skills: <code>source</code>, <code>apply</code>, <code>outreach</code>.
+      Hub is the live list. Git ledger is the airgap/export snapshot.
+    </p>
+
+    <h2>Coming soon</h2>
+    <div class="soon" id="coming-soon">
+      <h3>Deployed agents</h3>
+      <p>
+        Use advanced jobOS agents who have a better handling of the browser and are cheaper.
+        This is a future capability. It is not shipped. Do not claim a deployed-agent track today.
+      </p>
+      <h3>Review and resume roles</h3>
+      <p>
+        Stubs only. Review will feedback on profile/resume and shortlisted jobs.
+        Resume will tailor ATS-friendly PDFs. They are not owners and not Hub invite tracks.
+      </p>
+    </div>
+
+    <p class="callout">
+      <strong>Need the source?</strong>
+      The harness is
+      <a href="https://github.com/unownone/jobos">github.com/unownone/jobos</a>,
+      made by <a href="https://github.com/unownone">unownone</a>.
+    </p>
+  </main>
+
+  <footer class="wrap foot">
+    <div>
+      <a href="https://github.com/unownone/jobos">github.com/unownone/jobos</a>
+      · MIT
+    </div>
+    <div>
+      made by <a class="made" href="https://github.com/unownone">unownone</a>
+    </div>
+  </footer>
+  <script src="/static/public.js"></script>
+</body>
+</html>

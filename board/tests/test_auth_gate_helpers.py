@@ -7,6 +7,8 @@ from app.auth_gate import path_is_public, redact_secrets, safe_next_path
 
 def test_path_is_public_allowlist() -> None:
     assert path_is_public("/") is True
+    assert path_is_public("/start") is True
+    assert path_is_public("/static/public.css") is True
     assert path_is_public("/health") is True
     assert path_is_public("/ready") is True
     assert path_is_public("/login") is True

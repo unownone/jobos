@@ -394,6 +394,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def landing() -> FileResponse:
         return FileResponse(STATIC_DIR / "landing.html")
 
+    @app.get("/start", response_model=None)
+    def get_started() -> FileResponse:
+        return FileResponse(STATIC_DIR / "start.html")
+
     @app.get("/board", response_model=None)
     def index(principal: Principal = Depends(principal_dep)) -> FileResponse | RedirectResponse:
         if db.admin_bootstrapped() and not candidate_onboarded(settings, db, tenant=principal.tenant):
