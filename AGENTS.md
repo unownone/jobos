@@ -15,7 +15,7 @@ Always use registry skills/MCPs (`GET /api/registry/skills` after join). If you 
 
 1. Read `profiles/candidate.yaml` **or** Hub `GET /api/candidate/public`. If it is missing / `present: false`, stop for the human to finish `/onboarding`. Copy `profiles/candidate.example.yaml` only as a template. Do not invent a candidate.
 2. Read `docs/process.md` if you have not already this session.
-3. Claim a role from `docs/roles.md`. Write the claim into `ledger/INDEX.md` under **Active operators**.
+3. Claim a role from `docs/roles.md`. Write the claim on Hub presence / invites, not git `ledger/INDEX.md`.
 4. If Hub is live, `GET /api/memory/recall` (or read `memory` on the first heartbeat) before searching or claiming work.
 
 If the user says you own everything, you still run the three roles **in order**: catalog + research + discovery, then apply, then outreach. Never Easy Apply during discovery. Maintainer is a fourth owner and is **seldom** used; run it when the skill/MCP inventory, the Hub registry, or the proctor queue is the work, not mid-search.
@@ -47,19 +47,19 @@ If the work is **updating the skill tree itself** (lists, mcp.example.json, prun
 - Do not scrape authenticated pages you do not have an account for.
 - Prefer official APIs, public JSON feeds, and public career pages.
 - Attach PDFs on **email**. LinkedIn DMs usually cannot take a PDF; send a short note and ask for a chat, and point at a resume link if you have one.
-- Every state change gets a row in `ledger/events.jsonl` and an update on the job YAML.
+- Every state change gets a Hub event (`POST`/`PATCH` jobs) and a row on the tenant job. Git `ledger/` is export-only.
 - Local skills are **per-bot**. Do not load, copy, or promote another bot’s `scope=local` skill.
 - Only maintainer consumes `skill.record` and promotes after proctor. Discovery / apply / outreach may enqueue recordings; they must not ack them into shared.
 - If Hub is up (`HUB_URL` / `BOARD_URL`): **recall memory every round** (`GET /api/memory/recall` and the `memory` card on heartbeat / queue claim). Store only durable facts (portal quirks, blockers, dead tools). Do not dump transcripts, JDs, or secrets. Pods: worker (private) / track (shared on the lane) / common. Track/common facts that should become playbooks: `POST /api/memory/items/{id}/solidify`. Docs: [`docs/job-hub/memory.md`](docs/job-hub/memory.md).
 
 ## Ledger writes
 
-Canonical record: `ledger/jobs/<id>.yaml`
+Canonical record: Hub DB (`GET /api/jobs`). Git `ledger/jobs/<id>.yaml` is export-only.
 
-- Create a new file when discovering a new job.
+- Create a new job through Hub APIs when discovering.
 - Update in place for status, packets, and notes.
-- Append to `ledger/events.jsonl`.
-- Refresh the matching row in `ledger/INDEX.md` (or run `uv run scripts/rebuild_index.py`).
+- Events append in Postgres (`/api/events`).
+- `GET /api/export/ledger` writes a snapshot when you need git/airgap.
 
 If two bots touched the same file, keep both packets, do not delete the other role’s fields, and leave a `conflicts` note.
 

@@ -1,6 +1,6 @@
 # Ledger INDEX
 
-Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts/rebuild_index.py`.
+Human-readable **export projection**. Canonical data lives in Hub Postgres (`GET /api/jobs`). Rebuild a snapshot with `GET /api/export/ledger`. Do not treat this file as the live list.
 
 ## Active operators
 
@@ -36,6 +36,6 @@ Human board. Canonical data lives in `jobs/*.yaml`. Rebuild with `uv run scripts
 
 ## How to update
 
-1. Edit or add `ledger/jobs/<id>.yaml`
-2. Append one line to `events.jsonl`
-3. Refresh the row above (or run the rebuild script)
+1. Hub is the live list (`GET /api/jobs`)
+2. Optional: `GET /api/export/ledger` for a YAML snapshot
+3. This INDEX is not operator presence — use Hub `/admin` / presence

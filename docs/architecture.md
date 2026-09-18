@@ -1,13 +1,13 @@
 # Architecture
 
-jobOS is a **job harness**: a multi-agent workflow with a file-backed bus and an optional live Hub. The repo is the airgap coordination plane. When a hunt has a shared machine, maintainer also runs the Hub (`board/`) as the practical overlay. The git ledger is not deleted.
+jobOS is a **job harness**: a multi-agent workflow whose live list is **jobOS Hub** (Postgres + BlobStore + RabbitMQ). The process is stateless. Git `ledger/` is an export snapshot, not canonical state.
 
 ## Goals
 
 - One discovery lane that only finds and shortlists.
 - One apply lane that only submits from a packet, with writing that is worth reading.
 - One outreach lane that only emails and LinkedIn-DMs after a handoff.
-- A shared live list that airgapped bots can still update (git), plus an optional maintainer-owned hunt board when agents share a host.
+- A shared live list on Hub (Postgres, tenant-scoped), plus an export tarball when you need files.
 - Skills are **dynamic Hub registry records** (GitHub starters seed them), not hardcoded forever. Local mutations stay on the owning bot. Shared updates require maintainer proctor.
 - MCP/tool inventory is discovered, vetted, listed in `skills/lists/`, and maintained.
 
@@ -31,9 +31,9 @@ flowchart LR
 
   subgraph shared [Shared]
     research[Deep research]
-    ledger[ledger/jobs + INDEX + events]
+    store[Hub JobStore]
     board[board/ live API + UI]
-    registry[skill registry SQLite]
+    registry[skill registry Postgres]
   end
 
   subgraph outputs [Outputs]
@@ -103,30 +103,30 @@ A shared capability, not a fourth owner. Used to:
 
 Preferred MCP: Exa. Local fallback the cloud agent can run: [dzhng/deep-research](https://github.com/dzhng/deep-research) via `scripts/run_deep_research.py` (Firecrawl + OpenAI). Other fallbacks: Firecrawl MCP, Tavily, Parallel Search MCP, built-in search. See [`docs/catalogs/deep-research.md`](catalogs/deep-research.md). Build plan: [`docs/research/platform-mcp-build-plan.md`](research/platform-mcp-build-plan.md).
 
-The **maintainer** owner is for the skill tree, the Hub registry (proctor then promote), **and** the hunt board (tokens, uptime, schema), not for company research.
+The **maintainer** owner is for the skill tree, the Hub registry (proctor then promote), **and** the hunt board (schema, uptime), not for company research.
 
-### Ledger (airgap protocol)
+### JobStore (canonical)
 
-Source of truth for git-based hunts: jobs, people, and events as files. Git is the sync protocol. Optional Drive/Sheet is a mirror owned by discovery. See [`sharing.md`](sharing.md).
+Source of truth: Hub Postgres `jobs` / `events` / `people`, scoped by `account_id`. See [`job-hub/multi-tenant.md`](job-hub/multi-tenant.md). `GET /api/export/ledger` is a snapshot.
 
-### Hunt board (live overlay)
+### Hunt board (live plane)
 
-[`board/`](../board/README.md) is a FastAPI + SQLite private board (Job Hub) with Bearer / `X-Hub-Key` owner-agent keys, plus deprecated `X-Role` + `X-Token`. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. It does not replace the ledger schema. Import history with `scripts/board_import_ledger.py`. Operator/agent docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md).
+[`board/`](../board/README.md) is FastAPI + PostgreSQL + RabbitMQ + BlobStore. Username + password at `/login`. Compat `X-Role` + `X-Token` maps to `acc_compat` and is deprecated. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. Operator/agent docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md).
 
-**Memory pods** live in the same Hub SQLite (no extra Compose service): per-worker private, per-track shared (discovery / application / outreach / maintenance), plus a common pod. Agents recall every heartbeat and queue claim; writes are gated. Durable track/common facts may be **solidified** into the skill registry. [`docs/job-hub/memory.md`](job-hub/memory.md).
+**Memory pods** live in the same Hub Postgres: per-worker private, per-track shared, plus a common pod — all tenant-scoped. Agents recall every heartbeat and queue claim; writes are gated. Durable track/common facts may be **solidified** into the skill registry. [`docs/job-hub/memory.md`](job-hub/memory.md).
 
 ## Data flow for one job
 
 ```mermaid
 sequenceDiagram
   participant D as Discovery
-  participant L as Ledger
+  participant L as Hub JobStore
   participant A as Apply
   participant O as Outreach
   participant R as Deep research
 
   D->>R: Company and posting check
-  D->>L: Create job YAML (discovered)
+  D->>L: POST /api/jobs (discovered)
   D->>L: Score, shortlist, write apply_packet
   A->>L: Claim apply_ready job
   A->>R: Language and recent news for copy
@@ -178,17 +178,16 @@ Each subdivision still writes the same job file. If two discovery bots find the 
 
 **One bot, all roles.** Allowed. Must still obey the order and the forbidden actions per phase.
 
-**Three bots, three roles.** Default. Discovery owns the ledger portal.
+**Three bots, three roles.** Default. Discovery owns Hub job creation.
 
-**Many bots.** Split by portal or channel. Claim work in the job YAML (`owners.discovery`, `owners.apply`, `owners.outreach`) before mutating.
+**Many bots.** Split by portal or channel. Claim work on the Hub job (`owners.discovery`, `owners.apply`, `owners.outreach`) before mutating.
 
 **Maintainer bot (rare).** Separate turn. Writes lists. Owns the hunt board. Claims `skill.record`, proctors, promotes. Does not search jobs. Worker mutations stay `scope=local` until then.
 
-## What we deliberately do not build into the airgap protocol
+## What we deliberately do not build
 
-- A required hosted dashboard (the git ledger must work with no server)
-- A scraper farm
 - Auto Easy Apply from discovery
 - SMS / WhatsApp
+- Git as the live job list
 
-The optional **hunt board** in `board/` is maintainer-owned live infra for a shared host. It is an overlay, not a substitute for `ledger/`. Tokens stay gitignored. The ledger protocol remains the product for airgapped bots.
+The **Hub** in `board/` is maintainer-owned live infra. Secrets stay gitignored. Export YAML is a snapshot, not a second source of truth.
