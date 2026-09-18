@@ -6,7 +6,7 @@ export BOARD_DB="${BOARD_DB:-/tmp/board.db}"
 export HUB_PACKS_DIR="${HUB_PACKS_DIR:-/tmp/jobos-packs}"
 export HUB_REPO_ROOT="${HUB_REPO_ROOT:-/app}"
 export JOBOS_NONINTERACTIVE=1
-export PATH="/usr/local/bin:/app/board/.venv/bin:${PATH}"
+export PATH="/app/board/.venv/bin:/usr/local/bin:${PATH}"
 
 # Railway / Render inject PORT. Bind Hub there so healthchecks hit the process.
 if [[ -n "${PORT:-}" ]]; then
