@@ -104,20 +104,21 @@ path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 PY
 fi
 
-# Production must not install the dev group (pgserver has no linux aarch64 wheel).
+# Use the Hub project lock. `uv run --frozen path/to/script.py` looks for a
+# PEP 723 script lockfile (these scripts have `# /// script` headers).
 uv_run() {
-  uv run --frozen --no-dev "$@"
+  uv run --project "$ROOT" --frozen --no-dev "$@"
 }
 
 if [[ ! -f "$ROOT/.env" && ! -f "$ROOT/tokens.local.json" ]]; then
   echo "No role tokens yet. Generating gitignored board/.env ..."
-  uv_run "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT" --print
+  uv_run python "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT" --print
 else
-  uv_run "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT"
+  uv_run python "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT"
 fi
 
-uv_run "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$ROOT"
-uv_run "$REPO/scripts/hub_build_pack.py" --dir "$ROOT" --repo "$REPO"
+uv_run python "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$ROOT"
+uv_run python "$REPO/scripts/hub_build_pack.py" --dir "$ROOT" --repo "$REPO"
 
 if [[ -f "$ROOT/.env" ]]; then
   set -a
