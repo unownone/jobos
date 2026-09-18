@@ -1,6 +1,6 @@
 # Job Hub target architecture
 
-Grows **`board/`** (FastAPI + SQLite + admin UI) into the Hub. Consumers do not clone the hunt repo. Role playbooks are authored in git and served as a pack. Tagged skills live in the Hub **registry** (seeded from `skills/starters/`). Git is the starter copy; SQLite is the live copy.
+Grows **`board/`** (FastAPI + PostgreSQL + admin UI) into the Hub. Consumers do not clone the hunt repo. Role playbooks are authored in git and served as a pack. Tagged skills live in the Hub **registry**. Git is the starter copy; Postgres is the live copy. See [multi-tenant.md](multi-tenant.md).
 
 Related: [grilling](01-grilling.md), [PR plan](03-pr-plan.md), current overlay [board/README.md](../../board/README.md).
 
@@ -22,7 +22,9 @@ flowchart TB
   subgraph hub [Job Hub — only non-AI component]
     api[FastAPI same origin]
     ui[Board + Admin + Onboarding + Presence + Invites]
-    db[(SQLite jobs events queue users presence A2A skills mcps recordings memory)]
+    db[(PostgreSQL jobs events queue users skills memory — tenant scoped)]
+    blobs[Filesystem BlobStore volume]
+    mq[RabbitMQ jobos.work]
     pack[Skill/MCP/docs pack]
     a2a[A2A JSON-RPC + Agent Cards]
     secrets[gitignored .env + encrypted connectors]
@@ -40,6 +42,8 @@ flowchart TB
   o --> api
   m --> api
   api --> db
+  api --> blobs
+  api --> mq
   api --> pack
   api --> a2a
   api --> secrets
@@ -55,8 +59,9 @@ flowchart TB
 | Component | v1 choice |
 | --- | --- |
 | HTTP | Gunicorn + Uvicorn workers, FastAPI `board/app/main.py` |
-| DB | SQLite WAL (`board/data/board.db` extended) |
-| Queue | Table `queue_items` + row locks; not Redis |
+| DB | PostgreSQL (`DATABASE_URL`). Git `ledger/` is export-only. |
+| Queue | RabbitMQ topic `jobos.work` + Hub claim table; routing `{account_id}.{kind}` |
+| Files | BlobStore filesystem volume (`BLOB_ROOT`); Memory Adapter in tests |
 | Pack | Files under `board/data/packs/<sha>/` |
 | UI | Extend `board/app/static/index.html` (or split `admin.html` if the file gets large) |
 | Deploy | `scripts/hub_deploy.sh`; Docker Compose plain (`docker-compose.plain.yml`) or Traefik (`docker-compose.yml`). See [`docs/install.md`](../install.md). |
@@ -74,9 +79,9 @@ tracks: discovery | application | outreach | maintenance
 
 Process role names `apply` / `maintainer` are aliases in code (`TRACK_ALIASES`). Board permission tables keep using discovery/apply/outreach/maintenance/admin internally; API JSON prefers the four track names plus admin.
 
-## Data model (SQLite)
+## Data model (PostgreSQL)
 
-Keep `jobs` and `events` as today. Add:
+Keep `jobs` and `events` as today, scoped by `account_id`. Add:
 
 ### `users`
 

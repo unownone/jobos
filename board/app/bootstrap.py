@@ -10,11 +10,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from argon2 import PasswordHasher
-from argon2.exceptions import InvalidHashError, VerifyMismatchError
-
 from app.db import BoardDB, utc_now
+from app.passwords import PASSWORD_MIN_LEN, hash_password
 from app.settings import Settings, parse_env_file
+from app.tenant import AccountStore, TenantContext
 from app.urls import resolve_public_url
 
 BOOTSTRAP_PREFIX = "jh_boot_"
@@ -22,11 +21,8 @@ BOOTSTRAP_META_KEY = "bootstrap"
 BOOTSTRAP_PLAIN_KEY = "bootstrap.token"
 BOOTSTRAP_TTL = timedelta(days=7)
 SESSION_IDLE = timedelta(hours=12)
-PASSWORD_MIN_LEN = 8
 TOKEN_ENV_KEY = "HUB_BOOTSTRAP_TOKEN"
 USED_ENV_KEY = "HUB_BOOTSTRAP_USED"
-
-_HASHER = PasswordHasher()
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -40,17 +36,6 @@ def new_bootstrap_token() -> str:
 
 def new_id(prefix: str) -> str:
     return prefix + secrets.token_urlsafe(16).replace("-", "").replace("_", "")[:26]
-
-
-def hash_password(password: str) -> str:
-    return _HASHER.hash(password)
-
-
-def verify_password(password_hash: str, password: str) -> bool:
-    try:
-        return _HASHER.verify(password_hash, password)
-    except (VerifyMismatchError, InvalidHashError):
-        return False
 
 
 def public_base(settings: Settings) -> str:
@@ -267,11 +252,26 @@ def consume_bootstrap(
         raise PermissionError("signup closed; log in at /login")
     if not token_matches(meta, token):
         raise PermissionError("invalid or used bootstrap token")
+    username = email.strip().lower().split("@", 1)[0]
+    username = "".join(ch if ch.isalnum() or ch in "._-" else "" for ch in username)
+    if len(username) < 3:
+        username = "admin" + new_id("")[:8]
+    store = AccountStore(db.conn)
+    if store.get_by_username(username):
+        username = username[:20] + new_id("")[:8]
+    account_id = new_id("acc_")
+    account = store.create(
+        account_id=account_id,
+        username=username,
+        password_hash=hash_password(password),
+        created_at=utc_now(),
+    )
     user = db.create_admin(
         user_id=new_id("usr_"),
         email=email.strip().lower(),
         password_hash=hash_password(password),
         display_name="admin",
+        account_id=account_id,
     )
     db.mark_secret_used(BOOTSTRAP_META_KEY)
     wipe_bootstrap_plaintext(settings, db)
@@ -286,11 +286,19 @@ def consume_bootstrap(
         csrf_hash=sha256_hex(csrf_plain),
     )
     db.add_event(
+        TenantContext(account_id),
         job_id=None,
         actor_role="admin",
         actor=user["email"],
         action="bootstrap",
         note="admin user created; bootstrap token consumed",
-        fields={"user_id": user["id"]},
+        fields={"user_id": user["id"], "account_id": account_id},
     )
-    return {"user": user, "session_token": session_plain, "csrf_token": csrf_plain, "now": utc_now()}
+    return {
+        "user": user,
+        "session_token": session_plain,
+        "csrf_token": csrf_plain,
+        "now": utc_now(),
+        "account_id": account_id,
+        "account": account,
+    }

@@ -27,6 +27,7 @@ from app.skill_store import (
     public_skill,
     validate_skill_fields,
 )
+from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -100,20 +101,15 @@ class DeclineIn(BaseModel):
     note: str | None = None
 
 
-def _store(request: Request) -> SkillStore:
-    store = getattr(request.app.state, "skills", None)
-    if store is None:
-        store = SkillStore(request.app.state.db)
-        request.app.state.skills = store
-    return store
+def _store(request: Request, principal: Principal | None = None) -> SkillStore:
+    db = request.app.state.db
+    tenant = principal.tenant if principal is not None else TenantContext(COMPAT_ACCOUNT_ID)
+    return SkillStore(db, tenant)
 
 
-def _mcp_store(request: Request) -> McpStore:
-    store = getattr(request.app.state, "mcps", None)
-    if store is None:
-        store = McpStore(request.app.state.db)
-        request.app.state.mcps = store
-    return store
+def _mcp_store(request: Request, principal: Principal | None = None) -> McpStore:
+    tenant = principal.tenant if principal is not None else TenantContext(COMPAT_ACCOUNT_ID)
+    return McpStore(request.app.state.db, tenant)
 
 
 def _queue(request: Request) -> QueueService:
@@ -151,7 +147,9 @@ def _recording_payload_from_skill(skill: dict[str, Any], extra: dict[str, Any] |
     return payload
 
 
-def _sync_memory_solidify(request: Request, recording: dict[str, Any], status: str) -> None:
+def _sync_memory_solidify(
+    request: Request, recording: dict[str, Any], status: str, principal: Principal | None = None
+) -> None:
     payload = recording.get("payload") or {}
     memory_id = payload.get("memory_id")
     if not memory_id:
@@ -161,6 +159,7 @@ def _sync_memory_solidify(request: Request, recording: dict[str, Any], status: s
         str(memory_id),
         status=status,
         recording_id=recording.get("id"),
+        principal=principal,
     )
 
 
@@ -180,7 +179,7 @@ def _claimed_recording(queue: QueueService, principal: Principal, recording: dic
     item_id = recording.get("queue_item_id")
     if not item_id:
         raise HTTPException(status_code=409, detail="recording has no queue item to claim")
-    item = queue.get(item_id)
+    item = queue.get(principal.tenant, item_id)
     if item is None:
         raise HTTPException(status_code=409, detail="queue item missing")
     who = claimant_id(principal)
@@ -226,7 +225,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
     ) -> dict[str, Any]:
         if role and role not in SKILL_ROLES:
             raise HTTPException(status_code=422, detail=f"unknown role {role!r}")
-        store = _store(request)
+        store = _store(request, principal)
         items = store.list_visible(
             principal,
             tag=tag,
@@ -251,8 +250,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         platform: str | None = None,
         limit: int = 500,
     ) -> dict[str, Any]:
-        del principal
-        store = _mcp_store(request)
+        store = _mcp_store(request, principal)
         items = store.list_visible(
             status=status_filter,
             kind=kind,
@@ -269,8 +267,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        del principal
-        store = _mcp_store(request)
+        store = _mcp_store(request, principal)
         item = store.get_by_id_or_slug(mcp_id)
         if item is None:
             raise HTTPException(status_code=404, detail="mcp not found")
@@ -282,7 +279,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        store = _store(request)
+        store = _store(request, principal)
         skill = store.get(skill_id)
         if skill is None or not can_see_skill(principal, skill):
             raise HTTPException(status_code=404, detail="skill not found")
@@ -294,7 +291,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        store = _store(request)
+        store = _store(request, principal)
         fields = validate_skill_fields(body.model_dump())
         who = owner_key(principal)
         existing = store.get_local_by_slug(who, fields["slug"])
@@ -311,6 +308,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
             }
         )
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -327,7 +325,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        store = _store(request)
+        store = _store(request, principal)
         skill = store.get(skill_id)
         if skill is None:
             raise HTTPException(status_code=404, detail="skill not found")
@@ -355,6 +353,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
             patch["body"] = incoming["body"]
         stored = store.update(skill_id, patch)
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -370,7 +369,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        store = _store(request)
+        store = _store(request, principal)
         skill = store.get(skill_id)
         if skill is None or not can_see_skill(principal, skill):
             raise HTTPException(status_code=404, detail="skill not found")
@@ -406,6 +405,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
             }
         )
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -421,7 +421,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        store = _store(request)
+        store = _store(request, principal)
         queue = _queue(request)
         who = owner_key(principal)
         source = None
@@ -463,6 +463,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
             payload=payload,
         )
         item = queue.upsert(
+            principal.tenant,
             kind="skill.record",
             job_id=None,
             payload={"recording_id": recording["id"], "slug": payload.get("slug")},
@@ -473,6 +474,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         if body.skill_id and source is not None and source["scope"] == "local":
             store.update(source["id"], {"status": "recorded"})
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -489,7 +491,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         status_filter: Annotated[str | None, Query(alias="status")] = None,
         limit: int = 200,
     ) -> dict[str, Any]:
-        store = _store(request)
+        store = _store(request, principal)
         who = owner_key(principal)
         submitted_by = None if is_maintainer(principal) else who
         items = store.list_recordings(submitted_by=submitted_by, status=status_filter, limit=limit)
@@ -501,7 +503,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        store = _store(request)
+        store = _store(request, principal)
         recording = store.get_recording(recording_id)
         if recording is None:
             raise HTTPException(status_code=404, detail="recording not found")
@@ -517,7 +519,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         _require_maintainer(principal)
-        store = _store(request)
+        store = _store(request, principal)
         queue = _queue(request)
         recording = store.get_recording(recording_id)
         if recording is None:
@@ -536,8 +538,9 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
                 "reviewed_at": utc_now(),
             },
         )
-        _sync_memory_solidify(request, stored, "passed" if passed else "failed")
+        _sync_memory_solidify(request, stored, "passed" if passed else "failed", principal)
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -554,7 +557,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         _require_maintainer(principal)
-        store = _store(request)
+        store = _store(request, principal)
         queue = _queue(request)
         recording = store.get_recording(recording_id)
         if recording is None:
@@ -593,13 +596,14 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
                 },
             )
         stored = store.update_recording(recording_id, {"status": "promoted", "skill_id": skill["id"]})
-        _sync_memory_solidify(request, stored, "promoted")
+        _sync_memory_solidify(request, stored, "promoted", principal)
         if recording.get("queue_item_id"):
             try:
                 queue.ack(principal, recording["queue_item_id"])
             except HTTPException:
                 pass
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -617,7 +621,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         body: DeclineIn | None = None,
     ) -> dict[str, Any]:
         _require_maintainer(principal)
-        store = _store(request)
+        store = _store(request, principal)
         queue = _queue(request)
         recording = store.get_recording(recording_id)
         if recording is None:
@@ -635,13 +639,14 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
                 "reviewed_at": utc_now(),
             },
         )
-        _sync_memory_solidify(request, stored, "declined")
+        _sync_memory_solidify(request, stored, "declined", principal)
         if recording.get("queue_item_id"):
             try:
                 queue.nack(principal, recording["queue_item_id"], requeue=False, note=note or "declined")
             except HTTPException:
                 pass
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -659,8 +664,14 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         _require_maintainer(principal)
         pack = getattr(request.app.state, "pack", None)
         repo_root = pack.repo_root if pack is not None else None
-        result = seed_hub_registries(request.app.state.db, repo_root, settings=request.app.state.settings)
+        result = seed_hub_registries(
+            request.app.state.db,
+            repo_root,
+            settings=request.app.state.settings,
+            tenant=principal.tenant,
+        )
         request.app.state.db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,

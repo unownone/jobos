@@ -10,7 +10,7 @@ This repo is **jobOS**, a job harness — not a live job search. Keep PII and li
 4. If you added or dropped a tool, update `skills/lists/` and run `uv run scripts/rebuild_skill_index.py`
 5. Update catalogs if portals or MCPs changed
 
-Skills should stay short and point at docs. Do not fork the status enum in three places — `ledger/schema/job.schema.json` is the list.
+Skills should stay short and point at docs. Do not fork the status enum in three places — `ledger/schema/job.schema.json` is the list of statuses (Hub jobs use the same enum).
 
 ## Add a platform
 
@@ -26,14 +26,13 @@ Document the claim name in `docs/roles.md`. Do not add another job-search owner.
 
 ## Tests
 
-Ledger sanity:
+Hub isolation + board:
 
 ```bash
-uv run scripts/rebuild_index.py
-uv run scripts/rebuild_skill_index.py
+cd board && uv run pytest -q
 ```
 
-YAML in `ledger/jobs/` must parse and include `id`.
+Export snapshots (`GET /api/export/ledger`) may still write `ledger/jobs/*.yaml` for airgap copies. Those files are not the live list.
 
 Hunt board (maintainer-owned):
 

@@ -25,7 +25,6 @@ from tests.unauth_support import (
     SeededHub,
     assert_unauthenticated_denied,
     make_seeded_hub,
-    role_headers,
 )
 
 
@@ -91,7 +90,7 @@ def test_unauthenticated_cannot_create_or_mutate_jobs(seeded: SeededHub) -> None
     assert_unauthenticated_denied(patched, what=f"PATCH /api/jobs/{JOB_ID}")
     deleted = seeded.unauth.delete(f"/api/jobs/{JOB_ID}")
     assert_unauthenticated_denied(deleted, what=f"DELETE /api/jobs/{JOB_ID}")
-    still = seeded.authed.get(f"/api/jobs/{JOB_ID}", headers=role_headers("admin"))
+    still = seeded.authed.get(f"/api/jobs/{JOB_ID}")
     assert still.status_code == 200, still.text
     assert still.json()["job"]["company"] == JOB_COMPANY
 
@@ -274,11 +273,11 @@ def test_authenticated_control_candidate_and_people_still_work(seeded: SeededHub
     assert login.status_code == 200, login.text
     public = seeded.authed.get("/api/candidate/public")
     assert public.status_code == 200, public.text
-    people = seeded.authed.get("/api/people", headers=role_headers("outreach"))
+    people = seeded.authed.get("/api/people")
     assert people.status_code == 200, people.text
     ids = [row.get("id") for row in people.json().get("people", [])]
     assert PERSON_ID in ids
-    jobs = seeded.authed.get("/api/jobs", headers=role_headers("apply"))
+    jobs = seeded.authed.get("/api/jobs")
     assert jobs.status_code == 200
     assert any(job["id"] == JOB_ID for job in jobs.json()["jobs"])
 

@@ -23,7 +23,6 @@ from app.bootstrap import (
     public_base,
     sha256_hex,
     tokens_json_path_for,
-    verify_password,
 )
 from app.candidate import create_candidate_router
 from app.gates import CandidateGateMiddleware
@@ -68,10 +67,13 @@ from app.permissions import (
     ensure_can_stop,
     validate_status,
 )
-from app.profile import candidate_onboarded, candidate_status
+from app.profile import candidate_onboarded, candidate_status, hydrate_tenant_candidate
 from app.presence import mount_presence
 from app.queue import QUEUE_KINDS, QueueService, register_queue_routes
 from app.registry import create_registry_router
+from app.tenant import AccountError, AccountService, TenantContext
+from app.blob_store import build_blob_store
+from app.queue_bus import build_queue_bus
 from app.registry_seed import seed_hub_registries
 from app.skill_store import SkillStore
 from app.settings import Settings, load_settings
@@ -189,7 +191,13 @@ def _normalize_id(raw: str) -> str:
 
 
 class LoginIn(BaseModel):
-    email: str
+    password: str
+    username: str | None = None
+    email: str | None = None
+
+
+class SignupIn(BaseModel):
+    username: str
     password: str
 
 
@@ -266,7 +274,11 @@ def _extract_bootstrap_token(request: Request, body: BootstrapIn) -> str:
 def _health_payload(db: BoardDB, settings: Settings) -> dict[str, Any]:
     configured = sorted(role for role, token in settings.tokens.items() if token)
     bootstrapped = db.admin_bootstrapped()
-    cand = candidate_status(settings)
+    cand = candidate_status(settings, db)
+    if not cand["onboarded"]:
+        operator = db.operator_tenant()
+        if operator is not None:
+            cand = candidate_status(settings, db, tenant=operator)
     if not bootstrapped:
         next_step = "signup"
     elif not cand["onboarded"]:
@@ -304,20 +316,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     setup_otel()
     settings = settings or load_settings()
     db = BoardDB(settings.db_path, settings.database_url or None)
+    blob_memory = (settings.blob_adapter or "").lower() in {"memory", "mem", "test"}
+    blobs = build_blob_store(root=None if blob_memory else settings.blob_root, memory=blob_memory)
+    db.set_blob_store(blobs)
     metrics = MetricsStore(db.conn)
     principal_dep = require_principal(settings, db)
     optional_principal_dep = optional_principal(settings, db)
     pack = PackStore(settings)
     pack.ensure_current()
-    queue = QueueService(db, pack=pack)
+    bus = build_queue_bus(amqp_url=settings.amqp_url, adapter=settings.queue_adapter)
+    queue = QueueService(db, pack=pack, bus=bus)
     skills = SkillStore(db)
     mcps = McpStore(db)
     seed_hub_registries(db, pack.repo_root, settings=settings)
     minted = ensure_bootstrap(settings, db)
 
+    def _provision_tenant(request: Request, tenant) -> None:
+        seed_hub_registries(db, pack.repo_root, settings=settings, tenant=tenant)
+        hydrate_tenant_candidate(settings, db, tenant)
+        try:
+            bind = getattr(bus, "_bind_tenant", None)
+            if callable(bind):
+                bind(tenant)
+        except Exception:
+            pass
+
     app = FastAPI(
         title="jobOS Harness",
-        description="jobOS Harness helps find jobs. Private live coordination plane. Durable state lives in PostgreSQL. Maintainer owns tokens, schema, and uptime.",
+        description="jobOS Harness helps find jobs. Multi-tenant coordination plane. Durable state lives in PostgreSQL and volumized files. Queue is AMQP. Maintainer owns schema and uptime.",
         version="0.5.0",
     )
     app.add_middleware(CandidateGateMiddleware)
@@ -335,6 +361,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.skills = skills
     app.state.mcps = mcps
     app.state.pack = pack
+    app.state.blobs = blobs
+    app.state.bus = bus
     app.state.bootstrap_token = minted
     register_queue_routes(app, queue=queue, principal_dep=principal_dep)
     app.include_router(create_registry_router(principal_dep))
@@ -362,9 +390,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(create_onboarding_router(settings, db, pack, principal_dep))
 
     @app.get("/", response_model=None)
+    def landing() -> FileResponse:
+        return FileResponse(STATIC_DIR / "landing.html")
+
+    @app.get("/board", response_model=None)
     def index(principal: Principal = Depends(principal_dep)) -> FileResponse | RedirectResponse:
-        del principal
-        if db.admin_bootstrapped() and not candidate_onboarded(settings):
+        if db.admin_bootstrapped() and not candidate_onboarded(settings, db, tenant=principal.tenant):
             return RedirectResponse(url="/onboarding", status_code=302)
         return FileResponse(STATIC_DIR / "index.html")
 
@@ -462,6 +493,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             }
         )
         set_session_cookies(response, result["session_token"], result["csrf_token"])
+        _provision_tenant(request, TenantContext(str(user.get("account_id") or "")))
         return response
 
     def _principal_payload(principal: Principal) -> dict[str, Any]:
@@ -486,24 +518,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         return payload
 
-    @app.post("/api/auth/login")
-    def auth_login(body: LoginIn) -> JSONResponse:
-        user = db.get_user_by_email(body.email)
-        if user is None or not user.get("password_hash"):
-            raise HTTPException(status_code=401, detail="invalid email or password")
-        if user.get("disabled_at"):
-            raise HTTPException(status_code=401, detail="user disabled")
-        if not verify_password(user["password_hash"], body.password):
-            raise HTTPException(status_code=401, detail="invalid email or password")
+    @app.post("/api/auth/signup")
+    def auth_signup(body: SignupIn, request: Request) -> JSONResponse:
+        accounts = AccountService(db)
+        result = accounts.signup(body.username, body.password)
+        user = result["user"]
+        tenant = result["tenant"]
+        _provision_tenant(request, tenant)
         session_token, csrf_token = create_user_session(db, user["id"])
         db.add_event(
+            tenant,
             job_id=None,
             actor_role="admin",
-            actor=user.get("email") or user["id"],
-            action="login",
-            fields={"user_id": user["id"]},
+            actor=body.username,
+            action="signup",
+            fields={"user_id": user["id"], "account_id": tenant.account_id},
         )
-        response = JSONResponse({"ok": True, "user": public_user(user)})
+        response = JSONResponse(
+            {
+                "ok": True,
+                "account": result["account"],
+                "user": public_user(user),
+            }
+        )
+        set_session_cookies(response, session_token, csrf_token)
+        return response
+
+    @app.post("/api/auth/login")
+    def auth_login(body: LoginIn) -> JSONResponse:
+        ident = (body.username or body.email or "").strip()
+        if not ident:
+            raise HTTPException(status_code=422, detail="username or email is required")
+        accounts = AccountService(db)
+        result = accounts.login(ident, body.password, email=body.email)
+        user = result["user"]
+        tenant = result["tenant"]
+        session_token, csrf_token = create_user_session(db, user["id"])
+        db.add_event(
+            tenant,
+            job_id=None,
+            actor_role="admin",
+            actor=user.get("email") or user.get("display_name") or user["id"],
+            action="login",
+            fields={"user_id": user["id"], "account_id": tenant.account_id},
+        )
+        payload = public_user(user)
+        payload["account"] = result["account"]
+        response = JSONResponse({"ok": True, "user": payload})
         set_session_cookies(response, session_token, csrf_token)
         return response
 
@@ -539,6 +600,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ttl_hours=body.ttl_hours,
             allow_multiple_owners=body.allow_multiple_owners,
             created_by=principal.user_id or principal.actor,
+            account_id=principal.tenant.account_id,
         )
         url = join_url(settings, row["id"], secret)
         prompt = render_agent_prompt(
@@ -550,6 +612,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             secret=secret,
         )
         db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -568,7 +631,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/invites")
     def list_invites_endpoint(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
         require_admin(principal)
-        return {"invites": [public_invite(row) for row in db.list_invites()]}
+        return {"invites": [public_invite(row) for row in db.list_invites(principal.tenant)]}
 
     @app.post("/api/invites/{invite_id}/revoke")
     def revoke_invite_endpoint(
@@ -581,6 +644,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="invite not found")
         stored = db.revoke_invite(invite_id)
         db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -633,9 +697,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def list_agents(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
         require_owner_or_admin(principal)
         track = None if principal.kind == "admin" or principal.role == "admin" else principal.track
-        users = db.list_users(track=track, kind="agent")
+        users = db.list_users(principal.tenant, track=track, kind="agent")
         if principal.kind == "admin" or principal.role == "admin":
-            users = db.list_users(kind="agent") + db.list_users(kind="owner")
+            users = db.list_users(principal.tenant, kind="agent") + db.list_users(principal.tenant, kind="owner")
         return {"users": [public_user(u) for u in users]}
 
     @app.post("/api/agents")
@@ -753,11 +817,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> dict[str, Any]:
         if status_filter:
             validate_status(status_filter)
-        jobs = db.list_jobs(status=status_filter, q=q, stopped=stopped)
-        claims = queue.claims_for_jobs([job["id"] for job in jobs])
+        jobs = db.list_jobs(principal.tenant, status=status_filter, q=q, stopped=stopped)
+        claims = queue.claims_for_jobs(principal.tenant, [job["id"] for job in jobs])
         for job in jobs:
             job["claim"] = claims.get(job["id"])
-        total = len(db.list_jobs())
+        total = len(db.list_jobs(principal.tenant, ))
         return {
             "jobs": jobs,
             "count": len(jobs),
@@ -770,10 +834,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         job_id: str,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        job = db.get_job(job_id)
+        job = db.get_job(principal.tenant, job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="job not found")
-        claims = queue.claims_for_jobs([job_id])
+        claims = queue.claims_for_jobs(principal.tenant, [job_id])
         job["claim"] = claims.get(job_id)
         return {"job": job, "role": principal.role}
 
@@ -787,9 +851,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         job_id = _normalize_id(payload["id"]) if payload.get("id") else _slug_id(
             payload["company"], payload["title"]
         )
-        if db.get_job(job_id):
+        if db.get_job(principal.tenant, job_id):
             raise HTTPException(status_code=409, detail=f"job id already exists: {job_id}")
-        dup = db.find_duplicate(
+        dup = db.find_duplicate(principal.tenant,
             apply_url=str(payload.get("apply_url") or ""),
             company=payload["company"],
             title=payload["title"],
@@ -806,8 +870,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         payload["id"] = job_id
         payload["created_by_role"] = principal.role
-        stored = db.insert_job(payload)
+        stored = db.insert_job(principal.tenant, payload)
         event = db.add_event(
+            principal.tenant,
             job_id=job_id,
             actor_role=principal.role,
             actor=principal.actor,
@@ -817,7 +882,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             note="created",
             fields={"company": stored["company"], "title": stored["title"]},
         )
-        queue.sync_system_items(stored, actor_role=principal.role, actor=principal.actor)
+        queue.sync_system_items(principal.tenant, stored, actor_role=principal.role, actor=principal.actor)
         return {"job": stored, "event": event}
 
     @app.patch("/api/jobs/{job_id}")
@@ -826,15 +891,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         body: JobPatch,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        current = db.get_job(job_id)
+        current = db.get_job(principal.tenant, job_id)
         if current is None:
             raise HTTPException(status_code=404, detail="job not found")
         incoming = body.model_dump(exclude_none=True)
         if not incoming:
             return {"job": current, "event": None}
         patch = authorize_patch(principal.role, current, incoming)
-        stored = db.update_job(job_id, patch)
+        stored = db.update_job(principal.tenant, job_id, patch)
         event = db.add_event(
+            principal.tenant,
             job_id=job_id,
             actor_role=principal.role,
             actor=principal.actor,
@@ -844,7 +910,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             note="patched " + ", ".join(sorted(patch)),
             fields=patch,
         )
-        queue.sync_system_items(stored, actor_role=principal.role, actor=principal.actor)
+        queue.sync_system_items(principal.tenant, stored, actor_role=principal.role, actor=principal.actor)
         return {"job": stored, "event": event}
 
     @app.post("/api/jobs/{job_id}/stop")
@@ -854,10 +920,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         ensure_can_stop(principal.role)
-        current = db.get_job(job_id)
+        current = db.get_job(principal.tenant, job_id)
         if current is None:
             raise HTTPException(status_code=404, detail="job not found")
-        stored = db.update_job(
+        stored = db.update_job(principal.tenant,
             job_id,
             {
                 "stopped": True,
@@ -866,6 +932,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
         event = db.add_event(
+            principal.tenant,
             job_id=job_id,
             actor_role=principal.role,
             actor=principal.actor,
@@ -883,10 +950,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         ensure_can_stop(principal.role)
-        current = db.get_job(job_id)
+        current = db.get_job(principal.tenant, job_id)
         if current is None:
             raise HTTPException(status_code=404, detail="job not found")
-        stored = db.update_job(
+        stored = db.update_job(principal.tenant,
             job_id,
             {
                 "stopped": True,
@@ -894,6 +961,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
         event = db.add_event(
+            principal.tenant,
             job_id=job_id,
             actor_role=principal.role,
             actor=principal.actor,
@@ -910,10 +978,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         ensure_can_stop(principal.role)
-        current = db.get_job(job_id)
+        current = db.get_job(principal.tenant, job_id)
         if current is None:
             raise HTTPException(status_code=404, detail="job not found")
-        stored = db.update_job(
+        stored = db.update_job(principal.tenant,
             job_id,
             {
                 "stopped": False,
@@ -921,6 +989,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
         event = db.add_event(
+            principal.tenant,
             job_id=job_id,
             actor_role=principal.role,
             actor=principal.actor,
@@ -937,11 +1006,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         ensure_can_delete(principal.role)
-        current = db.get_job(job_id)
+        current = db.get_job(principal.tenant, job_id)
         if current is None:
             raise HTTPException(status_code=404, detail="job not found")
-        db.delete_job(job_id)
+        db.delete_job(principal.tenant, job_id)
         event = db.add_event(
+            principal.tenant,
             job_id=job_id,
             actor_role=principal.role,
             actor=principal.actor,
@@ -958,14 +1028,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         job_id: str | None = None,
         limit: int = 100,
     ) -> dict[str, Any]:
-        return {"events": db.list_events(job_id=job_id, limit=limit), "role": principal.role}
+        return {"events": db.list_events(principal.tenant, job_id=job_id, limit=limit), "role": principal.role}
 
     @app.get("/api/hygiene")
     def hygiene_report(
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         ensure_can_hygiene(principal.role)
-        jobs = db.list_jobs()
+        jobs = db.list_jobs(principal.tenant, )
         by_url: dict[str, list[str]] = {}
         by_ctl: dict[tuple[str, str, str], list[str]] = {}
         stale: list[str] = []
@@ -986,7 +1056,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if job["status"] == "apply_ready" and not packet.get("url") and not packet.get("steps"):
                 missing_packet.append(job["id"])
         return {
-            "counts_by_status": db.counts_by_status(),
+            "counts_by_status": db.counts_by_status(principal.tenant),
             "duplicate_apply_urls": [
                 {"apply_url": url, "ids": ids} for url, ids in by_url.items() if len(ids) > 1
             ],
@@ -1007,11 +1077,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ensure_can_hygiene(principal.role)
         db.vacuum()
         db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
             action="vacuum",
-        note="postgres autovacuum",
+            note="postgres autovacuum",
         )
         return {"ok": True}
 
@@ -1027,8 +1098,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 detail="only admin can replace the board during import",
             )
         if body.replace:
-            for job in db.list_jobs():
-                db.delete_job(job["id"])
+            for job in db.list_jobs(principal.tenant, ):
+                db.delete_job(principal.tenant, job["id"])
         created = 0
         updated = 0
         skipped = 0
@@ -1040,7 +1111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if not ID_RE.match(job_id):
                 skipped += 1
                 continue
-            existing = db.get_job(job_id)
+            existing = db.get_job(principal.tenant, job_id)
             row = {
                 "id": job_id,
                 "company": raw["company"],
@@ -1074,15 +1145,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 skipped += 1
                 continue
             if existing:
-                db.update_job(job_id, {k: v for k, v in row.items() if k != "id"})
+                db.update_job(principal.tenant, job_id, {k: v for k, v in row.items() if k != "id"})
                 updated += 1
             else:
-                db.insert_job(row)
+                db.insert_job(principal.tenant, row)
                 created += 1
         for raw_event in body.events:
             if not isinstance(raw_event, dict):
                 continue
             db.add_event(
+            principal.tenant,
                 job_id=raw_event.get("job_id"),
                 actor_role=str(raw_event.get("role") or raw_event.get("actor_role") or principal.role),
                 actor=str(raw_event.get("actor") or ""),
@@ -1092,6 +1164,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 note=str(raw_event.get("note") or "imported"),
             )
         db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -1124,6 +1197,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         payload["extra"] = extra
         payload["actor_role"] = principal.role
         payload["actor"] = principal.actor
+        payload["account_id"] = principal.account_id
         stored = metrics.record_token_burn(payload)
         return {"ok": True, "row": stored}
 
@@ -1133,14 +1207,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         limit: int = 100,
     ) -> dict[str, Any]:
         ensure_can_read_metrics(principal.role)
-        return {"rows": metrics.list_burns(limit=limit)}
+        return {"rows": metrics.list_burns(limit=limit, tenant=principal)}
 
     @app.get("/api/metrics/summary")
     def metrics_summary(
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         ensure_can_read_metrics(principal.role)
-        return metrics.summary()
+        return metrics.summary(tenant=principal)
+
+    @app.exception_handler(AccountError)
+    async def account_exc(_request: Request, exc: AccountError) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     @app.exception_handler(HTTPException)
     async def http_exc(_request: Request, exc: HTTPException) -> JSONResponse:

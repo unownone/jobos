@@ -160,6 +160,7 @@ def test_catalog_refresh_ack_unlocks_search(hub: tuple[TestClient, Settings], mo
     from datetime import datetime, timezone
 
     from app.queue import catalog_date_is_fresh, catalog_refresh_acked_recent
+    from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 
     assert catalog_date_is_fresh("2019-01-01", datetime(2026, 9, 7, tzinfo=timezone.utc)) is False
     assert catalog_date_is_fresh("2026-09-06", datetime(2026, 9, 7, tzinfo=timezone.utc)) is True
@@ -181,7 +182,9 @@ def test_catalog_refresh_ack_unlocks_search(hub: tuple[TestClient, Settings], mo
     item_id = claimed.json()["items"][0]["id"]
     acked = client.post(f"/api/queue/ack/{item_id}", headers=h("maintenance"))
     assert acked.status_code == 200, acked.text
-    assert catalog_refresh_acked_recent(client.app.state.db) is True
+    assert catalog_refresh_acked_recent(
+        client.app.state.db, TenantContext(COMPAT_ACCOUNT_ID)
+    ) is True
 
     client.post(
         "/api/queue/push",

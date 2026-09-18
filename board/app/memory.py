@@ -96,12 +96,8 @@ def _raise_memory(exc: MemoryError) -> None:
     ) from exc
 
 
-def _skill_store(request: Request) -> SkillStore:
-    store = getattr(request.app.state, "skills", None)
-    if store is None:
-        store = SkillStore(request.app.state.db)
-        request.app.state.skills = store
-    return store
+def _skill_store(request: Request, principal: Principal) -> SkillStore:
+    return SkillStore(request.app.state.db, principal.tenant)
 
 
 def create_memory_router(principal_dep) -> APIRouter:
@@ -261,6 +257,7 @@ def create_memory_router(principal_dep) -> APIRouter:
             _raise_memory(exc)
             raise
         db.add_event(
+            principal.tenant,
             job_id=item.get("job_id"),
             actor_role=principal.role,
             actor=principal.actor,
@@ -278,7 +275,7 @@ def create_memory_router(principal_dep) -> APIRouter:
         body: SolidifyIn | None = None,
     ) -> dict[str, Any]:
         db = request.app.state.db
-        raw = get_item(db, item_id)
+        raw = get_item(db, item_id, principal=principal)
         if raw is None or not can_read_pod(principal, raw["pod"]):
             _raise_memory(MemoryNotFound("memory item not found"))
             raise
@@ -291,7 +288,7 @@ def create_memory_router(principal_dep) -> APIRouter:
             _raise_memory(MemoryDenied("private worker notes cannot become skills"))
             raise
         existing_id = stored.get("recording_id")
-        store = _skill_store(request)
+        store = _skill_store(request, principal)
         if existing_id and (stored.get("solidify_status") or "none") in OPEN_SOLIDIFY_STATUSES:
             recording = store.get_recording(existing_id)
             if recording is not None:
@@ -329,6 +326,7 @@ def create_memory_router(principal_dep) -> APIRouter:
         recording = store.insert_recording(skill_id=None, submitted_by=who, payload=payload)
         queue = request.app.state.queue
         item = queue.upsert(
+            principal.tenant,
             kind="skill.record",
             job_id=None,
             payload={"recording_id": recording["id"], "slug": payload.get("slug"), "memory_id": stored["id"]},
@@ -336,8 +334,11 @@ def create_memory_router(principal_dep) -> APIRouter:
             actor=principal.actor,
         )
         recording = store.update_recording(recording["id"], {"queue_item_id": item["id"]})
-        set_solidify_status(db, stored["id"], status="queued", recording_id=recording["id"])
+        set_solidify_status(
+            db, stored["id"], status="queued", recording_id=recording["id"], principal=principal
+        )
         db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -346,7 +347,7 @@ def create_memory_router(principal_dep) -> APIRouter:
             fields={"memory_id": stored["id"], "recording_id": recording["id"], "queue_id": item["id"]},
         )
         return {
-            "item": public_item(db, stored["id"]),
+            "item": public_item(db, stored["id"], principal=principal),
             "recording": public_recording(recording),
             "queue_item": {"id": item["id"], "kind": item["kind"]},
             "status": "queued",

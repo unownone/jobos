@@ -16,7 +16,7 @@
 
 One-click / easy deploy uses this repo’s Hub image (`Dockerfile`) and Compose (`docker-compose.yml`, Hub on **8787**). **Railway:** button above → `railway.json` + root `Dockerfile` (maps PaaS `PORT` to Hub). **Coolify:** new Docker Compose resource → GitHub `unownone/jobos` → compose file `docker-compose.yml` → persist volume `hub-data` → set `HUB_PUBLIC_URL` to the Coolify FQDN. Same stack as local Compose, not a second image. Details: [`docs/install.md`](docs/install.md).
 
-Not a single auto-apply bot. One repo. Four owners today (three job-search roles plus a seldom maintainer). One shared ledger. A live Hub when agents share a host. Airgap still works.
+Not a single auto-apply bot. One repo. Four owners today (three job-search roles plus a seldom maintainer). Canonical state lives in Hub Postgres + a volumized BlobStore. Git `ledger/` is export-only.
 
 ```
 Discovery finds and shortlists.
@@ -36,7 +36,7 @@ curl -sS "$HUB_URL/agents.txt"
 
 Git copies: [`llms.txt`](llms.txt), [`agents.txt`](agents.txt), [`docs/llms.txt`](docs/llms.txt), [`docs/agents.txt`](docs/agents.txt). Hub also serves `/.well-known/llms.txt` and `/.well-known/agents.txt` as `text/plain`.
 
-The live coordination plane is **jobOS Hub** (`board/`): FastAPI + SQLite + operator UI. Maintainer owns it. Git `ledger/` remains the airgap protocol. See [`board/README.md`](board/README.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md).
+The live coordination plane is **jobOS Hub** (`board/`): FastAPI + PostgreSQL + RabbitMQ + operator UI. Maintainer owns it. Sign up at `/login` (username + password). Git `ledger/` is an export snapshot (`GET /api/export/ledger`), not the live list. See [`board/README.md`](board/README.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md), [`docs/job-hub/multi-tenant.md`](docs/job-hub/multi-tenant.md).
 
 ## Start here
 
@@ -89,7 +89,7 @@ flowchart TD
   registry[Hub skill registry]
   research[Deep research]
   discovery[Discovery role]
-  ledger[Git ledger airgap]
+  store[Hub JobStore Postgres]
   board[Hub hunt board live]
   apply[Apply role]
   outreach[Outreach role]
@@ -107,35 +107,35 @@ flowchart TD
   research --> discovery
   research --> apply
   research --> outreach
-  discovery -->|"shortlist + apply packet"| ledger
+  discovery -->|"shortlist + apply packet"| store
   discovery --> board
-  ledger --> apply
+  store --> apply
   board --> apply
-  apply -->|"applied + outreach packet"| ledger
+  apply -->|"applied + outreach packet"| store
   apply --> board
-  ledger --> outreach
+  store --> outreach
   board --> outreach
-  outreach -->|"touches + replies"| ledger
+  outreach -->|"touches + replies"| store
   outreach --> board
 ```
 
 Full writeup: [`docs/architecture.md`](docs/architecture.md). Domain names: [`CONTEXT.md`](CONTEXT.md).
 
-## Shared list: git ledger vs live Hub
+## Shared list: Hub is canonical
 
-Bots may have no shared network except git. The **git ledger is the airgap protocol** (YAML per job). It stays.
+Canonical jobs, events, people, skills, memory, and queue traffic live in **jobOS Hub** (Postgres + BlobStore + RabbitMQ), namespaced by account id. Sign up at `/login`. Landing is `/`. Board is `/board`.
 
-When several agents share a host, maintainer runs **jobOS Hub** as the live coordination UI/API. Discovery/apply/outreach consume it; they do not own it. If `HUB_URL` is set, that is the live list — see [`docs/job-hub/human.md`](docs/job-hub/human.md) (operator) and [`docs/job-hub/agent.md`](docs/job-hub/agent.md) (join, pack, queue). **Maintainer ≠ discovery.**
+`GET /api/export/ledger` writes a YAML snapshot when you need files. Git `ledger/` is **not** the live list.
+
+When `HUB_URL` is set, that is the live list — see [`docs/job-hub/human.md`](docs/job-hub/human.md) (operator) and [`docs/job-hub/agent.md`](docs/job-hub/agent.md) (join, pack, queue). **Maintainer ≠ discovery.** Multi-tenant design: [`docs/job-hub/multi-tenant.md`](docs/job-hub/multi-tenant.md).
 
 | Layer | What it is | When to use |
 | --- | --- | --- |
-| Airgap / template | One YAML file per job under `ledger/jobs/` | Always the file protocol; required if no server |
-| Human git view | [`ledger/INDEX.md`](ledger/INDEX.md) | Always in git |
-| Git audit | Append-only `ledger/events.jsonl` | Always in git |
-| **Live Hub** | [`board/`](board/README.md) FastAPI + SQLite + admin UI | Shared machine; maintainer-owned |
+| **Live Hub** | [`board/`](board/README.md) FastAPI + Postgres + RabbitMQ + BlobStore | Production and local compose |
+| Export snapshot | `GET /api/export/ledger` → `ledger/jobs/*.yaml` | Airgap copy, never dual-write |
 | Optional overlay | Google Drive / Sheet | Only if someone wants a spreadsheet; not source of truth |
 
-Discovery still owns the **git** ledger portal (conflicts, INDEX, schema). **Maintainer** owns the live Hub (tokens, uptime, hygiene, tunnels). Details: [`docs/sharing.md`](docs/sharing.md) and [`board/README.md`](board/README.md).
+**Maintainer** owns the live Hub (schema, uptime, hygiene). Details: [`docs/sharing.md`](docs/sharing.md) and [`board/README.md`](board/README.md).
 
 ## Skills in this repo
 

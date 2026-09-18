@@ -192,6 +192,7 @@ def create_onboarding_router(
         meta = pack.rebuild()
         result = seed_hub_registries(db, pack.repo_root, settings=settings)
         db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,

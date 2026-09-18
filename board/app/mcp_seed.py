@@ -11,6 +11,7 @@ import yaml
 from app.mcp_store import MCP_KINDS, McpStore, content_hash_for
 from app.pack import default_repo_root, repo_root_for
 from app.settings import Settings
+from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 
 LIST_FILES: tuple[tuple[str, str], ...] = (
     ("adopted.yaml", "adopted"),
@@ -289,9 +290,10 @@ def seed_github_mcps(
     repo_root: Path | None = None,
     *,
     settings: Settings | None = None,
+    tenant: Any | None = None,
 ) -> dict[str, int]:
     root = repo_root or repo_root_from_db(db, settings)
-    store = McpStore(db)
+    store = McpStore(db, tenant or TenantContext(COMPAT_ACCOUNT_ID))
     counts = {"inserted": 0, "updated": 0, "unchanged": 0, "skipped": 0}
     for fields in iter_github_mcps(root):
         _row, action = store.upsert_github(fields)

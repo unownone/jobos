@@ -16,7 +16,9 @@ Install and hosting: **[`docs/install.md`](../install.md)** (Docker, Compose pla
 
 ## What you deploy
 
-One FastAPI process (`board/`). PostgreSQL for durable state (jobs, users, candidate, memory, metrics). Secrets in gitignored `board/.env` and `board/tokens.local.json`. Never paste tokens into git, docs, or group chat.
+One FastAPI process (`board/`). PostgreSQL for durable tenant state (jobs, users, candidate, memory, metrics). Files in a volumized BlobStore. Queue is RabbitMQ (AMQP) with `{account_id}.{kind}` routing. Secrets in gitignored `board/.env`. Never paste tokens into git, docs, or group chat.
+
+Auth is **username + password** at `/login` (signup on the same page). No dashboard token is required. Multi-tenant design: [`multi-tenant.md`](multi-tenant.md).
 
 ```bash
 # from repo root
@@ -45,7 +47,7 @@ What the script does:
 4. Builds the onboarding pack (`scripts/hub_build_pack.py`).
 5. Starts `board/start.sh` (Gunicorn + Uvicorn workers on `BOARD_HOST`/`BOARD_PORT`, default `0.0.0.0:8787`).
 
-Stdout prints `Admin signup: $public_origin/admin/signup#bootstrap=…` once. After that admin exists, **nobody else can sign up** — `/admin/signup` redirects to `/login` and `POST /api/auth/bootstrap` returns 403.
+Stdout prints `Admin signup: $public_origin/admin/signup#bootstrap=…` once for a **fresh** deploy. After that, anyone may create an account at `/login` (username + password). `/admin/signup` still consumes the one-time bootstrap token if no admin exists yet.
 
 Dry run (no gunicorn): `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
 
@@ -53,15 +55,15 @@ Dry run (no gunicorn): `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
 
 There is **no** `POST /api/auth/bootstrap/rotate` in the shipped API. A new bootstrap is minted only when no admin exists. After the first admin, log in at `/login`.
 
-## Signup (first admin)
+## Signup
 
-1. Open the printed signup URL (`/admin/signup`).
-2. Email + password (password min 8). The page sends `POST /api/auth/bootstrap` with `Authorization: Bearer` of the bootstrap token.
+1. Open `/login` (or the printed `/admin/signup` URL on a brand-new Hub).
+2. Username + password (password min 8). `POST /api/auth/signup` — no dashboard token.
 3. You get a session cookie (`hub_session`, 12h idle) plus `hub_csrf`. Browser writes need header `X-CSRF` matching that cookie.
-4. The UI then **requires** [`/onboarding`](#candidate--resume-mandatory-first). Invites stay blocked until that succeeds.
-5. Later visits: `/login` → `POST /api/auth/login`. Logout: `POST /api/auth/logout`. There is no second signup.
+4. The UI then **requires** [`/onboarding`](#candidate--resume-mandatory-first) **for that account**.
+5. Later visits: `/login` → `POST /api/auth/login`. Logout: `POST /api/auth/logout`.
 
-Do not commit the bootstrap token, session cookies, or admin password.
+Do not commit session cookies or passwords. Compat `X-Role` + `X-Token` still exists for tests; prefer session or Bearer keys.
 
 ## Candidate + resume (mandatory first)
 
@@ -123,7 +125,7 @@ Heartbeat contract for agents: every **10s**. Server marks **stale after 30s**. 
 
 ## Export (airgap)
 
-Git ledger remains the airgap protocol. Hub export is a snapshot, not dual-write on every PATCH.
+`GET /api/export/ledger` writes a snapshot tarball (`ledger/INDEX.md`, `events.jsonl`, `jobs/*.yaml`, `people/*.yaml`). Secrets are stripped. Hub DB remains canonical; this is not dual-write.
 
 ```bash
 curl -sS "$HUB_URL/api/export/ledger" \

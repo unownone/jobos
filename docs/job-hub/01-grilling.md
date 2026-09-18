@@ -1,5 +1,7 @@
 # Job Hub grilling
 
+Historical decision log (2026-09). **Production now:** Hub Postgres is canonical, git `ledger/` is export-only, accounts are username+password multi-tenant. See [`multi-tenant.md`](multi-tenant.md). Do not implement the git-ledger dual-write options below.
+
 Every ambiguity is enumerated, then **decided**. Rationale is one line. Defaults fit `docs/process.md` and the current `board/` overlay.
 
 Track names in the Hub API: `discovery` | `application` | `outreach` | `maintenance`. Aliases: `application` = process role `apply`; `maintenance` = process role `maintainer`. `admin` is a **human hub owner**, not a job-search track.

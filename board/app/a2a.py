@@ -364,7 +364,7 @@ def create_a2a_router(
             task_id = str(params.get("id") or params.get("taskId") or "").strip()
             if not task_id:
                 return _jsonrpc_error(rpc_id, RPC_INVALID_PARAMS, "id is required")
-            stored = get_task(db, task_id)
+            stored = get_task(db, task_id, tenant=principal)
             if stored is None:
                 return _jsonrpc_error(rpc_id, RPC_TASK_NOT_FOUND, "task not found")
             result = stored.get("result") or {}
@@ -384,7 +384,7 @@ def create_a2a_router(
             if principal is None:
                 return _jsonrpc_error(rpc_id, RPC_AUTH_REQUIRED, "Authorization Bearer required")
             task_id = str(params.get("id") or params.get("taskId") or "").strip()
-            stored = get_task(db, task_id) if task_id else None
+            stored = get_task(db, task_id, tenant=principal) if task_id else None
             if stored is None:
                 return _jsonrpc_error(rpc_id, RPC_TASK_NOT_FOUND, "task not found")
             if stored["state"] in {"completed", "canceled", "failed", "rejected"}:
@@ -397,13 +397,13 @@ def create_a2a_router(
                 message=msg,
                 timestamp=stored["updated_at"],
             )
-            update_task(db, stored["id"], state="canceled", result=task)
+            update_task(db, stored["id"], state="canceled", result=task, tenant=principal)
             return _jsonrpc_result(rpc_id, task)
 
         if method == "tasks/list":
             if principal is None:
                 return _jsonrpc_error(rpc_id, RPC_AUTH_REQUIRED, "Authorization Bearer required")
-            rows = list_tasks(db, limit=int(params.get("limit") or 50))
+            rows = list_tasks(db, limit=int(params.get("limit") or 50), tenant=principal)
             return _jsonrpc_result(
                 rpc_id,
                 {
@@ -425,7 +425,7 @@ def create_a2a_router(
         if method != "message/send":
             return _jsonrpc_error(rpc_id, RPC_METHOD_NOT_FOUND, f"unknown method {method}")
 
-        if not candidate_onboarded(settings):
+        if not candidate_onboarded(settings, db, tenant=principal.tenant if principal else None):
             return _jsonrpc_error(
                 rpc_id,
                 RPC_CANDIDATE_REQUIRED,
@@ -479,8 +479,10 @@ def create_a2a_router(
             job_id=job_id,
             msg_type=msg_type,
             body=incoming_text,
+            principal=principal,
         )
         db.add_event(
+            principal.tenant,
             job_id=job_id,
             actor_role=principal.role,
             actor=principal.actor,
@@ -515,6 +517,7 @@ def create_a2a_router(
             from_user_id=principal.user_id,
             message_id=stored_msg["id"],
             request=params,
+            tenant=principal,
         )
         artifact = {
             "artifactId": stored_msg["id"],
@@ -531,7 +534,7 @@ def create_a2a_router(
             metadata={"protocol": "A2A", "hub": "job-apply-os"},
             timestamp=stored["created_at"],
         )
-        update_task(db, stored["id"], result=task)
+        update_task(db, stored["id"], result=task, tenant=principal)
         return _jsonrpc_result(rpc_id, task)
 
     @router.post("/a2a")
@@ -569,7 +572,6 @@ def create_a2a_router(
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        del principal
         base = public_base(settings).rstrip("/")
         db: BoardDB = request.app.state.db
         local = [
@@ -591,16 +593,15 @@ def create_a2a_router(
                 for t in TRACKS
             ],
         ]
-        return {"local": local, "peers": list_peers(db), "protocolVersion": PROTOCOL_VERSION}
+        return {"local": local, "peers": list_peers(db, tenant=principal), "protocolVersion": PROTOCOL_VERSION}
 
     @router.get("/api/a2a/peers")
     def a2a_list_peers(
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
-        del principal
         db: BoardDB = request.app.state.db
-        return {"peers": list_peers(db)}
+        return {"peers": list_peers(db, tenant=principal)}
 
     @router.post("/api/a2a/peers", status_code=201)
     def a2a_add_peer(
@@ -611,7 +612,7 @@ def create_a2a_router(
         if principal.role not in {"admin", "maintenance"} and principal.kind != "admin":
             raise HTTPException(status_code=403, detail="only admin or maintenance can register A2A peers")
         db: BoardDB = request.app.state.db
-        existing = get_peer_by_card_url(db, body.card_url.strip())
+        existing = get_peer_by_card_url(db, body.card_url.strip(), tenant=principal)
         if existing:
             return {"peer": existing, "deduped": True}
         card = _http_fetch_json(body.card_url.strip())
@@ -623,8 +624,10 @@ def create_a2a_router(
             card_url=body.card_url.strip(),
             agent_url=agent_url,
             card=card,
+            tenant=principal,
         )
         db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -642,7 +645,7 @@ def create_a2a_router(
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         db: BoardDB = request.app.state.db
-        peer = get_peer(db, peer_id)
+        peer = get_peer(db, peer_id, tenant=principal)
         if peer is None:
             raise HTTPException(status_code=404, detail="peer not found")
         agent_url = peer.get("agent_url") or ""
@@ -663,8 +666,9 @@ def create_a2a_router(
             "params": {"message": message},
         }
         reply = _http_fetch_json(agent_url, method="POST", body=rpc)
-        touch_peer(db, peer_id)
+        touch_peer(db, peer_id, tenant=principal)
         db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,

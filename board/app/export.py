@@ -15,6 +15,7 @@ from app.auth import Principal
 from app.db import BoardDB
 from app.people import list_people
 from app.permissions import ensure_can_export
+from app.tenant import TenantContext
 
 SECRET_KEY_FRAGMENTS = (
     "token",
@@ -211,10 +212,10 @@ def render_index(jobs: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def build_ledger_files(db: BoardDB) -> dict[str, str]:
-    jobs = [job_for_export(job) for job in db.list_jobs()]
-    people = [person_for_export(person) for person in list_people(db)]
-    events = [event_for_export(event) for event in db.list_events(limit=10000)]
+def build_ledger_files(db: BoardDB, tenant: TenantContext) -> dict[str, str]:
+    jobs = [job_for_export(job) for job in db.list_jobs(tenant)]
+    people = [person_for_export(person) for person in list_people(db, tenant)]
+    events = [event_for_export(event) for event in db.list_events(tenant, limit=10000)]
     files: dict[str, str] = {
         "ledger/INDEX.md": render_index(jobs),
         "ledger/events.jsonl": "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in events),
@@ -259,8 +260,9 @@ def create_export_router(principal_dep: Any) -> APIRouter:
         if fmt not in {"tar", "json"}:
             raise HTTPException(status_code=422, detail="format must be tar or json")
         db: BoardDB = request.app.state.db
-        files = build_ledger_files(db)
+        files = build_ledger_files(db, principal.tenant)
         db.add_event(
+            principal.tenant,
             job_id=None,
             actor_role=principal.role,
             actor=principal.actor,
@@ -268,9 +270,9 @@ def create_export_router(principal_dep: Any) -> APIRouter:
             note=f"files={len(files)} format={fmt}",
         )
         if fmt == "json":
-            jobs = [job_for_export(job) for job in db.list_jobs()]
-            people = [person_for_export(person) for person in list_people(db)]
-            events = [event_for_export(event) for event in db.list_events(limit=10000)]
+            jobs = [job_for_export(job) for job in db.list_jobs(principal.tenant)]
+            people = [person_for_export(person) for person in list_people(db, principal.tenant)]
+            events = [event_for_export(event) for event in db.list_events(principal.tenant, limit=10000)]
             return {
                 "jobs": jobs,
                 "people": people,

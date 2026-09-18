@@ -186,8 +186,10 @@ def create_messages_router(principal_dep: Callable[..., Any]) -> APIRouter:
             job_id=body.job_id,
             msg_type=msg_type,
             body=body.body,
+            principal=principal,
         )
         db.add_event(
+            principal.tenant,
             job_id=body.job_id,
             actor_role=principal.role,
             actor=principal.actor,
@@ -249,6 +251,7 @@ def create_messages_router(principal_dep: Callable[..., Any]) -> APIRouter:
         except MessageForbidden as exc:
             raise HTTPException(status_code=403, detail="not a recipient of this message") from exc
         db.add_event(
+            principal.tenant,
             job_id=stored.get("job_id"),
             actor_role=principal.role,
             actor=principal.actor,

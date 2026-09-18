@@ -8,6 +8,8 @@ import re
 from typing import Any
 
 from app.db import utc_now
+from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
+from app.tenant_schema import ensure_tenant_schema
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
 
@@ -17,7 +19,8 @@ MCP_ORIGINS = ("github", "recording", "mutation", "memory")
 
 MCP_SCHEMA = """
 CREATE TABLE IF NOT EXISTS mcps (
-    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    id TEXT NOT NULL,
     slug TEXT NOT NULL,
     name TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'mcp',
@@ -39,10 +42,11 @@ CREATE TABLE IF NOT EXISTS mcps (
     version INTEGER NOT NULL DEFAULT 1,
     content_hash TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (account_id, id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_mcps_slug ON mcps(slug);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mcps_account_slug ON mcps(account_id, slug);
 CREATE INDEX IF NOT EXISTS idx_mcps_status ON mcps(status);
 CREATE INDEX IF NOT EXISTS idx_mcps_kind ON mcps(kind);
 CREATE INDEX IF NOT EXISTS idx_mcps_origin ON mcps(origin);
@@ -51,6 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_mcps_origin ON mcps(origin);
 
 def ensure_mcp_schema(conn: Any) -> None:
     conn.executescript(MCP_SCHEMA)
+    ensure_tenant_schema(conn)
 
 
 def _dump(value: Any) -> str | None:
@@ -199,18 +204,29 @@ def mcp_matches_query(
 
 
 class McpStore:
-    def __init__(self, db: Any) -> None:
+    def __init__(self, db: Any, tenant: TenantContext | None = None) -> None:
         self.db = db
+        self.tenant = tenant or TenantContext(COMPAT_ACCOUNT_ID)
         ensure_mcp_schema(self.db.conn)
         self.db.conn.commit()
 
+    @property
+    def account_id(self) -> str:
+        return self.tenant.account_id
+
     def get(self, mcp_id: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute("SELECT * FROM mcps WHERE id = ?", (mcp_id,))
+        cur = self.db.conn.execute(
+            "SELECT * FROM mcps WHERE id = ? AND account_id = ?",
+            (mcp_id, self.account_id),
+        )
         row = cur.fetchone()
         return row_to_mcp(row) if row else None
 
     def get_by_slug(self, slug: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute("SELECT * FROM mcps WHERE slug = ?", (slug,))
+        cur = self.db.conn.execute(
+            "SELECT * FROM mcps WHERE account_id = ? AND slug = ?",
+            (self.account_id, slug),
+        )
         row = cur.fetchone()
         return row_to_mcp(row) if row else None
 
@@ -232,8 +248,8 @@ class McpStore:
     ) -> list[dict[str, Any]]:
         limit = max(1, min(int(limit), 1000))
         cur = self.db.conn.execute(
-            "SELECT * FROM mcps ORDER BY status, slug LIMIT ?",
-            (limit,),
+            "SELECT * FROM mcps WHERE account_id = ? ORDER BY status, slug LIMIT ?",
+            (self.account_id, limit),
         )
         out: list[dict[str, Any]] = []
         for row in cur.fetchall():
@@ -254,7 +270,7 @@ class McpStore:
         slug = str(fields["slug"]).strip().lower()
         if not SLUG_RE.match(slug):
             raise ValueError("mcp slug is invalid")
-        mcp_id = fields.get("id") or stable_mcp_id(slug)
+        mcp_id = fields.get("id") or f"mcp_{slug}"
         kind = str(fields.get("kind") or "mcp")
         if kind not in MCP_KINDS:
             raise ValueError(f"unknown mcp kind {kind!r}")
@@ -268,12 +284,12 @@ class McpStore:
         self.db.conn.execute(
             """
             INSERT INTO mcps (
-                id, slug, name, kind, status, verdict, capability_json, roles_json,
+                id, account_id, slug, name, kind, status, verdict, capability_json, roles_json,
                 platforms_json, source, install, auth, notes, reason, next_action,
                 config_json, hosted, origin, origin_ref, version, content_hash,
                 created_at, updated_at
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?
@@ -281,6 +297,7 @@ class McpStore:
             """,
             (
                 mcp_id,
+                self.account_id,
                 slug,
                 fields["name"],
                 kind,
@@ -368,7 +385,7 @@ class McpStore:
         existing = self.get_by_slug(slug)
         payload = {
             **fields,
-            "id": fields.get("id") or stable_mcp_id(slug),
+            "id": fields.get("id") or f"mcp_{slug}",
             "slug": slug,
             "origin": "github",
         }

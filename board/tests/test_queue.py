@@ -69,6 +69,15 @@ def bootstrap_admin(client: TestClient) -> None:
     assert res.status_code == 200, res.text
 
 
+def relogin_admin(client: TestClient) -> None:
+    client.cookies.clear()
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "owner@example.test", "password": "correct-horse"},
+    )
+    assert login.status_code == 200, login.text
+
+
 def mint_track_agents(client: TestClient, track: str, names: list[str]) -> list[str]:
     bootstrap_admin(client)
     created = client.post(
@@ -92,7 +101,6 @@ def mint_track_agents(client: TestClient, track: str, names: list[str]) -> list[
         )
         assert joined.status_code == 200, joined.text
         keys.append(joined.json()["api_key"])
-    client.cookies.clear()
     return keys
 
 
@@ -193,7 +201,7 @@ def test_expired_lease_stolen_emits_claim_expired(hub: tuple[TestClient, Setting
     stolen = client.post("/api/queue/claim", headers=bearer(keys[1]), json={"kinds": ["discovery.search"]})
     assert stolen.json()["count"] == 1
     assert stolen.json()["items"][0]["id"] == first.json()["items"][0]["id"]
-    events = client.get("/api/events", headers=h("admin")).json()["events"]
+    events = client.get("/api/events").json()["events"]
     assert "claim_expired" in [e["action"] for e in events]
 
 
@@ -244,7 +252,7 @@ def test_discovery_cannot_claim_apply_kinds(hub: tuple[TestClient, Settings]) ->
     assert created.status_code == 201, created.text
     denied = client.post("/api/queue/claim", headers=bearer(keys[0]), json={"kinds": ["apply.ready"]})
     assert denied.status_code == 403
-    listed = client.get("/api/queue", headers=h("admin"))
+    listed = client.get("/api/queue")
     assert any(row["kind"] == "apply.ready" and row["status"] == "open" for row in listed.json()["items"])
 
 
@@ -291,7 +299,7 @@ def test_apply_ready_system_enqueue_dedupes(hub: tuple[TestClient, Settings]) ->
         },
     )
     assert created.status_code == 201
-    listed = client.get("/api/queue", headers=h("admin")).json()["items"]
+    listed = client.get("/api/queue").json()["items"]
     assert not any(i["kind"] == "apply.ready" for i in listed)
     patched = client.patch(
         "/api/jobs/lever__qready",
@@ -303,14 +311,14 @@ def test_apply_ready_system_enqueue_dedupes(hub: tuple[TestClient, Settings]) ->
     assert again.status_code == 200
     items = [
         i
-        for i in client.get("/api/queue", headers=h("admin")).json()["items"]
+        for i in client.get("/api/queue").json()["items"]
         if i["kind"] == "apply.ready" and i["job_id"] == "lever__qready"
     ]
     assert len(items) == 1
     apply_key = mint_track_agents(client, "application", ["applier"])[0]
     claimed = client.post("/api/queue/claim", headers=bearer(apply_key), json={"kinds": ["apply.ready"]})
     assert claimed.json()["count"] == 1
-    job = client.get("/api/jobs/lever__qready", headers=h("admin")).json()["job"]
+    job = client.get("/api/jobs/lever__qready").json()["job"]
     assert job["owners"]["apply"] == "applier"
     acked = client.post(f"/api/queue/ack/{claimed.json()['items'][0]['id']}", headers=bearer(apply_key))
     assert acked.status_code == 200
@@ -336,7 +344,7 @@ def test_outreach_ready_on_applied(hub: tuple[TestClient, Settings]) -> None:
     assert created.status_code == 201
     moved = client.patch("/api/jobs/ashby__out1", headers=bearer(apply_key), json={"status": "applied"})
     assert moved.status_code == 200, moved.text
-    items = [i for i in client.get("/api/queue", headers=h("admin")).json()["items"] if i["kind"] == "outreach.ready"]
+    items = [i for i in client.get("/api/queue").json()["items"] if i["kind"] == "outreach.ready"]
     assert len(items) == 1
     assert items[0]["job_id"] == "ashby__out1"
 

@@ -6,9 +6,9 @@ jobOS is the job harness. Agents curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.t
 
 ## 0. Preconditions
 
-- Hub: finish `/onboarding` so `GET /health` has `candidate_onboarded: true`. Airgap: `profiles/candidate.yaml` exists and is truthful (never the example file as live data).
-- At least one resume PDF exists locally or on the Hub (`PUT /api/candidate/resume`).
-- The operator has claimed a role in `ledger/INDEX.md`.
+- Hub: finish `/onboarding` so the tenant's `GET /api/candidate/status` has `onboarded: true`. Airgap export: `GET /api/export/ledger`. Never treat git `ledger/` as the live list when Hub is up.
+- At least one resume PDF exists in the tenant BlobStore (`PUT /api/candidate/resume`).
+- The operator has claimed a role (Hub directory / invites). Do not write claims into git `ledger/INDEX.md` as live state.
 - If Hub is up, the operator recalled `GET /api/memory/recall` (worker + track + common) before the cycle. Do not skip it. Do not write memory until there is a durable fact.
 - Discovery has a reasonably current `docs/catalogs/skills-and-mcps.md` (or will refresh it first).
 - Maintainer, when claimed, also keeps `skills/lists/` in sync with that catalog, and consumes Hub `skill.record`.
@@ -63,8 +63,8 @@ Work the platform catalog in [`docs/catalogs/platforms.md`](catalogs/platforms.m
 
 ### 3.2 For every raw hit
 
-1. Dedup against `ledger/jobs/` by apply URL, then by `(company, title, location)`.
-2. Create `ledger/jobs/<id>.yaml` if new.
+1. Dedup against Hub `GET /api/jobs` by apply URL, then by `(company, title, location)`.
+2. `POST /api/jobs` if new. Do not treat git `ledger/jobs/` as the live list.
 3. Enrich with [`deep-research`](../skills/deep-research/SKILL.md): posting still live, company real, team sketch, red flags.
 4. Score 1–5 against the profile. Veto on deal-breakers.
 5. If shortlisted, write a complete `apply_packet`. Status becomes `apply_ready` (or `shortlisted` if the human wants a manual gate).
@@ -172,16 +172,15 @@ The ask is always: **a short chat**. Not “please hire me.” Not a novel.
 
 ### 5.5 Log
 
-Every send is a touch on the job YAML and a people file under `ledger/people/`. Status `waiting` until a reply, then `chatting` / `interview` / `closed_rejected`.
+Every send is a touch on the Hub job (`PATCH /api/jobs/{id}`) and people row (`/api/people`). Status `waiting` until a reply, then `chatting` / `interview` / `closed_rejected`.
 
 ## 6. Shared list hygiene
 
-- One job file per posting in git (`ledger/jobs/`).
-- INDEX.md is the human git board. Rebuild it if it drifts.
-- Events are append-only (`ledger/events.jsonl`, and `board` events when the live board is up).
-- Discovery owner resolves **git** merge conflicts.
+- Canonical jobs live in Hub Postgres, namespaced by `account_id`.
+- Events append in Postgres (`GET /api/events`).
+- `GET /api/export/ledger` writes a snapshot tarball when you need git/airgap files.
 - Never delete another role’s packet to “clean up.”
-- If the live hunt board / Job Hub is running (`HUB_URL` / `BOARD_URL`): discovery creates rows only; apply/outreach only advance their fields; admin stops/edits. **Maintainer** owns tokens, schema, and hygiene — see [`board/README.md`](../board/README.md). Operator/agent Hub docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). Git ledger remains the airgap protocol.
+- Discovery creates rows only; apply/outreach only advance their fields; admin stops/edits. **Maintainer** owns schema and hygiene — see [`board/README.md`](../board/README.md). Operator/agent Hub docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). Git `ledger/` is **export-only**, not the live list.
 
 ## 7. Quality gates
 

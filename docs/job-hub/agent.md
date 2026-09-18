@@ -9,7 +9,7 @@ curl -sS "$HUB_URL/llms.txt"
 curl -sS "$HUB_URL/agents.txt"
 ```
 
-If `HUB_URL` (or `BOARD_URL`) is set, Hub is the live list **and** the live skill registry. Git `ledger/` is the airgap/export protocol, not a second source of truth for this run. After the pack, `GET /api/registry/skills` — do not treat git `skills/` as live. **Always use registry skills/MCPs.** If you use something outside, `POST /api/registry/recordings` (or a local skill) and `POST /api/memory/items`. Only maintainer consumes `skill.record`.
+If `HUB_URL` (or `BOARD_URL`) is set, Hub is the live list **and** the live skill registry. Git `ledger/` is export-only (`GET /api/export/ledger`), not a second source of truth. After the pack, `GET /api/registry/skills` — do not treat git `skills/` as live. **Always use registry skills/MCPs.** If you use something outside, `POST /api/registry/recordings` (or a local skill) and `POST /api/memory/items`. Only maintainer consumes `skill.record`.
 
 **Maintainer ≠ discovery.** Track `maintenance` does not search portals, Easy Apply, or send employer mail. Discovery never Easy Applies (that is the **application** track). Only maintenance / admin **claim** `skill.record` and promote after proctor. Every track may **push** recordings. Local skills are per-bot.
 

@@ -21,7 +21,7 @@ Docker Desktop, Engine 24+, or Compose v2 is enough. Traefik is **optional**. Th
 ## First-run sequence (every install)
 
 1. Start the Hub (one of the commands above).
-2. Open the printed **Admin signup** URL (`/admin/signup#bootstrap=jh_boot_…`). Create the only human admin. The bootstrap token is wiped.
+2. Open `/` (landing) then `/login`. Create a username + password. **No dashboard token.** First-boot still has `/admin/signup#bootstrap=jh_boot_…` for the very first operator on a fresh database; after that, anyone may sign up.
 3. You are sent to **`/onboarding`**. Fill identity, titles, locations, and (recommended) a resume PDF. The example “Ada Example” profile is rejected.
 4. Health `next_step` becomes `ready` (or `resume` if you skipped the PDF).
 5. Mint track invites at `/admin`. Share join URLs out of band. Agents fetch `/.well-known/agent-card.json` for A2A.
@@ -39,7 +39,7 @@ curl -sS -X POST "$HUB_URL/api/jobs" -H "X-Role: discovery" ...
 
 ## Docker Compose (plain)
 
-Hub only. Binds **8787**. Persistence is PostgreSQL in the Compose file (no Hub volume). Postgres has **no published ports**. Data files live on the host at `~/.jobos/pgdata` (override with `JOBOS_PGDATA`). Packs rebuild into `/tmp`. There is no separate vector database.
+Hub only. Binds **8787**. Persistence is PostgreSQL. Files are volumized at `~/.jobos/blobs` (`JOBOS_BLOBS`). Queue is RabbitMQ. Postgres/RabbitMQ have **no published ports**. Postgres files live on the host at `~/.jobos/pgdata` (`JOBOS_PGDATA`). Packs rebuild into `/tmp`. There is no separate vector database.
 
 ```bash
 cd /path/to/jobos
@@ -52,7 +52,7 @@ docker compose -f docker-compose.plain.yml logs -f hub
 
 Equivalent wrapper: `bash scripts/hub_docker_plain.sh`.
 
-Open `http://127.0.0.1:8787/admin/signup`. After signup, `/onboarding`.
+Open `http://127.0.0.1:8787/` then `/login`. After signup, `/onboarding`. Board UI is `/board`.
 
 Override the published port with `HUB_PORT=343` if 8787 is taken (`http://127.0.0.1:343` — also set `HUB_PUBLIC_HOST` / `HUB_PUBLIC_URL` to match).
 
@@ -60,7 +60,7 @@ Stop: `docker compose -f docker-compose.plain.yml down` (keeps `~/.jobos/pgdata`
 
 ## Docker Compose + Traefik (public host)
 
-Ports **80** and **443** plus **8787**. The board is at `/`. File-based Traefik config (no Docker socket): `traefik/traefik.yml`, `traefik/dynamic.yml`.
+Ports **80** and **443** plus **8787**. Landing is `/`. Board is `/board`. File-based Traefik config (no Docker socket): `traefik/traefik.yml`, `traefik/dynamic.yml`.
 
 ```bash
 # hostname, IPv4, or IP:port. :443 → https:// on invite URLs.
@@ -80,7 +80,7 @@ Coolify has no universal one-click URL. Create a **Docker Compose** resource poi
 2. Compose file: `docker-compose.yml` (Hub on 8787 plus internal Postgres). Do not invent a second stack.
 3. Set `HUB_PUBLIC_URL` (and usually `HUB_PUBLIC_HOST`) to the Coolify FQDN, e.g. `https://hub.example.com`.
 4. Persist host bind `JOBOS_PGDATA` (default `~/.jobos/pgdata`). The Hub container has no volume.
-5. After first boot, open `/admin/signup` then `/onboarding`. Healthcheck is `GET /health` on 8787 inside the container.
+5. After first boot, open `/login` (or `/admin/signup` if the database is empty) then `/onboarding`. Healthcheck is `GET /health` on 8787 inside the container.
 6. OpenTelemetry logs go to container stdout (`OTEL_LOGS_EXPORTER=console`). No collector or OTLP endpoint. `OTEL_SDK_DISABLED=true` or `OTEL_LOGS_EXPORTER=none` turns them off.
 
 Same image as Railway and local Compose (`Dockerfile` at repo root).
