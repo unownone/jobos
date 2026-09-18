@@ -133,7 +133,13 @@ Do not create a fourth “research bot.” Research stays a tool the owners call
 
 ## Coming soon (stubs)
 
-These are **not** owners. Hub `/api/meta` lists them as `coming_soon`. INDEX may show a placeholder. There is no skill, no invite track, no queue kind.
+These are **not** owners. Hub `/api/meta` lists role stubs as `coming_soon`. INDEX may show a placeholder. There is no skill, no invite track, no queue kind.
+
+### Deployed agents
+
+**Status:** Coming soon.
+
+Use advanced jobOS agents who have a better handling of the browser and are cheaper. This is a future hosted capability, not a role you can claim today, and not an invite track.
 
 ### Review
 
