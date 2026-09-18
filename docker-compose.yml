@@ -25,7 +25,7 @@ services:
       POSTGRES_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       POSTGRES_DB: jobos
     volumes:
-      - ${JOBOS_PGDATA:-${HOME}/.jobos/pgdata}:/var/lib/postgresql/data
+      - ~/.jobos/pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
       interval: 5s
