@@ -456,7 +456,7 @@ main {
   color: var(--amber);
   line-height: 1;
 }
-.steps strong {
+.steps li > div > strong:first-of-type {
   display: block;
   margin-bottom: 0.2rem;
 }
