@@ -104,15 +104,20 @@ path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 PY
 fi
 
+# Production must not install the dev group (pgserver has no linux aarch64 wheel).
+uv_run() {
+  uv run --frozen --no-dev "$@"
+}
+
 if [[ ! -f "$ROOT/.env" && ! -f "$ROOT/tokens.local.json" ]]; then
   echo "No role tokens yet. Generating gitignored board/.env ..."
-  uv run "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT" --print
+  uv_run "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT" --print
 else
-  uv run "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT"
+  uv_run "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT"
 fi
 
-uv run "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$ROOT"
-uv run "$REPO/scripts/hub_build_pack.py" --dir "$ROOT" --repo "$REPO"
+uv_run "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$ROOT"
+uv_run "$REPO/scripts/hub_build_pack.py" --dir "$ROOT" --repo "$REPO"
 
 if [[ -f "$ROOT/.env" ]]; then
   set -a
@@ -141,4 +146,4 @@ fi
 echo "Sibling agents: ${PUBLIC}/api/jobs with Bearer keys (or X-Role + X-Token compat)"
 echo "Maintainer owns this process. Do not commit .env. Durable state is PostgreSQL."
 
-exec uv run uvicorn app.main:create_app --factory --host "$HOST" --port "$PORT"
+exec uv_run gunicorn --config gunicorn.conf.py

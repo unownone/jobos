@@ -86,7 +86,7 @@ Same image as Railway and local Compose (`Dockerfile` at repo root).
 
 ## Railway
 
-Use the README **Deploy on Railway** button (`railway.json` + `Dockerfile`). Railway injects `PORT`; the entrypoint copies it to `BOARD_PORT` so uvicorn binds the port the platform probes.
+Use the README **Deploy on Railway** button (`railway.json` + `Dockerfile`). Railway injects `PORT`; Gunicorn binds that port (see `board/gunicorn.conf.py`). Override worker count with `WEB_CONCURRENCY`.
 
 Set after the first domain exists:
 

@@ -43,11 +43,11 @@ What the script does:
 2. Mints compat role tokens (`scripts/board_gen_tokens.py`) if empty.
 3. Mints a one-time `jh_boot_*` bootstrap token if there is no admin user (`scripts/hub_ensure_bootstrap.py`).
 4. Builds the onboarding pack (`scripts/hub_build_pack.py`).
-5. Starts `board/start.sh` (uvicorn on `BOARD_HOST`/`BOARD_PORT`, default `0.0.0.0:8787`).
+5. Starts `board/start.sh` (Gunicorn + Uvicorn workers on `BOARD_HOST`/`BOARD_PORT`, default `0.0.0.0:8787`).
 
 Stdout prints `Admin signup: $public_origin/admin/signup#bootstrap=…` once. After that admin exists, **nobody else can sign up** — `/admin/signup` redirects to `/login` and `POST /api/auth/bootstrap` returns 403.
 
-Dry run (no uvicorn): `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
+Dry run (no gunicorn): `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
 
 `GET /health` is public and includes `admin_bootstrapped` (boolean). It does not leak tokens.
 

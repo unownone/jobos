@@ -54,7 +54,7 @@ flowchart TB
 
 | Component | v1 choice |
 | --- | --- |
-| HTTP | Existing uvicorn FastAPI `board/app/main.py` |
+| HTTP | Gunicorn + Uvicorn workers, FastAPI `board/app/main.py` |
 | DB | SQLite WAL (`board/data/board.db` extended) |
 | Queue | Table `queue_items` + row locks; not Redis |
 | Pack | Files under `board/data/packs/<sha>/` |

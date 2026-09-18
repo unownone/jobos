@@ -5,6 +5,8 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.13 /uv /usr/local/bin/uv
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
+    UV_NO_DEV=1 \
+    UV_FROZEN=1 \
     PATH="/app/board/.venv/bin:/usr/local/bin:${PATH}" \
     JOBOS_NONINTERACTIVE=1 \
     HUB_REPO_ROOT=/app \
