@@ -1,9 +1,9 @@
 # jobOS Hub behind Traefik. From repo root:
 #   HUB_PUBLIC_HOST=hunt.example.com bash scripts/hub_docker.sh
-# Traefik listens on 80 and 443. The board is served at /.
+# Traefik listens on 80 and 443. Landing is served at /. Board is /board.
 # Default Hub-only compose (no Traefik): docker compose up -d --build  (port 8787)
 #
-# Durable state is PostgreSQL (not a Hub volume). Postgres is not published.
+# Durable state is PostgreSQL + volumized blobs + RabbitMQ.
 # Postgres files live on ${JOBOS_PGDATA:-$HOME/.jobos/pgdata}.
 #
 # First operator step after signup is always /onboarding.
@@ -26,6 +26,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
+      RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
+    volumes:
+      - ${JOBOS_AMQPDATA:-${HOME}/.jobos/rabbitmq}:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
 
   traefik:
@@ -53,14 +67,22 @@ services:
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
       DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
+      AMQP_URL: "amqp://${JOBOS_AMQP_USER:-jobos}:${JOBOS_AMQP_PASSWORD:-jobos}@rabbitmq:5672/%2F"
+      QUEUE_ADAPTER: "rabbitmq"
+      BLOB_ROOT: "/var/lib/jobos/blobs"
+      BLOB_ADAPTER: "filesystem"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
+    volumes:
+      - ${JOBOS_BLOBS:-${HOME}/.jobos/blobs}:/var/lib/jobos/blobs
     expose:
       - "8787"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

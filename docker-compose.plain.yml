@@ -2,10 +2,10 @@
 #   docker compose -f docker-compose.plain.yml up -d --build
 # Hub listens on http://127.0.0.1:8787
 #
-# Durable state is PostgreSQL. Postgres has no published ports.
-# Data directory: ${JOBOS_PGDATA:-$HOME/.jobos/pgdata} (host bind, not a named volume).
+# Durable state is PostgreSQL. Files are volumized under ${JOBOS_BLOBS}.
+# Queue is RabbitMQ. Postgres/RabbitMQ have no published ports.
 #
-# First visit: /admin/signup → /onboarding (required) → then invites/agents.
+# First visit: /login (username + password) → /onboarding → invites/agents.
 
 name: jobos-plain
 
@@ -25,6 +25,20 @@ services:
       retries: 20
     restart: unless-stopped
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
+      RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
+    volumes:
+      - ${JOBOS_AMQPDATA:-${HOME}/.jobos/rabbitmq}:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   hub:
     build:
       context: .
@@ -38,12 +52,20 @@ services:
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
       DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
+      AMQP_URL: "amqp://${JOBOS_AMQP_USER:-jobos}:${JOBOS_AMQP_PASSWORD:-jobos}@rabbitmq:5672/%2F"
+      QUEUE_ADAPTER: "rabbitmq"
+      BLOB_ROOT: "/var/lib/jobos/blobs"
+      BLOB_ADAPTER: "filesystem"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-127.0.0.1:8787}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8787}"
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
+    volumes:
+      - ${JOBOS_BLOBS:-${HOME}/.jobos/blobs}:/var/lib/jobos/blobs
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
