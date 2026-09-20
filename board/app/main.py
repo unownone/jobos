@@ -25,7 +25,7 @@ from app.bootstrap import (
     tokens_json_path_for,
 )
 from app.candidate import create_candidate_router
-from app.gates import CandidateGateMiddleware
+from app.gates import CandidateGateMiddleware, candidate_required_payload
 from app.briefing import create_briefing_router
 from app.constants import COMING_SOON_ROLES, METADATA_KNOWN_KEYS, ROLES, STATUSES, TRACKS
 from app.db import BoardDB, public_user
@@ -67,7 +67,7 @@ from app.permissions import (
     ensure_can_stop,
     validate_status,
 )
-from app.profile import candidate_onboarded, candidate_status, hydrate_tenant_candidate
+from app.profile import candidate_onboarded, hydrate_tenant_candidate, hub_public_candidate_status
 from app.presence import mount_presence
 from app.queue import QUEUE_KINDS, QueueService, register_queue_routes
 from app.registry import create_registry_router
@@ -274,11 +274,7 @@ def _extract_bootstrap_token(request: Request, body: BootstrapIn) -> str:
 def _health_payload(db: BoardDB, settings: Settings) -> dict[str, Any]:
     configured = sorted(role for role, token in settings.tokens.items() if token)
     bootstrapped = db.admin_bootstrapped()
-    cand = candidate_status(settings, db)
-    if not cand["onboarded"]:
-        operator = db.operator_tenant()
-        if operator is not None:
-            cand = candidate_status(settings, db, tenant=operator)
+    cand = hub_public_candidate_status(settings, db)
     if not bootstrapped:
         next_step = "signup"
     elif not cand["onboarded"]:
@@ -673,7 +669,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not s:
             raise HTTPException(status_code=401, detail="missing invite secret")
         row = _load_invite_for_join(invite_id, s)
-        return join_payload(settings, row, db)
+        return join_payload(settings, row, db=db)
 
     @app.post("/api/auth/join")
     def auth_join(request: Request, body: JoinIn) -> dict[str, Any]:
@@ -689,6 +685,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             secret = secret or (parsed_secret or "")
         if not invite_id or not secret:
             raise HTTPException(status_code=401, detail="missing invite_id or secret")
+        row = _load_invite_for_join(invite_id, secret)
+        tenant = TenantContext(str(row["account_id"]))
+        if not candidate_onboarded(settings, db, tenant=tenant):
+            raise HTTPException(status_code=409, detail=candidate_required_payload())
         return join_with_invite(
             db,
             invite_id=invite_id,

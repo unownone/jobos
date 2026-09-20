@@ -7,8 +7,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
 from app.auth import authenticate, has_request_credentials
-from app.profile import candidate_onboarded
-from app.tenant import COMPAT_ACCOUNT_ID
+from app.profile import hub_public_candidate_status
 
 CANDIDATE_REQUIRED_CODE = "candidate_required"
 
@@ -27,6 +26,8 @@ _ALLOW_EXACT = frozenset(
         "/api/auth/bootstrap",
         "/api/auth/login",
         "/api/auth/signup",
+        # Redeem is public; handler still 409s unless the invite tenant is onboarded.
+        "/api/auth/join",
         "/api/auth/logout",
         "/api/auth/me",
         "/api/whoami",
@@ -99,9 +100,9 @@ class CandidateGateMiddleware(BaseHTTPMiddleware):
                 tenant = None
         onboarded = False
         if settings is not None:
-            onboarded = candidate_onboarded(settings, db, tenant=tenant)
-            if not onboarded and (tenant is None or tenant.account_id == COMPAT_ACCOUNT_ID):
-                onboarded = candidate_onboarded(settings)
+            # Unauthenticated / compat must match GET /health: operator tenant,
+            # not only acc_compat blobs or leftover disk files.
+            onboarded = hub_public_candidate_status(settings, db, tenant=tenant)["onboarded"]
         if settings is None or onboarded:
             return await call_next(request)
         if request.method == "GET" and wants_html(request):
