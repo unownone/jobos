@@ -35,6 +35,7 @@ def test_path_is_public_allowlist() -> None:
 def test_path_is_public_rejects_sensitive_surfaces() -> None:
     for path in (
         "/board",
+        "/home",
         "/onboarding",
         "/admin",
         "/admin/invites",
@@ -46,6 +47,7 @@ def test_path_is_public_rejects_sensitive_surfaces() -> None:
         "/static/admin.html",
         "/api/jobs",
         "/api/jobs/remoteok__1",
+        "/api/dashboard",
         "/api/candidate",
         "/api/candidate/public",
         "/api/candidate/status",

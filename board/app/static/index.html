@@ -12,7 +12,8 @@
 <body class="hub-app">
   <a class="skip" href="#main">Skip to content</a>
   <nav class="hub-rail" aria-label="Hub">
-    <a class="hub-brand" href="/board"><img src="/brand/mascot.png" width="36" height="36" alt="jobOS" /></a>
+    <a class="hub-brand" href="/home"><img src="/brand/mascot.png" width="36" height="36" alt="jobOS" /></a>
+    <a class="hub-nav-item" data-icon="home" data-nav="/home" href="/home">Home</a>
     <a class="hub-nav-item" data-icon="board" data-nav="/board" href="/board">Board</a>
     <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
     <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
@@ -55,6 +56,35 @@
     <button class="secondary" id="refresh" type="button">Refresh</button>
     <span class="stats" id="stats">0 shown · 0 total · not connected</span>
   </div>
+  <div class="hub-filters-more" id="moreFilters">
+    <select id="laneFilter" aria-label="Lane">
+      <option value="">Lane: any</option>
+      <option value="discovery">Lane: discovery</option>
+      <option value="apply">Lane: apply</option>
+      <option value="outreach">Lane: outreach</option>
+    </select>
+    <select id="kindFilter" aria-label="Apply kind">
+      <option value="">Kind: any</option>
+    </select>
+    <select id="scoreMin" aria-label="Minimum score">
+      <option value="">Score: any</option>
+      <option value="3">Score ≥ 3</option>
+      <option value="4">Score ≥ 4</option>
+      <option value="5">Score 5</option>
+    </select>
+    <select id="remoteFilter" aria-label="Remote">
+      <option value="">Remote: any</option>
+      <option value="remote">Remote</option>
+      <option value="onsite">On-site</option>
+    </select>
+    <select id="payFilter" aria-label="Pay stated">
+      <option value="">Pay: any</option>
+      <option value="true">Pay stated</option>
+      <option value="false">Pay missing</option>
+    </select>
+    <input id="locationFilter" placeholder="Location" />
+    <input id="sourceFilter" placeholder="Source" />
+  </div>
   <div id="compatBanner" class="warnbox" hidden style="margin:0 18px">Compat X-Role tokens are deprecated. Paste a Hub Bearer key (<code>jh_own_</code> / <code>jh_agt_</code>) or log in.</div>
   <div id="queueRail" class="filters" hidden>
     <span class="sub" id="queueLabel">Queue</span>
@@ -71,16 +101,29 @@
       <div id="memoryList"></div>
     </aside>
     <section id="list"><div class="empty">Loading jobs…</div></section>
-    <aside class="side" id="side"></aside>
+    <aside class="side" id="side" hidden></aside>
   </main>
+  <div class="hub-pager" id="pager">
+    <span class="sub" id="pageLabel">Page 1</span>
+    <div class="pages">
+      <button class="secondary" id="prevPage" type="button">Prev</button>
+      <select id="pageSize" aria-label="Page size">
+        <option value="25" selected>25 / page</option>
+        <option value="50">50 / page</option>
+        <option value="100">100 / page</option>
+      </select>
+      <button class="secondary" id="nextPage" type="button">Next</button>
+    </div>
+  </div>
   </div>
   <nav class="hub-dock" aria-label="Primary">
+    <a class="hub-nav-item" data-icon="home" data-nav="/home" href="/home">Home</a>
     <a class="hub-nav-item" data-icon="board" data-nav="/board" href="/board">Board</a>
     <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
-    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
     <button class="hub-nav-item" type="button" data-icon="more" data-hub-more>More</button>
   </nav>
   <div class="hub-more" id="hubMore">
+    <a href="/admin">Invites</a>
     <a href="/admin/data">Data</a>
     <a href="/admin/skills">Skills</a>
     <a href="/admin/memory">Memory</a>
@@ -94,12 +137,14 @@
   <script>
     let caps = null;
     let jobs = [];
-    let listMeta = { count: 0, total: 0, role: "" };
+    let listMeta = { count: 0, total: 0, matched: 0, limit: 25, offset: 0, role: "" };
     let selectedId = null;
     let selectedPresenceId = null;
     let statuses = [];
+    let applyKinds = [];
     let statusFilter = "";
     let connected = false;
+    let pageOffset = 0;
 
     let heartbeatTimer = null;
     let presenceTimer = null;
@@ -161,30 +206,25 @@
           statusFilter = btn.dataset.value;
           document.getElementById("statusBtn").textContent = statusFilter || "All statuses";
           closeMenus();
-          loadJobs();
+          resetPageAndLoad();
         });
       });
     }
 
-    function emptySide() {
-      document.getElementById("side").innerHTML = `
-        <div class="side-head">
-          <h2>Select a job</h2>
-          <button class="iconx" id="closeSide" type="button" aria-label="Close">X</button>
-        </div>
-        <label>Company</label><input disabled placeholder="" />
-        <label>Title</label><input disabled placeholder="" />
-        <label>Source</label><input disabled placeholder="" />
-        <label>Status</label>
-        <select disabled><option>discovered</option></select>
-        <div class="grid2">
-          <div><label>Score</label><input disabled /></div>
-          <div><label>Location</label><input disabled /></div>
-        </div>
-        <label>Apply URL</label><input disabled />
-      `;
-      document.getElementById("closeSide").onclick = () => { selectedId = null; emptySide(); renderTable(); };
+    function hideSide() {
+      selectedId = null;
+      selectedPresenceId = null;
+      const side = document.getElementById("side");
+      side.innerHTML = "";
+      side.hidden = true;
       if (window.Hub) Hub.setTicketOpen(false);
+      if (connected) renderTable();
+    }
+
+    function openSide() {
+      const side = document.getElementById("side");
+      side.hidden = false;
+      if (window.Hub) Hub.setTicketOpen(true);
     }
 
     function stopPresenceLoop() {
@@ -280,11 +320,10 @@
         ${events.length ? events.map((e) => `<div class="event">${escapeHtml(e.ts)} · ${escapeHtml(e.action)}${e.job_id ? " · " + escapeHtml(e.job_id) : ""}<br>${escapeHtml(e.note || "")}</div>`).join("") : "<div class='muted'>No events yet.</div>"}
       `;
       document.getElementById("closeSide").onclick = () => {
-        selectedPresenceId = null;
-        emptySide();
+        hideSide();
         loadPresence();
       };
-      if (window.Hub) Hub.setTicketOpen(true);
+      openSide();
     }
 
     async function loadPresence() {
@@ -335,6 +374,13 @@
         caps = me;
         const meta = await api("/api/meta");
         statuses = meta.statuses;
+        applyKinds = meta.apply_kinds || [];
+        const kindSel = document.getElementById("kindFilter");
+        const kept = kindSel.value;
+        kindSel.innerHTML = `<option value="">Kind: any</option>` + applyKinds.map((k) =>
+          `<option value="${escapeAttr(k)}">${escapeHtml(k)}</option>`
+        ).join("");
+        kindSel.value = kept;
         const who = document.getElementById("whoLabel");
         const label = ((me.user && me.user.display_name) || me.actor || me.user_id || "admin") +
           " · " + (me.kind || me.role || "admin");
@@ -345,7 +391,7 @@
         startPresenceLoop();
         startQueueLoop(me);
         await loadJobs();
-        if (!selectedId) emptySide();
+        if (!selectedId) hideSide();
       } catch (err) {
         stopPresenceLoop();
         setConnected(false, "sign in required");
@@ -355,7 +401,7 @@
           return;
         }
         document.getElementById("stats").textContent = err.message;
-        emptySide();
+        hideSide();
       }
     }
 
@@ -364,16 +410,57 @@
       const params = new URLSearchParams();
       const q = document.getElementById("q").value.trim();
       const stopped = document.getElementById("stopped").value;
+      const lane = document.getElementById("laneFilter").value;
+      const kind = document.getElementById("kindFilter").value;
+      const scoreMin = document.getElementById("scoreMin").value;
+      const remote = document.getElementById("remoteFilter").value;
+      const pay = document.getElementById("payFilter").value;
+      const location = document.getElementById("locationFilter").value.trim();
+      const source = document.getElementById("sourceFilter").value.trim();
+      const limit = Number(document.getElementById("pageSize").value) || 25;
       if (q) params.set("q", q);
       if (statusFilter) params.set("status", statusFilter);
       if (stopped) params.set("stopped", stopped);
+      if (lane) params.set("lane", lane);
+      if (kind) params.set("apply_kind", kind);
+      if (scoreMin) params.set("score_min", scoreMin);
+      if (remote) params.set("remote", remote);
+      if (pay) params.set("has_pay", pay);
+      if (location) params.set("location", location);
+      if (source) params.set("source", source);
+      params.set("limit", String(limit));
+      params.set("offset", String(pageOffset));
       const data = await api("/api/jobs?" + params.toString());
       jobs = data.jobs;
-      listMeta = { count: data.count, total: data.total ?? data.count, role: data.role };
+      listMeta = {
+        count: data.count,
+        total: data.total ?? data.count,
+        matched: data.matched ?? data.count,
+        limit: data.limit || limit,
+        offset: data.offset || pageOffset,
+        role: data.role,
+      };
+      const page = Math.floor(listMeta.offset / listMeta.limit) + 1;
+      const pages = Math.max(1, Math.ceil(listMeta.matched / listMeta.limit));
       document.getElementById("stats").textContent =
-        `${listMeta.count} shown · ${listMeta.total} total · ${listMeta.role}`;
+        `${listMeta.count} shown · ${listMeta.matched} match · ${listMeta.total} total · ${listMeta.role}`;
+      document.getElementById("pageLabel").textContent = `Page ${page} of ${pages}`;
+      document.getElementById("prevPage").disabled = listMeta.offset <= 0;
+      document.getElementById("nextPage").disabled = listMeta.offset + listMeta.count >= listMeta.matched;
       renderTable();
       if (selectedId) await selectJob(selectedId, false);
+    }
+
+    function resetPageAndLoad() {
+      pageOffset = 0;
+      loadJobs();
+    }
+
+    function dayLabel(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+      return d.toISOString().slice(0, 10);
     }
 
     function renderTable() {
@@ -383,15 +470,17 @@
       }
       const rows = jobs.map(j => `
         <tr data-id="${escapeAttr(j.id)}" class="${j.id === selectedId ? "active" : ""}">
-          <td><code>${escapeHtml(j.id)}</code></td>
           <td>${escapeHtml(j.company)}</td>
           <td>${escapeHtml(j.title)}</td>
           <td>${pill(j.status, j.stopped)}</td>
+          <td class="muted">${j.score == null ? "" : escapeHtml(String(j.score))}</td>
+          <td>${escapeHtml(j.pay || "—")}</td>
+          <td class="muted">${escapeHtml(dayLabel(j.posted_at) || dayLabel(j.created_at) || "")}</td>
           <td class="muted">${escapeHtml((j.claim && (j.claim.claimed_by || j.claim.kind)) || "")}</td>
         </tr>`).join("");
       document.getElementById("list").innerHTML = `
         <table class="hub-board-table">
-          <thead><tr><th>ID</th><th>Company</th><th>Title</th><th>Status</th><th>Claim</th></tr></thead>
+          <thead><tr><th>Company</th><th>Title</th><th>Status</th><th>Score</th><th>Pay</th><th>Posted</th><th>Claim</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       document.querySelectorAll("#list tbody tr").forEach(tr => {
@@ -430,6 +519,14 @@
         </div>
         <label>Apply URL</label>
         <input id="f_apply_url" value="${escapeAttr(job.apply_url || "")}" />
+        <div class="grid2">
+          <div><label>Posted</label><input id="f_posted_at" value="${escapeAttr(job.posted_at || "")}" placeholder="2026-09-01T00:00:00Z" /></div>
+          <div><label>Pay</label><input id="f_pay" value="${escapeAttr(job.pay || "")}" placeholder="as the posting states it" /></div>
+        </div>
+        <label>Job description</label>
+        <textarea id="f_description">${escapeHtml(job.description || "")}</textarea>
+        <label>Expectations</label>
+        <textarea id="f_expectations">${escapeHtml(job.expectations || "")}</textarea>
         <label>Notes</label>
         <textarea id="f_notes">${escapeHtml(job.notes || "")}</textarea>
         <label>Owners JSON</label>
@@ -454,13 +551,13 @@
           ${events.map(e => `<div class="event">${escapeHtml(e.ts)} · ${escapeHtml(e.actor_role)} · ${escapeHtml(e.action)}${e.from_status ? " · " + e.from_status + " → " + (e.to_status || "") : ""}<br>${escapeHtml(e.note || "")}</div>`).join("") || "<div class='sub'>No events</div>"}
         </div>
       `;
-      document.getElementById("closeSide").onclick = () => { selectedId = null; emptySide(); renderTable(); };
+      document.getElementById("closeSide").onclick = () => hideSide();
       document.getElementById("saveBtn").onclick = () => saveJob(job.id);
       document.getElementById("pauseBtn").onclick = () => pauseJob(job.id);
       document.getElementById("stopBtn").onclick = () => stopJob(job.id);
       document.getElementById("resumeBtn").onclick = () => resumeJob(job.id);
       document.getElementById("delBtn").onclick = () => deleteJob(job.id);
-      if (window.Hub) Hub.setTicketOpen(true);
+      openSide();
     }
 
     function parseJSONField(id, fallback) {
@@ -480,6 +577,10 @@
           apply_url: document.getElementById("f_apply_url").value,
           location: document.getElementById("f_location").value,
           notes: document.getElementById("f_notes").value,
+          description: document.getElementById("f_description").value,
+          expectations: document.getElementById("f_expectations").value,
+          pay: document.getElementById("f_pay").value,
+          posted_at: document.getElementById("f_posted_at").value,
           sources: source,
           owners: parseJSONField("f_owners", {}),
           apply_packet: parseJSONField("f_apply_packet", {}),
@@ -533,8 +634,7 @@
       if (!confirm("Delete " + id + "? This cannot be undone.")) return;
       try {
         await api("/api/jobs/" + encodeURIComponent(id), { method: "DELETE" });
-        selectedId = null;
-        emptySide();
+        hideSide();
         await loadJobs();
       } catch (e) {
         document.getElementById("sideErr").textContent = e.message;
@@ -553,11 +653,22 @@
       location.href = "/login";
     });
     document.getElementById("refresh").onclick = loadJobs;
-    document.getElementById("q").addEventListener("change", loadJobs);
+    document.getElementById("q").addEventListener("change", resetPageAndLoad);
     document.getElementById("q").addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") { ev.preventDefault(); loadJobs(); }
+      if (ev.key === "Enter") { ev.preventDefault(); resetPageAndLoad(); }
     });
-    document.getElementById("stopped").addEventListener("change", loadJobs);
+    ["stopped", "laneFilter", "kindFilter", "scoreMin", "remoteFilter", "payFilter", "locationFilter", "sourceFilter"].forEach((id) => {
+      document.getElementById(id).addEventListener("change", resetPageAndLoad);
+    });
+    document.getElementById("pageSize").addEventListener("change", resetPageAndLoad);
+    document.getElementById("prevPage").addEventListener("click", () => {
+      pageOffset = Math.max(0, pageOffset - (listMeta.limit || 25));
+      loadJobs();
+    });
+    document.getElementById("nextPage").addEventListener("click", () => {
+      pageOffset = pageOffset + (listMeta.limit || 25);
+      loadJobs();
+    });
     document.getElementById("statusBtn").addEventListener("click", (ev) => {
       ev.stopPropagation();
       const menu = document.getElementById("statusMenu");
@@ -580,14 +691,9 @@
     });
     const backdrop = document.getElementById("ticketBackdrop");
     if (backdrop) {
-      backdrop.addEventListener("click", () => {
-        selectedId = null;
-        selectedPresenceId = null;
-        emptySide();
-        renderTable();
-      });
+      backdrop.addEventListener("click", () => hideSide());
     }
-    emptySide();
+    hideSide();
     boot();
   </script>
 </body>

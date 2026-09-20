@@ -29,7 +29,7 @@ Source: `:root` in `/static/theme.css`.
 ## Layout
 
 - Public: sticky mast, two-column hero until 880px, datasheet capabilities, 5-stage loop rail.
-- Hub Operate: 76px left rail + stage. Board is presence | list | ticket. Phone ≤959px: rail hidden, 4-item dock, Jobs/Live switch, ticket as a bottom sheet. Tables become labeled cards at ≤720px.
+- Hub Operate: 76px left rail + stage. Home is the funnel dashboard. Board is presence | list | ticket. Ticket stays closed until a row is opened. Phone ≤959px: rail hidden, 4-item dock, Jobs/Live switch, ticket as a bottom sheet. Tables become labeled cards at ≤720px.
 - Shared: `--radius` 2px, `--touch` 44px, safe-area padding, dashed amber rules instead of punch-holes.
 
 ## Elevation & Depth

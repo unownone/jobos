@@ -138,6 +138,51 @@ OUTREACH_LANE = frozenset(
     }
 )
 
+APPLY_KINDS = (
+    "ats",
+    "linkedin_easy_apply",
+    "indeed",
+    "network",
+    "outreach_only",
+    "unknown",
+)
+
+LANE_FILTERS = {
+    "discovery": DISCOVERY_LANE,
+    "apply": APPLY_LANE,
+    "outreach": OUTREACH_LANE,
+}
+
+# Cumulative funnel: found ⊇ applied ⊇ outreached (current status).
+FUNNEL_APPLIED_STATUSES = frozenset(
+    {
+        "applied",
+        "outreach_ready",
+        "outreaching",
+        "waiting",
+        "chatting",
+        "interview",
+        "offer",
+        "closed_rejected",
+    }
+)
+FUNNEL_OUTREACHED_STATUSES = frozenset(
+    {
+        "outreaching",
+        "waiting",
+        "chatting",
+        "interview",
+        "offer",
+        "closed_rejected",
+    }
+)
+PIPELINE_OPEN_STATUSES = frozenset(STATUSES) - {
+    "skipped",
+    "closed_rejected",
+    "closed_withdrawn",
+    "closed_expired",
+}
+
 # Identity / discovery-owned. Apply and outreach must not rewrite these.
 IDENTITY_FIELDS = frozenset(
     {
@@ -151,6 +196,10 @@ IDENTITY_FIELDS = frozenset(
         "ats",
         "req_id",
         "sources",
+        "description",
+        "expectations",
+        "pay",
+        "posted_at",
     }
 )
 

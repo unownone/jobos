@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>jobOS Harness — Home</title>
+  <link rel="icon" href="/brand/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="/static/theme.css" />
+  <link rel="stylesheet" href="/static/hub.css" />
+</head>
+<body class="hub-app">
+  <a class="skip" href="#main">Skip to content</a>
+  <nav class="hub-rail" aria-label="Hub">
+    <a class="hub-brand" href="/home"><img src="/brand/mascot.png" width="36" height="36" alt="jobOS" /></a>
+    <a class="hub-nav-item" data-icon="home" data-nav="/home" href="/home">Home</a>
+    <a class="hub-nav-item" data-icon="board" data-nav="/board" href="/board">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
+    <a class="hub-nav-item" data-icon="data" data-nav="/admin/data" href="/admin/data">Data</a>
+    <a class="hub-nav-item" data-icon="skills" data-nav="/admin/skills" href="/admin/skills">Skills</a>
+    <a class="hub-nav-item" data-icon="memory" data-nav="/admin/memory" href="/admin/memory">Memory</a>
+    <a class="hub-nav-item" data-icon="candidate" data-nav="/onboarding" href="/onboarding">Candidate</a>
+    <span class="hub-rail-spacer"></span>
+    <button class="hub-nav-item" type="button" data-icon="logout" data-hub-logout>Log out</button>
+  </nav>
+  <div class="hub-stage">
+    <header class="hub-top">
+      <div class="brand">
+        <div>
+          <h1>jobOS Harness</h1>
+          <div class="sub">helps find jobs · live funnel · who is working</div>
+        </div>
+      </div>
+      <div class="connect">
+        <span id="connStatus" class="status"><span class="dot"></span><span id="connLabel">signing in</span></span>
+        <span id="whoLabel" class="sub"></span>
+        <button id="logoutBtn" class="secondary" type="button">Log out</button>
+      </div>
+    </header>
+    <main class="hub-home" id="main">
+      <div class="home-kpis">
+        <article class="home-kpi">
+          <div class="k">Found today</div>
+          <div class="v" id="kpiFoundToday">—</div>
+          <div class="s">Jobs POSTed to the board since 00:00 UTC</div>
+        </article>
+        <article class="home-kpi">
+          <div class="k">Applied today</div>
+          <div class="v" id="kpiAppliedToday">—</div>
+          <div class="s">Rows that reached applied</div>
+        </article>
+        <article class="home-kpi" id="kpiOldestCard">
+          <div class="k">Oldest in pipeline</div>
+          <div class="v" id="kpiOldestDays">—</div>
+          <div class="s" id="kpiOldestSub">Open jobs only · posted date when known</div>
+        </article>
+      </div>
+      <div class="home-charts">
+        <section class="home-chart">
+          <h2>Hunt funnel</h2>
+          <div class="chart-frame"><canvas id="funnelChart" aria-label="Jobs found, applied, outreached"></canvas></div>
+          <ul class="home-legend" id="funnelLegend" aria-live="polite"></ul>
+        </section>
+        <section class="home-chart">
+          <h2>Agents</h2>
+          <div class="chart-frame chart-donut">
+            <canvas id="agentChart" aria-label="Total agents versus currently working"></canvas>
+            <div class="donut-center">
+              <div class="v" id="agentWorking">—</div>
+              <div class="s" id="agentWorkingSub">working now</div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <section class="home-oldest" id="oldestPanel">
+        <h2>Oldest open job</h2>
+        <div id="oldestBody" class="home-empty">Loading pipeline…</div>
+      </section>
+    </main>
+  </div>
+  <nav class="hub-dock" aria-label="Primary">
+    <a class="hub-nav-item" data-icon="home" data-nav="/home" href="/home">Home</a>
+    <a class="hub-nav-item" data-icon="board" data-nav="/board" href="/board">Board</a>
+    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
+    <button class="hub-nav-item" type="button" data-icon="more" data-hub-more>More</button>
+  </nav>
+  <div class="hub-more" id="hubMore">
+    <a href="/admin">Invites</a>
+    <a href="/admin/data">Data</a>
+    <a href="/admin/skills">Skills</a>
+    <a href="/admin/memory">Memory</a>
+    <a href="/onboarding">Candidate</a>
+    <a href="/.well-known/agent-card.json">A2A</a>
+    <button type="button" data-hub-logout>Log out</button>
+    <button type="button" class="secondary" data-hub-more-close>Close</button>
+  </div>
+  <script src="/static/vendor/chart.umd.js"></script>
+  <script src="/static/hub.js"></script>
+  <script src="/static/home.js"></script>
+</body>
+</html>

@@ -67,6 +67,10 @@
     "proof": { "type": "object" },
     "conflicts": { "type": "array" },
     "notes": { "type": "string" },
+    "description": { "type": "string", "description": "Full job description from the posting. Empty if unknown." },
+    "expectations": { "type": "string", "description": "What the posting says it expects (requirements, must-haves). Empty if unknown." },
+    "pay": { "type": "string", "description": "Compensation as the posting states it. Empty if none mentioned." },
+    "posted_at": { "type": "string", "description": "When the employer posted the role (ISO-8601). Distinct from created_at (when we found it)." },
     "created_at": { "type": "string" },
     "updated_at": { "type": "string" }
   }

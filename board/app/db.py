@@ -7,12 +7,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.constants import JSON_FIELDS, STATUSES
+from app.constants import JSON_FIELDS, LANE_FILTERS, STATUSES
 from app.message_store import ensure_messages_schema
 from app.a2a_store import ensure_a2a_schema
 from app.memory_store import ensure_memory_schema
 from app.profile import bind_blob_store
-from app.sql import SqlConnection, connect_url, resolve_database_url, schema_for_db_path
+from app.sql import (
+    SqlConnection,
+    column_names,
+    connect_url,
+    resolve_database_url,
+    schema_for_db_path,
+)
 from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 from app.tenant_schema import ensure_tenant_schema
 from app.blob_store import BlobStore
@@ -47,6 +53,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     research_json TEXT,
     proof_json TEXT,
     notes TEXT,
+    description TEXT,
+    expectations TEXT,
+    pay TEXT,
+    posted_at TEXT,
     conflicts_json TEXT,
     stopped INTEGER NOT NULL DEFAULT 0,
     stop_reason TEXT,
@@ -265,6 +275,16 @@ def _migrate(conn: SqlConnection) -> None:
 
     ensure_mcp_schema(conn)
     ensure_tenant_schema(conn)
+    _ensure_job_posting_columns(conn)
+
+
+def _ensure_job_posting_columns(conn: SqlConnection) -> None:
+    cols = column_names(conn, "jobs")
+    if not cols:
+        return
+    for name in ("description", "expectations", "pay", "posted_at"):
+        if name not in cols:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} TEXT")
 
 
 def _dump(value: Any) -> str | None:
@@ -301,6 +321,10 @@ def row_to_job(row: Any) -> dict[str, Any]:
         "research": _load(data["research_json"], {}),
         "proof": _load(data["proof_json"], {}),
         "notes": data["notes"] or "",
+        "description": data.get("description") or "",
+        "expectations": data.get("expectations") or "",
+        "pay": data.get("pay") or "",
+        "posted_at": data.get("posted_at") or "",
         "conflicts": _load(data["conflicts_json"], []),
         "stopped": bool(data["stopped"]),
         "stop_reason": data["stop_reason"] or "",
@@ -337,27 +361,82 @@ class BoardDB:
         status: str | None = None,
         q: str | None = None,
         stopped: bool | None = None,
+        score_min: float | None = None,
+        score_max: float | None = None,
+        location: str | None = None,
+        apply_kind: str | None = None,
+        source: str | None = None,
+        remote: str | None = None,
+        has_pay: bool | None = None,
+        company: str | None = None,
+        lane: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
-        clauses: list[str] = ["account_id = ?"]
-        args: list[Any] = [tenant.account_id]
-        if status:
-            clauses.append("status = ?")
-            args.append(status)
-        if stopped is not None:
-            clauses.append("stopped = ?")
-            args.append(1 if stopped else 0)
-        if q:
-            like = f"%{q}%"
-            clauses.append(
-                "(id LIKE ? OR company LIKE ? OR title LIKE ? OR apply_url LIKE ? OR notes LIKE ?)"
-            )
-            args.extend([like, like, like, like, like])
-        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        cur = self.conn.execute(
-            f"SELECT * FROM jobs {where} ORDER BY updated_at DESC",
-            args,
+        where, args = _jobs_where(
+            tenant,
+            status=status,
+            q=q,
+            stopped=stopped,
+            score_min=score_min,
+            score_max=score_max,
+            location=location,
+            apply_kind=apply_kind,
+            source=source,
+            remote=remote,
+            has_pay=has_pay,
+            company=company,
+            lane=lane,
         )
+        sql = f"SELECT * FROM jobs {where} ORDER BY updated_at DESC"
+        if limit is not None:
+            sql += " LIMIT ? OFFSET ?"
+            args.extend([int(limit), max(0, int(offset))])
+        cur = self.conn.execute(sql, args)
         return [row_to_job(r) for r in cur.fetchall()]
+
+    def count_jobs(
+        self,
+        tenant: TenantContext,
+        *,
+        status: str | None = None,
+        q: str | None = None,
+        stopped: bool | None = None,
+        score_min: float | None = None,
+        score_max: float | None = None,
+        location: str | None = None,
+        apply_kind: str | None = None,
+        source: str | None = None,
+        remote: str | None = None,
+        has_pay: bool | None = None,
+        company: str | None = None,
+        lane: str | None = None,
+    ) -> int:
+        where, args = _jobs_where(
+            tenant,
+            status=status,
+            q=q,
+            stopped=stopped,
+            score_min=score_min,
+            score_max=score_max,
+            location=location,
+            apply_kind=apply_kind,
+            source=source,
+            remote=remote,
+            has_pay=has_pay,
+            company=company,
+            lane=lane,
+        )
+        cur = self.conn.execute(f"SELECT COUNT(*) AS n FROM jobs {where}", args)
+        row = cur.fetchone()
+        return int(row["n"]) if row else 0
+
+    def status_counts(self, tenant: TenantContext) -> dict[str, int]:
+        cur = self.conn.execute(
+            "SELECT status, COUNT(*) AS n FROM jobs WHERE account_id = ? GROUP BY status",
+            (tenant.account_id,),
+        )
+        return {str(row["status"]): int(row["n"]) for row in cur.fetchall()}
 
     def get_job(self, tenant: TenantContext, job_id: str) -> dict[str, Any] | None:
         cur = self.conn.execute(
@@ -406,12 +485,14 @@ class BoardDB:
             INSERT INTO jobs (
                 account_id, id, company, title, location, remote, url, apply_url, apply_kind, ats, req_id,
                 sources_json, status, score, owners_json, apply_packet_json, outreach_packet_json,
-                research_json, proof_json, notes, conflicts_json, stopped, stop_reason,
+                research_json, proof_json, notes, description, expectations, pay, posted_at,
+                conflicts_json, stopped, stop_reason,
                 created_at, updated_at, created_by_role
             ) VALUES (
                 :account_id, :id, :company, :title, :location, :remote, :url, :apply_url, :apply_kind, :ats, :req_id,
                 :sources_json, :status, :score, :owners_json, :apply_packet_json, :outreach_packet_json,
-                :research_json, :proof_json, :notes, :conflicts_json, :stopped, :stop_reason,
+                :research_json, :proof_json, :notes, :description, :expectations, :pay, :posted_at,
+                :conflicts_json, :stopped, :stop_reason,
                 :created_at, :updated_at, :created_by_role
             )
             """,
@@ -436,6 +517,10 @@ class BoardDB:
                 "research_json": _dump(job.get("research") or {}),
                 "proof_json": _dump(job.get("proof") or {}),
                 "notes": job.get("notes") or "",
+                "description": job.get("description") or "",
+                "expectations": job.get("expectations") or "",
+                "pay": job.get("pay") or "",
+                "posted_at": job.get("posted_at") or "",
                 "conflicts_json": _dump(job.get("conflicts") or []),
                 "stopped": 1 if job.get("stopped") else 0,
                 "stop_reason": job.get("stop_reason") or "",
@@ -485,6 +570,10 @@ class BoardDB:
                 "status",
                 "score",
                 "notes",
+                "description",
+                "expectations",
+                "pay",
+                "posted_at",
                 "stop_reason",
             }:
                 assignments.append(f"{key} = :{key}")
@@ -1254,6 +1343,78 @@ def _row_to_invite(row: Any) -> dict[str, Any]:
         "allow_multiple_owners": bool(row["allow_multiple_owners"]),
         "created_at": row["created_at"],
     }
+
+
+def _jobs_where(
+    tenant: TenantContext,
+    *,
+    status: str | None = None,
+    q: str | None = None,
+    stopped: bool | None = None,
+    score_min: float | None = None,
+    score_max: float | None = None,
+    location: str | None = None,
+    apply_kind: str | None = None,
+    source: str | None = None,
+    remote: str | None = None,
+    has_pay: bool | None = None,
+    company: str | None = None,
+    lane: str | None = None,
+) -> tuple[str, list[Any]]:
+    clauses: list[str] = ["account_id = ?"]
+    args: list[Any] = [tenant.account_id]
+    if status:
+        clauses.append("status = ?")
+        args.append(status)
+    if lane:
+        lane_statuses = LANE_FILTERS.get(lane.strip().lower())
+        if lane_statuses:
+            placeholders = ", ".join("?" for _ in lane_statuses)
+            clauses.append(f"status IN ({placeholders})")
+            args.extend(sorted(lane_statuses))
+    if stopped is not None:
+        clauses.append("stopped = ?")
+        args.append(1 if stopped else 0)
+    if q:
+        like = f"%{q}%"
+        clauses.append(
+            "(id LIKE ? OR company LIKE ? OR title LIKE ? OR apply_url LIKE ?"
+            " OR notes LIKE ? OR location LIKE ? OR description LIKE ?"
+            " OR expectations LIKE ? OR pay LIKE ?)"
+        )
+        args.extend([like] * 9)
+    if company:
+        clauses.append("company LIKE ?")
+        args.append(f"%{company}%")
+    if location:
+        clauses.append("location LIKE ?")
+        args.append(f"%{location}%")
+    if apply_kind:
+        clauses.append("apply_kind = ?")
+        args.append(apply_kind)
+    if source:
+        clauses.append("sources_json LIKE ?")
+        args.append(f"%{source}%")
+    if score_min is not None:
+        clauses.append("score IS NOT NULL AND score >= ?")
+        args.append(score_min)
+    if score_max is not None:
+        clauses.append("score IS NOT NULL AND score <= ?")
+        args.append(score_max)
+    remote_key = (remote or "").strip().lower()
+    if remote_key in {"remote", "true", "yes"}:
+        clauses.append(
+            "remote IS NOT NULL AND remote != '' AND lower(remote) NOT IN ('false','0','no','onsite')"
+        )
+    elif remote_key in {"onsite", "false", "no"}:
+        clauses.append(
+            "(remote IS NULL OR remote = '' OR lower(remote) IN ('false','0','no','onsite'))"
+        )
+    if has_pay is True:
+        clauses.append("pay IS NOT NULL AND TRIM(pay) != ''")
+    elif has_pay is False:
+        clauses.append("(pay IS NULL OR TRIM(pay) = '')")
+    return f"WHERE {' AND '.join(clauses)}", args
 
 
 def _owners(raw: Any) -> dict[str, str]:

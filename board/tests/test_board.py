@@ -298,7 +298,13 @@ def test_ui_is_served(client: TestClient) -> None:
     assert "jobOS Harness" in res.text
     assert "helps find jobs" in res.text
     assert "All statuses" in res.text
-    assert "Select a job" in res.text
+    assert "Select a job" not in res.text
+    assert 'id="pager"' in res.text
+    assert 'id="moreFilters"' in res.text
+    home = client.get("/home", headers=h("admin"))
+    assert home.status_code == 200
+    assert "Hunt funnel" in home.text
+    assert "Oldest open job" in home.text
     assert 'id="connectForm"' not in res.text
     assert "Connect</button>" not in res.text
 

@@ -108,6 +108,7 @@ BROWSER_HEADERS = {
 
 PROTECTED_PAGES = (
     ("/board", "job board page"),
+    ("/home", "operator home dashboard"),
     ("/admin", "admin dashboard"),
     ("/admin/invites", "admin invites page"),
     ("/admin/data", "operator data view"),
@@ -115,6 +116,7 @@ PROTECTED_PAGES = (
     ("/admin/skills", "skill registry page"),
     ("/admin/memory", "memory pods page"),
     ("/onboarding", "candidate onboarding page"),
+    ("/static/home.html", "operator home static HTML"),
     ("/static/index.html", "job board static HTML"),
     ("/static/admin.html", "admin static HTML"),
     ("/static/data.html", "operator data static HTML"),
@@ -126,6 +128,7 @@ PROTECTED_PAGES = (
 
 PROTECTED_GETS = (
     ("/api/jobs", "job board list"),
+    ("/api/dashboard", "operator home dashboard API"),
     (f"/api/jobs/{JOB_ID}", "job board detail"),
     ("/api/jobs?status=apply_ready", "job board status/ranking filter"),
     ("/api/jobs?q=CanarySecretCorpZXQ", "job board search"),

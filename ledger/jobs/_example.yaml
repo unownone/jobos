@@ -13,6 +13,14 @@ req_id: "123"
 sources: [google_dorks, wellfound]
 status: apply_ready
 score: 4
+posted_at: "2026-09-01T00:00:00Z"
+pay: "$180k–$220k + equity"
+description: |
+  Staff Backend Engineer on the API platform. Own Postgres-backed services,
+  public APIs, and the job-list coordination path.
+expectations: |
+  Production Python, Postgres, and shipping without inventing metrics.
+  Comfortable writing packets other bots can follow.
 owners:
   discovery: "discovery-1"
   apply: ""

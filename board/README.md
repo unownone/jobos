@@ -51,9 +51,9 @@ Status enum is the Job Apply OS contract (`discovered` → … → `offer` / `cl
 
 Use these steps on `http://127.0.0.1:8787/`. Create an account at `/login` (username + password). No dashboard token. Optional screenshot refresh: `bash board/scripts/capture_readme_shots.sh` (writes under `board/docs/` when those files exist).
 
-1. **Sign up / log in.** Open `/`, then `/login`. Create a username. You land on `/onboarding` until a truthful candidate exists, then `/board`.
+1. **Sign up / log in.** Open `/`, then `/login`. Create a username. You land on `/onboarding` until a truthful candidate exists, then `/board`. **Home** (`/home`) is the funnel dashboard: found → applied → outreached, agent load, today counts, oldest open job.
 
-2. **List.** Columns are ID, company, title, status pill. Search matches company / title / id / URL / notes. Stats on the right show how many rows are in view vs the whole board.
+2. **List.** Columns are company, title, status, score, pay, posted date, claim. Search matches company / title / id / URL / notes / description. Extra filters: lane, apply kind, score, remote, pay stated, location, source. The list is paginated (25/50/100). Stats on the right show shown / matched / total.
 
    ![Dashboard — jobs list](docs/01-dashboard.png)
 
@@ -61,7 +61,7 @@ Use these steps on `http://127.0.0.1:8787/`. Create an account at `/login` (user
 
    ![Status filter chips](docs/02-filters.png)
 
-4. **Open a job.** Click a row. The side panel title becomes `#id · company`. Identity fields (company, title, source, status, score, location, apply URL) sit at the top; packets, proof, events, Pause / Stop / Resume / Delete are below.
+4. **Open a job.** Click a row — the ticket is hidden until then. The side panel title becomes `#id · company`. Identity fields (company, title, source, status, score, location, apply URL, posted date, pay, description, expectations) sit at the top; packets, proof, events, Pause / Stop / Resume / Delete are below.
 
    ![Job detail / edit panel](docs/03-detail.png)
 
@@ -289,7 +289,8 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 | POST | `/api/presence/heartbeat` | session, Bearer, or Connect token; every 10s |
 | GET | `/api/presence` | admin, maintenance; owners see own track. No API keys. |
 | GET | `/api/users` | admin directory including disabled. No API keys. |
-| GET | `/api/whoami` `/api/meta` `/api/jobs` `/api/jobs/{id}` `/api/events` | any valid role / key |
+| GET | `/home` `/api/dashboard` | operator funnel (found/applied/outreached), agent load, today + oldest pipeline |
+| GET | `/api/whoami` `/api/meta` `/api/jobs` `/api/jobs/{id}` `/api/events` | any valid role / key. `GET /api/jobs` omit `limit` for the full list; board UI uses `limit`/`offset` plus lane/kind/score/remote/pay/location/source filters |
 | POST | `/api/jobs` | discovery, admin |
 | PATCH | `/api/jobs/{id}` | discovery (lane only), apply, outreach, admin |
 | POST | `/api/jobs/{id}/pause` `/resume` `/stop` | admin |
