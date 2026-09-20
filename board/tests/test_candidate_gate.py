@@ -145,6 +145,20 @@ def test_example_profile_rejected_then_real_profile_unlocks(hub: tuple[TestClien
     assert profile["identity"]["email"] == "jordan@example.test"
     assert "Staff Software Engineer" in profile["target"]["titles"]
     assert json_res.json()["onboarded"] is True
+    created_invite = client.post(
+        "/api/invites",
+        headers=csrf_headers(client),
+        json={"track": "discovery", "max_redemptions": 2},
+    )
+    assert created_invite.status_code == 200, created_invite.text
+    invite = created_invite.json()
+    join = client.get(
+        f"/api/join/{invite['invite']['id']}",
+        params={"s": invite["secret"]},
+    )
+    assert join.status_code == 200, join.text
+    assert join.json()["candidate"]["onboarded"] is True
+    assert join.json()["join_blocked"] is False
 
 
 def test_onboarding_page_and_status_with_fixture(hub: tuple[TestClient, Settings]) -> None:

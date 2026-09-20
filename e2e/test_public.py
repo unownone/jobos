@@ -8,7 +8,7 @@ from playwright.sync_api import Page, expect
 def test_landing_and_get_started_are_public(page: Page) -> None:
     page.goto("/")
     expect(page.locator("h1")).to_contain_text("Find jobs")
-    expect(page.locator('a[href="/login"]')).to_be_visible()
+    expect(page.get_by_role("link", name="Log in", exact=True)).to_be_visible()
     page.goto("/start")
     expect(page.locator("h1")).to_contain_text("Get started")
     expect(page.locator("body")).to_contain_text("candidate_required")

@@ -49,6 +49,8 @@ def test_invites_skills_memory_and_data_tabs(page: Page) -> None:
     expect(page.locator("#created")).to_contain_text("/join/", timeout=15_000)
     expect(page.locator("#prompt")).not_to_be_empty()
     expect(page.locator("#rows")).to_contain_text("outreach")
+    page.locator("#rows button", has_text="Revoke").first.click()
+    expect(page.locator("#rows")).to_contain_text("revoked", timeout=10_000)
 
     page.goto("/admin/skills")
     expect(page.locator("#skills")).to_contain_text("job-discovery", timeout=15_000)
@@ -59,9 +61,16 @@ def test_invites_skills_memory_and_data_tabs(page: Page) -> None:
     expect(page.locator("#msg")).to_contain_text("Seeded", timeout=20_000)
 
     page.goto("/admin/memory")
-    expect(page.locator("#write-title")).to_be_visible()
+    page.wait_for_function("() => document.querySelectorAll('#write-pod option').length > 0")
+    values = page.eval_on_selector_all("#write-pod option", "els => els.map(e => e.value)")
+    target = next((v for v in values if v == "track:discovery"), None) or next(
+        (v for v in values if v == "common" or str(v).startswith("track:")), None
+    )
+    assert target, values
+    page.select_option("#write-pod", target)
+    page.wait_for_function("() => document.querySelectorAll('#write-kind option').length > 0")
     page.fill("#write-title", "Greenhouse work-auth radio")
-    page.fill("#write-body", "The portal asks for work auth on page two. Do not guess.")
+    page.fill("#write-body", "The portal asks for work authorization on page two. Do not guess the legal answer.")
     page.click("#add-item")
     expect(page.locator("#compose-status")).to_contain_text("Stored", timeout=15_000)
     expect(page.locator("#rows")).to_contain_text("Greenhouse work-auth radio")
@@ -135,3 +144,47 @@ def test_agent_pack_messages_export_and_a2a(page: Page) -> None:
     assert a2a.ok
     peers = api(page, "GET", "/api/a2a/directory")
     assert peers["status"] in {200, 401, 403}
+
+    who = api(page, "GET", "/api/whoami")
+    assert who["status"] == 200, who
+    events = api(page, "GET", "/api/events")
+    assert events["status"] == 200, events
+    hygiene = api(page, "GET", "/api/hygiene")
+    assert hygiene["status"] == 200, hygiene
+    ready = page.request.get("/ready")
+    assert ready.ok
+    assert ready.json().get("ready") is True
+    burns = api(
+        page,
+        "POST",
+        "/api/metrics/token_burn",
+        body={
+            "tool_name": "e2e",
+            "skill": "job-discovery",
+            "lane": "discovery",
+            "prompt_tokens": 10,
+            "completion_tokens": 4,
+            "total_tokens": 14,
+        },
+    )
+    assert burns["status"] in {200, 201}, burns
+    listed_burns = api(page, "GET", "/api/metrics/token_burn")
+    assert listed_burns["status"] == 200, listed_burns
+    summary = api(page, "GET", "/api/metrics/summary")
+    assert summary["status"] == 200, summary
+    imported = api(
+        page,
+        "POST",
+        "/api/import",
+        body={
+            "jobs": [
+                {
+                    "id": "e2e__imported",
+                    "company": "ImportCo",
+                    "title": "Staff Import",
+                    "status": "discovered",
+                }
+            ]
+        },
+    )
+    assert imported["status"] in {200, 201}, imported

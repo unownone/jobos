@@ -9,11 +9,11 @@ Each live Hub surface has a Playwright owner. In-process FastAPI tests in
 | --- | --- | --- |
 | `/` | Public landing; session CTA becomes Open board | `test_public.py`, `test_onboarding.py` |
 | `/start` | Public get-started | `test_public.py` |
-| `/login` | Login, signup, bad password, next=/board | `test_onboarding.py`, `test_public.py` |
-| `/admin/signup` | Bootstrap form or redirect once an admin exists | public/login coverage |
+| `/login` | Login, signup, bad password, next=/board, existing admin | `test_onboarding.py`, `test_public.py` |
+| `/admin/signup` | Leaves once any admin exists | `test_onboarding.py` |
 | `/onboarding` | Identity → targets → proof → resume; validation; prefill | `test_onboarding.py` |
 | `/board` | Session, jobs list, search, ticket patch/pause/resume | `test_admin_shell.py`, `test_worker.py` |
-| `/admin` | Create invite, copy join URL, coming-soon stubs | `test_admin_shell.py`, `test_worker.py` |
+| `/admin` | Create invite, copy join URL, revoke, coming-soon stubs | `test_admin_shell.py`, `test_worker.py` |
 | `/admin/users` | Directory after worker heartbeat | `test_worker.py` |
 | `/admin/data` | jobs / people / candidate / skills / mcps / memory tabs | `test_worker.py`, `test_admin_shell.py` |
 | `/admin/skills` | Filter + GitHub re-seed | `test_admin_shell.py` |
@@ -35,6 +35,8 @@ Each live Hub surface has a Playwright owner. In-process FastAPI tests in
 | Messages | `test_admin_shell.py` |
 | Export ledger | `test_admin_shell.py` |
 | Onboarding pack / skills | `test_admin_shell.py` |
+| Hygiene / import / events / whoami | `test_admin_shell.py` |
+| Token-burn metrics | `test_admin_shell.py` |
 | A2A cards + directory | `test_public.py`, `test_admin_shell.py` |
 | Briefing `/llms.txt` `/agents.txt` | `test_public.py` |
 | Unauth gate | `test_public.py` + `board/tests/test_unauth_*` |

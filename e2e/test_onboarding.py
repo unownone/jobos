@@ -52,8 +52,8 @@ def test_signup_onboarding_stays_logged_in_and_prefills(page: Page) -> None:
     assert_still_signed_in(page)
 
     page.goto("/")
-    expect(page.locator('a[href="/board"]')).to_contain_text("Open board", timeout=10_000)
-    page.click('a[href="/board"]')
+    expect(page.get_by_role("link", name="Open board").first).to_be_visible(timeout=10_000)
+    page.get_by_role("link", name="Open board").first.click()
     page.wait_for_url("**/board", timeout=15_000)
     assert_still_signed_in(page)
 
@@ -90,9 +90,34 @@ def test_logout_then_board_requires_login(page: Page) -> None:
     signup_admin(page, username, password)
     fill_onboarding(page)
     skip_resume(page)
-    page.click("#logoutBtn")
-    page.wait_for_url("**/login**", timeout=15_000)
+    expect(page.locator("#whoLabel")).to_be_visible(timeout=15_000)
+    page.locator("#logoutBtn").click()
+    expect(page.locator("#username")).to_be_visible(timeout=15_000)
     page.goto("/board")
-    page.wait_for_url("**/login**", timeout=15_000)
+    expect(page.locator("#username")).to_be_visible(timeout=15_000)
     login = page.request.get("/api/auth/me")
     assert login.status == 401
+
+
+def test_existing_admin_login_honors_next_and_stays_in(page: Page) -> None:
+    username = unique_username("back")
+    password = unique_password()
+    signup_admin(page, username, password)
+    fill_onboarding(page)
+    skip_resume(page)
+    page.locator("#logoutBtn").click()
+    expect(page.locator("#username")).to_be_visible(timeout=15_000)
+    page.goto("/login?next=/board")
+    page.fill("#username", username)
+    page.fill("#password", password)
+    page.click("button[type='submit']")
+    page.wait_for_url("**/board", timeout=20_000)
+    expect(page.locator("#whoLabel")).to_contain_text(username, timeout=15_000)
+    assert_still_signed_in(page)
+
+
+def test_admin_signup_page_leaves_once_an_admin_exists(page: Page) -> None:
+    signup_admin(page, unique_username("boot"), unique_password())
+    page.goto("/admin/signup")
+    page.wait_for_url(re.compile(r".*/(login|onboarding|board)(?:$|[?#])"), timeout=15_000)
+    expect(page).not_to_have_url(re.compile(r".*/admin/signup(?:$|[?#])"))

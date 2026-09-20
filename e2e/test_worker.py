@@ -108,8 +108,8 @@ def test_worker_joins_posts_job_claims_queue_and_shows_in_directory(page: Page, 
         "/api/memory/items",
         token=key,
         body={
-            "pod": "worker",
-            "kind": "fact",
+            "pod": "track:discovery",
+            "kind": "search_coverage",
             "title": "E2E Wellfound pagination",
             "body": "Public search is enough; do not click Easy Apply during discovery.",
         },
@@ -138,6 +138,10 @@ def test_worker_joins_posts_job_claims_queue_and_shows_in_directory(page: Page, 
 
     page.goto("/admin/users")
     expect(page.locator("#rows")).to_contain_text(f"disc-{username}", timeout=15_000)
+    listed_agents = api(page, "GET", "/api/agents")
+    assert listed_agents["status"] == 200, listed_agents
+    agent_names = [row.get("display_name") for row in listed_agents["body"].get("users") or []]
+    assert any(name and f"disc-{username}" in name for name in agent_names), listed_agents
 
     page.goto("/admin/data?tab=jobs")
     expect(page.locator("#table")).to_contain_text("E2E Co", timeout=15_000)
@@ -145,5 +149,12 @@ def test_worker_joins_posts_job_claims_queue_and_shows_in_directory(page: Page, 
     expect(page.locator("#table")).to_contain_text("Hiring Manager", timeout=15_000)
     page.click('[data-tab="candidate"]')
     expect(page.locator("#table")).to_contain_text("Staff Software Engineer", timeout=15_000)
-    page.click('[data-tab="memory"]')
+
+    page.goto("/admin/data?tab=memory")
     expect(page.locator("#table")).to_contain_text("Wellfound", timeout=15_000)
+
+    page.goto("/admin/memory")
+    page.wait_for_function("() => document.querySelector('#pod option[value=\"\"]')")
+    page.select_option("#pod", "")
+    page.click("#load")
+    expect(page.locator("#rows")).to_contain_text("Wellfound", timeout=15_000)
