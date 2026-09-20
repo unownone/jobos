@@ -33,11 +33,16 @@
     <p class="muted"><a href="/">Back to landing</a></p>
   </main>
   <script>
-    const requested = new URLSearchParams(location.search).get("next") || "";
+    function nextPath() {
+      const requested = new URLSearchParams(location.search).get("next") || "";
+      if (!requested || requested === "/" || requested === "/start") return "/board";
+      if (!requested.startsWith("/") || requested.startsWith("//")) return "/board";
+      return requested;
+    }
     const saved = localStorage.getItem("jobos_username") || "";
     if (saved) document.getElementById("username").value = saved;
-    fetch("/api/auth/me").then((r) => {
-      if (r.ok) location.href = requested || "/board";
+    fetch("/api/auth/me", { credentials: "same-origin" }).then((r) => {
+      if (r.ok) location.href = nextPath();
     }).catch(() => {});
 
     async function submit(kind) {
@@ -48,6 +53,7 @@
       const url = kind === "signup" ? "/api/auth/signup" : "/api/auth/login";
       const res = await fetch(url, {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
@@ -57,12 +63,12 @@
         return;
       }
       try { localStorage.setItem("jobos_username", username); } catch (e) {}
-      const status = await fetch("/api/candidate/status").then((r) => r.json()).catch(() => ({}));
+      const status = await fetch("/api/candidate/status", { credentials: "same-origin" }).then((r) => r.json()).catch(() => ({}));
       if (!status.onboarded) {
         location.href = "/onboarding";
         return;
       }
-      location.href = requested || "/board";
+      location.href = nextPath();
     }
     document.getElementById("form").addEventListener("submit", (ev) => {
       ev.preventDefault();

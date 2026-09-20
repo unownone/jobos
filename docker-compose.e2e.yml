@@ -1,0 +1,81 @@
+# Isolated Job Hub stack for browser e2e. From repo root:
+#   bash scripts/e2e_browser.sh
+# or:
+#   docker compose -f docker-compose.e2e.yml -p jobos-e2e up -d --build
+#
+# Hub: http://127.0.0.1:18787  (does not clash with a laptop Hub on 8787)
+# Tear down data: docker compose -f docker-compose.e2e.yml -p jobos-e2e down -v
+
+name: jobos-e2e
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jobos
+      POSTGRES_PASSWORD: jobos
+      POSTGRES_DB: jobos
+    volumes:
+      - "e2e-pgdata:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: jobos
+      RABBITMQ_DEFAULT_PASS: jobos
+    volumes:
+      - "e2e-rabbitmq:/var/lib/rabbitmq"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      JOBOS_NONINTERACTIVE: "1"
+      BOARD_HOST: "0.0.0.0"
+      BOARD_PORT: "8787"
+      BOARD_DB: "/tmp/board.db"
+      HUB_PACKS_DIR: "/tmp/jobos-packs"
+      DATABASE_URL: "postgresql://jobos:jobos@postgres:5432/jobos"
+      AMQP_URL: "amqp://jobos:jobos@rabbitmq:5672/%2F"
+      QUEUE_ADAPTER: "rabbitmq"
+      BLOB_ROOT: "/var/lib/jobos/blobs"
+      BLOB_ADAPTER: "filesystem"
+      HUB_PUBLIC_HOST: "127.0.0.1:18787"
+      HUB_PUBLIC_URL: "http://127.0.0.1:18787"
+      WEB_CONCURRENCY: "1"
+      OTEL_SERVICE_NAME: "jobos-hub-e2e"
+      OTEL_LOGS_EXPORTER: "console"
+    volumes:
+      - "e2e-blobs:/var/lib/jobos/blobs"
+    ports:
+      - "18787:8787"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+volumes:
+  e2e-pgdata:
+  e2e-rabbitmq:
+  e2e-blobs:

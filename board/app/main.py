@@ -673,7 +673,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not s:
             raise HTTPException(status_code=401, detail="missing invite secret")
         row = _load_invite_for_join(invite_id, s)
-        return join_payload(settings, row)
+        return join_payload(settings, row, db)
 
     @app.post("/api/auth/join")
     def auth_join(request: Request, body: JoinIn) -> dict[str, Any]:

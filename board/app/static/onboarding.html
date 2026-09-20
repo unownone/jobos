@@ -145,6 +145,61 @@
     function splitList(raw) {
       return String(raw || "").split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
     }
+    function joinList(values, sep) {
+      return (Array.isArray(values) ? values : []).filter(Boolean).join(sep);
+    }
+    function setValue(id, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.value = value == null ? "" : String(value);
+    }
+    function fillForm(profile) {
+      if (!profile) return;
+      const identity = profile.identity || {};
+      const target = profile.target || {};
+      const proof = profile.proof || {};
+      const materials = profile.materials || {};
+      setValue("full_name", identity.full_name);
+      setValue("preferred_name", identity.preferred_name);
+      setValue("email", identity.email);
+      setValue("phone", identity.phone);
+      setValue("location", identity.location);
+      setValue("timezone", identity.timezone);
+      setValue("work_authorization", identity.work_authorization);
+      setValue("linkedin_url", identity.linkedin_url);
+      setValue("github_url", identity.github_url);
+      setValue("titles", joinList(target.titles, ", "));
+      setValue("locations_t", joinList(target.locations, ", "));
+      setValue("seniority", joinList(target.seniority, ", "));
+      setValue("domains", joinList(target.domains, ", "));
+      setValue("remote", target.remote);
+      setValue("must_haves", joinList(target.must_haves, "\n"));
+      setValue("deal_breakers", joinList(target.deal_breakers, "\n"));
+      setValue("headline", proof.headline);
+      setValue("years", proof.years_experience == null ? 0 : proof.years_experience);
+      setValue("stack", joinList(proof.stack, ", "));
+      setValue("highlights", joinList(proof.highlights, "\n"));
+      setValue("do_not_claim", joinList(proof.do_not_claim, "\n"));
+      setValue("writing_voice", materials.writing_voice);
+    }
+    async function loadProfile() {
+      const res = await fetch("/api/candidate", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      if (res.status === 404) return;
+      if (!res.ok) return;
+      const body = await res.json().catch(() => ({}));
+      fillForm(body.profile);
+      const rev = document.getElementById("revLine");
+      if (rev && body.revision) {
+        rev.textContent = "revision " + body.revision + " · Cache-Control: no-store · heartbeat returns candidate_revision";
+      }
+      if (body.resume_present) {
+        const resumeOk = document.getElementById("resumeOk");
+        if (resumeOk) resumeOk.textContent = "A resume is already stored. Upload again to replace it.";
+      }
+    }
     function show(step) {
       ["step1","step2","step3","step4"].forEach((id) => {
         document.getElementById(id).hidden = id !== step;
@@ -155,7 +210,7 @@
       document.getElementById("s4").classList.toggle("on", step === "step4");
     }
     async function me() {
-      const res = await fetch("/api/auth/me");
+      const res = await fetch("/api/auth/me", { credentials: "same-origin" });
       if (res.status === 401) {
         location.href = "/login?next=/onboarding";
         return null;
@@ -167,6 +222,7 @@
       }
       document.getElementById("who").textContent = "Signed in as " + ((body.user && body.user.email) || body.actor) + ". Fill a real profile.";
       document.getElementById("formPanel").hidden = false;
+      await loadProfile();
       return body;
     }
     function payload() {
@@ -242,6 +298,7 @@
       ok.textContent = "";
       const res = await fetch("/api/candidate", {
         method: "PUT",
+        credentials: "same-origin",
         headers: csrfHeaders(),
         body: JSON.stringify(payload()),
       });
@@ -268,6 +325,7 @@
       const buf = await file.arrayBuffer();
       const res = await fetch("/api/candidate/resume", {
         method: "PUT",
+        credentials: "same-origin",
         headers: { "X-CSRF": csrfHeaders()["X-CSRF"], "Content-Type": "application/pdf" },
         body: buf,
       });
@@ -277,10 +335,10 @@
         return;
       }
       resumeOk.textContent = "Resume stored. Opening the board…";
-      location.href = "/";
+      location.href = "/board";
     });
     document.getElementById("skipResume").addEventListener("click", () => {
-      location.href = "/admin";
+      location.href = "/board";
     });
     me();
   </script>

@@ -169,7 +169,8 @@ def own_track_pod_id(principal: Any) -> str | None:
 
 
 def parse_pod(raw: str) -> tuple[str, str | None]:
-    text = (raw or "").strip().lower()
+    raw_text = (raw or "").strip()
+    text = raw_text.lower()
     if not text:
         raise MemoryInvalid("pod is required")
     if text in {"common", "shared", "global"}:
@@ -182,12 +183,12 @@ def parse_pod(raw: str) -> tuple[str, str | None]:
     if mapped:
         return POD_KIND_TRACK, mapped
     if text.startswith("worker:"):
-        ident = text.split(":", 1)[1].strip()
+        ident = raw_text.split(":", 1)[1].strip()
         if not ident:
             raise MemoryInvalid("worker pod needs an id")
         return POD_KIND_WORKER, ident
     if text.startswith("track:"):
-        ident = resolve_track(text.split(":", 1)[1])
+        ident = resolve_track(raw_text.split(":", 1)[1])
         if ident is None:
             raise MemoryInvalid("unknown track pod")
         return POD_KIND_TRACK, ident

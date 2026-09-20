@@ -14,6 +14,7 @@ from app.profile import (
     candidate_blob_text,
     candidate_status,
     dump_profile_yaml,
+    load_candidate_mapping,
     parse_candidate_body,
     public_candidate_for_settings,
     resolve_candidate_path,
@@ -151,7 +152,7 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
     def candidate_admin_get(
         request: Request,
         principal: Principal = Depends(principal_dep),
-    ) -> PlainTextResponse:
+    ) -> Response:
         require_admin(principal)
         text = candidate_blob_text(db=request.app.state.db, tenant=principal.tenant)
         if text is None:
@@ -162,6 +163,18 @@ def create_candidate_router(settings: Settings, principal_dep: Any) -> APIRouter
                     detail="profiles/candidate.yaml missing; open /onboarding — do not invent one",
                 )
             text = path.read_text(encoding="utf-8")
+        accept = (request.headers.get("accept") or "").split(",")[0].split(";")[0].strip().lower()
+        if accept == "application/json":
+            mapping = load_candidate_mapping(
+                settings, db=request.app.state.db, tenant=principal.tenant
+            )
+            if mapping is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="profiles/candidate.yaml missing; open /onboarding — do not invent one",
+                )
+            status = candidate_status(settings, db=request.app.state.db, tenant=principal.tenant)
+            return _fresh_json({"ok": True, "profile": mapping, **status})
         return PlainTextResponse(text, media_type="text/yaml", headers=dict(NO_STORE))
 
     return router

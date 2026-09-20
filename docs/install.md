@@ -59,6 +59,8 @@ Override the published port with `HUB_PORT=343` if 8787 is taken (`http://127.0.
 
 Stop: `docker compose -f docker-compose.plain.yml down` (keeps named volumes). Destroy data: `docker compose -f docker-compose.plain.yml down -v`.
 
+Browser e2e (Playwright against Compose Hub): `bash scripts/e2e_browser.sh`. Inventory: [`e2e/FLOWS.md`](../e2e/FLOWS.md).
+
 ## Docker Compose + Traefik (public host)
 
 Ports **80** and **443** plus **8787**. Landing is `/`. Board is `/board`. File-based Traefik config (no Docker socket): `traefik/traefik.yml`, `traefik/dynamic.yml`.
