@@ -154,6 +154,9 @@ label {
   min-width: 0;
   background: var(--paper);
   min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--line);
@@ -269,7 +272,6 @@ label {
   grid-template-columns: 15.5rem minmax(0, 1fr);
   flex: 1;
   min-height: 0;
-  height: calc(100dvh - var(--top) - 3.35rem);
 }
 body.ticket-open .hub-board {
   grid-template-columns: 15.5rem minmax(0, 1fr) minmax(18rem, 26rem);
@@ -514,6 +516,7 @@ body.ticket-open .hub-backdrop { display: block; }
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
+  flex-shrink: 0;
   padding: 0.55rem 1rem;
   border-top: 1px solid var(--line);
   background: var(--panel);
@@ -526,6 +529,9 @@ body.ticket-open .hub-backdrop { display: block; }
 .hub-home {
   width: min(76rem, calc(100% - 2rem));
   margin: 1.1rem auto 2.5rem;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 .home-kpis {
   display: grid;
@@ -687,7 +693,12 @@ body.ticket-open .hub-backdrop { display: block; }
     padding-bottom: var(--dock);
   }
   .hub-rail { display: none; }
-  .hub-stage { border-left: 0; min-height: calc(100dvh - var(--dock)); }
+  .hub-stage {
+    border-left: 0;
+    min-height: calc(100dvh - var(--dock));
+    height: calc(100dvh - var(--dock));
+    max-height: calc(100dvh - var(--dock));
+  }
   .hub-dock {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -705,8 +716,6 @@ body.ticket-open .hub-backdrop { display: block; }
   .hub-board,
   body.ticket-open .hub-board {
     grid-template-columns: 1fr;
-    height: auto;
-    min-height: calc(100dvh - var(--top) - 7.5rem - var(--dock));
   }
   #presenceRail {
     display: none;

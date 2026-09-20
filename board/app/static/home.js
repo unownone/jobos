@@ -5,7 +5,6 @@
   const INK = "#f3eee3";
   const DIM = "#cbb892";
   const CHASSIS = "#0b1220";
-  const PANEL = "#172033";
 
   let funnelChart = null;
   let agentChart = null;
@@ -146,8 +145,8 @@
         labels: ["Working now", "Not working"],
         datasets: [{
           data: total === 0 ? [0, 1] : [working, idle],
-          backgroundColor: [AMBER, PANEL],
-          borderColor: [AMBER_HOT, "rgba(224,153,45,0.35)"],
+          backgroundColor: [AMBER, "rgba(203, 184, 146, 0.38)"],
+          borderColor: [AMBER_HOT, "rgba(203, 184, 146, 0.9)"],
           borderWidth: 1,
         }],
       },
