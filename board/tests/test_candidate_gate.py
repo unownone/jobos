@@ -135,6 +135,16 @@ def test_example_profile_rejected_then_real_profile_unlocks(hub: tuple[TestClien
         },
     )
     assert created.status_code == 201, created.text
+    yaml_res = client.get("/api/candidate")
+    assert yaml_res.status_code == 200, yaml_res.text
+    assert "Jordan Lee" in yaml_res.text
+    json_res = client.get("/api/candidate", headers={"Accept": "application/json"})
+    assert json_res.status_code == 200, json_res.text
+    profile = json_res.json()["profile"]
+    assert profile["identity"]["full_name"] == "Jordan Lee"
+    assert profile["identity"]["email"] == "jordan@example.test"
+    assert "Staff Software Engineer" in profile["target"]["titles"]
+    assert json_res.json()["onboarded"] is True
 
 
 def test_onboarding_page_and_status_with_fixture(hub: tuple[TestClient, Settings]) -> None:

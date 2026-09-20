@@ -118,9 +118,9 @@
     }
 
     async function api(path, opts = {}) {
-      const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) } });
+      const res = await fetch(path, { credentials: "same-origin", ...opts, headers: { ...headers(), ...(opts.headers || {}) } });
       if (res.status === 401) {
-        location.href = "/login?next=/";
+        location.href = "/login?next=/board";
         throw new Error("unauthorized");
       }
       const data = await res.json().catch(() => ({}));
@@ -330,10 +330,6 @@
     }
 
     async function boot() {
-      if (!csrfToken()) {
-        location.href = "/login?next=/";
-        return;
-      }
       try {
         const me = await api("/api/whoami");
         caps = me;
@@ -355,7 +351,7 @@
         setConnected(false, "sign in required");
         caps = null;
         if (String(err.message || "").toLowerCase().includes("401") || String(err.message || "").includes("unauthorized")) {
-          location.href = "/login?next=/";
+          location.href = "/login?next=/board";
           return;
         }
         document.getElementById("stats").textContent = err.message;

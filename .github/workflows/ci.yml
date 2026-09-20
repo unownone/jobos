@@ -37,7 +37,7 @@ jobs:
         run: uv sync --frozen --group dev
 
       - name: Ruff
-        run: uv run ruff check . ../scripts
+        run: uv run ruff check . ../scripts ../e2e
 
   test:
     name: test
@@ -86,3 +86,55 @@ jobs:
 
       - name: E2E tests (in-process HTTP TestClient)
         run: uv run pytest -m e2e --strict-markers --tb=short
+
+  e2e-browser:
+    name: e2e-browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+          cache-dependency-glob: e2e/uv.lock
+
+      - name: Install e2e (Playwright)
+        working-directory: e2e
+        run: uv sync --frozen
+
+      - name: Install Chromium
+        working-directory: e2e
+        run: uv run playwright install --with-deps chromium
+
+      - name: Compose Hub
+        run: docker compose -f docker-compose.e2e.yml -p jobos-e2e up -d --build
+
+      - name: Wait for Hub
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:18787/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.e2e.yml -p jobos-e2e logs
+          exit 1
+
+      - name: Playwright flows
+        working-directory: e2e
+        env:
+          E2E_HUB_URL: http://127.0.0.1:18787
+          E2E_BACKEND: external
+        run: uv run pytest --strict-markers --tb=short
+
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.e2e.yml -p jobos-e2e logs --tail=200
+
+      - name: Tear down Compose
+        if: always()
+        run: docker compose -f docker-compose.e2e.yml -p jobos-e2e down -v

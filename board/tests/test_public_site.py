@@ -73,6 +73,13 @@ def test_public_css_and_fonts_are_reachable(tmp_path: Path) -> None:
     assert js.status_code == 200
 
 
+def test_public_js_rewrites_login_when_session_exists() -> None:
+    js = Path(__file__).resolve().parents[1] / "app" / "static" / "public.js"
+    text = js.read_text(encoding="utf-8")
+    assert "/api/auth/me" in text
+    assert "Open board" in text
+
+
 def test_hub_and_public_share_one_theme_file() -> None:
     static = Path(__file__).resolve().parents[1] / "app" / "static"
     theme = (static / "theme.css").read_text(encoding="utf-8")
