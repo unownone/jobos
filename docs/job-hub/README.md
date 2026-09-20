@@ -20,7 +20,7 @@ This folder is the **design handoff** for turning the live hunt board into a **d
 | [02-architecture.md](02-architecture.md) | Components, data model, queues, APIs, UI surfaces. |
 | [03-pr-plan.md](03-pr-plan.md) | Independently mergeable phases A–H + implementer prompts. |
 
-Shipped vs spec (document, do not “fix” here): no `POST /api/auth/bootstrap/rotate`; join HTML is `/join/{id}?s=`; people are outreach+admin only; agents cannot `GET /api/presence`; `apply.ready` is system-enqueue; catalog stale on `discovery.search` is 409 (or the kind is dropped from a mixed claim); `HUB_DATA_KEY` unused; compat `X-Role`/`X-Token` still works with `compat_deprecated` on whoami.
+Shipped vs spec (document, do not “fix” here): no `POST /api/auth/bootstrap/rotate`; join HTML is `/join/{id}?s=`; people are outreach+admin only; agents cannot `GET /api/presence`; `apply.ready` is system-enqueue; catalog stale on `discovery.search` is 409 (or the kind is dropped from a mixed claim); `HUB_DATA_KEY` unused; compat `X-Role`/`X-Token` still works with `compat_deprecated` on whoami; presence auto-heartbeats on authenticated API actions and is stale after 5 minutes (grilling Q15 still says 10s/30s).
 
 ## What exists today (do not re-invent)
 

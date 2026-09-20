@@ -77,7 +77,13 @@ from app.permissions import (
     validate_status,
 )
 from app.profile import candidate_onboarded, hydrate_tenant_candidate, hub_public_candidate_status
-from app.presence import mount_presence
+from app.presence import (
+    HEARTBEAT_S,
+    STALE_AFTER_S,
+    mount_presence,
+    wrap_optional_principal_with_activity,
+    wrap_principal_with_activity,
+)
 from app.queue import QUEUE_KINDS, QueueService, register_queue_routes
 from app.registry import create_registry_router
 from app.tenant import AccountError, AccountService, TenantContext
@@ -333,8 +339,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     blobs = build_blob_store(root=None if blob_memory else settings.blob_root, memory=blob_memory)
     db.set_blob_store(blobs)
     metrics = MetricsStore(db.conn)
-    principal_dep = require_principal(settings, db)
-    optional_principal_dep = optional_principal(settings, db)
+    principal_dep = wrap_principal_with_activity(require_principal(settings, db), db)
+    optional_principal_dep = wrap_optional_principal_with_activity(
+        optional_principal(settings, db), db
+    )
     pack = PackStore(settings)
     pack.ensure_current()
     bus = build_queue_bus(amqp_url=settings.amqp_url, adapter=settings.queue_adapter)
@@ -804,7 +812,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
             "capabilities": capabilities(principal.role),
             "owner": "maintainer",
-            "heartbeat_s": 10,
+            "heartbeat_s": HEARTBEAT_S,
+            "stale_after_s": STALE_AFTER_S,
             "queue_kinds": list(QUEUE_KINDS),
             "queue_lease_m": 15,
             "registry": "/api/registry/skills",

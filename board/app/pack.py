@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from app.bootstrap import public_base
-from app.constants import TRACKS, canonical_track
+from app.constants import HEARTBEAT_S, STALE_AFTER_S, TRACKS, canonical_track
 from app.profile import public_candidate_at, public_candidate_for_settings
 from app.settings import Settings
 
@@ -588,7 +588,8 @@ class PackStore:
             "mcp_example": "/api/mcp/example.json",
             "scripts": self.script_entries(),
             "connectors_needed": connectors_for_track(key),
-            "heartbeat_s": 10,
+            "heartbeat_s": HEARTBEAT_S,
+            "stale_after_s": STALE_AFTER_S,
             "memory": {
                 "recall": "/api/memory/recall",
                 "write": "/api/memory/items",

@@ -49,7 +49,8 @@ The page loads JSON from `GET /api/join/{invite_id}?s=`. That payload is **not**
 - `expires_at`, `remaining` redemptions, `allow_multiple_owners`
 - `hub.public_url`, `hub.pack_sha`, `hub.git_sha`
 - `candidate.present` (false until the human finishes `/onboarding` — **do not invent one**). Join is blocked until then.
-- `heartbeat_s` (10)
+- `heartbeat_s` (10, optional explicit ping)
+- `stale_after_s` (300 — silent for 5 minutes → stale)
 - `join` instructions (`POST /api/auth/join`)
 - `onboarding`: URLs for pack JSON/zip/docs/skills/scripts, `catalog_updated_at`
 - `metadata_known_keys`: model, harness, bed, provider, runtime, version, capabilities, notes
@@ -207,7 +208,9 @@ curl -sS -X POST "$HUB_URL/api/registry/recordings/${REC_ID}/promote" \
 
 Contract: [`docs/catalogs/skill-outline.md`](../catalogs/skill-outline.md).
 
-## Heartbeat (10s)
+## Presence
+
+Any authenticated Hub action (jobs, queue, registry, whoami, …) records a heartbeat. You can still POST an explicit ping; you do not need a 10s loop.
 
 ```bash
 curl -sS -X POST "$HUB_URL/api/presence/heartbeat" \
@@ -216,7 +219,7 @@ curl -sS -X POST "$HUB_URL/api/presence/heartbeat" \
   -d '{"status_hint":"working","task_id":"optional-queue-id","job_id":null,"producing":false}'
 ```
 
-Client interval: **10 seconds**. Server `stale_after_s`: **30**. Response includes `status` (`logged_in` | `working` | `idle` | `producing` | `stale`), `pending_messages`, compact `memory` (worker + track + common facts), and `self` (no keys).
+Optional client interval: **10 seconds** (useful during a long Playwright fill with no Hub calls). Server `stale_after_s`: **300** (5 minutes). Directory rows include `last_seen` (ISO) and `last_active` (`Last active: 2m ago`). Response includes `status` (`logged_in` | `working` | `idle` | `producing` | `stale`), `pending_messages`, compact `memory` (worker + track + common facts), and `self` (no keys).
 
 Optional body: `status_hint`, `task_id`, `task_kind`, `job_id`, `producing`. Unauthenticated → 401.
 
@@ -360,7 +363,7 @@ Export: [human.md](human.md) (`GET /api/export/ledger`). Agents on maintenance/a
 
 ## Track loops (one-pagers)
 
-Cookie CSRF does not apply to Bearer `$HUB_KEY`. Loop: onboarding → heartbeat every 10s (**read `memory`**) → `GET /api/memory/recall` at the start of a work round → `GET /api/registry/skills` for the matching tag → claim → do the skill → patch job / people / events as allowed → maybe `POST /api/memory/items` (0–2 durable facts; solidify track/common facts that should become skills) → ack → read messages. Forks stay `scope=local`. Push recordings; do not claim `skill.record` unless you are maintenance.
+Cookie CSRF does not apply to Bearer `$HUB_KEY`. Loop: onboarding → Hub API calls (each one is a heartbeat; **read `memory`** on an explicit ping or recall) → `GET /api/memory/recall` at the start of a work round → `GET /api/registry/skills` for the matching tag → claim → do the skill → patch job / people / events as allowed → maybe `POST /api/memory/items` (0–2 durable facts; solidify track/common facts that should become skills) → ack → read messages. Forks stay `scope=local`. Push recordings; do not claim `skill.record` unless you are maintenance.
 
 ### Discovery
 

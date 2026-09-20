@@ -54,7 +54,10 @@ not ack recordings into shared.
 
 curl -sS "$HUB_URL/api/memory/recall" -H "Authorization: Bearer $HUB_KEY"
 
-Heartbeat (10s) already includes a compact memory card. Store 0–2 track/common
+Any Hub API call with Bearer $HUB_KEY is a heartbeat. Optional explicit
+POST /api/presence/heartbeat (10s) if you sit in a browser with no Hub
+calls. Silent for 5 minutes → stale. Compact memory card is on the
+explicit ping and on queue claim. Store 0–2 track/common
 facts per round if another bot needs them tomorrow. Solidify track/common facts
 that should become skills: POST /api/memory/items/{id}/solidify.
 

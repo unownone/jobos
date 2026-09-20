@@ -88,7 +88,7 @@ The Hub POSTs A2A `message/send` to the peer’s `url`. Do not put peer secrets 
 1. Human onboarded the candidate (`GET /health` → `candidate_onboarded: true`).
 2. Agent joins a track (`docs/job-hub/agent.md`) **or** already has `$HUB_KEY`.
 3. `GET /.well-known/agent-card.json`.
-4. Heartbeat `/api/presence/heartbeat` every 10s.
+4. Call Hub APIs (each call is a heartbeat). Optional: `POST /api/presence/heartbeat` during long idle browser work. Stale after 5 minutes.
 5. Claim Hub queue work **or** `message/send` a handoff/question/block.
 6. `tasks/get` if you need the Task record.
 

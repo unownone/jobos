@@ -35,13 +35,13 @@
     <button class="secondary" type="button" id="logout">Log out</button>
   </header>
   <main class="hub-page" id="main">
-    <p>Logged in and heartbeating operators. API keys are never shown.</p>
+    <p>Operators and agents. Any Hub action counts as a heartbeat; stale after 5 minutes. API keys are never shown.</p>
     <table class="hub-cards">
       <thead>
         <tr>
           <th>Name</th><th>Kind</th><th>Track / role</th><th>Status</th>
           <th>Model</th><th>Harness</th><th>Bed</th>
-          <th>Last seen</th><th>Task</th>
+          <th>Last active</th><th>Task</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -84,7 +84,7 @@
           "<td data-label='Model'>" + (u.model || "") + "</td>" +
           "<td data-label='Harness'>" + (u.harness || "") + "</td>" +
           "<td data-label='Bed'>" + (u.bed || "") + "</td>" +
-          "<td data-label='Last seen'>" + (u.last_seen || "") + "</td>" +
+          "<td data-label='Last active'>" + (u.last_active || u.last_seen || "") + "</td>" +
           "<td data-label='Task'>" + task + "</td>";
         tb.appendChild(tr);
       });

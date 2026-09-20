@@ -12,7 +12,7 @@ Lives **inside Hub PostgreSQL**. Same Compose file. Postgres is not published on
 | Qdrant + Ollama | Extra Compose services, RAM, and an embedding model for facts that are already short text. |
 | Hosted memory SaaS | Not self-hosted. Secrets would leave the hunt host. |
 
-Job Hub is already the only non-AI component. Agents already heartbeat every 10s and claim queue work. Recall piggybacks those calls. Retrieval is PostgreSQL `ILIKE` over short facts. That is the efficient fit.
+Job Hub is already the only non-AI component. Agents already call Hub APIs (each call is a heartbeat) and claim queue work. Recall piggybacks those calls. Retrieval is PostgreSQL `ILIKE` over short facts. That is the efficient fit.
 
 ## Pods
 

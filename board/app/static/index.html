@@ -94,7 +94,7 @@
   <main class="hub-board" id="main">
     <aside id="presenceRail">
       <h2>Presence</h2>
-      <div class="muted" id="presenceEmpty">Workers appear here when they heartbeat. Click one to see what they are doing.</div>
+      <div class="muted" id="presenceEmpty">Workers appear here when they take Hub actions. Click one to see what they are doing.</div>
       <div id="presenceList"></div>
       <h2>Memory</h2>
       <div class="muted" id="memoryEmpty">Heartbeat recalls worker + track + common facts each round.</div>
@@ -254,7 +254,7 @@
       const list = document.getElementById("presenceList");
       if (!users || !users.length) {
         empty.hidden = false;
-        empty.textContent = "No heartbeats yet. Workers appear when they check in.";
+        empty.textContent = "No workers yet. They appear when they call the Hub.";
         list.innerHTML = "";
         return;
       }
@@ -266,7 +266,7 @@
           <div class="name">${escapeHtml(u.display_name || uid)}</div>
           <div>${pill(u.status || "offline")} <span class="muted">${escapeHtml(u.kind || "")} · ${escapeHtml(u.track || u.role || "")}</span></div>
           <div class="muted">${escapeHtml([u.model, u.harness, u.bed].filter(Boolean).join(" · "))}</div>
-          <div class="muted">${escapeHtml(u.last_seen || "")}${task ? " · " + escapeHtml(task) : ""}</div>
+          <div class="muted">${escapeHtml(u.last_active || u.last_seen || "")}${task ? " · " + escapeHtml(task) : ""}</div>
         </div>`;
       }).join("");
       list.querySelectorAll(".who[data-id]").forEach((el) => {
@@ -310,7 +310,7 @@
           <button class="iconx" id="closeSide" type="button" aria-label="Close">X</button>
         </div>
         <p>${pill(u.status || "offline")} <span class="muted">${escapeHtml(u.kind || "")} · ${escapeHtml(u.track || u.role || "")}</span></p>
-        <p class="muted">${escapeHtml(u.last_seen || "")}</p>
+        <p class="muted">${escapeHtml(u.last_active || u.last_seen || "")}</p>
         ${job ? `<div class="warnbox">Working on ${escapeHtml(job.id)} · ${escapeHtml(job.company)} · ${escapeHtml(job.title)}</div>` : ""}
         <h2>Tools used</h2>
         ${tools.length ? tools.map((t) => `<div class="event">${escapeHtml(t.tool_name)} · ${escapeHtml(t.skill || "")} · ${t.n} calls · ${t.tokens} tokens</div>`).join("") : "<div class='muted'>No token-burn rows yet.</div>"}
