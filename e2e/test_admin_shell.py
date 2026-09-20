@@ -37,6 +37,9 @@ def test_nav_pages_load_for_admin(page: Page) -> None:
         page.goto(path)
         expect(page.locator(who)).not_to_contain_text("Checking session", timeout=15_000)
         expect(page.locator(who)).not_to_contain_text("signing in")
+    page.goto("/board")
+    expect(page.locator("#whoLabel")).to_contain_text("admin", timeout=15_000)
+    expect(page.locator("#list")).not_to_contain_text("Sign in as the Hub admin")
 
 
 def test_invites_skills_memory_and_data_tabs(page: Page) -> None:
