@@ -493,3 +493,29 @@ def candidate_onboarded(
     settings: Settings, db: Any | None = None, *, tenant: TenantContext | None = None
 ) -> bool:
     return bool(candidate_status(settings, db, tenant=tenant)["onboarded"])
+
+
+def hub_public_candidate_status(
+    settings: Settings, db: Any | None = None, *, tenant: TenantContext | None = None
+) -> dict[str, Any]:
+    """Candidate status for public Hub surfaces (health, unauthenticated gates).
+
+    Prefer ``tenant`` when given. If that slice is not onboarded and the caller
+    is unscoped or the compat account, fall back to the first admin tenant —
+    the same predicate ``GET /health`` uses. A real non-compat tenant without a
+    profile stays not-onboarded (do not invent a candidate).
+    """
+    status = candidate_status(settings, db, tenant=tenant)
+    if status["onboarded"]:
+        return status
+    if db is None:
+        return status
+    scoped = tenant is not None and tenant.account_id != COMPAT_ACCOUNT_ID
+    if scoped:
+        return status
+    operator = db.operator_tenant()
+    if operator is None:
+        return status
+    if tenant is not None and operator.account_id == tenant.account_id:
+        return status
+    return candidate_status(settings, db, tenant=operator)
