@@ -406,6 +406,28 @@ def validate_profile(data: dict[str, Any]) -> list[str]:
     return missing
 
 
+def load_candidate_mapping(
+    settings: Settings, db: Any | None = None, *, tenant: TenantContext | None = None
+) -> dict[str, Any] | None:
+    """Return the stored candidate as a normalized mapping, or None if missing."""
+    text = candidate_blob_text(db, tenant=tenant)
+    if text is not None and text.strip():
+        try:
+            loaded = yaml.safe_load(text)
+        except yaml.YAMLError:
+            return None
+        if isinstance(loaded, dict):
+            return normalize_profile(loaded)
+        return None
+    path = resolve_candidate_path(settings)
+    if _compat_disk_ok(tenant) and path is not None and path.is_file():
+        try:
+            return normalize_profile(load_profile_dict(path))
+        except (OSError, yaml.YAMLError, ValueError):
+            return None
+    return None
+
+
 def dump_profile_yaml(data: dict[str, Any]) -> str:
     normalized = normalize_profile(data)
     header = (

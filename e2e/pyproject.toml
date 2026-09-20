@@ -1,0 +1,18 @@
+[project]
+name = "jobos-e2e"
+version = "0.1.0"
+description = "Playwright browser e2e for jobOS Hub"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "pytest>=8",
+  "pytest-playwright>=0.7",
+  "pgserver>=0.1.4; sys_platform != 'linux' or platform_machine != 'aarch64'",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+pythonpath = ["."]
+addopts = "-ra --strict-markers --tb=short"
+markers = [
+  "browser: Playwright tests against a live Hub (Compose or local uvicorn)",
+]

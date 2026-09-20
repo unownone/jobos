@@ -41,6 +41,7 @@ markers = [
   "no_candidate: do not seed a candidate.yaml fixture (gate tests)",
   "e2e: in-process HTTP TestClient / page contract tests (no extra server)",
   "unit: fast tests that do not boot the FastAPI app",
+  "browser: Playwright tests against a live Hub (Compose or local uvicorn)",
 ]
 
 [tool.ruff]

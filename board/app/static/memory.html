@@ -208,12 +208,12 @@
           method: "POST",
           body: JSON.stringify(composePayload()),
         });
-        document.getElementById("compose-status").textContent =
-          data.status === "exists" ? "Already stored." : "Stored.";
-        document.getElementById("compose-status").className = "ok";
         resetCompose();
         fillKinds(document.getElementById("write-kind"), scopeOf(document.getElementById("write-pod").value));
         await load();
+        document.getElementById("compose-status").textContent =
+          data.status === "exists" ? "Already stored." : "Stored.";
+        document.getElementById("compose-status").className = "ok";
       } catch (err) {
         document.getElementById("compose-status").textContent = String(err.message || err);
         document.getElementById("compose-status").className = "err";
@@ -228,11 +228,11 @@
           method: "PATCH",
           body: JSON.stringify({ title: payload.title, body: payload.body }),
         });
-        document.getElementById("compose-status").textContent = "Updated.";
-        document.getElementById("compose-status").className = "ok";
         resetCompose();
         fillKinds(document.getElementById("write-kind"), scopeOf(document.getElementById("write-pod").value));
         await load();
+        document.getElementById("compose-status").textContent = "Updated.";
+        document.getElementById("compose-status").className = "ok";
       } catch (err) {
         document.getElementById("compose-status").textContent = String(err.message || err);
         document.getElementById("compose-status").className = "err";

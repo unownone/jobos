@@ -45,3 +45,26 @@ def test_authenticated_pages_have_mobile_dock() -> None:
         assert "hub-dock" in text, name
         assert "hub-rail" in text, name
         assert "/admin/memory" in text, name
+
+
+def test_onboarding_prefills_saved_profile_and_stays_in_hub() -> None:
+    text = (STATIC / "onboarding.html").read_text(encoding="utf-8")
+    assert "function fillForm" in text
+    assert "function loadProfile" in text
+    assert 'Accept: "application/json"' in text
+    assert 'location.href = "/board"' in text
+    assert 'location.href = "/"' not in text
+    assert 'location.href = "/admin"' not in text
+
+
+def test_board_unauthorized_stays_on_hub_login_next() -> None:
+    text = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert "/login?next=/board" in text
+    assert '"/login?next=/"' not in text
+    assert "'/login?next=/'" not in text
+
+
+def test_login_treats_public_next_as_board() -> None:
+    text = (STATIC / "login.html").read_text(encoding="utf-8")
+    assert "function nextPath" in text
+    assert 'requested === "/"' in text

@@ -60,6 +60,12 @@ def test_cannot_read_other_worker_pod() -> None:
         resolve_read_pod(p, "worker:usr_other")
 
 
+def test_mixed_case_worker_pod_id_is_own() -> None:
+    p = _principal(user_id="usr_AbC123")
+    assert resolve_write_pod(p, "worker:usr_AbC123") == "worker:usr_AbC123"
+    assert worker_pod_id(p) == "worker:usr_AbC123"
+
+
 def test_inspector_can_read_other_track() -> None:
     admin = _principal(role="admin", kind="admin", track=None, user_id="usr_admin")
     assert resolve_read_pod(admin, "track:discovery") == "track:discovery"

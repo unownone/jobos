@@ -458,14 +458,12 @@ def disable_agent(db: BoardDB, user: dict[str, Any]) -> dict[str, Any]:
     return public_user(stored)
 
 
-def join_payload(
-    settings: Settings, invite: dict[str, Any], db: BoardDB | None = None
-) -> dict[str, Any]:
+def join_payload(settings: Settings, invite: dict[str, Any], db: BoardDB | None = None) -> dict[str, Any]:
     track = invite["track"]
     pack_fields = hub_pack_fields(settings)
-    tenant = TenantContext(str(invite["account_id"]))
-    candidate = public_candidate_for_settings(settings, db, tenant=tenant)
-    status = candidate_status(settings, db, tenant=tenant)
+    tenant = TenantContext(str(invite.get("account_id") or COMPAT_ACCOUNT_ID))
+    candidate = public_candidate_for_settings(settings, db=db, tenant=tenant)
+    status = candidate_status(settings, db=db, tenant=tenant)
     onboarded = bool(status["onboarded"])
     return {
         "hub": {
