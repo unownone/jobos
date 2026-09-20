@@ -1,8 +1,11 @@
 """Heartbeat, live presence, and admin/owner directory. Phase C.
 
-`POST /api/presence/heartbeat` is the only heartbeat route. Inbox
-`pending_messages` is the unread count from the messages store (Phase G).
-Never return API keys, hashes, or secrets in directory payloads.
+Any authenticated Hub action records a heartbeat. Agents may still
+`POST /api/presence/heartbeat` (optional; useful for long idle browser
+sessions). Server marks presence stale after 5 minutes of silence.
+
+Inbox `pending_messages` is the unread count from the messages store
+(Phase G). Never return API keys, hashes, or secrets in directory payloads.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict
 
 from app.auth import Principal
-from app.constants import ROLE_TO_TRACK, role_for_track
+from app.constants import HEARTBEAT_S, ROLE_TO_TRACK, STALE_AFTER_S, role_for_track
 from app.db import BoardDB
 from app.message_store import count_unread
 from app.memory_store import row_to_item, safe_compact_recall
@@ -25,11 +28,11 @@ from app.tenant import TenantContext
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-HEARTBEAT_S = 10
-STALE_AFTER_S = 30
 IDLE_AFTER_S = 60
 PRODUCING_WRITE_S = 60
 SESSION_GRACE_S = 60
+WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+OBSERVER_GET_PATHS = frozenset({"/api/presence", "/api/users"})
 
 PRESENCE_STATUSES = (
     "logged_in",
@@ -80,6 +83,28 @@ def age_seconds(then: datetime | None, now: datetime) -> float | None:
     if then is None:
         return None
     return (now - then).total_seconds()
+
+
+def format_last_active(last_seen: datetime | None, now: datetime) -> str | None:
+    """Human label for the presence rail: 'Last active: 2m ago'."""
+    if last_seen is None:
+        return None
+    seconds = age_seconds(last_seen, now)
+    if seconds is None:
+        return None
+    if seconds < 0:
+        seconds = 0
+    if seconds < 10:
+        rel = "just now"
+    elif seconds < 60:
+        rel = f"{int(seconds)}s ago"
+    elif seconds < 3600:
+        rel = f"{int(seconds // 60)}m ago"
+    elif seconds < 86400:
+        rel = f"{int(seconds // 3600)}h ago"
+    else:
+        rel = last_seen.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return f"Last active: {rel}"
 
 
 def clock_from_request(request: Request) -> Clock:
@@ -183,6 +208,7 @@ def public_presence(
     row: dict[str, Any] | None,
     status: str,
     last_seen: str | None,
+    now: datetime | None = None,
     compat_actor: str | None = None,
     compat_role: str | None = None,
 ) -> dict[str, Any]:
@@ -194,6 +220,7 @@ def public_presence(
     role = "admin" if stored_kind == "admin" else (role_for_track(track) or compat_role or "")
     if stored_kind == "viewer":
         role = "maintenance"
+    clock = now or datetime.now(timezone.utc)
     payload = {
         "user_id": user_id,
         "display_name": (user or {}).get("display_name") or compat_actor or user_id,
@@ -204,6 +231,7 @@ def public_presence(
         "harness": meta.get("harness"),
         "bed": meta.get("bed"),
         "last_seen": last_seen,
+        "last_active": format_last_active(parse_ts(last_seen), clock),
         "status": status,
         "current_task": current_task_payload(row),
     }
@@ -223,15 +251,164 @@ def _compat_user_id(principal: Principal) -> str:
     return f"compat:{principal.role}:{actor}"
 
 
-def _require_presence_identity(principal: Principal) -> str:
+def activity_user_id(principal: Principal) -> str | None:
     if principal.user_id:
         return principal.user_id
     if principal.auth == "compat_role":
         return _compat_user_id(principal)
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="hub identity required (Bearer key or session)",
+    return None
+
+
+def infer_task_from_request(request: Request) -> tuple[str | None, str | None, str | None]:
+    path = request.url.path or ""
+    if path.startswith("/api/jobs/"):
+        job_id = path[len("/api/jobs/") :].split("/", 1)[0].strip()
+        if job_id:
+            return job_id, "job", job_id
+    return None, None, None
+
+
+def should_auto_heartbeat(request: Request) -> bool:
+    method = (request.method or "GET").upper()
+    if method in {"OPTIONS", "HEAD"}:
+        return False
+    path = request.url.path or ""
+    cleaned = path.rstrip("/") or "/"
+    if cleaned == "/api/presence/heartbeat":
+        return False
+    if method == "GET":
+        if cleaned in OBSERVER_GET_PATHS:
+            return False
+        if cleaned.startswith("/api/presence/"):
+            return False
+        if path.startswith("/static/") or path.startswith("/brand/"):
+            return False
+    return True
+
+
+def record_activity(
+    db: BoardDB,
+    principal: Principal,
+    request: Request,
+    *,
+    status_hint: str | None = None,
+    task_id: str | None = None,
+    task_kind: str | None = None,
+    job_id: str | None = None,
+    producing: bool | None = None,
+    explicit: bool = False,
+) -> dict[str, Any] | None:
+    """Upsert presence for this principal. Explicit POST replaces hint/task fields."""
+    user_id = activity_user_id(principal)
+    if not user_id:
+        if explicit:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="hub identity required (Bearer key or session)",
+            )
+        return None
+    now = clock_from_request(request)()
+    now_iso = iso_z(now)
+    existing = get_presence_row(db, user_id)
+    last_hb = parse_ts(existing.get("last_heartbeat") if existing else None)
+    stale_already = (
+        existing is None
+        or last_hb is None
+        or (age_seconds(last_hb, now) or 0) > STALE_AFTER_S
     )
+    connected_at = now_iso if stale_already else existing["connected_at"]
+    method = (request.method or "GET").upper()
+    is_write = method in WRITE_METHODS
+    if explicit:
+        hint = (status_hint or "").strip().lower() or None
+        next_task_id = (task_id or "").strip() or None
+        next_task_kind = (task_kind or "").strip() or None
+        next_job_id = (job_id or "").strip() or None
+        next_producing = bool(producing) or hint == "producing"
+    else:
+        inferred_task, inferred_kind, inferred_job = infer_task_from_request(request)
+        hint = (status_hint or (existing or {}).get("status_hint") or "").strip().lower() or None
+        if is_write and hint not in {"working", "producing"}:
+            hint = "working"
+        if not hint:
+            hint = "working" if is_write else "logged_in"
+        next_task_id = (existing or {}).get("task_id") or inferred_task
+        next_task_kind = (existing or {}).get("task_kind") or inferred_kind
+        next_job_id = (existing or {}).get("job_id") or inferred_job
+        next_producing = bool((existing or {}).get("producing"))
+        if is_write:
+            next_producing = True
+    producing_at = existing.get("producing_at") if existing else None
+    if next_producing and (explicit or is_write or not producing_at):
+        producing_at = now_iso
+    user = db.get_user(user_id) if principal.user_id else None
+    claim = active_claim_for_user(db, user_id, now) if principal.user_id else None
+    write_since = iso_z(now - timedelta(seconds=PRODUCING_WRITE_S))
+    recent_write = bool(user) and user_has_event_since(db, user, write_since, principal.tenant)
+    computed = derive_status(
+        last_heartbeat=now,
+        connected_at=parse_ts(connected_at),
+        status_hint=hint,
+        producing_flag=next_producing,
+        has_claim=bool(claim),
+        recent_write=recent_write,
+        now=now,
+    )
+    stored = upsert_presence_row(
+        db,
+        user_id=user_id,
+        status=computed,
+        status_hint=hint,
+        last_heartbeat=now_iso,
+        connected_at=connected_at,
+        task_id=next_task_id,
+        task_kind=next_task_kind,
+        job_id=next_job_id,
+        producing=next_producing,
+        producing_at=producing_at,
+        user_agent=request.headers.get("user-agent"),
+        tenant=principal.tenant,
+    )
+    return {
+        "user_id": user_id,
+        "user": user,
+        "stored": stored,
+        "status": computed,
+        "now": now,
+        "now_iso": now_iso,
+    }
+
+
+def wrap_principal_with_activity(principal_dep: Any, db: BoardDB) -> Any:
+    async def dependency(
+        request: Request,
+        principal: Principal = Depends(principal_dep),
+    ) -> Principal:
+        try:
+            if should_auto_heartbeat(request):
+                record_activity(db, principal, request, explicit=False)
+        except Exception:
+            pass
+        return principal
+
+    return dependency
+
+
+def wrap_optional_principal_with_activity(principal_dep: Any, db: BoardDB) -> Any:
+    async def dependency(
+        request: Request,
+        principal: Principal | None = Depends(principal_dep),
+    ) -> Principal | None:
+        if principal is None:
+            return None
+        try:
+            if should_auto_heartbeat(request):
+                record_activity(db, principal, request, explicit=False)
+        except Exception:
+            pass
+        return principal
+
+    return dependency
 
 
 PRESENCE_DDL = """
@@ -536,6 +713,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
                 row=row,
                 status=computed,
                 last_seen=last_seen,
+                now=now,
                 compat_actor=compat_actor,
                 compat_role=compat_role,
             )
@@ -558,6 +736,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
                 row=None,
                 status="logged_in",
                 last_seen=sess.get("last_seen"),
+                now=now,
             )
             seen.add(uid)
             out.append(item)
@@ -584,56 +763,34 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
                 status_code=422,
                 detail=f"status_hint must be one of {list(PRESENCE_STATUSES)}",
             )
-        user_id = _require_presence_identity(principal)
-        now = clock_from_request(request)()
-        now_iso = iso_z(now)
-        existing = get_presence_row(db, user_id)
-        last_hb = parse_ts(existing.get("last_heartbeat") if existing else None)
-        stale_already = (
-            existing is None
-            or last_hb is None
-            or (age_seconds(last_hb, now) or 0) > STALE_AFTER_S
-        )
-        connected_at = now_iso if stale_already else existing["connected_at"]
-        producing_at = existing.get("producing_at") if existing else None
-        if payload.producing or hint == "producing":
-            producing_at = now_iso
-        user = db.get_user(user_id) if principal.user_id else None
-        claim = active_claim_for_user(db, user_id, now) if principal.user_id else None
-        write_since = iso_z(now - timedelta(seconds=PRODUCING_WRITE_S))
-        recent_write = bool(user) and user_has_event_since(
-            db, user, write_since, principal.tenant
-        )
-        computed = derive_status(
-            last_heartbeat=now,
-            connected_at=parse_ts(connected_at),
-            status_hint=hint,
-            producing_flag=bool(payload.producing),
-            has_claim=bool(claim),
-            recent_write=recent_write,
-            now=now,
-        )
-        stored = upsert_presence_row(
+        recorded = record_activity(
             db,
-            user_id=user_id,
-            status=computed,
+            principal,
+            request,
             status_hint=hint,
-            last_heartbeat=now_iso,
-            connected_at=connected_at,
-            task_id=(payload.task_id or "").strip() or None,
-            task_kind=(payload.task_kind or "").strip() or None,
-            job_id=(payload.job_id or "").strip() or None,
-            producing=bool(payload.producing) or hint == "producing",
-            producing_at=producing_at,
-            user_agent=request.headers.get("user-agent"),
-            tenant=principal.tenant,
+            task_id=payload.task_id,
+            task_kind=payload.task_kind,
+            job_id=payload.job_id,
+            producing=payload.producing,
+            explicit=True,
         )
+        if recorded is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="hub identity required (Bearer key or session)",
+            )
+        stored = recorded["stored"]
+        computed = recorded["status"]
+        now_iso = recorded["now_iso"]
+        now = recorded["now"]
+        user = recorded["user"]
         self_row = public_presence(
-            user_id=user_id,
+            user_id=recorded["user_id"],
             user=user,
             row=stored,
             status=computed,
             last_seen=now_iso,
+            now=now,
             compat_actor=principal.actor if user is None else None,
             compat_role=principal.role if user is None else None,
         )
@@ -651,6 +808,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             "heartbeat_s": HEARTBEAT_S,
             "stale_after_s": STALE_AFTER_S,
             "last_seen": now_iso,
+            "last_active": self_row.get("last_active"),
             "pending_messages": count_unread(db, principal),
             "memory": memory,
             "candidate_revision": cand.get("revision"),
@@ -699,6 +857,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
             row=row,
             status=computed,
             last_seen=(row or {}).get("last_heartbeat"),
+            now=now,
             compat_actor=compat_actor,
             compat_role=compat_role,
         )
@@ -757,6 +916,7 @@ def create_presence_router(db: BoardDB, principal_dep: Any) -> APIRouter:
                 row=row,
                 status=computed or "offline",
                 last_seen=last_seen,
+                now=now,
             )
             item["disabled_at"] = user.get("disabled_at")
             item["email"] = user.get("email")

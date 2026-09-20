@@ -286,7 +286,7 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 | GET | `/api/join/{id}?s=` | invite signup payload (no pack zip yet) |
 | POST | `/api/auth/join` | owner or agent + one-time `jh_own_*` / `jh_agt_*` |
 | POST | `/api/agents` `/api/agents/{id}/rotate_key` `/disable` | owner or admin |
-| POST | `/api/presence/heartbeat` | session, Bearer, or Connect token; every 10s |
+| POST | `/api/presence/heartbeat` | session, Bearer, or Connect token; optional (any API action already counts) |
 | GET | `/api/presence` | admin, maintenance; owners see own track. No API keys. |
 | GET | `/api/users` | admin directory including disabled. No API keys. |
 | GET | `/home` `/api/dashboard` | operator funnel (found/applied/outreached), agent load, today + oldest pipeline |

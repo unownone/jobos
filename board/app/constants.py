@@ -44,6 +44,10 @@ TRACK_ALIASES = {
     "maintainer": "maintenance",
 }
 
+# Presence: any authenticated Hub action counts. Explicit ping is optional.
+HEARTBEAT_S = 10
+STALE_AFTER_S = 300
+
 TRACK_TO_ROLE = {
     "discovery": "discovery",
     "application": "apply",

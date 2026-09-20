@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.auth import require_principal
 from app.constants import ROLES
 from app.main import create_app
-from app.presence import STALE_AFTER_S, derive_status, mount_presence
+from app.presence import STALE_AFTER_S, derive_status, format_last_active, mount_presence
 from app.settings import Settings
 
 TOKENS = {role: f"test-token-{role}-not-real" for role in ROLES}
@@ -120,19 +120,25 @@ def test_heartbeat_logged_in_then_stale(hub: tuple[TestClient, Settings, Clock])
     body = ping.json()
     assert body["status"] == "logged_in"
     assert body["heartbeat_s"] == 10
-    assert body["stale_after_s"] == 30
+    assert body["stale_after_s"] == 300
+    assert body["last_active"].startswith("Last active:")
+    assert "just now" in body["last_active"]
     assert body["pending_messages"] == 0
     assert "api_key" not in str(body).lower()
     listed = client.get("/api/presence")
     assert listed.status_code == 200
     users = listed.json()["users"]
     assert any(u["status"] == "logged_in" for u in users)
+    assert any((u.get("last_active") or "").startswith("Last active:") for u in users)
     clock.advance(STALE_AFTER_S + 1)
     stale = client.get("/api/presence")
     assert stale.status_code == 200
-    statuses = {u["user_id"]: u["status"] for u in stale.json()["users"]}
+    stale_users = stale.json()["users"]
+    statuses = {u["user_id"]: u["status"] for u in stale_users}
     admin_id = client.get("/api/auth/me").json()["user_id"]
     assert statuses[admin_id] == "stale"
+    stale_row = next(u for u in stale_users if u["user_id"] == admin_id)
+    assert stale_row["last_active"] == "Last active: 5m ago"
 
 
 def test_idle_after_sixty_seconds_of_heartbeats(
@@ -362,7 +368,7 @@ def test_derive_status_unit() -> None:
     )
     assert (
         derive_status(
-            last_heartbeat=now - timedelta(seconds=31),
+            last_heartbeat=now - timedelta(seconds=301),
             connected_at=now - timedelta(seconds=40),
             status_hint="working",
             producing_flag=True,
@@ -396,3 +402,94 @@ def test_derive_status_unit() -> None:
         )
         == "producing"
     )
+    assert (
+        derive_status(
+            last_heartbeat=now - timedelta(seconds=31),
+            connected_at=now - timedelta(seconds=40),
+            status_hint="working",
+            producing_flag=True,
+            has_claim=True,
+            recent_write=True,
+            now=now,
+        )
+        == "producing"
+    )
+
+
+def test_format_last_active_unit() -> None:
+    now = datetime(2026, 9, 20, 12, 0, 0, tzinfo=timezone.utc)
+    assert format_last_active(None, now) is None
+    assert format_last_active(now - timedelta(seconds=3), now) == "Last active: just now"
+    assert format_last_active(now - timedelta(seconds=12), now) == "Last active: 12s ago"
+    assert format_last_active(now - timedelta(seconds=301), now) == "Last active: 5m ago"
+    assert format_last_active(now - timedelta(hours=2), now) == "Last active: 2h ago"
+    assert (
+        format_last_active(now - timedelta(days=2), now) == "Last active: 2026-09-18 12:00 UTC"
+    )
+
+
+def test_api_action_is_heartbeat_without_manual_ping(
+    hub: tuple[TestClient, Settings, Clock],
+) -> None:
+    client, _settings, clock = hub
+    bootstrap_admin(client)
+    owner = invite_join(client, track="discovery", display_name="auto-bot")
+    key = owner["api_key"]
+    before = client.get("/api/presence")
+    assert all(u["display_name"] != "auto-bot" for u in before.json()["users"])
+    meta = client.get("/api/whoami", headers={"Authorization": f"Bearer {key}"})
+    assert meta.status_code == 200, meta.text
+    listed = client.get("/api/presence")
+    row = next(u for u in listed.json()["users"] if u["display_name"] == "auto-bot")
+    assert row["status"] in {"logged_in", "idle", "working", "producing"}
+    assert row["last_active"] == "Last active: just now"
+    clock.advance(STALE_AFTER_S - 10)
+    still = client.get("/api/presence")
+    live = next(u for u in still.json()["users"] if u["display_name"] == "auto-bot")
+    assert live["status"] != "stale"
+    clock.advance(20)
+    stale = client.get("/api/presence")
+    gone = next(u for u in stale.json()["users"] if u["display_name"] == "auto-bot")
+    assert gone["status"] == "stale"
+    assert gone["last_active"] == "Last active: 5m ago"
+
+
+def test_job_write_marks_agent_producing(
+    hub: tuple[TestClient, Settings, Clock],
+) -> None:
+    client, _settings, _clock = hub
+    bootstrap_admin(client)
+    owner = invite_join(client, track="discovery", display_name="writer-bot")
+    key = owner["api_key"]
+    created = client.post(
+        "/api/jobs",
+        headers={"Authorization": f"Bearer {key}"},
+        json={
+            "id": "auto__presence",
+            "company": "Acme",
+            "title": "Staff",
+            "status": "discovered",
+        },
+    )
+    assert created.status_code == 201, created.text
+    listed = client.get("/api/presence")
+    row = next(u for u in listed.json()["users"] if u["display_name"] == "writer-bot")
+    assert row["status"] == "producing"
+    assert row["last_active"].startswith("Last active:")
+
+
+def test_presence_list_does_not_refresh_other_agents(
+    hub: tuple[TestClient, Settings, Clock],
+) -> None:
+    client, _settings, clock = hub
+    bootstrap_admin(client)
+    owner = invite_join(client, track="discovery", display_name="quiet-bot")
+    key = owner["api_key"]
+    client.get("/api/whoami", headers={"Authorization": f"Bearer {key}"})
+    clock.advance(STALE_AFTER_S + 1)
+    listed = client.get("/api/presence")
+    row = next(u for u in listed.json()["users"] if u["display_name"] == "quiet-bot")
+    assert row["status"] == "stale"
+    listed_again = client.get("/api/presence")
+    row_again = next(u for u in listed_again.json()["users"] if u["display_name"] == "quiet-bot")
+    assert row_again["status"] == "stale"

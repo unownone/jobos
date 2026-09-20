@@ -10,8 +10,10 @@ from fastapi import HTTPException, Response, status
 
 from app.bootstrap import SESSION_IDLE, new_id, public_base, sha256_hex
 from app.constants import (
+    HEARTBEAT_S,
     INVITE_MODES,
     METADATA_KNOWN_KEYS,
+    STALE_AFTER_S,
     TRACKS,
     canonical_track,
     role_for_track,
@@ -492,7 +494,8 @@ def join_payload(settings: Settings, invite: dict[str, Any], db: BoardDB | None 
         },
         "join_blocked": not onboarded,
         "onboarding": join_onboarding_section(settings, invite),
-        "heartbeat_s": 10,
+        "heartbeat_s": HEARTBEAT_S,
+        "stale_after_s": STALE_AFTER_S,
         "memory": {
             "recall": "/api/memory/recall",
             "write": "/api/memory/items",

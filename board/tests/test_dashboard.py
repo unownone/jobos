@@ -180,7 +180,8 @@ def test_dashboard_funnel_today_and_oldest(client: TestClient) -> None:
     assert oldest["pay"] == "$160k"
     assert oldest["days_in_pipeline"] >= 39
     assert body["agents"]["total"] == 0
-    assert body["agents"]["working"] == 0
+    assert body["agents"]["working"] >= 1
+    assert body["agents"]["live"] >= 1
     page = client.get("/home", headers=h("admin"))
     assert page.status_code == 200
     assert "Hunt funnel" in page.text

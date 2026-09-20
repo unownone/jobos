@@ -287,7 +287,7 @@ Auth: session, Bearer / `X-Hub-Key`, or compat role token. Unauthenticated → 4
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| POST | `/api/presence/heartbeat` | any_user | 10s ping |
+| POST | `/api/presence/heartbeat` | any_user | optional ping; any API action already counts; stale after 5m |
 | GET | `/api/presence` | admin, maintenance; owners: own track | Directory |
 | GET | `/api/users` | admin | Same + disabled |
 
