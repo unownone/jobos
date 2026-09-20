@@ -25,6 +25,7 @@ def _onboarded_admin(page: Page) -> str:
 def test_nav_pages_load_for_admin(page: Page) -> None:
     _onboarded_admin(page)
     pages = [
+        ("/home", "#whoLabel"),
         ("/board", "#whoLabel"),
         ("/admin", "#who"),
         ("/admin/users", "#who"),

@@ -25,13 +25,14 @@ One private board for sibling agents — not a spreadsheet, not a consumer job b
 
 - FastAPI serves static HTML from `board/app/static/`; sessions are cookie + CSRF. Agents use Bearer keys.
 - Airgap fallback is git `ledger/`; this UI is the live plane.
-- Must keep working IDs/copy that tests pin: `Select a job`, `All statuses`, `jobOS Harness`, `helps find jobs`, `Skill registry`, `Memory pods`, `jobOS data`, `Candidate onboarding`, `Directory`, `Join`, `data-solidify`, `id="add-item"`.
+- Must keep working IDs/copy that tests pin: `All statuses`, `jobOS Harness`, `helps find jobs`, `Hunt funnel`, `Skill registry`, `Memory pods`, `jobOS data`, `Candidate onboarding`, `Directory`, `Join`, `data-solidify`, `id="add-item"`.
 - No invented candidate, employers, or metrics in the UI.
 
 ## Capabilities and Constraints
 
-- Pages: `/` public landing, `/start` public get-started, `/board` operator board, `/login`, `/admin/signup`, `/onboarding`, `/admin` invites, `/admin/data`, `/admin/users`, `/admin/skills`, `/admin/memory`, `/join/{id}`.
-- Board: search/filter jobs, open a row, patch allowed fields, pause/stop/resume/delete, presence rail, memory from heartbeat, hygiene for admins.
+- Pages: `/` public landing, `/start` public get-started, `/home` operator dashboard, `/board` operator board, `/login`, `/admin/signup`, `/onboarding`, `/admin` invites, `/admin/data`, `/admin/users`, `/admin/skills`, `/admin/memory`, `/join/{id}`.
+- Board: search/filter/paginate jobs, open a row (ticket hidden until then), patch allowed fields including job description / expectations / pay / posted date, pause/stop/resume/delete, presence rail, memory from heartbeat, hygiene for admins.
+- Home: funnel (found → applied → outreached), agent total vs working, jobs found/applied today, oldest open job with posted date.
 - **Inferred (unattended):** keep the existing HTML/JS architecture (no new SPA framework). Shared CSS/JS is allowed. Stack is already FastAPI + static HTML.
 - Visual world is industrial terminal-ops for **all** HTML (landing + Hub + login). Tokens: `board/app/static/theme.css`.
 - Superdesign CLI login and Impeccable engine download were unavailable this session; direction is code-led from product truth.

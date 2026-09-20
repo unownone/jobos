@@ -12,6 +12,7 @@ Each live Hub surface has a Playwright owner. In-process FastAPI tests in
 | `/login` | Login, signup, bad password, next=/board, existing admin | `test_onboarding.py`, `test_public.py` |
 | `/admin/signup` | Leaves once any admin exists | `test_onboarding.py` |
 | `/onboarding` | Identity → targets → proof → resume; validation; prefill | `test_onboarding.py` |
+| `/home` | Funnel, agents, today, oldest pipeline job | `test_admin_shell.py` |
 | `/board` | Session, jobs list, search, ticket patch/pause/resume | `test_admin_shell.py`, `test_worker.py` |
 | `/admin` | Create invite, copy join URL, revoke, coming-soon stubs | `test_admin_shell.py`, `test_worker.py` |
 | `/admin/users` | Directory after worker heartbeat | `test_worker.py` |

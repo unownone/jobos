@@ -10,7 +10,7 @@ OWN-WORLD: Dark navy chassis, amber phosphor primary, dashed stitch, Red Hat Tex
 
 STORY: The operator sees who is live, what is in the hopper, and can open/pause/stop a job without hunting chrome. On a phone they get jobs or live workers, then a full-screen ticket — never three competing panes.
 
-FIRST VIEWPORT (desktop): 76px chassis rail, presence column, job list filling the stage, ticket panel idle until a row is opened. (mobile): chassis dock, full-width job rows, no empty side panel; opening a job slides a ticket sheet.
+FIRST VIEWPORT (desktop): 76px chassis rail, presence column, job list filling the stage, ticket panel closed until a row is opened. Home shows funnel + agent charts first. (mobile): chassis dock, full-width job rows, no empty side panel; opening a job slides a ticket sheet.
 
 FORM: Industrial terminal-ops. Seed key: unattended (shared with public landing). Code-led.
 

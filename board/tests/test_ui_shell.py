@@ -6,6 +6,7 @@ STATIC = Path(__file__).resolve().parents[1] / "app" / "static"
 
 PAGES = [
     "index.html",
+    "home.html",
     "login.html",
     "signup.html",
     "join.html",
@@ -40,7 +41,7 @@ def test_hub_css_blocks_are_balanced() -> None:
 
 
 def test_authenticated_pages_have_mobile_dock() -> None:
-    for name in ("index.html", "admin.html", "data.html", "users.html", "skills.html", "memory.html", "onboarding.html"):
+    for name in ("index.html", "home.html", "admin.html", "data.html", "users.html", "skills.html", "memory.html", "onboarding.html"):
         text = (STATIC / name).read_text(encoding="utf-8")
         assert "hub-dock" in text, name
         assert "hub-rail" in text, name

@@ -326,6 +326,8 @@ Heartbeat `pending_messages` is the unread count. Admin can read all; agents see
 curl -sS "$HUB_URL/api/whoami" -H "Authorization: Bearer $HUB_KEY"
 curl -sS "$HUB_URL/api/meta" -H "Authorization: Bearer $HUB_KEY"
 curl -sS "$HUB_URL/api/jobs" -H "Authorization: Bearer $HUB_KEY"
+# Omit limit to read the full tenant list (dedup). The board UI paginates with ?limit=&offset=.
+# Identity fields include description, expectations, pay, posted_at (empty string if unknown).
 curl -sS "$HUB_URL/api/candidate/public" -H "Authorization: Bearer $HUB_KEY"
 # Look at revision. It bumps when hub-data YAML bytes change.
 # Response Cache-Control: no-store. Heartbeat also returns candidate_revision.

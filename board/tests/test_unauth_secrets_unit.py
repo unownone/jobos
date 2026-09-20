@@ -39,6 +39,7 @@ STATIC_SECRET_RE = re.compile("|".join(secret_like_patterns()))
 PROTECTED_ROUTE_PATHS = frozenset(
     {
         "/board",
+        "/home",
         "/admin",
         "/admin/invites",
         "/admin/data",
@@ -46,6 +47,7 @@ PROTECTED_ROUTE_PATHS = frozenset(
         "/onboarding",
         "/api/jobs",
         "/api/jobs/{job_id}",
+        "/api/dashboard",
         "/api/people",
         "/api/people/{person_id}",
         "/api/candidate",

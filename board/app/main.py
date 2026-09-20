@@ -27,7 +27,16 @@ from app.bootstrap import (
 from app.candidate import create_candidate_router
 from app.gates import CandidateGateMiddleware, candidate_required_payload
 from app.briefing import create_briefing_router
-from app.constants import COMING_SOON_ROLES, METADATA_KNOWN_KEYS, ROLES, STATUSES, TRACKS
+from app.constants import (
+    APPLY_KINDS,
+    COMING_SOON_ROLES,
+    LANE_FILTERS,
+    METADATA_KNOWN_KEYS,
+    ROLES,
+    STATUSES,
+    TRACKS,
+)
+from app.dashboard import mount_dashboard
 from app.db import BoardDB, public_user
 from app.export import create_export_router
 from app.invite_prompt import render_agent_prompt
@@ -105,6 +114,10 @@ class JobIn(BaseModel):
     research: dict[str, Any] | None = None
     proof: dict[str, Any] | None = None
     notes: str | None = None
+    description: str | None = None
+    expectations: str | None = None
+    pay: str | None = None
+    posted_at: str | None = None
     conflicts: list[Any] | None = None
     stopped: bool | None = None
     stop_reason: str | None = None
@@ -133,6 +146,10 @@ class JobPatch(BaseModel):
     research: dict[str, Any] | None = None
     proof: dict[str, Any] | None = None
     notes: str | None = None
+    description: str | None = None
+    expectations: str | None = None
+    pay: str | None = None
+    posted_at: str | None = None
     conflicts: list[Any] | None = None
     stopped: bool | None = None
     stop_reason: str | None = None
@@ -774,6 +791,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def meta(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
         return {
             "statuses": list(STATUSES),
+            "apply_kinds": list(APPLY_KINDS),
+            "lanes": list(LANE_FILTERS),
             "roles": list(ROLES),
             "tracks": list(TRACKS),
             "coming_soon_roles": [dict(row) for row in COMING_SOON_ROLES],
@@ -818,18 +837,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         status_filter: Annotated[str | None, Query(alias="status")] = None,
         q: str | None = None,
         stopped: bool | None = None,
+        score_min: float | None = None,
+        score_max: float | None = None,
+        location: str | None = None,
+        apply_kind: str | None = None,
+        source: str | None = None,
+        remote: str | None = None,
+        has_pay: bool | None = None,
+        company: str | None = None,
+        lane: str | None = None,
+        limit: Annotated[int | None, Query(ge=1, le=100)] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
     ) -> dict[str, Any]:
         if status_filter:
             validate_status(status_filter)
-        jobs = db.list_jobs(principal.tenant, status=status_filter, q=q, stopped=stopped)
+        if apply_kind and apply_kind not in APPLY_KINDS:
+            raise HTTPException(status_code=422, detail=f"unknown apply_kind {apply_kind!r}")
+        if lane and lane not in LANE_FILTERS:
+            raise HTTPException(status_code=422, detail=f"unknown lane {lane!r}")
+        page_offset = int(offset)
+        page_size = int(limit) if limit is not None else None
+        filters = {
+            "status": status_filter,
+            "q": q,
+            "stopped": stopped,
+            "score_min": score_min,
+            "score_max": score_max,
+            "location": location,
+            "apply_kind": apply_kind,
+            "source": source,
+            "remote": remote,
+            "has_pay": has_pay,
+            "company": company,
+            "lane": lane,
+        }
+        jobs = db.list_jobs(principal.tenant, limit=page_size, offset=page_offset, **filters)
+        matched = db.count_jobs(principal.tenant, **filters)
+        total = db.count_jobs(principal.tenant)
         claims = queue.claims_for_jobs(principal.tenant, [job["id"] for job in jobs])
         for job in jobs:
             job["claim"] = claims.get(job["id"])
-        total = len(db.list_jobs(principal.tenant, ))
         return {
             "jobs": jobs,
             "count": len(jobs),
+            "matched": matched,
             "total": total,
+            "limit": page_size,
+            "offset": page_offset,
             "role": principal.role,
         }
 
@@ -1136,6 +1190,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "research": raw.get("research") or {},
                 "proof": raw.get("proof") or {},
                 "notes": raw.get("notes") or "",
+                "description": raw.get("description") or "",
+                "expectations": raw.get("expectations") or "",
+                "pay": raw.get("pay") or "",
+                "posted_at": raw.get("posted_at") or "",
                 "conflicts": raw.get("conflicts") or [],
                 "stopped": bool(raw.get("stopped")),
                 "stop_reason": raw.get("stop_reason") or "",
@@ -1220,6 +1278,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ensure_can_read_metrics(principal.role)
         return metrics.summary(tenant=principal)
 
+    mount_dashboard(app, db, principal_dep, settings)
+    mount_presence(app, db, principal_dep)
+
     @app.exception_handler(AccountError)
     async def account_exc(_request: Request, exc: AccountError) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
@@ -1228,7 +1289,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def http_exc(_request: Request, exc: HTTPException) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content={"detail": redact_secrets(exc.detail)})
 
-    mount_presence(app, db, principal_dep)
     _flatten_included_routers(app)
     instrument_fastapi(app)
     return app
