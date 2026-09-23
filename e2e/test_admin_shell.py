@@ -113,15 +113,30 @@ def test_board_job_ticket_patch_pause_resume(page: Page) -> None:
     page.locator("#list tr", has_text="TicketCo").click()
     expect(page.locator("#f_company")).to_have_value("TicketCo")
     page.fill("#f_notes", "Shortlisted for the e2e run.")
-    page.click("#saveBtn")
-    expect(page.locator("#sideErr")).to_contain_text("Saved", timeout=10_000)
-
     page.select_option("#f_status", "rejected")
     page.select_option("#f_rejection_by", "company")
+    expect(page.locator("#f_status")).to_have_value("rejected")
     page.fill("#f_company_remarks", "Went with another candidate.")
     page.fill("#f_user_remarks", "Skip this company next cycle.")
-    page.click("#saveBtn")
+    with page.expect_response(
+        lambda r: "/api/jobs/" in r.url and r.request.method == "PATCH"
+    ) as pending:
+        page.click("#saveBtn")
+    patch = pending.value
+    assert patch.ok, patch.text()
+    patch_body = patch.json()
+    assert patch_body.get("job", {}).get("status") == "rejected", {
+        "request": patch.request.post_data,
+        "response": patch_body,
+    }
     expect(page.locator("#sideErr")).to_contain_text("Saved", timeout=10_000)
+    job_id = created["body"]["job"]["id"]
+    stored = api(page, "GET", f"/api/jobs/{job_id}")
+    assert stored["status"] == 200, stored
+    assert stored["body"]["job"]["status"] == "rejected", stored
+    assert stored["body"]["job"]["rejection"]["by"] == "company", stored
+    assert stored["body"]["job"]["rejection"]["company_remarks"] == "Went with another candidate."
+    assert stored["body"]["job"]["rejection"]["user_remarks"] == "Skip this company next cycle."
     page.locator("#list tr", has_text="TicketCo").click()
     expect(page.locator("#f_status")).to_have_value("rejected")
     expect(page.locator("#f_rejection_by")).to_have_value("company")
