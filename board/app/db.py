@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     expectations TEXT,
     pay TEXT,
     posted_at TEXT,
+    rejection_json TEXT,
     conflicts_json TEXT,
     stopped INTEGER NOT NULL DEFAULT 0,
     stop_reason TEXT,
@@ -233,6 +234,7 @@ COLUMN_TO_FIELD = {
     "research_json": "research",
     "proof_json": "proof",
     "conflicts_json": "conflicts",
+    "rejection_json": "rejection",
 }
 
 FIELD_TO_COLUMN = {v: k for k, v in COLUMN_TO_FIELD.items()}
@@ -285,6 +287,8 @@ def _ensure_job_posting_columns(conn: SqlConnection) -> None:
     for name in ("description", "expectations", "pay", "posted_at"):
         if name not in cols:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} TEXT")
+    if "rejection_json" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN rejection_json TEXT")
 
 
 def _dump(value: Any) -> str | None:
@@ -297,6 +301,24 @@ def _load(raw: str | None, default: Any) -> Any:
     if raw is None or raw == "":
         return default
     return json.loads(raw)
+
+
+def _rejection_from_row(raw: str | None) -> dict[str, str]:
+    loaded = _load(raw, {})
+    return _normalize_rejection(loaded)
+
+
+def _normalize_rejection(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        value = {}
+    by = str(value.get("by") or "").strip().lower()
+    if by not in {"company", "user"}:
+        by = ""
+    return {
+        "by": by,
+        "company_remarks": str(value.get("company_remarks") or ""),
+        "user_remarks": str(value.get("user_remarks") or ""),
+    }
 
 
 def row_to_job(row: Any) -> dict[str, Any]:
@@ -325,6 +347,7 @@ def row_to_job(row: Any) -> dict[str, Any]:
         "expectations": data.get("expectations") or "",
         "pay": data.get("pay") or "",
         "posted_at": data.get("posted_at") or "",
+        "rejection": _rejection_from_row(data.get("rejection_json")),
         "conflicts": _load(data["conflicts_json"], []),
         "stopped": bool(data["stopped"]),
         "stop_reason": data["stop_reason"] or "",
@@ -486,13 +509,13 @@ class BoardDB:
                 account_id, id, company, title, location, remote, url, apply_url, apply_kind, ats, req_id,
                 sources_json, status, score, owners_json, apply_packet_json, outreach_packet_json,
                 research_json, proof_json, notes, description, expectations, pay, posted_at,
-                conflicts_json, stopped, stop_reason,
+                rejection_json, conflicts_json, stopped, stop_reason,
                 created_at, updated_at, created_by_role
             ) VALUES (
                 :account_id, :id, :company, :title, :location, :remote, :url, :apply_url, :apply_kind, :ats, :req_id,
                 :sources_json, :status, :score, :owners_json, :apply_packet_json, :outreach_packet_json,
                 :research_json, :proof_json, :notes, :description, :expectations, :pay, :posted_at,
-                :conflicts_json, :stopped, :stop_reason,
+                :rejection_json, :conflicts_json, :stopped, :stop_reason,
                 :created_at, :updated_at, :created_by_role
             )
             """,
@@ -521,6 +544,7 @@ class BoardDB:
                 "expectations": job.get("expectations") or "",
                 "pay": job.get("pay") or "",
                 "posted_at": job.get("posted_at") or "",
+                "rejection_json": _dump(_normalize_rejection(job.get("rejection"))),
                 "conflicts_json": _dump(job.get("conflicts") or []),
                 "stopped": 1 if job.get("stopped") else 0,
                 "stop_reason": job.get("stop_reason") or "",
@@ -551,7 +575,7 @@ class BoardDB:
             if key in JSON_FIELDS:
                 col = FIELD_TO_COLUMN[key]
                 assignments.append(f"{col} = :{col}")
-                values[col] = _dump(value)
+                values[col] = _dump(_normalize_rejection(value) if key == "rejection" else value)
             elif key == "remote":
                 assignments.append("remote = :remote")
                 values["remote"] = _remote_to_text(value)
@@ -1380,9 +1404,9 @@ def _jobs_where(
         clauses.append(
             "(id LIKE ? OR company LIKE ? OR title LIKE ? OR apply_url LIKE ?"
             " OR notes LIKE ? OR location LIKE ? OR description LIKE ?"
-            " OR expectations LIKE ? OR pay LIKE ?)"
+            " OR expectations LIKE ? OR pay LIKE ? OR rejection_json LIKE ?)"
         )
-        args.extend([like] * 9)
+        args.extend([like] * 10)
     if company:
         clauses.append("company LIKE ?")
         args.append(f"%{company}%")

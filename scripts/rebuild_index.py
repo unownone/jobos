@@ -63,6 +63,7 @@ def next_action(job: dict) -> str:
         "chatting": "continue thread",
         "interview": "interview loop",
         "offer": "decision",
+        "rejected": "—",
         "closed_rejected": "—",
         "closed_withdrawn": "—",
         "closed_expired": "—",

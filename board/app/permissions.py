@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -22,7 +23,10 @@ from app.constants import (
     OUTREACH_LANE,
     PATCH_ROLES,
     PEOPLE_ROLES,
+    REJECTION_BY,
+    REJECTION_FIELDS,
     RESUME_ROLES,
+    SHARED_STATUSES,
     STATUSES,
     STOP_ROLES,
 )
@@ -46,6 +50,8 @@ def capabilities(role: str) -> dict[str, Any]:
         "can_read_metrics": role in METRICS_READ_ROLES,
         "patch_fields": sorted(_patch_fields_for(role)),
         "status_lane": sorted(_lane_for(role)),
+        "shared_statuses": sorted(SHARED_STATUSES) if role in PATCH_ROLES else [],
+        "rejection_by": list(REJECTION_BY) if role in PATCH_ROLES else [],
     }
 
 
@@ -130,6 +136,63 @@ def validate_status(value: str) -> str:
     return value
 
 
+def empty_rejection() -> dict[str, str]:
+    return {"by": "", "company_remarks": "", "user_remarks": ""}
+
+
+def merge_rejection(current: dict[str, Any] | None, incoming: Any) -> dict[str, str]:
+    merged = empty_rejection()
+    if isinstance(current, dict):
+        for key in REJECTION_FIELDS:
+            merged[key] = str(current.get(key) or "")
+        by = merged["by"].strip().lower()
+        merged["by"] = by if by in REJECTION_BY else ""
+    if incoming is None:
+        return merged
+    if not isinstance(incoming, dict):
+        raise HTTPException(status_code=422, detail="rejection must be an object")
+    allowed = set(REJECTION_FIELDS) | {"remarks"}
+    extra = set(incoming) - allowed
+    if extra:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unknown rejection keys: {sorted(extra)}",
+        )
+    if "by" in incoming:
+        by = "" if incoming["by"] is None else str(incoming["by"]).strip().lower()
+        if by and by not in REJECTION_BY:
+            raise HTTPException(
+                status_code=422,
+                detail="rejection.by must be 'company' or 'user'",
+            )
+        merged["by"] = by
+    for key in ("company_remarks", "user_remarks"):
+        if key in incoming:
+            merged[key] = "" if incoming[key] is None else str(incoming[key])
+    if "remarks" in incoming:
+        if not merged["by"]:
+            raise HTTPException(
+                status_code=422,
+                detail="rejection.remarks requires rejection.by (company or user)",
+            )
+        text = "" if incoming["remarks"] is None else str(incoming["remarks"])
+        target = "company_remarks" if merged["by"] == "company" else "user_remarks"
+        if target not in incoming:
+            merged[target] = text
+    return merged
+
+
+def _ensure_rejected_has_by(status_value: str, rejection: dict[str, str] | None) -> None:
+    if status_value != "rejected":
+        return
+    by = (rejection or {}).get("by") or ""
+    if by not in REJECTION_BY:
+        raise HTTPException(
+            status_code=422,
+            detail="status rejected requires rejection.by of 'company' or 'user'",
+        )
+
+
 def merge_owners(current: dict[str, Any] | None, incoming: Any, role: str) -> dict[str, str]:
     merged = {"discovery": "", "apply": "", "outreach": ""}
     if isinstance(current, dict):
@@ -190,13 +253,19 @@ def authorize_patch(role: str, current: dict[str, Any], incoming: dict[str, Any]
                 detail=f"role {role} cannot set status {next_status}",
             )
 
+    next_rejection = current.get("rejection") if isinstance(current.get("rejection"), dict) else empty_rejection()
+    if "rejection" in incoming:
+        next_rejection = merge_rejection(current.get("rejection"), incoming["rejection"])
+    _ensure_rejected_has_by(str(next_status or ""), next_rejection)
+
     if role == "discovery":
         if current.get("status") not in DISCOVERY_LANE:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="discovery cannot edit a job after it leaves the discovery lane",
-            )
-        if next_status not in DISCOVERY_LANE:
+            if not _is_shared_rejection_patch(incoming, current, next_status):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="discovery cannot edit a job after it leaves the discovery lane",
+                )
+        elif str(next_status) not in DISCOVERY_LANE and str(next_status) not in SHARED_STATUSES:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="discovery can only keep the job in discovery-lane statuses",
@@ -208,6 +277,8 @@ def authorize_patch(role: str, current: dict[str, Any], incoming: dict[str, Any]
             patch["owners"] = merge_owners(current.get("owners"), value, role)
         elif key == "status":
             patch["status"] = next_status
+        elif key == "rejection":
+            patch["rejection"] = next_rejection
         elif key == "stopped":
             if role != "admin":
                 raise HTTPException(
@@ -233,7 +304,7 @@ def authorize_create(role: str, incoming: dict[str, Any]) -> dict[str, Any]:
         )
     status_value = incoming.get("status") or "discovered"
     validate_status(str(status_value))
-    if role == "discovery" and status_value not in DISCOVERY_LANE:
+    if role == "discovery" and status_value not in DISCOVERY_LANE and status_value not in SHARED_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="discovery can only create jobs in the discovery lane",
@@ -247,6 +318,11 @@ def authorize_create(role: str, incoming: dict[str, Any]) -> dict[str, Any]:
     body["status"] = status_value
     if "owners" in body:
         body["owners"] = merge_owners(None, body.get("owners"), role)
+    if "rejection" in body:
+        body["rejection"] = merge_rejection(None, body.get("rejection"))
+    else:
+        body["rejection"] = empty_rejection()
+    _ensure_rejected_has_by(str(status_value), body.get("rejection"))
     return body
 
 
@@ -266,11 +342,11 @@ def _lane_for(role: str) -> frozenset[str]:
     if role == "admin":
         return frozenset(STATUSES)
     if role == "discovery":
-        return DISCOVERY_LANE
+        return DISCOVERY_LANE | SHARED_STATUSES
     if role == "apply":
-        return APPLY_LANE
+        return APPLY_LANE | SHARED_STATUSES
     if role == "outreach":
-        return OUTREACH_LANE
+        return OUTREACH_LANE | SHARED_STATUSES
     return frozenset()
 
 
@@ -280,3 +356,32 @@ def _owner_keys_for(role: str) -> set[str]:
     if role in OWNER_KEYS:
         return {role}
     return set()
+
+
+def _is_shared_rejection_patch(
+    incoming: dict[str, Any],
+    current: dict[str, Any],
+    next_status: Any,
+) -> bool:
+    """Discovery may close a later-lane job only by setting rejected + remarks."""
+    if str(next_status) != "rejected":
+        return False
+    for key, value in incoming.items():
+        if key in {"status", "rejection"}:
+            continue
+        if _field_differs(key, value, current):
+            return False
+    return True
+
+
+def _field_differs(key: str, new: Any, current: dict[str, Any]) -> bool:
+    old = current.get(key)
+    if key == "owners":
+        left = {k: str((new or {}).get(k) or "") for k in OWNER_KEYS} if isinstance(new, dict) else new
+        right = {k: str((old or {}).get(k) or "") for k in OWNER_KEYS} if isinstance(old, dict) else old
+        return left != right
+    if isinstance(new, (dict, list)) or isinstance(old, (dict, list)):
+        return json.dumps(new, sort_keys=True, default=str) != json.dumps(old, sort_keys=True, default=str)
+    if new is None:
+        return False
+    return new != old

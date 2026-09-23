@@ -102,10 +102,17 @@ STATUSES = (
     "chatting",
     "interview",
     "offer",
+    "rejected",
     "closed_rejected",
     "closed_withdrawn",
     "closed_expired",
 )
+
+# Any patch role (discovery / apply / outreach / admin) may set this status
+# from any unstopped job, with rejection.by = company | user.
+SHARED_STATUSES = frozenset({"rejected"})
+REJECTION_BY = ("company", "user")
+REJECTION_FIELDS = ("by", "company_remarks", "user_remarks")
 
 DISCOVERY_LANE = frozenset(
     {
@@ -182,6 +189,7 @@ FUNNEL_OUTREACHED_STATUSES = frozenset(
 )
 PIPELINE_OPEN_STATUSES = frozenset(STATUSES) - {
     "skipped",
+    "rejected",
     "closed_rejected",
     "closed_withdrawn",
     "closed_expired",
@@ -215,6 +223,7 @@ DISCOVERY_FIELDS = IDENTITY_FIELDS | {
     "apply_packet",
     "research",
     "notes",
+    "rejection",
     "conflicts",
 }
 
@@ -225,6 +234,7 @@ APPLY_FIELDS = frozenset(
         "proof",
         "outreach_packet",
         "notes",
+        "rejection",
     }
 )
 
@@ -234,6 +244,7 @@ OUTREACH_FIELDS = frozenset(
         "owners",
         "outreach_packet",
         "notes",
+        "rejection",
     }
 )
 
@@ -254,6 +265,7 @@ JSON_FIELDS = frozenset(
         "research",
         "proof",
         "conflicts",
+        "rejection",
     }
 )
 

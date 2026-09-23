@@ -362,7 +362,7 @@ tbody tr:hover, tbody tr.active { background: var(--panel-2); }
 .pill.applying, .pill.waiting, .pill.chatting, .pill.interview { color: var(--warn); }
 .pill.outreaching { color: var(--orange); }
 .pill.apply_blocked { color: var(--grey); }
-.pill.skipped, .pill.closed_rejected, .pill.closed_expired { color: var(--bad); }
+.pill.skipped, .pill.rejected, .pill.closed_rejected, .pill.closed_expired { color: var(--bad); }
 .pill.stopped, .pill.closed_withdrawn { color: var(--stop); }
 .pill.logged_in, .pill.idle { color: var(--teal); }
 .pill.working, .pill.producing { color: var(--warn); }

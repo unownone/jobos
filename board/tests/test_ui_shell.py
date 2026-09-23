@@ -58,6 +58,14 @@ def test_onboarding_prefills_saved_profile_and_stays_in_hub() -> None:
     assert 'location.href = "/admin"' not in text
 
 
+def test_board_page_has_rejection_fields() -> None:
+    text = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'id="f_rejection_by"' in text
+    assert 'id="f_company_remarks"' in text
+    assert 'id="f_user_remarks"' in text
+    assert "Rejected by" in text
+
+
 def test_board_unauthorized_stays_on_hub_login_next() -> None:
     text = (STATIC / "index.html").read_text(encoding="utf-8")
     assert "/login?next=/board" in text

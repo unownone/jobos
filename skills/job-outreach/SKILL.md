@@ -65,6 +65,7 @@ Start from `assets/templates/email.md` and `assets/templates/linkedin-dm.md`, th
 - After send: `waiting`
 - Reply: `chatting` (or `interview` if they propose a loop)
 - No reply after the cap: note `exhausted` on the person, move on
+- Company or user said no: `status: rejected` with `rejection.by` (`company` | `user`) and remarks. Prefer this over `closed_rejected` when you know who said no.
 
 If the hunt board is up (`BOARD_URL` + outreach token from maintainer): PATCH only outreach fields. Do not own the board. See [`board/README.md`](../../board/README.md).
 

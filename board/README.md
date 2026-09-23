@@ -53,15 +53,15 @@ Use these steps on `http://127.0.0.1:8787/`. Create an account at `/login` (user
 
 1. **Sign up / log in.** Open `/`, then `/login`. Create a username. You land on `/onboarding` until a truthful candidate exists, then `/board`. **Home** (`/home`) is the funnel dashboard: found → applied → outreached, agent load, today counts, oldest open job.
 
-2. **List.** Columns are company, title, status, score, pay, posted date, claim. Search matches company / title / id / URL / notes / description. Extra filters: lane, apply kind, score, remote, pay stated, location, source. The list is paginated (25/50/100). Stats on the right show shown / matched / total.
+2. **List.** Columns are company, title, status, score, pay, posted date, claim. Search matches company / title / id / URL / notes / description / rejection remarks. Extra filters: lane, apply kind, score, remote, pay stated, location, source. The list is paginated (25/50/100). Stats on the right show shown / matched / total.
 
    ![Dashboard — jobs list](docs/01-dashboard.png)
 
-3. **Filter.** **All statuses** opens the full jobOS enum (`discovered` → `offer` / `closed_*`). **Stopped: any** can hide paused/stopped rows or show only those.
+3. **Filter.** **All statuses** opens the full jobOS enum (`discovered` → `offer` / `rejected` / `closed_*`). **Stopped: any** can hide paused/stopped rows or show only those.
 
    ![Status filter chips](docs/02-filters.png)
 
-4. **Open a job.** Click a row — the ticket is hidden until then. The side panel title becomes `#id · company`. Identity fields (company, title, source, status, score, location, apply URL, posted date, pay, description, expectations) sit at the top; packets, proof, events, Pause / Stop / Resume / Delete are below.
+4. **Open a job.** Click a row — the ticket is hidden until then. The side panel title becomes `#id · company`. Identity fields (company, title, source, status, score, location, apply URL, posted date, pay, description, expectations) sit at the top; notes, **rejected by** (company or user) plus remarks, packets, proof, events, Pause / Stop / Resume / Delete are below.
 
    ![Job detail / edit panel](docs/03-detail.png)
 
@@ -75,7 +75,7 @@ What each role sees vs admin:
 | --- | --- | --- | --- | --- | --- |
 | See list / events | yes | yes | yes | yes | yes |
 | Create row | yes | no | no | no | yes |
-| Patch own lane | discovery lane only | apply fields | outreach fields | no | all |
+| Patch own lane | discovery lane only (+ shared `rejected`) | apply fields (+ `rejected`) | outreach fields (+ `rejected`) | no | all |
 | Pause / Stop / Resume / Delete | no | no | no | no | yes |
 | Hygiene / import / metrics summary | no | no | no | yes | yes |
 | Log token burn | yes | yes | yes | yes | yes |

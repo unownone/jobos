@@ -69,6 +69,7 @@ Work the platform catalog in [`docs/catalogs/platforms.md`](catalogs/platforms.m
 4. Score 1–5 against the profile. Veto on deal-breakers.
 5. If shortlisted, write a complete `apply_packet`. Status becomes `apply_ready` (or `shortlisted` if the human wants a manual gate).
 6. If it is a talent network with no job URL, set `apply_kind: network` and still write the packet: how to apply to the network, plus an outreach seed.
+7. If the company or the user already said no, set `status: rejected` with `rejection.by` (`company` | `user`) and remarks. Do not keep it in the open pipeline. `skipped` is still for “we passed during sourcing.”
 
 ### 3.3 Apply packet bar
 
@@ -135,6 +136,10 @@ Then set `status: applied` and seed `outreach_packet`.
 
 If a portal needs a human (captcha, government ID upload, unknown work-auth question), set `apply_blocked` with the exact blocker. Do not guess legal answers.
 
+### 4.5 Rejected
+
+Company emailed a no, or the user does not want this role: `status: rejected`. Set `rejection.by` to `company` or `user`, and put the text in `company_remarks` and/or `user_remarks`. Discovery, apply, and outreach may all do this (`PATCH /api/jobs/{id}`). Do not invent a reason.
+
 ## 5. Outreach cycle
 
 Goal: a human conversation. Not a spray.
@@ -172,7 +177,7 @@ The ask is always: **a short chat**. Not “please hire me.” Not a novel.
 
 ### 5.5 Log
 
-Every send is a touch on the Hub job (`PATCH /api/jobs/{id}`) and people row (`/api/people`). Status `waiting` until a reply, then `chatting` / `interview` / `closed_rejected`.
+Every send is a touch on the Hub job (`PATCH /api/jobs/{id}`) and people row (`/api/people`). Status `waiting` until a reply, then `chatting` / `interview` / `offer`. Company or user said no: `rejected` with `rejection.by` (`company` | `user`) and remarks. `closed_rejected` remains valid for an outreach close without structured remarks.
 
 ## 6. Shared list hygiene
 
@@ -180,7 +185,9 @@ Every send is a touch on the Hub job (`PATCH /api/jobs/{id}`) and people row (`/
 - Events append in Postgres (`GET /api/events`).
 - `GET /api/export/ledger` writes a snapshot tarball when you need git/airgap files.
 - Never delete another role’s packet to “clean up.”
-- Discovery creates rows only; apply/outreach only advance their fields; admin stops/edits. **Maintainer** owns schema and hygiene — see [`board/README.md`](../board/README.md). Operator/agent Hub docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). Git `ledger/` is **export-only**, not the live list.
+- Discovery creates rows only; apply/outreach only advance their fields; **any patch role** may set `status: rejected` plus `rejection` remarks; admin stops/edits. **Maintainer** owns schema and hygiene — see [`board/README.md`](../board/README.md). Operator/agent Hub docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). Git `ledger/` is **export-only**, not the live list.
+
+`rejected` is a shared close. It is not lane-scoped. Required: `rejection.by` = `company` | `user`. Optional: `company_remarks`, `user_remarks`. Shorthand: `{ "by": "company", "remarks": "filled internally" }` writes the text onto that party’s remarks field. `closed_rejected` still works for outreach; prefer `rejected` when you know who said no.
 
 ## 7. Quality gates
 

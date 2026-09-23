@@ -23,26 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "board"))
 
 from app.db import BoardDB  # noqa: E402
-
-STATUSES = {
-    "discovered",
-    "enriching",
-    "shortlisted",
-    "skipped",
-    "apply_ready",
-    "applying",
-    "applied",
-    "apply_blocked",
-    "outreach_ready",
-    "outreaching",
-    "waiting",
-    "chatting",
-    "interview",
-    "offer",
-    "closed_rejected",
-    "closed_withdrawn",
-    "closed_expired",
-}
+from app.constants import STATUSES  # noqa: E402
 
 
 def main() -> int:
@@ -88,6 +69,7 @@ def main() -> int:
             "research": raw.get("research") or {},
             "proof": raw.get("proof") or {},
             "notes": raw.get("notes") or "",
+            "rejection": raw.get("rejection") or {},
             "conflicts": raw.get("conflicts") or [],
             "created_at": raw.get("created_at"),
             "updated_at": raw.get("updated_at"),

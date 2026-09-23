@@ -105,21 +105,30 @@ def mint_track_agents(client: TestClient, track: str, names: list[str]) -> list[
 
 
 def unlock_discovery_search(client: TestClient) -> None:
-    """Ack catalog.refresh so discovery.search claims are not 409 when the pack date is >7 days old."""
+    """Ack catalog.refresh on the admin tenant so minted agents can claim discovery.search.
+
+    Compat X-Role tokens live on a different account than bootstrap_admin. When the
+    pack catalog date is older than 7 days, the ack must land on the tenant the
+    agents join or discovery.search claims return 409.
+    """
+    bootstrap_admin(client)
+    headers = csrf_headers(client)
     pushed = client.post(
         "/api/queue/push",
-        headers=h("maintenance"),
+        headers=headers,
         json={"kind": "catalog.refresh", "payload": {"reason": "pytest"}},
     )
     assert pushed.status_code == 200, pushed.text
     claimed = client.post(
         "/api/queue/claim",
-        headers=h("maintenance"),
+        headers=headers,
         json={"kinds": ["catalog.refresh"], "limit": 1},
     )
     assert claimed.status_code == 200, claimed.text
-    item_id = claimed.json()["items"][0]["id"]
-    acked = client.post(f"/api/queue/ack/{item_id}", headers=h("maintenance"))
+    items = claimed.json().get("items") or []
+    assert items, claimed.text
+    item_id = items[0]["id"]
+    acked = client.post(f"/api/queue/ack/{item_id}", headers=headers)
     assert acked.status_code == 200, acked.text
 
 

@@ -38,7 +38,7 @@ For each platform in scope (user list, else the minimum viable set in process.md
 4. Run `skills/deep-research/SKILL.md` on shortlist candidates.
 5. Score 1–5. Veto deal-breakers.
 6. If shortlisted, fill `apply_packet` using `handoffs/apply-packet.md` until another bot could apply tomorrow.
-7. Set status `apply_ready` or `shortlisted` (if the user wants a manual gate) or `skipped` with a reason.
+7. Set status `apply_ready` or `shortlisted` (if the user wants a manual gate) or `skipped` with a reason. If the company or the user already said no, set `status: rejected` with `rejection.by` (`company` | `user`) and remarks instead of leaving it open.
 8. Hub appends the event. Do not append git `ledger/events.jsonl` as live state.
 9. You consume the board; you do not issue tokens or change schema.
 

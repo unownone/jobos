@@ -48,6 +48,7 @@ If the work is **updating the skill tree itself** (lists, mcp.example.json, prun
 - Prefer official APIs, public JSON feeds, and public career pages.
 - Attach PDFs on **email**. LinkedIn DMs usually cannot take a PDF; send a short note and ask for a chat, and point at a resume link if you have one.
 - Every state change gets a Hub event (`POST`/`PATCH` jobs) and a row on the tenant job. Git `ledger/` is export-only.
+- Any patch role (discovery, apply, outreach, admin) may set `status: rejected` with `rejection.by` (`company` | `user`) and remarks. Do not invent a reason.
 - Local skills are **per-bot**. Do not load, copy, or promote another bot’s `scope=local` skill.
 - Only maintainer consumes `skill.record` and promotes after proctor. Discovery / apply / outreach may enqueue recordings; they must not ack them into shared.
 - If Hub is up (`HUB_URL` / `BOARD_URL`): **recall memory every round** (`GET /api/memory/recall` and the `memory` card on heartbeat / queue claim). Store only durable facts (portal quirks, blockers, dead tools). Do not dump transcripts, JDs, or secrets. Pods: worker (private) / track (shared on the lane) / common. Track/common facts that should become playbooks: `POST /api/memory/items/{id}/solidify`. Docs: [`docs/job-hub/memory.md`](docs/job-hub/memory.md).

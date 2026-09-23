@@ -341,6 +341,7 @@ curl -sS "$HUB_URL/api/candidate/public" -H "Authorization: Bearer $HUB_KEY"
 | --- | --- | --- | --- | --- | --- |
 | `POST /api/jobs` | yes | no | no | no | yes |
 | Patch identity / discovery lane | yes | no | no | no | yes |
+| Set status `rejected` + remarks | yes | yes | yes | no | yes |
 | Set status `applied` / Easy Apply | **no** | yes | no | no | no* |
 | People API | no | no | yes | no | yes |
 | Resume PDF | no | yes | yes | no | yes |
@@ -349,7 +350,7 @@ curl -sS "$HUB_URL/api/candidate/public" -H "Authorization: Bearer $HUB_KEY"
 | Invites | no | no | no | no | yes |
 | Mint agents | owner | owner | owner | owner | yes |
 
-\*Admin can patch statuses for operations; admin is not the apply lane. Discovery create/patch cannot leave the discovery lane (`discovered`…`apply_ready` / `skipped`). Status `applied` from discovery → 403.
+\*Admin can patch statuses for operations; admin is not the apply lane. Discovery create/patch cannot leave the discovery lane (`discovered`…`apply_ready` / `skipped`) except to set shared `rejected` with `rejection.by` (`company` | `user`) and remarks. Status `applied` from discovery → 403.
 
 People:
 

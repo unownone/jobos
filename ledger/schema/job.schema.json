@@ -47,6 +47,7 @@
         "chatting",
         "interview",
         "offer",
+        "rejected",
         "closed_rejected",
         "closed_withdrawn",
         "closed_expired"
@@ -67,6 +68,15 @@
     "proof": { "type": "object" },
     "conflicts": { "type": "array" },
     "notes": { "type": "string" },
+    "rejection": {
+      "type": "object",
+      "description": "Who closed the job and why. Any patch role may set this with status rejected.",
+      "properties": {
+        "by": { "type": "string", "enum": ["company", "user", ""] },
+        "company_remarks": { "type": "string", "description": "What the company said, if anything." },
+        "user_remarks": { "type": "string", "description": "What the candidate/user said, if anything." }
+      }
+    },
     "description": { "type": "string", "description": "Full job description from the posting. Empty if unknown." },
     "expectations": { "type": "string", "description": "What the posting says it expects (requirements, must-haves). Empty if unknown." },
     "pay": { "type": "string", "description": "Compensation as the posting states it. Empty if none mentioned." },
