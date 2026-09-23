@@ -116,6 +116,18 @@ def test_board_job_ticket_patch_pause_resume(page: Page) -> None:
     page.click("#saveBtn")
     expect(page.locator("#sideErr")).to_contain_text("Saved", timeout=10_000)
 
+    page.select_option("#f_status", "rejected")
+    page.select_option("#f_rejection_by", "company")
+    page.fill("#f_company_remarks", "Went with another candidate.")
+    page.fill("#f_user_remarks", "Skip this company next cycle.")
+    page.click("#saveBtn")
+    expect(page.locator("#sideErr")).to_contain_text("Saved", timeout=10_000)
+    page.locator("#list tr", has_text="TicketCo").click()
+    expect(page.locator("#f_status")).to_have_value("rejected")
+    expect(page.locator("#f_rejection_by")).to_have_value("company")
+    expect(page.locator("#f_company_remarks")).to_have_value("Went with another candidate.")
+    expect(page.locator("#f_user_remarks")).to_have_value("Skip this company next cycle.")
+
     page.once("dialog", lambda dialog: dialog.accept("e2e pause"))
     page.click("#pauseBtn")
     expect(page.locator("#list")).to_contain_text("stopped", timeout=10_000)
