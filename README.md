@@ -197,10 +197,10 @@ Full map: [`docs/catalogs/platforms.md`](docs/catalogs/platforms.md).
 discovered → enriching → shortlisted → apply_ready → applying → applied
                                                       ↘ apply_blocked
 applied → outreach_ready → outreaching → waiting → chatting → interview → offer
-         ↘ skipped / closed_rejected / closed_withdrawn / closed_expired
+         ↘ skipped / rejected / closed_rejected / closed_withdrawn / closed_expired
 ```
 
-Discovery may set `skipped`. Apply may set `apply_blocked` with a reason and a packet update. Outreach never silently rewrites a job’s title, company, or apply URL.
+Discovery may set `skipped`. Apply may set `apply_blocked` with a reason and a packet update. **Any patch role** (discovery, apply, outreach, admin) may set `rejected` with `rejection.by` (`company` | `user`) and company/user remarks. Outreach never silently rewrites a job’s title, company, or apply URL.
 
 ## What “good” looks like
 

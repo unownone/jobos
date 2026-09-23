@@ -56,4 +56,8 @@ outreach_packet:
   ask: "15-minute chat"
   resume: "assets/resume/resume-primary.pdf"
 notes: ""
+rejection:
+  by: ""
+  company_remarks: ""
+  user_remarks: ""
 conflicts: []

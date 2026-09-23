@@ -53,6 +53,7 @@ JOB_EXPORT_KEYS = (
     "research",
     "proof",
     "notes",
+    "rejection",
     "description",
     "expectations",
     "pay",

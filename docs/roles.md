@@ -18,7 +18,7 @@ Discovery, apply, and outreach **consume** matching tagged skills from the regis
 
 **Owns:** the ledger portal (conflict resolution, INDEX rebuild, schema), portal credentials that others may not have (Indeed OAuth, LinkedIn logged-in search, etc.).
 
-**Writes:** new job files, scores, apply packets, `skipped` reasons.
+**Writes:** new job files, scores, apply packets, `skipped` reasons, and `rejected` (with `rejection` remarks) when the company or user already said no.
 
 **Must never:** submit an application, click Easy Apply, send outreach. Must not consume `skill.record` or promote another bot’s local skill.
 
@@ -41,7 +41,7 @@ When Hub is up, pick a matching tagged skill (`GET /api/registry/skills?tag=appl
 
 **Owns:** ATS logins used to submit, resume variants, the quality of the written materials.
 
-**Writes:** `applying` / `applied` / `apply_blocked`, proof, seeded outreach packet.
+**Writes:** `applying` / `applied` / `apply_blocked`, proof, seeded outreach packet, and `rejected` plus remarks if the company or user said no.
 
 **Must never:** invent a job, apply without a packet, start cold outreach. Must not consume `skill.record` or promote another bot’s local skill.
 
@@ -63,7 +63,7 @@ When Hub is up, pick a matching tagged skill (`GET /api/registry/skills?tag=outr
 
 **Owns:** Gmail (or other mail) drafts with PDF attachments, LinkedIn DMs, the people ledger.
 
-**Writes:** touches, `waiting` / `chatting`, do-not-contact.
+**Writes:** touches, `waiting` / `chatting`, do-not-contact, and `rejected` plus remarks when the company or user said no.
 
 **Must never:** SMS, apply, attach nothing and call the email complete. Must not consume `skill.record` or promote another bot’s local skill.
 

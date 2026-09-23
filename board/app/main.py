@@ -32,7 +32,9 @@ from app.constants import (
     COMING_SOON_ROLES,
     LANE_FILTERS,
     METADATA_KNOWN_KEYS,
+    REJECTION_BY,
     ROLES,
+    SHARED_STATUSES,
     STATUSES,
     TRACKS,
 )
@@ -74,6 +76,7 @@ from app.permissions import (
     ensure_can_import,
     ensure_can_read_metrics,
     ensure_can_stop,
+    merge_rejection,
     validate_status,
 )
 from app.profile import candidate_onboarded, hydrate_tenant_candidate, hub_public_candidate_status
@@ -120,6 +123,7 @@ class JobIn(BaseModel):
     research: dict[str, Any] | None = None
     proof: dict[str, Any] | None = None
     notes: str | None = None
+    rejection: dict[str, Any] | None = None
     description: str | None = None
     expectations: str | None = None
     pay: str | None = None
@@ -152,6 +156,7 @@ class JobPatch(BaseModel):
     research: dict[str, Any] | None = None
     proof: dict[str, Any] | None = None
     notes: str | None = None
+    rejection: dict[str, Any] | None = None
     description: str | None = None
     expectations: str | None = None
     pay: str | None = None
@@ -799,6 +804,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def meta(principal: Principal = Depends(principal_dep)) -> dict[str, Any]:
         return {
             "statuses": list(STATUSES),
+            "shared_statuses": list(SHARED_STATUSES),
+            "rejection_by": list(REJECTION_BY),
             "apply_kinds": list(APPLY_KINDS),
             "lanes": list(LANE_FILTERS),
             "roles": list(ROLES),
@@ -1199,6 +1206,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "research": raw.get("research") or {},
                 "proof": raw.get("proof") or {},
                 "notes": raw.get("notes") or "",
+                "rejection": raw.get("rejection") or {},
                 "description": raw.get("description") or "",
                 "expectations": raw.get("expectations") or "",
                 "pay": raw.get("pay") or "",
@@ -1212,6 +1220,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             }
             try:
                 validate_status(str(row["status"]))
+                row["rejection"] = merge_rejection(None, row.get("rejection") or {})
+                if row["status"] == "rejected" and row["rejection"].get("by") not in ("company", "user"):
+                    skipped += 1
+                    continue
             except HTTPException:
                 skipped += 1
                 continue

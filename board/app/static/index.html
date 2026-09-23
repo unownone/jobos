@@ -529,6 +529,16 @@
         <textarea id="f_expectations">${escapeHtml(job.expectations || "")}</textarea>
         <label>Notes</label>
         <textarea id="f_notes">${escapeHtml(job.notes || "")}</textarea>
+        <label>Rejected by</label>
+        <select id="f_rejection_by">
+          <option value="" ${!(job.rejection && job.rejection.by) ? "selected" : ""}>—</option>
+          <option value="company" ${(job.rejection && job.rejection.by) === "company" ? "selected" : ""}>company</option>
+          <option value="user" ${(job.rejection && job.rejection.by) === "user" ? "selected" : ""}>user</option>
+        </select>
+        <label>Company remarks</label>
+        <textarea id="f_company_remarks">${escapeHtml((job.rejection && job.rejection.company_remarks) || "")}</textarea>
+        <label>User remarks</label>
+        <textarea id="f_user_remarks">${escapeHtml((job.rejection && job.rejection.user_remarks) || "")}</textarea>
         <label>Owners JSON</label>
         <textarea id="f_owners">${escapeHtml(JSON.stringify(job.owners || {}, null, 2))}</textarea>
         <label>Apply packet JSON</label>
@@ -577,6 +587,11 @@
           apply_url: document.getElementById("f_apply_url").value,
           location: document.getElementById("f_location").value,
           notes: document.getElementById("f_notes").value,
+          rejection: {
+            by: document.getElementById("f_rejection_by").value,
+            company_remarks: document.getElementById("f_company_remarks").value,
+            user_remarks: document.getElementById("f_user_remarks").value,
+          },
           description: document.getElementById("f_description").value,
           expectations: document.getElementById("f_expectations").value,
           pay: document.getElementById("f_pay").value,
