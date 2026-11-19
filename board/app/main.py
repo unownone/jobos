@@ -878,7 +878,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if lane and lane not in LANE_FILTERS:
             raise HTTPException(status_code=422, detail=f"unknown lane {lane!r}")
         page_offset = int(offset)
-        page_size = int(limit) if limit is not None else None
+        # The store treats None as every row. This list is the only place that caps an omitted limit.
+        page_size = int(limit) if limit is not None else 100
         filters = {
             "status": status_filter,
             "q": q,
@@ -1115,7 +1116,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         principal: Principal = Depends(principal_dep),
     ) -> dict[str, Any]:
         ensure_can_hygiene(principal.role)
-        jobs = db.list_jobs(principal.tenant, )
+        jobs = db.list_jobs(principal.tenant, limit=None)
         by_url: dict[str, list[str]] = {}
         by_ctl: dict[tuple[str, str, str], list[str]] = {}
         stale: list[str] = []
@@ -1178,8 +1179,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 detail="only admin can replace the board during import",
             )
         if body.replace:
-            for job in db.list_jobs(principal.tenant, ):
-                db.delete_job(principal.tenant, job["id"])
+            db.delete_jobs_for_account(principal.tenant)
         created = 0
         updated = 0
         skipped = 0

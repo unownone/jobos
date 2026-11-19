@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.constants import ROLES
 from app.main import create_app
-from app.memory_store import skill_draft_from_memory
+from app.memory_policy import MemoryRateLimited
+from app.memory_store import (
+    ensure_memory_schema,
+    insert_item,
+    list_items,
+    skill_draft_from_memory,
+    touch_recalled,
+)
 from app.settings import Settings
 
 TOKENS = {role: f"test-token-{role}-not-real" for role in ROLES}
@@ -616,3 +625,242 @@ def test_memory_page_exposes_crud_controls(hub: tuple[TestClient, Settings]) -> 
     assert "data-edit" in page.text
     assert "/api/memory/items/" in page.text
     assert "/move" in page.text
+
+
+class _RecordingConn:
+    def __init__(self, raw: sqlite3.Connection) -> None:
+        self._raw = raw
+        self.calls: list[str] = []
+        self.commits = 0
+
+    def execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
+        self.calls.append(" ".join(sql.split()))
+        return self._raw.execute(sql, params)
+
+    def executescript(self, script: str) -> None:
+        self._raw.executescript(script)
+
+    def commit(self) -> None:
+        self.commits += 1
+        self._raw.commit()
+
+    def rollback(self) -> None:
+        self._raw.rollback()
+
+
+def _sqlite_db() -> SimpleNamespace:
+    raw = sqlite3.connect(":memory:")
+    raw.row_factory = sqlite3.Row
+    conn = _RecordingConn(raw)
+    ensure_memory_schema(conn)
+    return SimpleNamespace(conn=conn, commit=conn.commit)
+
+
+def _worker(name: str = "searcher") -> SimpleNamespace:
+    return SimpleNamespace(
+        role="discovery",
+        actor=name,
+        user_id=f"usr_{name}",
+        track="discovery",
+        kind="agent",
+        account_id="acc_memory_repo",
+    )
+
+
+def _note(title: str, body: str) -> dict[str, str]:
+    return {"pod": "worker", "kind": "working_note", "title": title, "body": body}
+
+
+def test_search_escapes_wildcards_and_uses_only_the_first_48_characters() -> None:
+    db = _sqlite_db()
+    principal = _worker()
+    literal = insert_item(
+        db,
+        principal,
+        **_note(
+            "Literal wildcard note",
+            "Stored 100% of the score_marker for the next discovery loop only.",
+        ),
+    )
+    insert_item(
+        db,
+        principal,
+        **_note(
+            "Decoy wildcard note",
+            "Stored 1000 of the scoreXmarker for the next discovery loop only.",
+        ),
+    )
+    percent = [row["id"] for row in list_items(db, principal, q="100%")]
+    underscore = [row["id"] for row in list_items(db, principal, q="score_marker")]
+    assert percent == [literal["id"]]
+    assert underscore == [literal["id"]]
+
+    prefix = "M" * 48
+    longer = prefix + ("NZ" * 6)
+    bounded = insert_item(db, principal, **_note("Bounded prefix note", prefix))
+    insert_item(
+        db,
+        principal,
+        **_note("Suffix only note", ("NZ" * 6) + " padding for a durable worker note."),
+    )
+    found = [row["id"] for row in list_items(db, principal, q=longer)]
+    assert found == [bounded["id"]]
+
+
+def test_duplicate_insert_uses_on_conflict_and_ignores_a_full_budget() -> None:
+    db = _sqlite_db()
+    principal = _worker("budget")
+    calls = db.conn.calls
+    first = insert_item(
+        db,
+        principal,
+        **_note("First budget note", "Already paged the public feed through page one."),
+    )
+    _assert_insert_uses_on_conflict(calls)
+    calls.clear()
+    for idx in range(5):
+        insert_item(
+            db,
+            principal,
+            **_note(
+                f"Budget note {idx + 2} ok",
+                f"Already paged the public feed through page {idx + 2} today.",
+            ),
+        )
+    calls.clear()
+    again = insert_item(
+        db,
+        principal,
+        **_note("First budget note", "Already paged the public feed through page one."),
+    )
+    assert again["deduped"] is True
+    assert again["id"] == first["id"]
+    _assert_insert_uses_on_conflict(calls)
+    with pytest.raises(MemoryRateLimited):
+        insert_item(
+            db,
+            principal,
+            **_note("Seventh note blocked", "Already paged the public feed through page seven."),
+        )
+    stored = list_items(db, principal, limit=20)
+    assert len(stored) == 6
+    assert first["id"] in {row["id"] for row in stored}
+
+
+def _assert_insert_uses_on_conflict(calls: list[str]) -> None:
+    insert_at = next(i for i, sql in enumerate(calls) if "INSERT INTO memory_items" in sql)
+    insert_sql = calls[insert_at].upper()
+    assert "ON CONFLICT (ACCOUNT_ID, POD, CONTENT_HASH)" in insert_sql
+    assert "DO NOTHING" in insert_sql
+    prior = calls[:insert_at]
+    assert not any(
+        "CONTENT_HASH" in sql.upper() and sql.lstrip().upper().startswith("SELECT") for sql in prior
+    )
+
+
+def test_touch_recalled_updates_all_ids_in_chunks_of_90_binds() -> None:
+    raw = sqlite3.connect(":memory:")
+    raw.row_factory = sqlite3.Row
+    conn = _RecordingConn(raw)
+    ensure_memory_schema(conn)
+    principal = _worker("touch")
+    ids = [f"mem_{idx:03d}" for idx in range(100)]
+    for item_id in ids:
+        raw.execute(
+            """
+            INSERT INTO memory_items (
+                id, account_id, pod, kind, title, body, content_hash, created_by,
+                created_at, updated_at
+            ) VALUES (
+                ?, 'acc_memory_repo', 'worker:usr_touch', 'fact', 'Touched note',
+                ?, ?, 'usr_touch', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z'
+            )
+            """,
+            (item_id, f"Durable note body for {item_id} in the worker pod.", item_id),
+        )
+    raw.execute(
+        """
+        INSERT INTO memory_items (
+            id, account_id, pod, kind, title, body, content_hash, created_by,
+            created_at, updated_at
+        ) VALUES (
+            'mem_other', 'acc_other', 'worker:usr_touch', 'fact', 'Other account',
+            'Durable note body that belongs to another account.', 'hash_other',
+            'usr_touch', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z'
+        )
+        """
+    )
+    raw.commit()
+    conn.calls.clear()
+    conn.commits = 0
+    touch_recalled(SimpleNamespace(conn=conn, commit=conn.commit), ids, principal=principal)
+    assert conn.commits == 1
+    updates = [sql for sql in conn.calls if "UPDATE memory_items" in sql]
+    assert len(updates) == 2
+    assert all(" IN (" in sql.upper() for sql in updates)
+    assert updates[0].count("?") == 90
+    assert updates[1].count("?") == 14
+    rows = {
+        row["id"]: row
+        for row in raw.execute(
+            "SELECT id, recall_count, last_recalled_at FROM memory_items"
+        )
+    }
+    for item_id in ids:
+        assert rows[item_id]["recall_count"] == 1
+        assert rows[item_id]["last_recalled_at"]
+    assert rows["mem_other"]["recall_count"] == 0
+    assert rows["mem_other"]["last_recalled_at"] is None
+
+    conn.calls.clear()
+    conn.commits = 0
+    touch_recalled(SimpleNamespace(conn=conn, commit=conn.commit), [], principal=principal)
+    assert conn.calls == []
+    assert conn.commits == 0
+
+
+def test_memory_search_escapes_wildcards_over_http(hub: tuple[TestClient, Settings]) -> None:
+    client, _settings = hub
+    headers = h("discovery", "http-search")
+    literal = client.post(
+        "/api/memory/items",
+        headers=headers,
+        json=_note(
+            "Literal wildcard note",
+            "Stored 100% of the score_marker for the next discovery loop only.",
+        ),
+    )
+    assert literal.status_code == 201, literal.text
+    decoy = client.post(
+        "/api/memory/items",
+        headers=headers,
+        json=_note(
+            "Decoy wildcard note",
+            "Stored 1000 of the scoreXmarker for the next discovery loop only.",
+        ),
+    )
+    assert decoy.status_code == 201, decoy.text
+    percent = client.get("/api/memory/items", headers=headers, params={"q": "100%"})
+    assert percent.status_code == 200, percent.text
+    assert [row["title"] for row in percent.json()["items"]] == ["Literal wildcard note"]
+    under = client.get("/api/memory/items", headers=headers, params={"q": "score_marker"})
+    assert [row["title"] for row in under.json()["items"]] == ["Literal wildcard note"]
+    prefix = "M" * 48
+    bounded = client.post(
+        "/api/memory/items",
+        headers=headers,
+        json=_note("Bounded prefix note", prefix),
+    )
+    assert bounded.status_code == 201, bounded.text
+    suffix = client.post(
+        "/api/memory/items",
+        headers=headers,
+        json=_note("Suffix only note", ("NZ" * 6) + " padding for a durable worker note."),
+    )
+    assert suffix.status_code == 201, suffix.text
+    found = client.get(
+        "/api/memory/items",
+        headers=headers,
+        params={"q": prefix + ("NZ" * 6)},
+    )
+    assert [row["title"] for row in found.json()["items"]] == ["Bounded prefix note"]

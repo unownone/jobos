@@ -33,6 +33,9 @@ SECRET_KEY_FRAGMENTS = (
     "board_token",
 )
 
+# list_jobs(None) reads every row. Export keeps an explicit bound.
+LEDGER_JOB_LIMIT = 100_000
+
 JOB_EXPORT_KEYS = (
     "id",
     "company",
@@ -218,7 +221,7 @@ def render_index(jobs: list[dict[str, Any]]) -> str:
 
 
 def build_ledger_files(db: BoardDB, tenant: TenantContext) -> dict[str, str]:
-    jobs = [job_for_export(job) for job in db.list_jobs(tenant)]
+    jobs = [job_for_export(job) for job in db.list_jobs(tenant, limit=LEDGER_JOB_LIMIT)]
     people = [person_for_export(person) for person in list_people(db, tenant)]
     events = [event_for_export(event) for event in db.list_events(tenant, limit=10000)]
     files: dict[str, str] = {
@@ -275,7 +278,7 @@ def create_export_router(principal_dep: Any) -> APIRouter:
             note=f"files={len(files)} format={fmt}",
         )
         if fmt == "json":
-            jobs = [job_for_export(job) for job in db.list_jobs(principal.tenant)]
+            jobs = [job_for_export(job) for job in db.list_jobs(principal.tenant, limit=LEDGER_JOB_LIMIT)]
             people = [person_for_export(person) for person in list_people(db, principal.tenant)]
             events = [event_for_export(event) for event in db.list_events(principal.tenant, limit=10000)]
             return {

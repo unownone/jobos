@@ -19,7 +19,7 @@ from app.constants import (
     PIPELINE_OPEN_STATUSES,
     ROLE_TO_TRACK,
 )
-from app.db import BoardDB, row_to_job
+from app.db import BoardDB
 from app.presence import (
     derive_status,
     list_presence_rows,
@@ -79,34 +79,13 @@ def summarize_dashboard(db: BoardDB, tenant: Any, *, now: datetime | None = None
     applied = _count_status(by_status, FUNNEL_APPLIED_STATUSES)
     outreached = _count_status(by_status, FUNNEL_OUTREACHED_STATUSES)
 
-    found_today_row = db.conn.execute(
-        "SELECT COUNT(*) AS n FROM jobs WHERE account_id = ? AND created_at >= ?",
-        (tenant.account_id, day_start),
-    ).fetchone()
-    applied_today_row = db.conn.execute(
-        """
-        SELECT COUNT(DISTINCT job_id) AS n FROM events
-        WHERE account_id = ? AND to_status = 'applied' AND ts >= ?
-        """,
-        (tenant.account_id, day_start),
-    ).fetchone()
+    found_today = db.count_jobs_created_since(tenant, day_start)
+    applied_today = db.count_events_to_status_since(tenant, "applied", day_start)
 
-    open_statuses = sorted(PIPELINE_OPEN_STATUSES)
-    placeholders = ", ".join("?" for _ in open_statuses)
-    oldest_row = db.conn.execute(
-        f"""
-        SELECT * FROM jobs
-        WHERE account_id = ?
-          AND stopped = 0
-          AND status IN ({placeholders})
-        ORDER BY COALESCE(NULLIF(posted_at, ''), created_at) ASC
-        LIMIT 1
-        """,
-        [tenant.account_id, *open_statuses],
-    ).fetchone()
+    oldest_job = db.oldest_open_job(tenant, sorted(PIPELINE_OPEN_STATUSES))
     oldest: dict[str, Any] | None = None
-    if oldest_row:
-        job = row_to_job(oldest_row)
+    if oldest_job is not None:
+        job = oldest_job
         posted = (job.get("posted_at") or "").strip()
         found_at = job.get("created_at") or ""
         age_from = posted or found_at
@@ -165,8 +144,8 @@ def summarize_dashboard(db: BoardDB, tenant: Any, *, now: datetime | None = None
             "live": live,
         },
         "today": {
-            "found": int(found_today_row["n"]) if found_today_row else 0,
-            "applied": int(applied_today_row["n"]) if applied_today_row else 0,
+            "found": found_today,
+            "applied": applied_today,
             "day_start": day_start,
         },
         "oldest_in_pipeline": oldest,

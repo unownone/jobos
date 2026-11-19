@@ -16,7 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
-from app.auth import authenticate, has_request_credentials
+from app.auth_manager import AuthConflict, AuthManager, CSRF_DETAIL, install_secret_log_filter
 from app.gates import wants_html
 
 AUTH_REQUIRED = "authentication required"
@@ -127,33 +127,29 @@ class AuthGateMiddleware(BaseHTTPMiddleware):
     """Reject anonymous access before route handlers load sensitive payloads."""
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        install_secret_log_filter()
         if request.method == "OPTIONS":
+            request.state.principal = None
             return await call_next(request)
         path = request.url.path
-        if path_is_public(path):
-            return await call_next(request)
+        public = path_is_public(path)
         settings = getattr(request.app.state, "settings", None)
         db = getattr(request.app.state, "db", None)
         if settings is None or db is None:
+            request.state.principal = None
+            if public:
+                return await call_next(request)
             return unauthenticated_response(request)
-        if not has_request_credentials(request):
-            return unauthenticated_response(request)
+        manager = AuthManager.from_settings(settings, db)
         try:
-            # Skip CSRF here so cookie POSTs still reach require_principal's 403.
-            authenticate(
-                settings,
-                db,
-                request=None,
-                authorization=request.headers.get("authorization"),
-                x_hub_key=request.headers.get("x-hub-key"),
-                x_role=request.headers.get("x-role"),
-                x_token=request.headers.get("x-token"),
-                x_actor=request.headers.get("x-actor"),
-                x_csrf=request.headers.get("x-csrf"),
-                hub_session=request.cookies.get("hub_session"),
-                hub_csrf=request.cookies.get("hub_csrf"),
-            )
+            principal = manager.resolve(request)
+        except AuthConflict as exc:
+            request.state.principal = None
+            return unauthenticated_response(request, detail=exc.detail)
         except HTTPException as exc:
+            request.state.principal = None
+            if public:
+                return await call_next(request)
             if exc.status_code == 401:
                 return unauthenticated_response(request, detail=exc.detail)
             if exc.status_code in {403, 503}:
@@ -162,4 +158,13 @@ class AuthGateMiddleware(BaseHTTPMiddleware):
                     content={"detail": redact_secrets(exc.detail)},
                 )
             raise
-        return await call_next(request)
+        if principal is not None and not principal.csrf_ok:
+            if public:
+                principal = None
+            else:
+                request.state.principal = None
+                return JSONResponse(status_code=403, content={"detail": CSRF_DETAIL})
+        request.state.principal = principal
+        if public or principal is not None:
+            return await call_next(request)
+        return unauthenticated_response(request)

@@ -51,6 +51,7 @@ def public_catalog(
     role: str | None = None,
     limit: int = 200,
 ) -> dict[str, Any]:
+    # list_approved_shared is the summary path: the SQL page does not load body_md.
     skills = store.list_approved_shared(tag=tag, role=role, limit=limit)
     compact = [catalog_skill(item) for item in skills]
     mcps = hosted_mcps()

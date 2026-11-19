@@ -131,9 +131,9 @@ def test_list_jobs_paginates_and_filters(client: TestClient) -> None:
     assert lane["matched"] == 2
     loc = client.get("/api/jobs?location=NYC&limit=50", headers=h("admin")).json()
     assert loc["matched"] == 3
-    # Agents omit limit when deduping; do not silently truncate the live list.
+    # Omitting limit on this route applies 100 and reports that cap.
     full = client.get("/api/jobs", headers=h("admin")).json()
-    assert full["limit"] is None
+    assert full["limit"] == 100
     assert full["count"] == 6
     assert full["matched"] == 6
     assert len(full["jobs"]) == 6

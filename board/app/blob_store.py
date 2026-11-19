@@ -1,18 +1,20 @@
 """BlobStore Module: tenant-scoped file bytes.
 
-Interface is put/get/delete with TenantContext. Two Adapters make the Seam
-real: FilesystemBlobStore (production, volumized) and MemoryBlobStore (tests).
-An S3 Adapter can sit at the same Seam later without rewriting callers.
+Interface is put/get/delete with TenantContext. Adapters: FilesystemBlobStore
+(production, volumized), MemoryBlobStore (tests), and R2BlobStore (Cloudflare
+R2 binding). R2 uses the Workers binding shape, not boto3 or the S3 API.
 """
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.tenant import TenantContext
 
@@ -182,7 +184,192 @@ class FilesystemBlobStore:
         return existed
 
 
-def build_blob_store(*, root: Path | None, memory: bool = False) -> BlobStore:
+async def _await_binding(awaitable: Any) -> Any:
+    return await awaitable
+
+
+def _complete(value: Any, method: str) -> Any:
+    """Return a sync binding result unchanged.
+
+    A coroutine or other awaitable is finished with ``asyncio.run`` when this
+    thread has no running loop. A running loop is not nested; the call fails
+    and names ``method``.
+    """
+    if not inspect.isawaitable(value):
+        return value
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_await_binding(value))
+    if inspect.iscoroutine(value):
+        value.close()
+    raise RuntimeError(
+        f"R2 binding {method}() returned an awaitable while an event loop is already running"
+    )
+
+
+def _put_binding(binding: Any, key: str, value: bytes, http_metadata: dict[str, str] | None) -> None:
+    """Call ``put(key, value, httpMetadata?)`` on a Cloudflare R2 binding.
+
+    Workers Python takes ``httpMetadata`` as a keyword. The JS binding's third
+    argument is an options object whose ``httpMetadata`` field is optional.
+    """
+    try:
+        result = binding.put(key, value, httpMetadata=http_metadata)
+    except TypeError:
+        result = binding.put(key, value, {"httpMetadata": http_metadata or {}})
+    _complete(result, "put")
+
+
+def _body_bytes(obj: Any) -> bytes:
+    reader = getattr(obj, "arrayBuffer", None)
+    if callable(reader):
+        raw = _complete(reader(), "arrayBuffer")
+        if isinstance(raw, str):
+            return raw.encode("utf-8")
+        return bytes(raw)
+    reader = getattr(obj, "text", None)
+    if callable(reader):
+        text = _complete(reader(), "text")
+        if isinstance(text, bytes):
+            return text
+        return str(text).encode("utf-8")
+    body = getattr(obj, "body", None)
+    if inspect.isawaitable(body):
+        body = _complete(body, "body")
+    if isinstance(body, (bytes, bytearray, memoryview)):
+        return bytes(body)
+    raise TypeError("R2 object does not expose arrayBuffer(), text(), or a bytes body")
+
+
+def _http_metadata(obj: Any) -> dict[str, Any]:
+    raw = getattr(obj, "httpMetadata", None)
+    if raw is None:
+        raw = getattr(obj, "http_metadata", None)
+    if not isinstance(raw, dict):
+        return {}
+    nested = raw.get("httpMetadata")
+    if isinstance(nested, dict) and "contentType" not in raw and "content-type" not in raw:
+        return nested
+    return raw
+
+
+def _content_type_of(meta: dict[str, Any], http_meta: dict[str, Any]) -> str:
+    return str(
+        meta.get("content_type")
+        or http_meta.get("contentType")
+        or http_meta.get("content-type")
+        or "application/octet-stream"
+    )
+
+
+class R2BlobStore:
+    """Adapter over any object with the Cloudflare R2 binding shape.
+
+    ``put(key, value, httpMetadata?)``, ``get(key)`` returns an object with
+    ``arrayBuffer`` / ``text`` or ``None``, and ``delete(key)``. Metadata that
+    httpMetadata cannot carry is a sibling object, so a binding that only
+    stores bytes still round-trips filename and updated_at.
+    """
+
+    def __init__(self, binding: Any) -> None:
+        if binding is None:
+            raise ValueError("R2BlobStore requires a binding")
+        self._binding = binding
+
+    def _keys(self, tenant: TenantContext, key: str) -> tuple[str, str, str]:
+        norm = normalize_key(key)
+        prefix = f"{tenant.account_id}/"
+        return norm, prefix + norm, prefix + "meta:" + norm
+
+    def put(
+        self,
+        tenant: TenantContext,
+        key: str,
+        content: bytes,
+        *,
+        content_type: str = "application/octet-stream",
+        filename: str = "",
+    ) -> Blob:
+        norm, data_key, meta_key = self._keys(tenant, key)
+        payload = bytes(content)
+        content_type = content_type or "application/octet-stream"
+        filename = filename or Path(norm).name
+        updated_at = utc_stamp()
+        _put_binding(self._binding, data_key, payload, {"contentType": content_type})
+        meta = {
+            "key": norm,
+            "content_type": content_type,
+            "filename": filename,
+            "updated_at": updated_at,
+            "account_id": tenant.account_id,
+        }
+        _put_binding(
+            self._binding,
+            meta_key,
+            json.dumps(meta, ensure_ascii=False).encode("utf-8"),
+            {"contentType": "application/json"},
+        )
+        return Blob(
+            key=norm,
+            content=payload,
+            content_type=content_type,
+            filename=filename,
+            updated_at=updated_at,
+            account_id=tenant.account_id,
+        )
+
+    def get(self, tenant: TenantContext, key: str) -> Blob | None:
+        norm, data_key, meta_key = self._keys(tenant, key)
+        obj = _complete(self._binding.get(data_key), "get")
+        if obj is None:
+            return None
+        content = _body_bytes(obj)
+        http_meta = _http_metadata(obj)
+        meta: dict[str, Any] = {}
+        meta_obj = _complete(self._binding.get(meta_key), "get")
+        if meta_obj is not None:
+            try:
+                loaded = json.loads(_body_bytes(meta_obj).decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                loaded = None
+            if isinstance(loaded, dict):
+                meta = loaded
+        filename = str(meta.get("filename") or Path(norm).name)
+        updated_at = str(meta.get("updated_at") or utc_stamp())
+        account_id = str(meta.get("account_id") or tenant.account_id)
+        return Blob(
+            key=norm,
+            content=content,
+            content_type=_content_type_of(meta, http_meta),
+            filename=filename,
+            updated_at=updated_at,
+            account_id=account_id,
+        )
+
+    def delete(self, tenant: TenantContext, key: str) -> bool:
+        _norm, data_key, meta_key = self._keys(tenant, key)
+        existed = _complete(self._binding.get(data_key), "get") is not None
+        _complete(self._binding.delete(data_key), "delete")
+        _complete(self._binding.delete(meta_key), "delete")
+        return existed
+
+
+def build_blob_store(
+    *,
+    root: Path | None = None,
+    memory: bool = False,
+    adapter: str | None = None,
+    binding: Any | None = None,
+) -> BlobStore:
+    """Pick an adapter.
+
+    ``adapter="r2"`` with a binding returns :class:`R2BlobStore`. With no
+    binding, the previous default remains: memory when asked or when ``root``
+    is missing, otherwise the filesystem.
+    """
+    if (adapter or "").strip().lower() == "r2" and binding is not None:
+        return R2BlobStore(binding)
     if memory or root is None:
         return MemoryBlobStore()
     return FilesystemBlobStore(root)
