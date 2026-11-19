@@ -125,17 +125,32 @@ class MetricsStore:
         return [self._row(r) for r in cur.fetchall()]
 
     def summary(self, *, tenant: Any | None = None) -> dict[str, Any]:
-        cur = self.conn.execute(
-            "SELECT * FROM token_burn WHERE account_id = ?",
-            (account_id_of(tenant),),
-        )
-        rows = [self._row(r) for r in cur.fetchall()]
+        cur = self.conn.execute(_SUMMARY_SQL, (account_id_of(tenant),))
+        total: dict[str, Any] | None = None
+        grouped: dict[str, list[dict[str, Any]]] = {"tool": [], "skill": [], "role": []}
+        for row in cur.fetchall():
+            bucket = str(row["bucket"])
+            if bucket == "total":
+                total = dict(row)
+                continue
+            grouped.setdefault(bucket, []).append(dict(row))
+        if total is None:
+            total = {
+                "n": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "cost_usd": 0,
+                "duration_ms_p50": None,
+                "duration_ms_p95": None,
+                "n_with_duration": 0,
+            }
         return {
-            "n": len(rows),
-            "totals": _totals(rows),
-            "by_tool": _group(rows, "tool_name"),
-            "by_skill": _group(rows, "skill"),
-            "by_role": _group(rows, "actor_role"),
+            "n": int(total["n"] or 0),
+            "totals": _totals_from_agg(total),
+            "by_tool": _pack_groups(grouped.get("tool", [])),
+            "by_skill": _pack_groups(grouped.get("skill", [])),
+            "by_role": _pack_groups(grouped.get("role", [])),
         }
 
     def _row(self, row: Any) -> dict[str, Any]:
@@ -161,26 +176,60 @@ class MetricsStore:
         }
 
 
-def _totals(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    durations = [float(r["duration_ms"]) for r in rows if r.get("duration_ms") is not None]
+_AGG_COLUMNS = """
+    COUNT(*)::bigint AS n,
+    COALESCE(SUM(prompt_tokens), 0)::bigint AS prompt_tokens,
+    COALESCE(SUM(completion_tokens), 0)::bigint AS completion_tokens,
+    COALESCE(SUM(total_tokens), 0)::bigint AS total_tokens,
+    ROUND(COALESCE(SUM(cost_usd), 0)::numeric, 6) AS cost_usd,
+    percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS duration_ms_p50,
+    percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS duration_ms_p95,
+    COUNT(duration_ms)::bigint AS n_with_duration
+"""
+
+_SUMMARY_SQL = f"""
+WITH filtered AS (
+    SELECT tool_name, skill, actor_role, prompt_tokens, completion_tokens,
+           total_tokens, cost_usd, duration_ms
+    FROM token_burn
+    WHERE account_id = ?
+)
+SELECT bucket, name, n, prompt_tokens, completion_tokens, total_tokens, cost_usd,
+       duration_ms_p50, duration_ms_p95, n_with_duration
+FROM (
+    SELECT 'total' AS bucket, '' AS name, {_AGG_COLUMNS}
+    FROM filtered
+    UNION ALL
+    SELECT 'tool', COALESCE(NULLIF(tool_name, ''), '(none)'), {_AGG_COLUMNS}
+    FROM filtered
+    GROUP BY 2
+    UNION ALL
+    SELECT 'skill', COALESCE(NULLIF(skill, ''), '(none)'), {_AGG_COLUMNS}
+    FROM filtered
+    GROUP BY 2
+    UNION ALL
+    SELECT 'role', COALESCE(NULLIF(actor_role, ''), '(none)'), {_AGG_COLUMNS}
+    FROM filtered
+    GROUP BY 2
+) agg
+"""
+
+
+def _totals_from_agg(row: dict[str, Any]) -> dict[str, Any]:
+    p50 = row.get("duration_ms_p50")
+    p95 = row.get("duration_ms_p95")
     return {
-        "prompt_tokens": sum(int(r["prompt_tokens"]) for r in rows),
-        "completion_tokens": sum(int(r["completion_tokens"]) for r in rows),
-        "total_tokens": sum(int(r["total_tokens"]) for r in rows),
-        "cost_usd": round(sum(float(r["cost_usd"] or 0) for r in rows), 6),
-        "duration_ms_p50": percentile(durations, 50),
-        "duration_ms_p95": percentile(durations, 95),
-        "n_with_duration": len(durations),
+        "prompt_tokens": int(row.get("prompt_tokens") or 0),
+        "completion_tokens": int(row.get("completion_tokens") or 0),
+        "total_tokens": int(row.get("total_tokens") or 0),
+        "cost_usd": round(float(row.get("cost_usd") or 0), 6),
+        "duration_ms_p50": None if p50 is None else float(p50),
+        "duration_ms_p95": None if p95 is None else float(p95),
+        "n_with_duration": int(row.get("n_with_duration") or 0),
     }
 
 
-def _group(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
-    buckets: dict[str, list[dict[str, Any]]] = {}
-    for row in rows:
-        buckets.setdefault(str(row.get(key) or "(none)"), []).append(row)
-    out = []
-    for name, group in sorted(
-        buckets.items(), key=lambda kv: -sum(int(r["total_tokens"]) for r in kv[1])
-    ):
-        out.append({"name": name, "n": len(group), **_totals(group)})
-    return out
+def _pack_groups(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    packed = [{"name": str(row.get("name") or "(none)"), "n": int(row["n"]), **_totals_from_agg(row)} for row in rows]
+    packed.sort(key=lambda item: (-int(item["total_tokens"]), str(item["name"])))
+    return packed
