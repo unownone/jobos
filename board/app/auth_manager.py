@@ -233,10 +233,10 @@ class AccessJwtMethod:
             return None
         email = claims.get("email")
         if not isinstance(email, str) or not email.strip():
-            raise _unauthorized("invalid access token")
+            return None
         user = self._db.get_user_by_email(email)
         if user is None:
-            raise _unauthorized("invalid access token")
+            return None
         return _principal_from_user(user, auth="access_jwt", actor_override=_actor(request))
 
 
@@ -303,6 +303,9 @@ class AuthManager:
         distinct_user_ids = {item.user_id for item in matched if item.user_id is not None}
         if len(distinct_user_ids) > 1:
             raise AuthConflict()
+        identified = [item for item in matched if item.user_id is not None]
+        if identified:
+            return identified[0]
         return matched[0]
 
 

@@ -637,7 +637,7 @@ def test_access_jwt_rejects_bad_signature_issuer_audience_and_expiry(tmp_path: P
             is None
         )
 
-    with pytest.raises(HTTPException) as exc:
+    assert (
         manager.resolve(
             make_request(
                 "GET",
@@ -646,6 +646,62 @@ def test_access_jwt_rejects_bad_signature_issuer_audience_and_expiry(tmp_path: P
                     "Cf-Access-Jwt-Assertion": access_token(private_pem, email="missing@example.test")
                 },
             )
+        )
+        is None
+    )
+
+
+def test_access_jwt_unknown_email_falls_through_to_session(tmp_path: Path) -> None:
+    private_pem, public_pem = rsa_pems(tmp_path, "jwt-unknown-fallthrough")
+    store = MemoryDirectory()
+    session_user = store.add_user(
+        agent_user(user_id="usr_sess", email="sess@example.test", account_id="acc_sess")
+    )
+    store.add_session("sess-real", session_user, csrf="csrf")
+    settings = make_settings(
+        tmp_path,
+        auth_methods="access_jwt,session",
+        access_team_domain="contoso.cloudflareaccess.com",
+        access_aud=AUDIENCE,
+        access_jwt_public_key=public_pem,
+    )
+    token = access_token(private_pem, email="missing@example.test")
+    principal = AuthManager.from_settings(settings, store).resolve(
+        make_request(
+            "GET",
+            "/api/jobs",
+            headers={"Cf-Access-Jwt-Assertion": token},
+            cookies={"hub_session": "sess-real", "hub_csrf": "csrf"},
+        )
+    )
+    assert principal is not None
+    assert principal.user_id == "usr_sess"
+    assert principal.auth == "session"
+
+
+def test_access_jwt_unknown_email_without_other_credentials_is_401(tmp_path: Path) -> None:
+    private_pem, public_pem = rsa_pems(tmp_path, "jwt-unknown-only")
+    store = MemoryDirectory()
+    store.add_user(agent_user(email="ada@example.test"))
+    settings = make_settings(
+        tmp_path,
+        auth_methods="access_jwt",
+        access_team_domain="contoso.cloudflareaccess.com",
+        access_aud=AUDIENCE,
+        access_jwt_public_key=public_pem,
+    )
+    token = access_token(private_pem, email="missing@example.test")
+    assert (
+        AuthManager.from_settings(settings, store).resolve(
+            make_request("GET", "/api/jobs", headers={"Cf-Access-Jwt-Assertion": token})
+        )
+        is None
+    )
+    with pytest.raises(HTTPException) as exc:
+        authenticate(
+            settings,
+            store,
+            request=make_request("GET", "/api/jobs", headers={"Cf-Access-Jwt-Assertion": token}),
         )
     assert exc.value.status_code == 401
 
@@ -686,6 +742,27 @@ def test_compat_and_session_in_auth_methods_ignore_none_user_id_conflict(
     user = store.add_user(agent_user(user_id="usr_sess", email="sess@example.test"))
     store.add_session("sess-dual", user, csrf="csrf")
     settings = make_settings(tmp_path, auth_methods="session,compat")
+    monkeypatch.setattr("app.auth_manager._presented_role_token", lambda _request: False)
+    principal = AuthManager.from_settings(settings, store).resolve(
+        make_request(
+            "GET",
+            "/api/jobs",
+            headers={"X-Role": "discovery", "X-Token": "token-discovery", "X-Actor": "pytest"},
+            cookies={"hub_session": "sess-dual", "hub_csrf": "csrf"},
+        )
+    )
+    assert principal is not None
+    assert principal.user_id == "usr_sess"
+    assert principal.auth == "session"
+
+
+def test_compat_before_session_prefers_session_user(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = MemoryDirectory()
+    user = store.add_user(agent_user(user_id="usr_sess", email="sess@example.test"))
+    store.add_session("sess-dual", user, csrf="csrf")
+    settings = make_settings(tmp_path, auth_methods="compat,session")
     monkeypatch.setattr("app.auth_manager._presented_role_token", lambda _request: False)
     principal = AuthManager.from_settings(settings, store).resolve(
         make_request(
