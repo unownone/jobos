@@ -73,8 +73,12 @@ class SqliteDatabase:
             for stmt in prepared:
                 results.append(self._execute(stmt.sql, stmt.params, guarded=True))
             self._conn.execute("COMMIT")
-        except Exception:
+        except Exception as exc:
             self._conn.execute("ROLLBACK")
+            if isinstance(exc, sqlite3.Error):
+                mapped = map_sqlite_error(exc)
+                if mapped is not None:
+                    raise mapped from exc
             raise
         return results
 
