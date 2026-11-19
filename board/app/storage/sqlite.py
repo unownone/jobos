@@ -72,10 +72,10 @@ class SqliteDatabase:
         try:
             for stmt in prepared:
                 results.append(self._execute(stmt.sql, stmt.params, guarded=True))
+            self._conn.execute("COMMIT")
         except Exception:
             self._conn.execute("ROLLBACK")
             raise
-        self._conn.execute("COMMIT")
         return results
 
     def _guard(self, params: Sequence[Any]) -> None:
