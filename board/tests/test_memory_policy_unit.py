@@ -13,6 +13,7 @@ from app.memory_policy import (
     fts_match_query,
     resolve_read_pod,
     resolve_write_pod,
+    search_like_pattern,
     validate_kind,
     validate_write_text,
     visible_pod_ids,
@@ -128,3 +129,17 @@ def test_compat_worker_id_uses_actor() -> None:
 def test_fts_query_quotes_tokens() -> None:
     assert fts_match_query("Greenhouse work-auth") == '"Greenhouse" AND "work" AND "auth"'
     assert fts_match_query("???") is None
+
+
+def test_search_like_pattern_bounds_term_and_escapes_wildcards() -> None:
+    assert search_like_pattern(None) is None
+    assert search_like_pattern("   ") is None
+    assert search_like_pattern("???") is None
+    assert search_like_pattern("%" * 80 + "ab") is None
+    assert search_like_pattern("Greenhouse") == "%Greenhouse%"
+    assert search_like_pattern("100%_ok") == "%100\\%\\_ok%"
+    assert search_like_pattern("aa\\bb") == "%aa\\\\bb%"
+    assert search_like_pattern("score_marker") == "%score\\_marker%"
+    assert search_like_pattern("M" * 60) == "%" + ("M" * 48) + "%"
+    assert search_like_pattern("   " + ("M" * 60)) == "%" + ("M" * 48) + "%"
+    assert search_like_pattern("ab" + ("%" * 80)) == "%ab" + ("\\%" * 46) + "%"

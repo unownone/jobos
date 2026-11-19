@@ -9,8 +9,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
 
 from app.constants import TRACKS
-from app.sql import column_names as sql_column_names
 from app.tenant import account_id_of
+from app.storage.repos import memory as memory_repo
 from app.memory_policy import (
     HEARTBEAT_LIMIT,
     POD_COMMON,
@@ -30,7 +30,6 @@ from app.memory_policy import (
     compact_body,
     content_hash,
     default_ttl_days,
-    fts_match_query,
     is_hub_admin,
     is_inspector,
     kinds_for_scope,
@@ -46,40 +45,6 @@ from app.memory_policy import (
     worker_pod_id,
     write_budget_hint,
 )
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS memory_items (
-    id TEXT PRIMARY KEY,
-    account_id TEXT NOT NULL,
-    pod TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    job_id TEXT,
-    company TEXT,
-    tags_json TEXT,
-    importance INTEGER NOT NULL DEFAULT 2,
-    pinned INTEGER NOT NULL DEFAULT 0,
-    content_hash TEXT NOT NULL,
-    created_by TEXT NOT NULL,
-    created_track TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    expires_at TEXT,
-    last_recalled_at TEXT,
-    recall_count INTEGER NOT NULL DEFAULT 0,
-    solidify_status TEXT NOT NULL DEFAULT 'none',
-    recording_id TEXT
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_account_pod_hash
-    ON memory_items(account_id, pod, content_hash);
-CREATE INDEX IF NOT EXISTS idx_memory_pod ON memory_items(pod);
-CREATE INDEX IF NOT EXISTS idx_memory_kind ON memory_items(kind);
-CREATE INDEX IF NOT EXISTS idx_memory_expires ON memory_items(expires_at);
-CREATE INDEX IF NOT EXISTS idx_memory_created_by ON memory_items(created_by, created_at);
-CREATE INDEX IF NOT EXISTS idx_memory_recording ON memory_items(recording_id);
-"""
 
 class MemoryPrincipal(Protocol):
     role: str
@@ -108,22 +73,8 @@ def _iso_future(days: int, now: datetime | None = None) -> str:
     return when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _column_names(conn: Any, table: str) -> set[str]:
-    try:
-        return sql_column_names(conn, table)
-    except Exception:
-        return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
-
-
 def ensure_memory_schema(conn: Any) -> None:
-    conn.executescript(SCHEMA)
-    cols = _column_names(conn, "memory_items")
-    if "solidify_status" not in cols:
-        conn.execute(
-            "ALTER TABLE memory_items ADD COLUMN solidify_status TEXT NOT NULL DEFAULT 'none'"
-        )
-    if "recording_id" not in cols:
-        conn.execute("ALTER TABLE memory_items ADD COLUMN recording_id TEXT")
+    memory_repo.ensure_schema(conn)
 
 
 def _load_tags(raw: str | None) -> list[str]:
@@ -166,16 +117,13 @@ def row_to_item(row: Any, *, compact: bool = False) -> dict[str, Any]:
 
 
 def live_clause(now_iso: str) -> str:
-    return "(expires_at IS NULL OR expires_at = '' OR expires_at > ?)"
+    """Live-row predicate. Bind ``now_iso`` to the placeholder."""
+    return memory_repo.LIVE_CLAUSE
 
 
 def purge_expired(db: HasConn, *, now_iso: str | None = None) -> int:
     now = now_iso or utc_now()
-    cur = db.conn.execute(
-        "DELETE FROM memory_items WHERE expires_at IS NOT NULL AND expires_at != '' AND expires_at <= ?",
-        (now,),
-    )
-    deleted = int(cur.rowcount or 0)
+    deleted = memory_repo.delete_expired(db.conn, now)
     if deleted:
         db.conn.commit()
     return deleted
@@ -239,33 +187,15 @@ def pod_catalog(principal: MemoryPrincipal) -> list[dict[str, Any]]:
     return pods
 
 
-def _visible_sql(principal: MemoryPrincipal) -> tuple[str, list[Any]]:
-    pods = visible_pod_ids(principal)
-    placeholders = ",".join("?" for _ in pods)
-    return f"pod IN ({placeholders})", list(pods)
-
-
 def count_recent_writes(db: HasConn, *, writer: str, scope: str, now: datetime, principal: MemoryPrincipal) -> int:
     since = (now - timedelta(seconds=WRITE_WINDOW_S)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    aid = account_id_of(principal)
-    if scope == POD_KIND_COMMON:
-        pod_match = "pod = ?"
-        args: list[Any] = [aid, writer, since, POD_COMMON]
-    elif scope == POD_KIND_TRACK:
-        pod_match = "pod LIKE 'track:%'"
-        args = [aid, writer, since]
-    else:
-        pod_match = "pod LIKE 'worker:%'"
-        args = [aid, writer, since]
-    cur = db.conn.execute(
-        f"""
-        SELECT COUNT(*) AS n FROM memory_items
-        WHERE account_id = ? AND created_by = ? AND created_at >= ? AND {pod_match}
-        """,
-        args,
+    return memory_repo.count_recent_writes(
+        db.conn,
+        account_id=account_id_of(principal),
+        writer=writer,
+        since=since,
+        scope=scope,
     )
-    row = cur.fetchone()
-    return int(row["n"] if row else 0)
 
 
 def _enforce_rate(db: HasConn, principal: MemoryPrincipal, scope: str) -> None:
@@ -280,20 +210,12 @@ def _enforce_rate(db: HasConn, principal: MemoryPrincipal, scope: str) -> None:
 
 
 def get_item(db: HasConn, item_id: str, *, principal: MemoryPrincipal | None = None) -> dict[str, Any] | None:
-    cur = db.conn.execute(
-        "SELECT * FROM memory_items WHERE id = ? AND account_id = ?",
-        (item_id, account_id_of(principal)),
-    )
-    row = cur.fetchone()
+    row = memory_repo.fetch_item(db.conn, item_id, account_id_of(principal))
     return dict(row) if row else None
 
 
 def public_item(db: HasConn, item_id: str, *, compact: bool = False, principal: MemoryPrincipal | None = None) -> dict[str, Any]:
-    cur = db.conn.execute(
-        "SELECT * FROM memory_items WHERE id = ? AND account_id = ?",
-        (item_id, account_id_of(principal)),
-    )
-    row = cur.fetchone()
+    row = memory_repo.fetch_item(db.conn, item_id, account_id_of(principal))
     if row is None:
         raise MemoryNotFound("memory item not found")
     return row_to_item(row, compact=compact)
@@ -314,44 +236,27 @@ def list_items(
 ) -> list[dict[str, Any]]:
     purge_expired(db)
     cap = max(1, min(int(limit), RECALL_LIMIT_MAX))
-    now = utc_now()
-    clauses: list[str] = ["account_id = ?"]
-    args: list[Any] = [account_id_of(principal)]
-    if pod:
-        target = resolve_read_pod(principal, pod)
-        clauses.append("pod = ?")
-        args.append(target)
-    else:
-        where, vis_args = _visible_sql(principal)
-        clauses.append(where)
-        args.extend(vis_args)
-    if not include_expired:
-        clauses.append(live_clause(now))
-        args.append(now)
-    if kind:
-        clauses.append("kind = ?")
-        args.append(kind.strip().lower())
-    if job_id:
-        clauses.append("job_id = ?")
-        args.append(job_id.strip())
-    if company:
-        clauses.append("lower(COALESCE(company, '')) = lower(?)")
-        args.append(company.strip())
+    target = resolve_read_pod(principal, pod) if pod else None
+    rows = memory_repo.list_items(
+        db.conn,
+        account_id=account_id_of(principal),
+        pod=target,
+        visible_pods=None if target is not None else visible_pod_ids(principal),
+        include_expired=include_expired,
+        now=utc_now(),
+        kind=kind.strip().lower() if kind else None,
+        job_id=job_id.strip() if job_id else None,
+        company=company.strip() if company else None,
+        query=q,
+        limit=cap,
+    )
+    return [row_to_item(row, compact=compact) for row in rows]
 
-    match = fts_match_query(q)
-    if match:
-        like = f"%{q.strip()}%"
-        clauses.append("(title LIKE ? OR body LIKE ? OR COALESCE(company, '') LIKE ?)")
-        args.extend([like, like, like])
 
-    sql = f"""
-        SELECT * FROM memory_items
-        WHERE {' AND '.join(clauses)}
-        ORDER BY pinned DESC, importance DESC, updated_at DESC
-        LIMIT ?
-    """
-    cur = db.conn.execute(sql, [*args, cap])
-    return [row_to_item(row, compact=compact) for row in cur.fetchall()]
+def _deduped_row(row: Any) -> dict[str, Any]:
+    item = row_to_item(row)
+    item["deduped"] = True
+    return item
 
 
 def insert_item(
@@ -386,54 +291,52 @@ def insert_item(
         company=company,
         job_id=job_id,
     )
-    cur = db.conn.execute(
-        "SELECT * FROM memory_items WHERE account_id = ? AND pod = ? AND content_hash = ?",
-        (account_id_of(principal), target, digest),
-    )
-    existing = cur.fetchone()
-    if existing:
-        item = row_to_item(existing)
-        item["deduped"] = True
-        return item
-    _enforce_rate(db, principal, scope)
+    aid = account_id_of(principal)
     ttl = ttl_days
     if ttl is None:
         ttl = default_ttl_days(scope=scope, kind=stored_kind, importance=level)
-    if ttl is not None:
-        if ttl < 1 or ttl > 365:
-            raise MemoryInvalid("ttl_days must be 1–365 when set")
+    ttl_invalid = ttl is not None and (ttl < 1 or ttl > 365)
+    if ttl_invalid:
+        existing = memory_repo.fetch_by_hash(db.conn, aid, target, digest)
+        if existing is not None:
+            return _deduped_row(existing)
+        _enforce_rate(db, principal, scope)
+        raise MemoryInvalid("ttl_days must be 1–365 when set")
+    now_dt = datetime.now(timezone.utc)
+    since = (now_dt - timedelta(seconds=WRITE_WINDOW_S)).strftime("%Y-%m-%dT%H:%M:%SZ")
     now = utc_now()
     item_id = _new_id("mem_")
     writer = worker_id(principal)
     clean_tags = [str(tag).strip() for tag in (tags or []) if str(tag).strip()][:8]
-    db.conn.execute(
-        """
-        INSERT INTO memory_items (
-            id, account_id, pod, kind, title, body, job_id, company, tags_json, importance, pinned,
-            content_hash, created_by, created_track, created_at, updated_at, expires_at,
-            last_recalled_at, recall_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0)
-        """,
-        (
-            item_id,
-            account_id_of(principal),
-            target,
-            stored_kind,
-            title_text,
-            body_text,
-            (job_id or "").strip() or None,
-            (company or "").strip() or None,
-            json.dumps(clean_tags, ensure_ascii=False) if clean_tags else None,
-            level,
-            1 if pinned else 0,
-            digest,
-            writer,
-            getattr(principal, "track", None),
-            now,
-            now,
-            _iso_future(ttl) if ttl else None,
-        ),
+    inserted = memory_repo.insert_item(
+        db.conn,
+        item_id=item_id,
+        account_id=aid,
+        pod=target,
+        kind=stored_kind,
+        title=title_text,
+        body=body_text,
+        job_id=(job_id or "").strip() or None,
+        company=(company or "").strip() or None,
+        tags_json=json.dumps(clean_tags, ensure_ascii=False) if clean_tags else None,
+        importance=level,
+        pinned=1 if pinned else 0,
+        content_hash=digest,
+        writer=writer,
+        created_track=getattr(principal, "track", None),
+        created_at=now,
+        updated_at=now,
+        expires_at=_iso_future(ttl) if ttl else None,
+        since=since,
+        scope=scope,
+        cap=WRITE_CAPS[scope],
     )
+    if inserted is None:
+        existing = memory_repo.fetch_by_hash(db.conn, aid, target, digest)
+        if existing is not None:
+            return _deduped_row(existing)
+        _enforce_rate(db, principal, scope)
+        raise MemoryInvalid("memory item was not stored")
     db.conn.commit()
     return public_item(db, item_id, principal=principal)
 
@@ -441,17 +344,12 @@ def insert_item(
 def touch_recalled(db: HasConn, item_ids: list[str], *, principal: MemoryPrincipal | None = None) -> None:
     if not item_ids:
         return
-    now = utc_now()
-    aid = account_id_of(principal)
-    for item_id in item_ids:
-        db.conn.execute(
-            """
-            UPDATE memory_items
-            SET last_recalled_at = ?, recall_count = recall_count + 1
-            WHERE id = ? AND account_id = ?
-            """,
-            (now, item_id, aid),
-        )
+    memory_repo.touch_recalled(
+        db.conn,
+        item_ids,
+        now=utc_now(),
+        account_id=account_id_of(principal),
+    )
     db.conn.commit()
 
 
@@ -473,14 +371,12 @@ def update_item(
         raise MemoryDenied("cannot access this memory item")
     writer = worker_id(principal)
     owns = stored["created_by"] == writer
+    aid = account_id_of(principal)
     if forget:
         if not owns and not is_inspector(principal):
             raise MemoryDenied("cannot forget another worker's memory")
         now = utc_now()
-        db.conn.execute(
-            "UPDATE memory_items SET expires_at = ?, updated_at = ? WHERE id = ? AND account_id = ?",
-            (now, now, item_id, account_id_of(principal)),
-        )
+        memory_repo.forget_item(db.conn, item_id=item_id, account_id=aid, now=now)
         db.conn.commit()
         return public_item(db, item_id, principal=principal)
     if pinned is not None:
@@ -507,13 +403,16 @@ def update_item(
         company=stored.get("company"),
         job_id=stored.get("job_id"),
     )
-    db.conn.execute(
-        """
-        UPDATE memory_items
-        SET title = ?, body = ?, pinned = ?, expires_at = ?, content_hash = ?, updated_at = ?
-        WHERE id = ? AND account_id = ?
-        """,
-        (new_title, new_body, pin_val, exp, digest, now, item_id, account_id_of(principal)),
+    memory_repo.update_item(
+        db.conn,
+        title=new_title,
+        body=new_body,
+        pinned=pin_val,
+        expires_at=exp,
+        content_hash=digest,
+        updated_at=now,
+        item_id=item_id,
+        account_id=aid,
     )
     db.conn.commit()
     return public_item(db, item_id, principal=principal)
@@ -528,7 +427,7 @@ def delete_item(db: HasConn, principal: MemoryPrincipal, item_id: str) -> dict[s
     writer = worker_id(principal)
     if stored["created_by"] != writer and not is_inspector(principal):
         raise MemoryDenied("cannot delete another worker's memory")
-    db.conn.execute("DELETE FROM memory_items WHERE id = ? AND account_id = ?", (item_id, account_id_of(principal)))
+    memory_repo.delete_item(db.conn, item_id, account_id_of(principal))
     db.conn.commit()
     return {"ok": True, "id": item_id, "deleted": True}
 
@@ -581,6 +480,7 @@ def move_item(
         company=stored.get("company"),
         job_id=stored.get("job_id"),
     )
+    aid = account_id_of(principal)
     if target == stored["pod"] and stored_kind == stored["kind"] and not copy:
         item = public_item(db, item_id, principal=principal)
         item["moved"] = False
@@ -601,25 +501,24 @@ def move_item(
         )
         cloned["copied_from"] = item_id
         return cloned
-    existing = db.conn.execute(
-        "SELECT * FROM memory_items WHERE account_id = ? AND pod = ? AND content_hash = ?",
-        (account_id_of(principal), target, digest),
-    ).fetchone()
+    existing = memory_repo.fetch_by_hash(db.conn, aid, target, digest)
     if existing and existing["id"] != item_id:
-        db.conn.execute("DELETE FROM memory_items WHERE id = ? AND account_id = ?", (item_id, account_id_of(principal)))
+        memory_repo.delete_item(db.conn, item_id, aid)
         db.conn.commit()
         item = row_to_item(existing)
         item["deduped"] = True
         item["moved"] = True
         return item
-    now = utc_now()
-    db.conn.execute(
-        """
-        UPDATE memory_items
-        SET pod = ?, kind = ?, title = ?, body = ?, content_hash = ?, updated_at = ?
-        WHERE id = ? AND account_id = ?
-        """,
-        (target, stored_kind, title_text, body_text, digest, now, item_id, account_id_of(principal)),
+    memory_repo.move_item(
+        db.conn,
+        pod=target,
+        kind=stored_kind,
+        title=title_text,
+        body=body_text,
+        content_hash=digest,
+        updated_at=utc_now(),
+        item_id=item_id,
+        account_id=aid,
     )
     db.conn.commit()
     item = public_item(db, item_id, principal=principal)
@@ -802,13 +701,13 @@ def set_solidify_status(
         return
     now = utc_now()
     rec_id = recording_id if recording_id is not None else stored.get("recording_id")
-    db.conn.execute(
-        """
-        UPDATE memory_items
-        SET solidify_status = ?, recording_id = ?, updated_at = ?
-        WHERE id = ? AND account_id = ?
-        """,
-        (status, rec_id, now, item_id, account_id_of(principal)),
+    memory_repo.set_solidify(
+        db.conn,
+        status=status,
+        recording_id=rec_id,
+        updated_at=now,
+        item_id=item_id,
+        account_id=account_id_of(principal),
     )
     db.conn.commit()
 
