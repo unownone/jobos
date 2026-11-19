@@ -72,10 +72,14 @@ class SqliteDatabase:
         try:
             for stmt in prepared:
                 results.append(self._execute(stmt.sql, stmt.params, guarded=True))
-        except Exception:
+            self._conn.execute("COMMIT")
+        except Exception as exc:
             self._conn.execute("ROLLBACK")
+            if isinstance(exc, sqlite3.Error):
+                mapped = map_sqlite_error(exc)
+                if mapped is not None:
+                    raise mapped from exc
             raise
-        self._conn.execute("COMMIT")
         return results
 
     def _guard(self, params: Sequence[Any]) -> None:
