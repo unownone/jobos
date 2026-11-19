@@ -124,6 +124,33 @@ def test_heartbeat_logged_in_then_stale(hub: tuple[TestClient, Settings, Clock])
     assert body["last_active"].startswith("Last active:")
     assert "just now" in body["last_active"]
     assert body["pending_messages"] == 0
+    assert set(body) == {
+        "ok",
+        "status",
+        "heartbeat_s",
+        "stale_after_s",
+        "last_seen",
+        "last_active",
+        "pending_messages",
+        "memory",
+        "candidate_revision",
+        "candidate_onboarded",
+        "self",
+    }
+    assert set(body["self"]) == {
+        "user_id",
+        "display_name",
+        "track",
+        "kind",
+        "role",
+        "model",
+        "harness",
+        "bed",
+        "last_seen",
+        "last_active",
+        "status",
+        "current_task",
+    }
     assert "api_key" not in str(body).lower()
     listed = client.get("/api/presence")
     assert listed.status_code == 200
@@ -493,3 +520,258 @@ def test_presence_list_does_not_refresh_other_agents(
     listed_again = client.get("/api/presence")
     row_again = next(u for u in listed_again.json()["users"] if u["display_name"] == "quiet-bot")
     assert row_again["status"] == "stale"
+
+
+def test_load_users_by_ids_chunks_instead_of_querying_each_id() -> None:
+    from app.storage.repos.presence import load_users_by_ids
+    from app.storage.sqlite import SqliteDatabase
+
+    db = SqliteDatabase(":memory:")
+    db.execute("CREATE TABLE users (id TEXT PRIMARY KEY, kind TEXT)")
+    ids = [f"usr_{i}" for i in range(101)]
+    db.queries.reset()
+    assert load_users_by_ids(db, []) == {}
+    assert db.queries.count == 0
+    db.queries.reset()
+    assert load_users_by_ids(db, ["usr_1", "usr_1", "usr_2"]) == {}
+    assert db.queries.count == 1
+    db.queries.reset()
+    assert load_users_by_ids(db, ids) == {}
+    assert db.queries.count == 2
+
+
+def test_directory_listing_does_not_query_once_per_user() -> None:
+    from app.auth import Principal
+    from app.presence import directory_rows
+    from app.storage.sqlite import SqliteDatabase
+
+    db = SqliteDatabase(":memory:")
+    db.execute(
+        """
+        CREATE TABLE presence (
+            user_id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            status TEXT,
+            status_hint TEXT,
+            last_heartbeat TEXT NOT NULL,
+            connected_at TEXT NOT NULL,
+            task_id TEXT,
+            task_kind TEXT,
+            job_id TEXT,
+            producing INTEGER NOT NULL DEFAULT 0,
+            producing_at TEXT,
+            user_agent TEXT
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE users (
+            id TEXT PRIMARY KEY,
+            account_id TEXT,
+            kind TEXT,
+            track TEXT,
+            email TEXT,
+            password_hash TEXT,
+            display_name TEXT,
+            metadata_json TEXT,
+            created_by TEXT,
+            disabled_at TEXT,
+            created_at TEXT
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE sessions (
+            id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            last_seen TEXT,
+            expires_at TEXT
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE events (
+            id INTEGER PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            ts TEXT NOT NULL,
+            job_id TEXT,
+            actor TEXT
+        )
+        """
+    )
+    account = "acc_dir"
+    other = "acc_other"
+    stamp = "2026-09-07T12:00:00Z"
+    db.execute(
+        """
+        INSERT INTO events (account_id, ts, job_id, actor)
+        VALUES (?, ?, ?, ?)
+        """,
+        (account, stamp, "job-1", "usr_work"),
+    )
+    people = [
+        ("usr_work", account, "agent", "discovery", "Writer", None),
+        ("usr_viewer", account, "viewer", None, "Pat", None),
+        ("usr_disabled", account, "admin", None, "Gone", stamp),
+        ("usr_agent_only", account, "agent", "discovery", "Lurker", None),
+        ("usr_other", other, "agent", "discovery", "Outsider", None),
+    ]
+    for index in range(10):
+        people.append((f"usr_{index}", account, "agent", "discovery", f"bot-{index}", None))
+    for user_id, account_id, kind, track, name, disabled in people:
+        db.execute(
+            """
+            INSERT INTO users (
+                id, account_id, kind, track, email, password_hash, display_name,
+                metadata_json, created_by, disabled_at, created_at
+            ) VALUES (?, ?, ?, ?, NULL, NULL, ?, '{}', NULL, ?, ?)
+            """,
+            (user_id, account_id, kind, track, name, disabled, stamp),
+        )
+    present = ["usr_work", *[f"usr_{index}" for index in range(10)]]
+    for user_id in present:
+        hint = "working" if user_id == "usr_work" else "logged_in"
+        db.execute(
+            """
+            INSERT INTO presence (
+                user_id, account_id, status, status_hint, last_heartbeat, connected_at,
+                task_id, task_kind, job_id, producing, producing_at, user_agent
+            ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 0, NULL, '')
+            """,
+            (user_id, account, hint, hint, stamp, stamp),
+        )
+    db.execute(
+        """
+        INSERT INTO presence (
+            user_id, account_id, status, status_hint, last_heartbeat, connected_at,
+            task_id, task_kind, job_id, producing, producing_at, user_agent
+        ) VALUES ('compat:discovery:ghost', ?, 'logged_in', 'logged_in', ?, ?, NULL, NULL, NULL, 0, NULL, '')
+        """,
+        (account, stamp, stamp),
+    )
+    db.execute(
+        """
+        INSERT INTO presence (
+            user_id, account_id, status, status_hint, last_heartbeat, connected_at,
+            task_id, task_kind, job_id, producing, producing_at, user_agent
+        ) VALUES ('usr_other', ?, 'logged_in', 'logged_in', ?, ?, NULL, NULL, NULL, 0, NULL, '')
+        """,
+        (other, stamp, stamp),
+    )
+    for session_id, user_id, account_id in (
+        ("sess_view", "usr_viewer", account),
+        ("sess_disabled", "usr_disabled", account),
+        ("sess_agent", "usr_agent_only", account),
+        ("sess_other", "usr_other", other),
+    ):
+        db.execute(
+            """
+            INSERT INTO sessions (id, account_id, user_id, last_seen, expires_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (session_id, account_id, user_id, stamp, stamp),
+        )
+    principal = Principal(
+        role="admin",
+        actor="Ada",
+        user_id="usr_admin",
+        track=None,
+        kind="admin",
+        auth="session",
+        account_id=account,
+    )
+    seen: list[str] = []
+    original = db._execute
+
+    def spy(sql: str, params: tuple = (), *, guarded: bool = False):
+        seen.append(" ".join(sql.split()).lower())
+        return original(sql, params, guarded=guarded)
+
+    db._execute = spy
+    now = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
+    rows = directory_rows(db, principal, now)
+    by_name = {row["display_name"]: row for row in rows}
+    assert by_name["Writer"]["status"] == "producing"
+    assert by_name["bot-0"]["status"] == "logged_in"
+    assert by_name["Pat"]["status"] == "logged_in"
+    assert by_name["ghost"]["kind"] == "compat"
+    assert "Outsider" not in by_name
+    assert "Gone" not in by_name
+    assert "Lurker" not in by_name
+    user_sql = [sql for sql in seen if "from users" in sql]
+    event_sql = [sql for sql in seen if "from events" in sql]
+    assert len(user_sql) == 1
+    assert " in (" in user_sql[0]
+    assert "id = ?" not in user_sql[0]
+    assert len(event_sql) == 1
+    assert "limit 1" not in event_sql[0]
+    assert any("from presence" in sql and "order by last_heartbeat desc" in sql for sql in seen)
+    assert len(seen) < len(present)
+
+
+def test_presence_http_list_does_not_query_per_user(
+    hub: tuple[TestClient, Settings, Clock],
+) -> None:
+    from app.presence import iso_z, upsert_presence_row
+    from app.tenant import TenantContext
+
+    client, _settings, clock = hub
+    bootstrap_admin(client)
+    db = client.app.state.db
+    admin_id = client.get("/api/auth/me").json()["user_id"]
+    admin = db.get_user(admin_id)
+    tenant = TenantContext(admin["account_id"])
+    stamp = iso_z(clock.now)
+    for index in range(12):
+        user = db.insert_user(
+            user_id=f"usr_batch_{index}",
+            kind="agent",
+            track="discovery",
+            email=None,
+            password_hash=None,
+            display_name=f"batch-{index}",
+            metadata={"model": "m", "harness": "h", "bed": "b"},
+            created_by=admin_id,
+            account_id=admin["account_id"],
+        )
+        upsert_presence_row(
+            db,
+            user_id=user["id"],
+            status="logged_in",
+            status_hint="logged_in",
+            last_heartbeat=stamp,
+            connected_at=stamp,
+            task_id=None,
+            task_kind=None,
+            job_id=None,
+            producing=False,
+            producing_at=None,
+            user_agent="test",
+            tenant=tenant,
+        )
+    calls: list[str] = []
+    original = db.conn.execute
+
+    def wrapped(sql, params=()):
+        calls.append(" ".join(str(sql).split()).lower())
+        return original(sql, params)
+
+    db.conn.execute = wrapped
+    try:
+        listed = client.get("/api/presence")
+    finally:
+        db.conn.execute = original
+    assert listed.status_code == 200, listed.text
+    names = {row["display_name"] for row in listed.json()["users"]}
+    assert {f"batch-{index}" for index in range(12)} <= names
+    user_sql = [sql for sql in calls if "from users" in sql]
+    point = [sql for sql in user_sql if " in (" not in sql]
+    batched = [sql for sql in user_sql if " in (" in sql]
+    event_limits = [sql for sql in calls if "from events" in sql and "limit 1" in sql]
+    assert len(batched) == 1
+    assert len(point) < 12
+    assert event_limits == []
