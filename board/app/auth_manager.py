@@ -150,13 +150,16 @@ class HubKeyMethod:
 class SessionMethod:
     name = "session"
 
-    def __init__(self, db: Any) -> None:
+    def __init__(self, db: Any, *, yield_to_role_token: bool = True) -> None:
         self._db = db
+        # When compat is not in AUTH_METHODS, role headers route via the compat
+        # fallback and the session cookie is not a second identity.
+        self._yield_to_role_token = yield_to_role_token
 
     def match(self, request: Request) -> Principal | None:
-        # A hub key, or X-Role plus X-Token, is the caller. The cookie is not a
-        # second identity, matching the previous short-circuit order.
-        if _presented_hub_key(request) or _presented_role_token(request):
+        if _presented_hub_key(request):
+            return None
+        if self._yield_to_role_token and _presented_role_token(request):
             return None
         token = (request.cookies.get("hub_session") or "").strip()
         if not token:
@@ -254,12 +257,21 @@ class CompatMethod:
         return authenticate_compat(self._settings, role, token, request.headers.get("x-actor"))
 
 
-_BUILDERS = {
-    "hub_key": lambda settings, db: HubKeyMethod(db),
-    "session": lambda settings, db: SessionMethod(db),
-    "access_jwt": lambda settings, db: AccessJwtMethod(settings, db),
-    "compat": lambda settings, db: CompatMethod(settings),
-}
+def _build_methods(settings: Settings, db: Any, names: list[str]) -> list[AuthMethod]:
+    yield_session_to_role_token = "compat" not in names
+    methods: list[AuthMethod] = []
+    for name in names:
+        if name == "hub_key":
+            methods.append(HubKeyMethod(db))
+        elif name == "session":
+            methods.append(SessionMethod(db, yield_to_role_token=yield_session_to_role_token))
+        elif name == "access_jwt":
+            methods.append(AccessJwtMethod(settings, db))
+        elif name == "compat":
+            methods.append(CompatMethod(settings))
+        else:
+            raise ValueError(f"unknown auth method {name}")
+    return methods
 
 
 class AuthManager:
@@ -273,12 +285,7 @@ class AuthManager:
     def from_settings(cls, settings: Settings, db: Any) -> AuthManager:
         raw = (settings.auth_methods or "").strip() or "hub_key,session"
         names = [part.strip() for part in raw.split(",") if part.strip()]
-        methods: list[AuthMethod] = []
-        for name in names:
-            builder = _BUILDERS.get(name)
-            if builder is None:
-                raise ValueError(f"unknown auth method {name}")
-            methods.append(builder(settings, db))
+        methods = _build_methods(settings, db, names)
         return cls(methods, settings=settings, db=db)
 
     def resolve(self, request: Request) -> Principal | None:

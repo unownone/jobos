@@ -734,15 +734,11 @@ def test_access_jwt_and_hub_key_for_different_users_conflict(tmp_path: Path) -> 
         )
 
 
-def test_compat_and_session_in_auth_methods_ignore_none_user_id_conflict(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Session normally skips when role tokens are present; patch only for this dual-match case."""
+def test_compat_and_session_in_auth_methods_ignore_none_user_id_conflict(tmp_path: Path) -> None:
     store = MemoryDirectory()
     user = store.add_user(agent_user(user_id="usr_sess", email="sess@example.test"))
     store.add_session("sess-dual", user, csrf="csrf")
     settings = make_settings(tmp_path, auth_methods="session,compat")
-    monkeypatch.setattr("app.auth_manager._presented_role_token", lambda _request: False)
     principal = AuthManager.from_settings(settings, store).resolve(
         make_request(
             "GET",
@@ -756,14 +752,11 @@ def test_compat_and_session_in_auth_methods_ignore_none_user_id_conflict(
     assert principal.auth == "session"
 
 
-def test_compat_before_session_prefers_session_user(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_compat_before_session_prefers_session_user(tmp_path: Path) -> None:
     store = MemoryDirectory()
     user = store.add_user(agent_user(user_id="usr_sess", email="sess@example.test"))
     store.add_session("sess-dual", user, csrf="csrf")
     settings = make_settings(tmp_path, auth_methods="compat,session")
-    monkeypatch.setattr("app.auth_manager._presented_role_token", lambda _request: False)
     principal = AuthManager.from_settings(settings, store).resolve(
         make_request(
             "GET",
