@@ -1,13 +1,70 @@
-"""BlobStore Seam: Filesystem + Memory Adapters, tenant-scoped keys."""
+"""BlobStore Seam: Filesystem, Memory, and R2 Adapters, tenant-scoped keys."""
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import pytest
 
-from app.blob_store import FilesystemBlobStore, MemoryBlobStore, build_blob_store, normalize_key
+from app.blob_store import (
+    FilesystemBlobStore,
+    MemoryBlobStore,
+    R2BlobStore,
+    build_blob_store,
+    normalize_key,
+)
 from app.tenant import TenantContext
+
+
+class _R2Object:
+    def __init__(self, body: bytes, http_metadata: dict | None = None) -> None:
+        self._body = bytes(body)
+        self.httpMetadata = dict(http_metadata or {})
+
+    def arrayBuffer(self) -> bytes:
+        return self._body
+
+    def text(self) -> str:
+        return self._body.decode("utf-8")
+
+
+class MemoryR2Binding:
+    """In-memory Cloudflare R2 binding: put(key, value, httpMetadata?), get, delete."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, _R2Object] = {}
+
+    def put(self, key: str, value: bytes, httpMetadata: dict | None = None) -> None:
+        meta = httpMetadata or {}
+        if "httpMetadata" in meta and "contentType" not in meta:
+            nested = meta.get("httpMetadata")
+            meta = nested if isinstance(nested, dict) else {}
+        self.objects[key] = _R2Object(value, meta)
+
+    def get(self, key: str) -> _R2Object | None:
+        return self.objects.get(key)
+
+    def delete(self, key: str) -> None:
+        self.objects.pop(key, None)
+
+
+class _OptionsR2Binding:
+    """JS-style binding: the third positional argument is the put options object."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, _R2Object] = {}
+
+    def put(self, key: str, value: bytes, options: dict | None = None) -> None:
+        options = options or {}
+        meta = options.get("httpMetadata") if isinstance(options, dict) else None
+        self.objects[key] = _R2Object(value, meta if isinstance(meta, dict) else {})
+
+    def get(self, key: str) -> _R2Object | None:
+        return self.objects.get(key)
+
+    def delete(self, key: str) -> None:
+        self.objects.pop(key, None)
 
 
 def test_memory_blob_store_is_tenant_scoped() -> None:
@@ -41,3 +98,122 @@ def test_build_blob_store_memory_adapter() -> None:
 def test_normalize_key_rejects_traversal() -> None:
     with pytest.raises(ValueError):
         normalize_key("../secret")
+
+
+def test_r2_blob_store_round_trips_bytes_through_fake_binding() -> None:
+    binding = MemoryR2Binding()
+    store = build_blob_store(root=None, adapter="r2", binding=binding)
+    assert isinstance(store, R2BlobStore)
+    tenant = TenantContext("acc_r2")
+    payload = b"\xff\xfe%PDF-1.4\x00not-text"
+    stored = store.put(
+        tenant,
+        "resumes/a.pdf",
+        payload,
+        content_type="application/pdf",
+        filename="a.pdf",
+    )
+    assert stored.content == payload
+    held = binding.get("acc_r2/resumes/a.pdf")
+    assert held is not None
+    assert held.arrayBuffer() == payload
+    assert held.httpMetadata["contentType"] == "application/pdf"
+    loaded = store.get(tenant, "resumes/a.pdf")
+    assert loaded is not None
+    assert loaded.content == payload
+    assert loaded.content_type == "application/pdf"
+    assert loaded.filename == "a.pdf"
+    assert loaded.account_id == "acc_r2"
+    other = TenantContext("acc_other")
+    assert store.get(other, "resumes/a.pdf") is None
+    assert store.delete(tenant, "resumes/a.pdf") is True
+    assert store.get(tenant, "resumes/a.pdf") is None
+    assert binding.get("acc_r2/resumes/a.pdf") is None
+    assert store.delete(tenant, "resumes/a.pdf") is False
+
+
+def test_r2_blob_store_accepts_options_object_binding() -> None:
+    binding = _OptionsR2Binding()
+    store = R2BlobStore(binding)
+    tenant = TenantContext("acc_opts")
+    store.put(tenant, "note.txt", b"hello", content_type="text/plain", filename="note.txt")
+    loaded = store.get(tenant, "note.txt")
+    assert loaded is not None
+    assert loaded.content == b"hello"
+    assert loaded.content_type == "text/plain"
+    assert loaded.filename == "note.txt"
+
+
+class _AsyncR2Object:
+    def __init__(self, body: bytes, http_metadata: dict | None = None) -> None:
+        self._body = bytes(body)
+        self.httpMetadata = dict(http_metadata or {})
+
+    async def arrayBuffer(self) -> bytes:
+        return self._body
+
+    async def text(self) -> str:
+        return self._body.decode("utf-8")
+
+
+class AsyncMemoryR2Binding:
+    """Async stand-in for a Workers R2 binding. Methods return coroutines."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, _AsyncR2Object] = {}
+
+    async def put(self, key: str, value: bytes, httpMetadata: dict | None = None) -> None:
+        meta = httpMetadata or {}
+        if "httpMetadata" in meta and "contentType" not in meta:
+            nested = meta.get("httpMetadata")
+            meta = nested if isinstance(nested, dict) else {}
+        self.objects[key] = _AsyncR2Object(value, meta)
+
+    async def get(self, key: str) -> _AsyncR2Object | None:
+        return self.objects.get(key)
+
+    async def delete(self, key: str) -> None:
+        self.objects.pop(key, None)
+
+
+def test_r2_blob_store_round_trips_bytes_through_async_binding() -> None:
+    binding = AsyncMemoryR2Binding()
+    store = R2BlobStore(binding)
+    tenant = TenantContext("acc_async")
+    payload = b"\xff\xfeasync-pdf\x00"
+    stored = store.put(
+        tenant,
+        "resumes/b.pdf",
+        payload,
+        content_type="application/pdf",
+        filename="b.pdf",
+    )
+    assert stored.content == payload
+    held = asyncio.run(binding.get("acc_async/resumes/b.pdf"))
+    assert held is not None
+    assert asyncio.run(held.arrayBuffer()) == payload
+    loaded = store.get(tenant, "resumes/b.pdf")
+    assert loaded is not None
+    assert loaded.content == payload
+    assert loaded.content_type == "application/pdf"
+    assert loaded.filename == "b.pdf"
+    assert store.delete(tenant, "resumes/b.pdf") is True
+    assert store.get(tenant, "resumes/b.pdf") is None
+    assert asyncio.run(binding.get("acc_async/resumes/b.pdf")) is None
+
+
+def test_r2_blob_store_refuses_awaitable_when_loop_is_running() -> None:
+    store = R2BlobStore(AsyncMemoryR2Binding())
+
+    async def _put_inside_loop() -> None:
+        store.put(TenantContext("acc_loop"), "a.bin", b"x")
+
+    with pytest.raises(RuntimeError, match=r"put\(\)"):
+        asyncio.run(_put_inside_loop())
+
+
+def test_build_blob_store_keeps_filesystem_without_r2_binding(tmp_path: Path) -> None:
+    root = tmp_path / "blobs"
+    assert isinstance(build_blob_store(root=root), FilesystemBlobStore)
+    assert isinstance(build_blob_store(root=root, adapter="r2"), FilesystemBlobStore)
+    assert isinstance(build_blob_store(root=root, adapter=" r2 "), FilesystemBlobStore)
