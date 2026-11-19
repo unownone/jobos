@@ -23,13 +23,25 @@ CREATE INDEX IF NOT EXISTS idx_messages_account_to_user ON messages(account_id, 
 CREATE INDEX IF NOT EXISTS idx_messages_account_to_track ON messages(account_id, to_track, created_at);
 CREATE INDEX IF NOT EXISTS idx_memory_recall ON memory_items(account_id, pod, pinned, importance, updated_at);
 CREATE INDEX IF NOT EXISTS idx_burn_account_id ON token_burn(account_id, id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_a2a_peers_account_card ON a2a_peers(account_id, card_url);
+-- SqlWorkQueue uses ON CONFLICT(account_id, dedupe_key) with no WHERE clause.
+-- That target matches a non-partial unique index. dedupe_key is NOT NULL.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_items_account_dedupe
+    ON queue_items(account_id, dedupe_key);
 
 -- redemptions and max_redemptions exist on the baseline invites table.
 ALTER TABLE invites DROP CONSTRAINT IF EXISTS invites_redemptions_lte_max;
 ALTER TABLE invites ADD CONSTRAINT invites_redemptions_lte_max CHECK (redemptions <= max_redemptions);
 
 CREATE INDEX IF NOT EXISTS idx_invites_track ON invites(account_id, track);
+
+-- Old baselines declared card_url UNIQUE, which Postgres names
+-- a2a_peers_card_url_key. Fresh baselines do not. No rows are deleted.
+-- Duplicate (account_id, card_url) pairs cannot exist while that unique
+-- constraint is present, so this drop does not fail on those pairs.
+ALTER TABLE a2a_peers DROP CONSTRAINT IF EXISTS a2a_peers_card_url_key;
+DROP INDEX IF EXISTS a2a_peers_card_url_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_a2a_peers_account_card ON a2a_peers(account_id, card_url);
 
 CREATE TABLE IF NOT EXISTS outbox (
     id TEXT PRIMARY KEY,

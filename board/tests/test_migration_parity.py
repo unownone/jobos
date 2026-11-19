@@ -33,6 +33,7 @@ REQUIRED_INDEXES = (
     "idx_memory_recall",
     "idx_burn_account_id",
     "idx_a2a_peers_account_card",
+    "idx_queue_items_account_dedupe",
 )
 
 _INDEX_SQL = re.compile(r"^CREATE (?:UNIQUE )?INDEX[^;]*;", re.M)
@@ -102,6 +103,12 @@ def test_sqlite_migrations_create_indexes_and_check(tmp_path: Path) -> None:
         assert missing == []
         assert "idx_invites_track" in names
         assert "idx_queue_account_dedupe" in names
+        assert "idx_queue_items_account_dedupe" in names
+        dedupe_sql = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_queue_items_account_dedupe'"
+        ).fetchone()[0]
+        assert "UNIQUE" in dedupe_sql.upper()
+        assert "WHERE" not in dedupe_sql.upper()
         versions = [row[0] for row in conn.execute("SELECT version FROM schema_migrations ORDER BY version")]
         assert versions == ["0001_baseline.sql", "0002_indexes_and_constraints.sql"]
         tables = {
@@ -111,6 +118,7 @@ def test_sqlite_migrations_create_indexes_and_check(tmp_path: Path) -> None:
         assert "outbox" in tables
         assert "processed_messages" in tables
         assert "invites__redemptions_chk" not in tables
+        assert "a2a_peers__account_card" not in tables
         events_id = conn.execute("PRAGMA table_info(events)").fetchall()
         assert events_id[0][1] == "id" and events_id[0][2].upper() == "TEXT"
         burn_id = conn.execute("PRAGMA table_info(token_burn)").fetchall()
@@ -148,6 +156,47 @@ def test_sqlite_migrations_create_indexes_and_check(tmp_path: Path) -> None:
         conn.execute(
             "INSERT INTO processed_messages (id, processed_at) VALUES ('msg1', '2020-01-01T00:00:00Z')"
         )
+        peer_sql = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'a2a_peers'"
+        ).fetchone()[0]
+        assert "UNIQUE" not in peer_sql.upper()
+        conn.execute(
+            """
+            INSERT INTO queue_items (id, account_id, kind, status, dedupe_key, created_at)
+            VALUES ('q1', 'acc', 'discovery.search', 'open', 'same', '2020-01-01T00:00:00Z')
+            ON CONFLICT(account_id, dedupe_key) DO NOTHING
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO queue_items (id, account_id, kind, status, dedupe_key, created_at)
+            VALUES ('q2', 'acc', 'discovery.search', 'open', 'same', '2020-01-01T00:00:00Z')
+            ON CONFLICT(account_id, dedupe_key) DO NOTHING
+            """
+        )
+        queued = conn.execute(
+            "SELECT COUNT(*) FROM queue_items WHERE account_id = 'acc' AND dedupe_key = 'same'"
+        ).fetchone()[0]
+        assert queued == 1
+        conn.execute(
+            """
+            INSERT INTO a2a_peers (id, account_id, card_url, created_at)
+            VALUES ('p1', 'acc_a', 'https://agent.example/card', '2020-01-01T00:00:00Z')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO a2a_peers (id, account_id, card_url, created_at)
+            VALUES ('p2', 'acc_b', 'https://agent.example/card', '2020-01-01T00:00:00Z')
+            """
+        )
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(
+                """
+                INSERT INTO a2a_peers (id, account_id, card_url, created_at)
+                VALUES ('p3', 'acc_a', 'https://agent.example/card', '2020-01-01T00:00:00Z')
+                """
+            )
     finally:
         conn.close()
 
@@ -281,6 +330,71 @@ def test_postgres_migration_parity() -> None:
                 "INSERT INTO processed_messages (id, processed_at) VALUES (%s, %s)",
                 ("msg1", "2020-01-01T00:00:00Z"),
             )
+            dedupe_def = conn.execute(
+                """
+                SELECT indexdef FROM pg_indexes
+                WHERE schemaname = %s AND indexname = 'idx_queue_items_account_dedupe'
+                """,
+                (schema,),
+            ).fetchone()
+            assert dedupe_def is not None
+            assert "UNIQUE" in dedupe_def[0].upper()
+            assert "WHERE" not in dedupe_def[0].upper()
+            card_unique = conn.execute(
+                """
+                SELECT c.conname
+                FROM pg_constraint c
+                JOIN pg_class t ON t.oid = c.conrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                WHERE n.nspname = %s AND t.relname = 'a2a_peers'
+                  AND c.contype = 'u' AND c.conname = 'a2a_peers_card_url_key'
+                """,
+                (schema,),
+            ).fetchone()
+            assert card_unique is None
+            conn.execute(
+                """
+                INSERT INTO queue_items (id, account_id, kind, status, dedupe_key, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT(account_id, dedupe_key) DO NOTHING
+                """,
+                ("q1", "acc", "discovery.search", "open", "same", "2020-01-01T00:00:00Z"),
+            )
+            conn.execute(
+                """
+                INSERT INTO queue_items (id, account_id, kind, status, dedupe_key, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT(account_id, dedupe_key) DO NOTHING
+                """,
+                ("q2", "acc", "discovery.search", "open", "same", "2020-01-01T00:00:00Z"),
+            )
+            queued = conn.execute(
+                "SELECT COUNT(*) FROM queue_items WHERE account_id = %s AND dedupe_key = %s",
+                ("acc", "same"),
+            ).fetchone()
+            assert queued is not None and queued[0] == 1
+            conn.execute(
+                """
+                INSERT INTO a2a_peers (id, account_id, card_url, created_at)
+                VALUES (%s, %s, %s, %s)
+                """,
+                ("p1", "acc_a", "https://agent.example/card", "2020-01-01T00:00:00Z"),
+            )
+            conn.execute(
+                """
+                INSERT INTO a2a_peers (id, account_id, card_url, created_at)
+                VALUES (%s, %s, %s, %s)
+                """,
+                ("p2", "acc_b", "https://agent.example/card", "2020-01-01T00:00:00Z"),
+            )
+            with pytest.raises(psycopg.Error):
+                conn.execute(
+                    """
+                    INSERT INTO a2a_peers (id, account_id, card_url, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    ("p3", "acc_a", "https://agent.example/card", "2020-01-01T00:00:00Z"),
+                )
         finally:
             conn.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
     finally:

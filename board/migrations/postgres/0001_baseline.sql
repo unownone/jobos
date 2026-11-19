@@ -418,7 +418,7 @@ CREATE TABLE IF NOT EXISTS a2a_peers (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL,
     name TEXT,
-    card_url TEXT NOT NULL UNIQUE,
+    card_url TEXT NOT NULL,
     agent_url TEXT,
     card_json TEXT,
     created_at TEXT NOT NULL,
