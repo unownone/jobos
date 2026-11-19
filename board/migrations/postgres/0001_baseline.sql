@@ -2,6 +2,7 @@
 --
 -- Portable types: TEXT ids, INTEGER 0/1 flags. No identity columns.
 -- events.id and token_burn.id are TEXT primary keys in this file.
+-- A fresh table fills an omitted id with gen_random_uuid()::text.
 -- Existing Postgres databases already have those two columns as bigint
 -- identity. CREATE TABLE IF NOT EXISTS leaves those live columns in place.
 -- This migration baselines them. It does not recreate or alter them.
@@ -57,7 +58,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_apply_url ON jobs(account_id, apply_url);
 CREATE INDEX IF NOT EXISTS idx_jobs_account ON jobs(account_id, updated_at);
 
 CREATE TABLE IF NOT EXISTS events (
-    id TEXT PRIMARY KEY,
+    id TEXT PRIMARY KEY DEFAULT (gen_random_uuid()::text),
     account_id TEXT NOT NULL,
     ts TEXT NOT NULL,
     job_id TEXT,
@@ -208,7 +209,7 @@ CREATE TABLE IF NOT EXISTS hub_kv (
 );
 
 CREATE TABLE IF NOT EXISTS token_burn (
-    id TEXT PRIMARY KEY,
+    id TEXT PRIMARY KEY DEFAULT (gen_random_uuid()::text),
     account_id TEXT NOT NULL DEFAULT 'acc_compat',
     ts TEXT NOT NULL,
     tool_name TEXT NOT NULL,

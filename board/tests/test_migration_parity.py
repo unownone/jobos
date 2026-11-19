@@ -43,8 +43,18 @@ def _read_dir(directory: Path) -> str:
     return "\n".join(path.read_text(encoding="utf-8") for path in sorted(directory.glob("*.sql")))
 
 
+_SQLITE_ID_DEFAULT = "DEFAULT (lower(hex(randomblob(16))))"
+_POSTGRES_ID_DEFAULT = "DEFAULT (gen_random_uuid()::text)"
+
+
 def _ddl(sql: str) -> str:
     return re.sub(r"--[^\n]*", "", sql)
+
+
+def _normalize_generated_ids(sql: str) -> str:
+    return sql.replace(_SQLITE_ID_DEFAULT, "DEFAULT (__TEXT_ID__)").replace(
+        _POSTGRES_ID_DEFAULT, "DEFAULT (__TEXT_ID__)"
+    )
 
 
 def _sqlite_index_names(conn: sqlite3.Connection) -> set[str]:
@@ -82,8 +92,12 @@ def test_portable_type_rules_and_baseline_parity() -> None:
         assert "BIGINT" not in upper
     sqlite_base = (SQLITE_DIR / "0001_baseline.sql").read_text(encoding="utf-8")
     postgres_base = (POSTGRES_DIR / "0001_baseline.sql").read_text(encoding="utf-8")
-    assert re.sub(r"\s+", " ", _ddl(sqlite_base)).strip() == re.sub(
-        r"\s+", " ", _ddl(postgres_base).replace("BYTEA", "BLOB")
+    assert sqlite_base.count(_SQLITE_ID_DEFAULT) == 2
+    assert postgres_base.count(_POSTGRES_ID_DEFAULT) == 2
+    assert _SQLITE_ID_DEFAULT not in postgres_base
+    assert _POSTGRES_ID_DEFAULT not in sqlite_base
+    assert re.sub(r"\s+", " ", _normalize_generated_ids(_ddl(sqlite_base))).strip() == re.sub(
+        r"\s+", " ", _normalize_generated_ids(_ddl(postgres_base).replace("BYTEA", "BLOB"))
     ).strip()
     assert _INDEX_SQL.findall(
         (SQLITE_DIR / "0002_indexes_and_constraints.sql").read_text(encoding="utf-8")
@@ -123,6 +137,24 @@ def test_sqlite_migrations_create_indexes_and_check(tmp_path: Path) -> None:
         assert events_id[0][1] == "id" and events_id[0][2].upper() == "TEXT"
         burn_id = conn.execute("PRAGMA table_info(token_burn)").fetchall()
         assert burn_id[0][1] == "id" and burn_id[0][2].upper() == "TEXT"
+        conn.execute(
+            """
+            INSERT INTO events (account_id, ts, actor_role, action)
+            VALUES ('acc_evt', '2020-01-01T00:00:00Z', 'discovery', 'noted')
+            """
+        )
+        event_id = conn.execute("SELECT id FROM events WHERE account_id = 'acc_evt'").fetchone()[0]
+        assert isinstance(event_id, str) and event_id
+        conn.execute(
+            """
+            INSERT INTO token_burn (ts, tool_name)
+            VALUES ('2020-01-01T00:00:00Z', 'search')
+            """
+        )
+        burn_row_id = conn.execute(
+            "SELECT id FROM token_burn WHERE tool_name = 'search'"
+        ).fetchone()[0]
+        assert isinstance(burn_row_id, str) and burn_row_id
         blob = conn.execute("PRAGMA table_info(hub_blobs)").fetchall()
         content = next(row for row in blob if row[1] == "content")
         assert content[2].upper() == "BLOB"
