@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,10 @@ from fastapi.testclient import TestClient
 
 from app.constants import ROLES
 from app.main import create_app
+from app.people import insert_person, list_people
+from app.queue import catalog_date_is_fresh, catalog_refresh_acked_recent
 from app.settings import Settings
+from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 
 TOKENS = {role: f"test-token-{role}-not-real" for role in ROLES}
 
@@ -157,11 +161,6 @@ def test_stale_catalog_blocks_discovery_search(hub: tuple[TestClient, Settings],
 
 
 def test_catalog_refresh_ack_unlocks_search(hub: tuple[TestClient, Settings], monkeypatch: pytest.MonkeyPatch) -> None:
-    from datetime import datetime, timezone
-
-    from app.queue import catalog_date_is_fresh, catalog_refresh_acked_recent
-    from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
-
     assert catalog_date_is_fresh("2019-01-01", datetime(2026, 9, 7, tzinfo=timezone.utc)) is False
     assert catalog_date_is_fresh("2026-09-06", datetime(2026, 9, 7, tzinfo=timezone.utc)) is True
 
@@ -222,3 +221,79 @@ def test_candidate_public_false_and_resume_gates(hub: tuple[TestClient, Settings
     still_denied = client.get("/api/candidate/resume", headers=h("discovery"))
     assert still_denied.status_code == 403
     assert not (settings.board_dir.parent / "profiles" / "candidate.yaml").exists()
+
+
+def _person_ids(payload: dict) -> set[str]:
+    return {person["id"] for person in payload["people"]}
+
+
+def test_people_search_escapes_like_and_caps_at_48(hub: tuple[TestClient, Settings]) -> None:
+    client, _settings = hub
+    created = [
+        ("acme__pct", "save 100% now", "Percent Co"),
+        ("acme__lit", "100_ready", "Ac_me"),
+        ("acme__wild", "100Xready", "AcXme"),
+        ("acme__bang", "100!ready", "Plain Co"),
+        ("acme__plain", "plain", "Other"),
+    ]
+    for person_id, name, company in created:
+        posted = client.post(
+            "/api/people",
+            headers=h("outreach"),
+            json={"id": person_id, "name": name, "company": company, "title": "Lead"},
+        )
+        assert posted.status_code == 201, posted.text
+
+    percent = client.get("/api/people", headers=h("admin"), params={"q": "%"})
+    assert percent.status_code == 200, percent.text
+    assert _person_ids(percent.json()) == {"acme__pct"}
+
+    underscore = client.get("/api/people", headers=h("admin"), params={"q": "100_"})
+    assert _person_ids(underscore.json()) == {"acme__lit"}
+
+    company = client.get("/api/people", headers=h("admin"), params={"q": "Ac_me"})
+    assert _person_ids(company.json()) == {"acme__lit"}
+
+    bang = client.get("/api/people", headers=h("admin"), params={"q": "100!ready"})
+    assert _person_ids(bang.json()) == {"acme__bang"}
+
+    stem = "S" * 48
+    long_name = client.post(
+        "/api/people",
+        headers=h("outreach"),
+        json={"id": "acme__long", "name": stem, "company": "Capco"},
+    )
+    assert long_name.status_code == 201, long_name.text
+    capped = client.get("/api/people", headers=h("admin"), params={"q": stem + "NOT-IN-NAME"})
+    assert "acme__long" in _person_ids(capped.json())
+    assert "acme__plain" not in _person_ids(capped.json())
+
+
+def test_people_list_defaults_to_200(hub: tuple[TestClient, Settings]) -> None:
+    client, _settings = hub
+    db = client.app.state.db
+    tenant = TenantContext(COMPAT_ACCOUNT_ID)
+    base = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    for i in range(201):
+        stamp = (base + timedelta(seconds=i)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        insert_person(
+            db,
+            tenant,
+            {
+                "id": f"bulk__p{i:04d}",
+                "name": f"Person {i}",
+                "company": "Bulk",
+                "created_at": stamp,
+                "updated_at": stamp,
+            },
+        )
+    listed = list_people(db, tenant)
+    assert len(listed) == 200
+    ids = {person["id"] for person in listed}
+    assert "bulk__p0200" in ids
+    assert "bulk__p0000" not in ids
+    everyone = list_people(db, tenant, limit=500)
+    assert len(everyone) == 201
+    api = client.get("/api/people", headers=h("admin"))
+    assert api.status_code == 200, api.text
+    assert api.json()["count"] == 200
