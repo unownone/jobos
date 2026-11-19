@@ -6,7 +6,7 @@ import fnmatch
 import hashlib
 import json
 import re
-from typing import Any
+from typing import Any, Sequence
 from urllib.parse import urlparse
 
 from fastapi import HTTPException
@@ -14,6 +14,7 @@ from fastapi import HTTPException
 from app.auth import Principal
 from app.bootstrap import new_id
 from app.db import utc_now
+from app.storage.repos.registry import SkillRepo, apply_skill_schema
 from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 from app.tenant_schema import ensure_tenant_schema
 
@@ -29,73 +30,8 @@ PROCTOR_STATUSES = ("none", "pending", "passed", "failed")
 RECORDING_STATUSES = ("queued", "proctoring", "passed", "failed", "promoted", "declined")
 MOTION_TAGS = ("source", "apply", "outreach", "research", "maintain")
 
-SKILL_SCHEMA = """
-CREATE TABLE IF NOT EXISTS skills (
-    account_id TEXT NOT NULL,
-    id TEXT NOT NULL,
-    slug TEXT NOT NULL,
-    name TEXT NOT NULL,
-    kind TEXT NOT NULL DEFAULT 'skill',
-    role TEXT NOT NULL,
-    tags_json TEXT NOT NULL DEFAULT '[]',
-    scope TEXT NOT NULL DEFAULT 'shared',
-    owner_user_id TEXT,
-    status TEXT NOT NULL DEFAULT 'approved',
-    platform TEXT,
-    match_json TEXT,
-    inputs_json TEXT,
-    outputs_json TEXT,
-    body_md TEXT NOT NULL,
-    origin TEXT NOT NULL DEFAULT 'github',
-    origin_ref TEXT,
-    parent_skill_id TEXT,
-    version INTEGER NOT NULL DEFAULT 1,
-    content_hash TEXT NOT NULL,
-    reproducible INTEGER NOT NULL DEFAULT 1,
-    proctor_status TEXT NOT NULL DEFAULT 'none',
-    proctor_note TEXT,
-    proctor_evidence_json TEXT,
-    approved_at TEXT,
-    approved_by TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    created_by TEXT,
-    PRIMARY KEY (account_id, id)
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_account_shared_slug
-    ON skills(account_id, slug) WHERE scope = 'shared';
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_account_local_slug
-    ON skills(account_id, owner_user_id, slug) WHERE scope = 'local';
-
-CREATE INDEX IF NOT EXISTS idx_skills_role_status ON skills(role, status);
-CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(owner_user_id);
-CREATE INDEX IF NOT EXISTS idx_skills_origin ON skills(origin);
-
-CREATE TABLE IF NOT EXISTS skill_recordings (
-    account_id TEXT NOT NULL,
-    id TEXT NOT NULL,
-    skill_id TEXT,
-    submitted_by TEXT NOT NULL,
-    payload_json TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'queued',
-    queue_item_id TEXT,
-    proctor_note TEXT,
-    proctor_evidence_json TEXT,
-    reviewed_by TEXT,
-    reviewed_at TEXT,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (account_id, id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_skill_recordings_status ON skill_recordings(account_id, status);
-CREATE INDEX IF NOT EXISTS idx_skill_recordings_submitter ON skill_recordings(account_id, submitted_by);
-"""
-
-
 def ensure_skill_schema(conn: Any) -> None:
-    conn.executescript(SKILL_SCHEMA)
+    apply_skill_schema(conn)
     ensure_tenant_schema(conn)
 
 
@@ -121,12 +57,6 @@ def content_hash_for(body: str, slug: str, role: str, tags: list[str]) -> str:
         sort_keys=True,
     )
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
-
-
-def _dump(value: Any) -> str | None:
-    if value is None:
-        return None
-    return json.dumps(value, ensure_ascii=False)
 
 
 def _load(raw: str | None, default: Any) -> Any:
@@ -251,7 +181,7 @@ def row_to_skill(row: Any) -> dict[str, Any]:
         "match": _load(data["match_json"], {"ats": [], "url_patterns": [], "apply_kind": []}),
         "inputs": _load(data["inputs_json"], []),
         "outputs": _load(data["outputs_json"], []),
-        "body": data["body_md"] or "",
+        "body": (data.get("body_md") or "") if "body_md" in data else "",
         "origin": data["origin"],
         "origin_ref": data["origin_ref"] or "",
         "parent_skill_id": data["parent_skill_id"],
@@ -403,6 +333,7 @@ class SkillStore:
         self.tenant = tenant or TenantContext(COMPAT_ACCOUNT_ID)
         ensure_skill_schema(self.db.conn)
         self.db.conn.commit()
+        self.repo = SkillRepo(self.db.conn)
 
     @property
     def account_id(self) -> str:
@@ -412,28 +343,20 @@ class SkillStore:
         return SkillStore(self.db, tenant)
 
     def get(self, skill_id: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute(
-            "SELECT * FROM skills WHERE id = ? AND account_id = ?",
-            (skill_id, self.account_id),
-        )
-        row = cur.fetchone()
+        row = self.repo.get_skill(self.account_id, skill_id)
         return row_to_skill(row) if row else None
 
     def get_shared_by_slug(self, slug: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute(
-            "SELECT * FROM skills WHERE account_id = ? AND scope = 'shared' AND slug = ?",
-            (self.account_id, slug),
-        )
-        row = cur.fetchone()
+        row = self.repo.get_shared_by_slug(self.account_id, slug)
         return row_to_skill(row) if row else None
 
     def get_local_by_slug(self, owner_user_id: str, slug: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute(
-            "SELECT * FROM skills WHERE account_id = ? AND scope = 'local' AND owner_user_id = ? AND slug = ?",
-            (self.account_id, owner_user_id, slug),
-        )
-        row = cur.fetchone()
+        row = self.repo.get_local_by_slug(self.account_id, owner_user_id, slug)
         return row_to_skill(row) if row else None
+
+    def skill_bodies(self, skill_ids: Sequence[str]) -> dict[str, str]:
+        """Markdown for ids the caller already decided to return."""
+        return self.repo.skill_bodies(self.account_id, skill_ids)
 
     def list_approved_shared(
         self,
@@ -445,18 +368,11 @@ class SkillStore:
         url: str | None = None,
         limit: int = 200,
     ) -> list[dict[str, Any]]:
-        """Approved shared catalog only. No local drafts. Safe for unauth CatalogQuery."""
+        """Approved shared catalog only. Summary rows: no markdown body."""
         limit = max(1, min(int(limit), 500))
-        cur = self.db.conn.execute(
-            """
-            SELECT * FROM skills
-            WHERE account_id = ? AND scope = 'shared' AND status = 'approved'
-            ORDER BY updated_at DESC LIMIT ?
-            """,
-            (self.account_id, limit),
-        )
+        rows = self.repo.list_approved_shared_summary(self.account_id, limit)
         out: list[dict[str, Any]] = []
-        for row in cur.fetchall():
+        for row in rows:
             skill = row_to_skill(row)
             if skill_matches_query(
                 skill,
@@ -487,34 +403,13 @@ class SkillStore:
         who = owner_key(principal)
         limit = max(1, min(int(limit), 500))
         if is_admin(principal):
-            cur = self.db.conn.execute(
-                "SELECT * FROM skills WHERE account_id = ? ORDER BY updated_at DESC LIMIT ?",
-                (self.account_id, limit),
-            )
+            rows = self.repo.list_admin_summary(self.account_id, limit)
         elif is_maintainer(principal):
-            cur = self.db.conn.execute(
-                """
-                SELECT * FROM skills
-                WHERE account_id = ? AND (scope = 'shared' OR owner_user_id = ?)
-                ORDER BY updated_at DESC LIMIT ?
-                """,
-                (self.account_id, who, limit),
-            )
+            rows = self.repo.list_maintainer_summary(self.account_id, who, limit)
         else:
-            cur = self.db.conn.execute(
-                """
-                SELECT * FROM skills
-                WHERE account_id = ?
-                  AND (
-                    (scope = 'shared' AND status = 'approved')
-                    OR (scope = 'local' AND owner_user_id = ?)
-                  )
-                ORDER BY updated_at DESC LIMIT ?
-                """,
-                (self.account_id, who, limit),
-            )
+            rows = self.repo.list_member_summary(self.account_id, who, limit)
         out: list[dict[str, Any]] = []
-        for row in cur.fetchall():
+        for row in rows:
             skill = row_to_skill(row)
             if not can_see_skill(principal, skill):
                 continue
@@ -541,53 +436,38 @@ class SkillStore:
         slug = fields["slug"]
         role = fields["role"]
         digest = fields.get("content_hash") or content_hash_for(body, slug, role, tags)
-        self.db.conn.execute(
-            """
-            INSERT INTO skills (
-                id, account_id, slug, name, kind, role, tags_json, scope, owner_user_id, status,
-                platform, match_json, inputs_json, outputs_json, body_md, origin,
-                origin_ref, parent_skill_id, version, content_hash, reproducible,
-                proctor_status, proctor_note, proctor_evidence_json, approved_at,
-                approved_by, created_at, updated_at, created_by
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?, ?
-            )
-            """,
-            (
-                skill_id,
-                self.account_id,
-                slug,
-                fields["name"],
-                fields.get("kind") or "skill",
-                role,
-                _dump(tags),
-                fields.get("scope") or "shared",
-                fields.get("owner_user_id"),
-                fields.get("status") or "draft",
-                fields.get("platform") or "",
-                _dump(fields.get("match") or {"ats": [], "url_patterns": [], "apply_kind": []}),
-                _dump(fields.get("inputs") or []),
-                _dump(fields.get("outputs") or []),
-                body,
-                fields.get("origin") or "mutation",
-                fields.get("origin_ref") or "",
-                fields.get("parent_skill_id"),
-                int(fields.get("version") or 1),
-                digest,
-                1 if fields.get("reproducible", True) else 0,
-                fields.get("proctor_status") or "none",
-                fields.get("proctor_note") or "",
-                _dump(fields.get("proctor_evidence") or {}),
-                fields.get("approved_at"),
-                fields.get("approved_by"),
-                fields.get("created_at") or now,
-                fields.get("updated_at") or now,
-                fields.get("created_by") or "",
-            ),
+        self.repo.insert_skill(
+            self.account_id,
+            {
+                "id": skill_id,
+                "slug": slug,
+                "name": fields["name"],
+                "kind": fields.get("kind") or "skill",
+                "role": role,
+                "tags": tags,
+                "scope": fields.get("scope") or "shared",
+                "owner_user_id": fields.get("owner_user_id"),
+                "status": fields.get("status") or "draft",
+                "platform": fields.get("platform") or "",
+                "match": fields.get("match") or {"ats": [], "url_patterns": [], "apply_kind": []},
+                "inputs": fields.get("inputs") or [],
+                "outputs": fields.get("outputs") or [],
+                "body": body,
+                "origin": fields.get("origin") or "mutation",
+                "origin_ref": fields.get("origin_ref") or "",
+                "parent_skill_id": fields.get("parent_skill_id"),
+                "version": int(fields.get("version") or 1),
+                "content_hash": digest,
+                "reproducible": bool(fields.get("reproducible", True)),
+                "proctor_status": fields.get("proctor_status") or "none",
+                "proctor_note": fields.get("proctor_note") or "",
+                "proctor_evidence": fields.get("proctor_evidence") or {},
+                "approved_at": fields.get("approved_at"),
+                "approved_by": fields.get("approved_by"),
+                "created_at": fields.get("created_at") or now,
+                "updated_at": fields.get("updated_at") or now,
+                "created_by": fields.get("created_by") or "",
+            },
         )
         if commit:
             self.db.conn.commit()
@@ -610,48 +490,7 @@ class SkillStore:
             tags,
         )
         now = utc_now()
-        self.db.conn.execute(
-            """
-            UPDATE skills SET
-                slug = ?, name = ?, kind = ?, role = ?, tags_json = ?, scope = ?,
-                owner_user_id = ?, status = ?, platform = ?, match_json = ?,
-                inputs_json = ?, outputs_json = ?, body_md = ?, origin = ?,
-                origin_ref = ?, parent_skill_id = ?, version = ?, content_hash = ?,
-                reproducible = ?, proctor_status = ?, proctor_note = ?,
-                proctor_evidence_json = ?, approved_at = ?, approved_by = ?,
-                updated_at = ?, created_by = ?
-            WHERE id = ?
-            """,
-            (
-                merged["slug"],
-                merged["name"],
-                merged["kind"],
-                merged["role"],
-                _dump(tags),
-                merged["scope"],
-                merged.get("owner_user_id"),
-                merged["status"],
-                merged.get("platform") or "",
-                _dump(merged.get("match") or {}),
-                _dump(merged.get("inputs") or []),
-                _dump(merged.get("outputs") or []),
-                merged.get("body") or "",
-                merged["origin"],
-                merged.get("origin_ref") or "",
-                merged.get("parent_skill_id"),
-                int(merged.get("version") or 1),
-                merged["content_hash"],
-                1 if merged.get("reproducible", True) else 0,
-                merged.get("proctor_status") or "none",
-                merged.get("proctor_note") or "",
-                _dump(merged.get("proctor_evidence") or {}),
-                merged.get("approved_at"),
-                merged.get("approved_by"),
-                now,
-                merged.get("created_by") or "",
-                skill_id,
-            ),
-        )
+        self.repo.update_skill(self.account_id, skill_id, merged, updated_at=now)
         if commit:
             self.db.conn.commit()
         stored = self.get(skill_id)
@@ -711,8 +550,7 @@ class SkillStore:
         return updated, "updated"
 
     def get_recording(self, recording_id: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute("SELECT * FROM skill_recordings WHERE id = ? AND account_id = ?", (recording_id, self.account_id))
-        row = cur.fetchone()
+        row = self.repo.get_recording(self.account_id, recording_id)
         return row_to_recording(row) if row else None
 
     def list_recordings(
@@ -722,21 +560,14 @@ class SkillStore:
         status: str | None = None,
         limit: int = 200,
     ) -> list[dict[str, Any]]:
-        clauses: list[str] = ["account_id = ?"]
-        args: list[Any] = [self.account_id]
-        if submitted_by:
-            clauses.append("submitted_by = ?")
-            args.append(submitted_by)
-        if status:
-            clauses.append("status = ?")
-            args.append(status)
-        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         limit = max(1, min(int(limit), 500))
-        cur = self.db.conn.execute(
-            f"SELECT * FROM skill_recordings {where} ORDER BY created_at DESC LIMIT ?",
-            [*args, limit],
+        rows = self.repo.list_recordings(
+            self.account_id,
+            submitted_by=submitted_by,
+            status=status,
+            limit=limit,
         )
-        return [row_to_recording(r) for r in cur.fetchall()]
+        return [row_to_recording(row) for row in rows]
 
     def insert_recording(
         self,
@@ -748,22 +579,14 @@ class SkillStore:
     ) -> dict[str, Any]:
         now = utc_now()
         recording_id = new_id("rec_")
-        self.db.conn.execute(
-            """
-            INSERT INTO skill_recordings (
-                id, account_id, skill_id, submitted_by, payload_json, status, queue_item_id,
-                proctor_note, proctor_evidence_json, reviewed_by, reviewed_at, created_at
-            ) VALUES (?, ?, ?, ?, ?, 'queued', ?, '', '{}', NULL, NULL, ?)
-            """,
-            (
-                recording_id,
-                self.account_id,
-                skill_id,
-                submitted_by,
-                json.dumps(payload, ensure_ascii=False),
-                queue_item_id,
-                now,
-            ),
+        self.repo.insert_recording(
+            recording_id=recording_id,
+            account_id=self.account_id,
+            skill_id=skill_id,
+            submitted_by=submitted_by,
+            payload=payload,
+            queue_item_id=queue_item_id,
+            created_at=now,
         )
         self.db.conn.commit()
         stored = self.get_recording(recording_id)
@@ -775,33 +598,8 @@ class SkillStore:
         current = self.get_recording(recording_id)
         if current is None:
             raise HTTPException(status_code=404, detail="recording not found")
-        assignments: list[str] = []
-        values: list[Any] = []
-        mapping = {
-            "skill_id": "skill_id",
-            "status": "status",
-            "queue_item_id": "queue_item_id",
-            "proctor_note": "proctor_note",
-            "reviewed_by": "reviewed_by",
-            "reviewed_at": "reviewed_at",
-        }
-        for key, col in mapping.items():
-            if key in fields:
-                assignments.append(f"{col} = ?")
-                values.append(fields[key])
-        if "payload" in fields:
-            assignments.append("payload_json = ?")
-            values.append(json.dumps(fields["payload"], ensure_ascii=False))
-        if "proctor_evidence" in fields:
-            assignments.append("proctor_evidence_json = ?")
-            values.append(json.dumps(fields["proctor_evidence"] or {}, ensure_ascii=False))
-        if not assignments:
+        if not self.repo.update_recording(self.account_id, recording_id, fields):
             return current
-        values.extend([recording_id, self.account_id])
-        self.db.conn.execute(
-            f"UPDATE skill_recordings SET {', '.join(assignments)} WHERE id = ? AND account_id = ?",
-            values,
-        )
         self.db.conn.commit()
         stored = self.get_recording(recording_id)
         if stored is None:

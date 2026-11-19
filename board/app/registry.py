@@ -222,6 +222,7 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
         scope: str | None = None,
         status_filter: Annotated[str | None, Query(alias="status")] = None,
         limit: int = 200,
+        detail: bool = True,
     ) -> dict[str, Any]:
         if role and role not in SKILL_ROLES:
             raise HTTPException(status_code=422, detail=f"unknown role {role!r}")
@@ -237,7 +238,17 @@ def create_registry_router(principal_dep: Any) -> APIRouter:
             status=status_filter,
             limit=limit,
         )
-        return {"skills": [public_skill(item) for item in items], "count": len(items)}
+        if detail:
+            bodies = store.skill_bodies([item["id"] for item in items])
+            for item in items:
+                item["body"] = bodies.get(item["id"], "")
+        skills = []
+        for item in items:
+            row = public_skill(item)
+            if not detail:
+                row.pop("body", None)
+            skills.append(row)
+        return {"skills": skills, "count": len(skills)}
 
     @router.get("/api/registry/mcps")
     def list_mcps(
