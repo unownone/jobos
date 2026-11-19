@@ -33,7 +33,7 @@ SECRET_KEY_FRAGMENTS = (
     "board_token",
 )
 
-# list_jobs(None) returns at most 100 rows. Export asks for the board explicitly.
+# list_jobs(None) reads every row. Export keeps an explicit bound.
 LEDGER_JOB_LIMIT = 100_000
 
 JOB_EXPORT_KEYS = (

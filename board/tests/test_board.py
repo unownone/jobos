@@ -289,21 +289,67 @@ def test_maintenance_hygiene_and_import(client: TestClient) -> None:
     assert replace.status_code == 403
 
 
-def test_list_jobs_none_is_capped_and_explicit_limit_is_kept(tmp_path: Path) -> None:
-    db = BoardDB(tmp_path / "board.db")
+def test_omitted_limit_reads_every_job_and_http_reports_the_cap(client: TestClient) -> None:
+    db = client.app.state.db
     tenant = db.compat_tenant
-    try:
-        for i in range(101):
-            db.insert_job(
-                tenant,
-                {"id": f"cap__{i:03d}", "company": f"Co{i}", "title": "Role"},
-            )
-        assert len(db.list_jobs(tenant)) == 100
-        assert len(db.list_jobs(tenant, limit=None)) == 100
-        assert len(db.list_jobs(tenant, limit=500)) == 101
-        assert db.count_jobs(tenant) == 101
-    finally:
-        db.close()
+    for i in range(101):
+        db.insert_job(
+            tenant,
+            {
+                "id": f"cap__{i:03d}",
+                "company": f"Co{i}",
+                "title": "Role",
+                "apply_url": "https://example.test/dup" if i < 2 else "",
+                "updated_at": (
+                    "2020-01-01T00:00:00Z"
+                    if i < 2
+                    else f"2026-06-{(1 + (i // 60)):02d}T00:{(i % 60):02d}:00Z"
+                ),
+            },
+        )
+    assert len(db.list_jobs(tenant)) == 101
+    assert len(db.list_jobs(tenant, limit=None)) == 101
+    assert len(db.list_jobs(tenant, limit=100)) == 100
+    assert db.count_jobs(tenant) == 101
+
+    listed = client.get("/api/jobs", headers=h("admin"))
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    assert body["limit"] == 100
+    assert body["count"] == 100
+    assert body["matched"] == 101
+    assert body["total"] == 101
+
+    report = client.get("/api/hygiene", headers=h("maintenance"))
+    assert report.status_code == 200, report.text
+    duplicates = [
+        item
+        for item in report.json()["duplicate_apply_urls"]
+        if item["apply_url"] == "https://example.test/dup"
+    ]
+    assert len(duplicates) == 1
+    assert sorted(duplicates[0]["ids"]) == ["cap__000", "cap__001"]
+
+    replaced = client.post(
+        "/api/import",
+        headers=h("admin"),
+        json={
+            "replace": True,
+            "jobs": [
+                {
+                    "id": "import__kept",
+                    "company": "Kept",
+                    "title": "Only",
+                    "status": "discovered",
+                }
+            ],
+        },
+    )
+    assert replaced.status_code == 200, replaced.text
+    assert replaced.json()["created"] == 1
+    after = client.get("/api/jobs", headers=h("admin")).json()
+    assert after["total"] == 1
+    assert [row["id"] for row in after["jobs"]] == ["import__kept"]
 
 
 def test_job_search_caps_terms_and_escapes_wildcards(tmp_path: Path) -> None:

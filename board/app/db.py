@@ -432,6 +432,9 @@ class BoardDB:
     def delete_job(self, tenant: TenantContext, job_id: str) -> None:
         self.jobs.delete_job(tenant, job_id)
 
+    def delete_jobs_for_account(self, tenant: TenantContext) -> int:
+        return self.jobs.delete_jobs_for_account(tenant.account_id)
+
     def add_event(
         self,
         tenant: TenantContext,

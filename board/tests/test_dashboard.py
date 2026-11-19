@@ -131,10 +131,9 @@ def test_list_jobs_paginates_and_filters(client: TestClient) -> None:
     assert lane["matched"] == 2
     loc = client.get("/api/jobs?location=NYC&limit=50", headers=h("admin")).json()
     assert loc["matched"] == 3
-    # The query omits limit, so the response field stays null. list_jobs(None)
-    # pages at 100; this fixture is under that cap and still returns every job.
+    # Omitting limit on this route applies 100 and reports that cap.
     full = client.get("/api/jobs", headers=h("admin")).json()
-    assert full["limit"] is None
+    assert full["limit"] == 100
     assert full["count"] == 6
     assert full["matched"] == 6
     assert len(full["jobs"]) == 6

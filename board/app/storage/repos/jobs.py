@@ -10,8 +10,6 @@ from typing import Any, Sequence
 from app.constants import JSON_FIELDS, LANE_FILTERS, STATUSES
 from app.tenant import TenantContext
 
-# Callers that pass limit=None used to scan the whole table. Cap that page.
-DEFAULT_LIST_LIMIT = 100
 SEARCH_CAP = 48
 
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -270,9 +268,10 @@ class JobsRepo:
             company=company,
             lane=lane,
         )
-        page_limit = DEFAULT_LIST_LIMIT if limit is None else int(limit)
-        sql = f"SELECT * FROM jobs {where} ORDER BY updated_at DESC LIMIT ? OFFSET ?"
-        args.extend([page_limit, max(0, int(offset))])
+        sql = f"SELECT * FROM jobs {where} ORDER BY updated_at DESC"
+        if limit is not None:
+            sql += " LIMIT ? OFFSET ?"
+            args.extend([int(limit), max(0, int(offset))])
         cur = self.conn.execute(sql, args)
         return [row_to_job(row) for row in cur.fetchall()]
 
@@ -466,11 +465,7 @@ class JobsRepo:
         self.conn.commit()
 
     def delete_jobs_for_account(self, account_id: str) -> int:
-        """Delete every job for one account in one statement.
-
-        Unwired: `POST /api/import` with replace still deletes jobs one by one
-        in main.py. This method is the replacement for that loop.
-        """
+        """Delete every job for one account in one statement."""
         cur = self.conn.execute("DELETE FROM jobs WHERE account_id = ?", (account_id,))
         self.conn.commit()
         return int(cur.rowcount)
