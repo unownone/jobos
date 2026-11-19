@@ -425,6 +425,61 @@ def test_hub_key_wins_over_a_different_session_cookie(tmp_path: Path) -> None:
     assert secret not in str(principal)
 
 
+def test_access_jwt_before_session_falls_through_on_bad_jwt(tmp_path: Path) -> None:
+    private_pem, public_pem = rsa_pems(tmp_path, "jwt-fallthrough")
+    store = MemoryDirectory()
+    session_user = store.add_user(
+        agent_user(user_id="usr_sess", email="sess@example.test", account_id="acc_sess")
+    )
+    store.add_session("sess-real", session_user, csrf="csrf")
+    settings = make_settings(
+        tmp_path,
+        auth_methods="access_jwt,session",
+        access_team_domain="contoso.cloudflareaccess.com",
+        access_aud=AUDIENCE,
+        access_jwt_public_key=public_pem,
+    )
+    principal = AuthManager.from_settings(settings, store).resolve(
+        make_request(
+            "GET",
+            "/api/jobs",
+            headers={"Cf-Access-Jwt-Assertion": "not.a.jwt"},
+            cookies={"hub_session": "sess-real", "hub_csrf": "csrf"},
+        )
+    )
+    assert principal is not None
+    assert principal.user_id == "usr_sess"
+    assert principal.auth == "session"
+
+
+def test_access_jwt_before_session_conflicts_for_different_users(tmp_path: Path) -> None:
+    private_pem, public_pem = rsa_pems(tmp_path, "jwt-order-conflict")
+    store = MemoryDirectory()
+    store.add_user(agent_user(user_id="usr_mail", email="ada@example.test", account_id="acc_mail"))
+    session_user = store.add_user(
+        agent_user(user_id="usr_sess", email="sess@example.test", account_id="acc_sess")
+    )
+    store.add_session("sess-other", session_user, csrf="csrf")
+    token = access_token(private_pem, email="ada@example.test")
+    settings = make_settings(
+        tmp_path,
+        auth_methods="access_jwt,session",
+        access_team_domain="contoso.cloudflareaccess.com",
+        access_aud=AUDIENCE,
+        access_jwt_public_key=public_pem,
+    )
+    with pytest.raises(AuthConflict) as exc:
+        AuthManager.from_settings(settings, store).resolve(
+            make_request(
+                "GET",
+                "/api/jobs",
+                headers={"Cf-Access-Jwt-Assertion": token},
+                cookies={"hub_session": "sess-other", "hub_csrf": "csrf"},
+            )
+        )
+    assert exc.value.status_code == 401
+
+
 def test_access_jwt_and_session_for_different_users_conflict(tmp_path: Path) -> None:
     private_pem, public_pem = rsa_pems(tmp_path, "session-conflict")
     store = MemoryDirectory()
@@ -557,7 +612,6 @@ def test_access_jwt_rejects_bad_signature_issuer_audience_and_expiry(tmp_path: P
         access_token(private_pem, issuer="https://other.cloudflareaccess.com"),
         access_token(private_pem, audience="other-aud"),
         access_token(private_pem, exp=int(time.time()) - 60),
-        access_token(private_pem, email=""),
         hs256_token(
             public_pem,
             {
@@ -576,12 +630,24 @@ def test_access_jwt_rejects_bad_signature_issuer_audience_and_expiry(tmp_path: P
     ).rstrip(b"=").decode()
     cases.append(f"{header}.{payload}.")
     for token in cases:
-        with pytest.raises(HTTPException) as exc:
+        assert (
             manager.resolve(
                 make_request("GET", "/api/jobs", headers={"Cf-Access-Jwt-Assertion": token})
             )
-        assert exc.value.status_code == 401
-        assert token not in str(exc.value.detail)
+            is None
+        )
+
+    with pytest.raises(HTTPException) as exc:
+        manager.resolve(
+            make_request(
+                "GET",
+                "/api/jobs",
+                headers={
+                    "Cf-Access-Jwt-Assertion": access_token(private_pem, email="missing@example.test")
+                },
+            )
+        )
+    assert exc.value.status_code == 401
 
 
 def test_access_jwt_and_hub_key_for_different_users_conflict(tmp_path: Path) -> None:
@@ -610,6 +676,28 @@ def test_access_jwt_and_hub_key_for_different_users_conflict(tmp_path: Path) -> 
                 },
             )
         )
+
+
+def test_compat_and_session_in_auth_methods_ignore_none_user_id_conflict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Session normally skips when role tokens are present; patch only for this dual-match case."""
+    store = MemoryDirectory()
+    user = store.add_user(agent_user(user_id="usr_sess", email="sess@example.test"))
+    store.add_session("sess-dual", user, csrf="csrf")
+    settings = make_settings(tmp_path, auth_methods="session,compat")
+    monkeypatch.setattr("app.auth_manager._presented_role_token", lambda _request: False)
+    principal = AuthManager.from_settings(settings, store).resolve(
+        make_request(
+            "GET",
+            "/api/jobs",
+            headers={"X-Role": "discovery", "X-Token": "token-discovery", "X-Actor": "pytest"},
+            cookies={"hub_session": "sess-dual", "hub_csrf": "csrf"},
+        )
+    )
+    assert principal is not None
+    assert principal.user_id == "usr_sess"
+    assert principal.auth == "session"
 
 
 def test_compat_tokens_still_authenticate_without_a_hub_key_or_session(tmp_path: Path) -> None:

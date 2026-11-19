@@ -217,20 +217,20 @@ class AccessJwtMethod:
         if not token:
             return None
         if not self._settings.access_jwt_public_key.strip():
-            raise _unauthorized("invalid access token")
+            return None
         try:
             claims = decode_rs256(token, self._settings.access_jwt_public_key)
         except JwtError:
-            raise _unauthorized("invalid access token") from None
+            return None
         if claims.get("iss") != self._issuer:
-            raise _unauthorized("invalid access token")
+            return None
         audience = claims.get("aud")
         audiences = audience if isinstance(audience, list) else [audience]
         if self._audience not in audiences:
-            raise _unauthorized("invalid access token")
+            return None
         exp = claims.get("exp")
         if isinstance(exp, bool) or not isinstance(exp, (int, float)) or time.time() >= float(exp):
-            raise _unauthorized("invalid access token")
+            return None
         email = claims.get("email")
         if not isinstance(email, str) or not email.strip():
             raise _unauthorized("invalid access token")
@@ -300,7 +300,8 @@ class AuthManager:
         if kind == "error":
             raise value
         matched = [item for item_kind, item in outcomes if item_kind == "ok"]
-        if len({item.user_id for item in matched}) > 1:
+        distinct_user_ids = {item.user_id for item in matched if item.user_id is not None}
+        if len(distinct_user_ids) > 1:
             raise AuthConflict()
         return matched[0]
 
