@@ -70,6 +70,10 @@ class Settings:
     queue_adapter: str = "memory"
     blob_root: Path | None = None
     blob_adapter: str = "filesystem"
+    auth_methods: str = "hub_key,session"
+    access_team_domain: str = ""
+    access_aud: str = ""
+    access_jwt_public_key: str = ""
 
 
 def load_settings() -> Settings:
