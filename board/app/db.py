@@ -5,9 +5,16 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
-from app.constants import JSON_FIELDS, LANE_FILTERS, STATUSES
+from app.storage.repos.events import EventsRepo
+from app.storage.repos.jobs import (
+    COLUMN_TO_FIELD,
+    FIELD_TO_COLUMN,
+    JobsRepo,
+    _jobs_where,
+    row_to_job,
+)
 from app.message_store import ensure_messages_schema
 from app.a2a_store import ensure_a2a_schema
 from app.memory_store import ensure_memory_schema
@@ -22,6 +29,17 @@ from app.sql import (
 from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 from app.tenant_schema import ensure_tenant_schema
 from app.blob_store import BlobStore
+
+__all__ = [
+    "BoardDB",
+    "COLUMN_TO_FIELD",
+    "FIELD_TO_COLUMN",
+    "connect",
+    "public_user",
+    "row_to_job",
+    "utc_now",
+    "_jobs_where",
+]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (
@@ -226,20 +244,6 @@ CREATE INDEX IF NOT EXISTS idx_burn_skill ON token_burn(skill);
 CREATE INDEX IF NOT EXISTS idx_burn_ts ON token_burn(ts);
 """
 
-COLUMN_TO_FIELD = {
-    "sources_json": "sources",
-    "owners_json": "owners",
-    "apply_packet_json": "apply_packet",
-    "outreach_packet_json": "outreach_packet",
-    "research_json": "research",
-    "proof_json": "proof",
-    "conflicts_json": "conflicts",
-    "rejection_json": "rejection",
-}
-
-FIELD_TO_COLUMN = {v: k for k, v in COLUMN_TO_FIELD.items()}
-
-
 def utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -303,66 +307,13 @@ def _load(raw: str | None, default: Any) -> Any:
     return json.loads(raw)
 
 
-def _rejection_from_row(raw: str | None) -> dict[str, str]:
-    loaded = _load(raw, {})
-    return _normalize_rejection(loaded)
-
-
-def _normalize_rejection(value: Any) -> dict[str, str]:
-    if not isinstance(value, dict):
-        value = {}
-    by = str(value.get("by") or "").strip().lower()
-    if by not in {"company", "user"}:
-        by = ""
-    return {
-        "by": by,
-        "company_remarks": str(value.get("company_remarks") or ""),
-        "user_remarks": str(value.get("user_remarks") or ""),
-    }
-
-
-def row_to_job(row: Any) -> dict[str, Any]:
-    data = dict(row)
-    job: dict[str, Any] = {
-        "id": data["id"],
-        "company": data["company"],
-        "title": data["title"],
-        "location": data["location"] or "",
-        "remote": data["remote"],
-        "url": data["url"] or "",
-        "apply_url": data["apply_url"] or "",
-        "apply_kind": data["apply_kind"] or "",
-        "ats": data["ats"] or "",
-        "req_id": data["req_id"] or "",
-        "sources": _load(data["sources_json"], []),
-        "status": data["status"],
-        "score": data["score"],
-        "owners": _load(data["owners_json"], {"discovery": "", "apply": "", "outreach": ""}),
-        "apply_packet": _load(data["apply_packet_json"], {}),
-        "outreach_packet": _load(data["outreach_packet_json"], {}),
-        "research": _load(data["research_json"], {}),
-        "proof": _load(data["proof_json"], {}),
-        "notes": data["notes"] or "",
-        "description": data.get("description") or "",
-        "expectations": data.get("expectations") or "",
-        "pay": data.get("pay") or "",
-        "posted_at": data.get("posted_at") or "",
-        "rejection": _rejection_from_row(data.get("rejection_json")),
-        "conflicts": _load(data["conflicts_json"], []),
-        "stopped": bool(data["stopped"]),
-        "stop_reason": data["stop_reason"] or "",
-        "created_at": data["created_at"],
-        "updated_at": data["updated_at"],
-        "created_by_role": data["created_by_role"] or "",
-    }
-    return job
-
-
 class BoardDB:
     def __init__(self, db_path: Path, database_url: str | None = None) -> None:
         self.db_path = db_path
         self.database_url = resolve_database_url(database_url)
         self.conn = connect(db_path, self.database_url)
+        self.jobs = JobsRepo(self.conn)
+        self.events = EventsRepo(self.conn)
         self.compat_tenant = TenantContext(COMPAT_ACCOUNT_ID)
         self.blob_store: BlobStore | None = None
         bind_blob_store(self)
@@ -396,7 +347,7 @@ class BoardDB:
         limit: int | None = None,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        where, args = _jobs_where(
+        return self.jobs.list_jobs(
             tenant,
             status=status,
             q=q,
@@ -410,13 +361,9 @@ class BoardDB:
             has_pay=has_pay,
             company=company,
             lane=lane,
+            limit=limit,
+            offset=offset,
         )
-        sql = f"SELECT * FROM jobs {where} ORDER BY updated_at DESC"
-        if limit is not None:
-            sql += " LIMIT ? OFFSET ?"
-            args.extend([int(limit), max(0, int(offset))])
-        cur = self.conn.execute(sql, args)
-        return [row_to_job(r) for r in cur.fetchall()]
 
     def count_jobs(
         self,
@@ -435,7 +382,7 @@ class BoardDB:
         company: str | None = None,
         lane: str | None = None,
     ) -> int:
-        where, args = _jobs_where(
+        return self.jobs.count_jobs(
             tenant,
             status=status,
             q=q,
@@ -450,24 +397,12 @@ class BoardDB:
             company=company,
             lane=lane,
         )
-        cur = self.conn.execute(f"SELECT COUNT(*) AS n FROM jobs {where}", args)
-        row = cur.fetchone()
-        return int(row["n"]) if row else 0
 
     def status_counts(self, tenant: TenantContext) -> dict[str, int]:
-        cur = self.conn.execute(
-            "SELECT status, COUNT(*) AS n FROM jobs WHERE account_id = ? GROUP BY status",
-            (tenant.account_id,),
-        )
-        return {str(row["status"]): int(row["n"]) for row in cur.fetchall()}
+        return self.jobs.status_counts(tenant)
 
     def get_job(self, tenant: TenantContext, job_id: str) -> dict[str, Any] | None:
-        cur = self.conn.execute(
-            "SELECT * FROM jobs WHERE account_id = ? AND id = ?",
-            (tenant.account_id, job_id),
-        )
-        row = cur.fetchone()
-        return row_to_job(row) if row else None
+        return self.jobs.get_job(tenant, job_id)
 
     def find_duplicate(
         self,
@@ -479,146 +414,23 @@ class BoardDB:
         location: str,
         exclude_id: str | None = None,
     ) -> dict[str, Any] | None:
-        if apply_url:
-            cur = self.conn.execute(
-                "SELECT * FROM jobs WHERE account_id = ? AND apply_url = ? AND apply_url != ''",
-                (tenant.account_id, apply_url),
-            )
-            row = cur.fetchone()
-            if row and row["id"] != exclude_id:
-                return row_to_job(row)
-        cur = self.conn.execute(
-            """
-            SELECT * FROM jobs
-            WHERE account_id = ?
-              AND lower(company) = lower(?) AND lower(title) = lower(?)
-              AND lower(COALESCE(location, '')) = lower(?)
-            """,
-            (tenant.account_id, company, title, location or ""),
+        return self.jobs.find_duplicate(
+            tenant,
+            apply_url=apply_url,
+            company=company,
+            title=title,
+            location=location,
+            exclude_id=exclude_id,
         )
-        row = cur.fetchone()
-        if row and row["id"] != exclude_id:
-            return row_to_job(row)
-        return None
 
     def insert_job(self, tenant: TenantContext, job: dict[str, Any]) -> dict[str, Any]:
-        now = utc_now()
-        self.conn.execute(
-            """
-            INSERT INTO jobs (
-                account_id, id, company, title, location, remote, url, apply_url, apply_kind, ats, req_id,
-                sources_json, status, score, owners_json, apply_packet_json, outreach_packet_json,
-                research_json, proof_json, notes, description, expectations, pay, posted_at,
-                rejection_json, conflicts_json, stopped, stop_reason,
-                created_at, updated_at, created_by_role
-            ) VALUES (
-                :account_id, :id, :company, :title, :location, :remote, :url, :apply_url, :apply_kind, :ats, :req_id,
-                :sources_json, :status, :score, :owners_json, :apply_packet_json, :outreach_packet_json,
-                :research_json, :proof_json, :notes, :description, :expectations, :pay, :posted_at,
-                :rejection_json, :conflicts_json, :stopped, :stop_reason,
-                :created_at, :updated_at, :created_by_role
-            )
-            """,
-            {
-                "account_id": tenant.account_id,
-                "id": job["id"],
-                "company": job["company"],
-                "title": job["title"],
-                "location": job.get("location") or "",
-                "remote": _remote_to_text(job.get("remote")),
-                "url": job.get("url") or "",
-                "apply_url": job.get("apply_url") or "",
-                "apply_kind": job.get("apply_kind") or "",
-                "ats": job.get("ats") or "",
-                "req_id": job.get("req_id") or "",
-                "sources_json": _dump(job.get("sources") or []),
-                "status": job.get("status") or "discovered",
-                "score": job.get("score"),
-                "owners_json": _dump(_owners(job.get("owners"))),
-                "apply_packet_json": _dump(job.get("apply_packet") or {}),
-                "outreach_packet_json": _dump(job.get("outreach_packet") or {}),
-                "research_json": _dump(job.get("research") or {}),
-                "proof_json": _dump(job.get("proof") or {}),
-                "notes": job.get("notes") or "",
-                "description": job.get("description") or "",
-                "expectations": job.get("expectations") or "",
-                "pay": job.get("pay") or "",
-                "posted_at": job.get("posted_at") or "",
-                "rejection_json": _dump(_normalize_rejection(job.get("rejection"))),
-                "conflicts_json": _dump(job.get("conflicts") or []),
-                "stopped": 1 if job.get("stopped") else 0,
-                "stop_reason": job.get("stop_reason") or "",
-                "created_at": job.get("created_at") or now,
-                "updated_at": job.get("updated_at") or now,
-                "created_by_role": job.get("created_by_role") or "",
-            },
-        )
-        self.conn.commit()
-        stored = self.get_job(tenant, job["id"])
-        if stored is None:
-            raise RuntimeError("insert did not persist")
-        return stored
+        return self.jobs.insert_job(tenant, job)
 
     def update_job(self, tenant: TenantContext, job_id: str, fields: dict[str, Any]) -> dict[str, Any]:
-        if not fields:
-            stored = self.get_job(tenant, job_id)
-            if stored is None:
-                raise KeyError(job_id)
-            return stored
-        assignments: list[str] = []
-        values: dict[str, Any] = {
-            "id": job_id,
-            "account_id": tenant.account_id,
-            "updated_at": utc_now(),
-        }
-        for key, value in fields.items():
-            if key in JSON_FIELDS:
-                col = FIELD_TO_COLUMN[key]
-                assignments.append(f"{col} = :{col}")
-                values[col] = _dump(_normalize_rejection(value) if key == "rejection" else value)
-            elif key == "remote":
-                assignments.append("remote = :remote")
-                values["remote"] = _remote_to_text(value)
-            elif key == "stopped":
-                assignments.append("stopped = :stopped")
-                values["stopped"] = 1 if value else 0
-            elif key in {
-                "company",
-                "title",
-                "location",
-                "url",
-                "apply_url",
-                "apply_kind",
-                "ats",
-                "req_id",
-                "status",
-                "score",
-                "notes",
-                "description",
-                "expectations",
-                "pay",
-                "posted_at",
-                "stop_reason",
-            }:
-                assignments.append(f"{key} = :{key}")
-                values[key] = value
-        assignments.append("updated_at = :updated_at")
-        self.conn.execute(
-            f"UPDATE jobs SET {', '.join(assignments)} WHERE account_id = :account_id AND id = :id",
-            values,
-        )
-        self.conn.commit()
-        stored = self.get_job(tenant, job_id)
-        if stored is None:
-            raise KeyError(job_id)
-        return stored
+        return self.jobs.update_job(tenant, job_id, fields)
 
     def delete_job(self, tenant: TenantContext, job_id: str) -> None:
-        self.conn.execute(
-            "DELETE FROM jobs WHERE account_id = ? AND id = ?",
-            (tenant.account_id, job_id),
-        )
-        self.conn.commit()
+        self.jobs.delete_job(tenant, job_id)
 
     def add_event(
         self,
@@ -633,39 +445,17 @@ class BoardDB:
         note: str | None = None,
         fields: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        ts = utc_now()
-        cur = self.conn.execute(
-            """
-            INSERT INTO events (
-                account_id, ts, job_id, actor_role, actor, action, from_status, to_status, note, fields_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                tenant.account_id,
-                ts,
-                job_id,
-                actor_role,
-                actor or "",
-                action,
-                from_status,
-                to_status,
-                note or "",
-                _dump(fields) if fields else None,
-            ),
+        return self.events.add_event(
+            tenant,
+            job_id=job_id,
+            actor_role=actor_role,
+            actor=actor,
+            action=action,
+            from_status=from_status,
+            to_status=to_status,
+            note=note,
+            fields=fields,
         )
-        self.conn.commit()
-        return {
-            "id": cur.lastrowid,
-            "ts": ts,
-            "job_id": job_id,
-            "actor_role": actor_role,
-            "actor": actor or "",
-            "action": action,
-            "from_status": from_status,
-            "to_status": to_status,
-            "note": note or "",
-            "fields": fields or {},
-        }
 
     def list_events(
         self,
@@ -674,42 +464,23 @@ class BoardDB:
         job_id: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
-        limit = max(1, min(limit, 10000))
-        if job_id:
-            cur = self.conn.execute(
-                "SELECT * FROM events WHERE account_id = ? AND job_id = ? ORDER BY id DESC LIMIT ?",
-                (tenant.account_id, job_id, limit),
-            )
-        else:
-            cur = self.conn.execute(
-                "SELECT * FROM events WHERE account_id = ? ORDER BY id DESC LIMIT ?",
-                (tenant.account_id, limit),
-            )
-        out: list[dict[str, Any]] = []
-        for row in cur.fetchall():
-            out.append(
-                {
-                    "id": row["id"],
-                    "ts": row["ts"],
-                    "job_id": row["job_id"],
-                    "actor_role": row["actor_role"],
-                    "actor": row["actor"] or "",
-                    "action": row["action"],
-                    "from_status": row["from_status"],
-                    "to_status": row["to_status"],
-                    "note": row["note"] or "",
-                    "fields": _load(row["fields_json"], {}),
-                }
-            )
-        return out
+        return self.events.list_events(tenant, job_id=job_id, limit=limit)
 
     def counts_by_status(self, tenant: TenantContext) -> dict[str, int]:
-        cur = self.conn.execute(
-            "SELECT status, COUNT(*) AS n FROM jobs WHERE account_id = ? GROUP BY status",
-            (tenant.account_id,),
-        )
-        found = {row["status"]: row["n"] for row in cur.fetchall()}
-        return {status: int(found.get(status, 0)) for status in STATUSES}
+        return self.jobs.counts_by_status(tenant)
+
+    def count_jobs_created_since(self, tenant: TenantContext, since: str) -> int:
+        return self.jobs.count_created_since(tenant, since)
+
+    def oldest_open_job(
+        self, tenant: TenantContext, statuses: Sequence[str]
+    ) -> dict[str, Any] | None:
+        return self.jobs.oldest_open(tenant, statuses)
+
+    def count_events_to_status_since(
+        self, tenant: TenantContext, to_status: str, since: str
+    ) -> int:
+        return self.events.count_to_status_since(tenant, to_status, since)
 
     def vacuum(self) -> None:
         # Postgres VACUUM cannot run inside the app transaction. No-op; autovacuum handles it.
@@ -1367,92 +1138,3 @@ def _row_to_invite(row: Any) -> dict[str, Any]:
         "allow_multiple_owners": bool(row["allow_multiple_owners"]),
         "created_at": row["created_at"],
     }
-
-
-def _jobs_where(
-    tenant: TenantContext,
-    *,
-    status: str | None = None,
-    q: str | None = None,
-    stopped: bool | None = None,
-    score_min: float | None = None,
-    score_max: float | None = None,
-    location: str | None = None,
-    apply_kind: str | None = None,
-    source: str | None = None,
-    remote: str | None = None,
-    has_pay: bool | None = None,
-    company: str | None = None,
-    lane: str | None = None,
-) -> tuple[str, list[Any]]:
-    clauses: list[str] = ["account_id = ?"]
-    args: list[Any] = [tenant.account_id]
-    if status:
-        clauses.append("status = ?")
-        args.append(status)
-    if lane:
-        lane_statuses = LANE_FILTERS.get(lane.strip().lower())
-        if lane_statuses:
-            placeholders = ", ".join("?" for _ in lane_statuses)
-            clauses.append(f"status IN ({placeholders})")
-            args.extend(sorted(lane_statuses))
-    if stopped is not None:
-        clauses.append("stopped = ?")
-        args.append(1 if stopped else 0)
-    if q:
-        like = f"%{q}%"
-        clauses.append(
-            "(id LIKE ? OR company LIKE ? OR title LIKE ? OR apply_url LIKE ?"
-            " OR notes LIKE ? OR location LIKE ? OR description LIKE ?"
-            " OR expectations LIKE ? OR pay LIKE ? OR rejection_json LIKE ?)"
-        )
-        args.extend([like] * 10)
-    if company:
-        clauses.append("company LIKE ?")
-        args.append(f"%{company}%")
-    if location:
-        clauses.append("location LIKE ?")
-        args.append(f"%{location}%")
-    if apply_kind:
-        clauses.append("apply_kind = ?")
-        args.append(apply_kind)
-    if source:
-        clauses.append("sources_json LIKE ?")
-        args.append(f"%{source}%")
-    if score_min is not None:
-        clauses.append("score IS NOT NULL AND score >= ?")
-        args.append(score_min)
-    if score_max is not None:
-        clauses.append("score IS NOT NULL AND score <= ?")
-        args.append(score_max)
-    remote_key = (remote or "").strip().lower()
-    if remote_key in {"remote", "true", "yes"}:
-        clauses.append(
-            "remote IS NOT NULL AND remote != '' AND lower(remote) NOT IN ('false','0','no','onsite')"
-        )
-    elif remote_key in {"onsite", "false", "no"}:
-        clauses.append(
-            "(remote IS NULL OR remote = '' OR lower(remote) IN ('false','0','no','onsite'))"
-        )
-    if has_pay is True:
-        clauses.append("pay IS NOT NULL AND TRIM(pay) != ''")
-    elif has_pay is False:
-        clauses.append("(pay IS NULL OR TRIM(pay) = '')")
-    return f"WHERE {' AND '.join(clauses)}", args
-
-
-def _owners(raw: Any) -> dict[str, str]:
-    base = {"discovery": "", "apply": "", "outreach": ""}
-    if isinstance(raw, dict):
-        for key in base:
-            if key in raw and raw[key] is not None:
-                base[key] = str(raw[key])
-    return base
-
-
-def _remote_to_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    return str(value)

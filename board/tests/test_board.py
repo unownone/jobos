@@ -8,8 +8,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.constants import ROLES
+from app.db import BoardDB
 from app.main import create_app
 from app.settings import Settings
+from app.storage.repos.jobs import SEARCH_CAP, _jobs_where
+from app.tenant import TenantContext
 
 TOKENS = {role: f"test-token-{role}-not-real" for role in ROLES}
 
@@ -284,6 +287,61 @@ def test_maintenance_hygiene_and_import(client: TestClient) -> None:
         json={"jobs": [], "replace": True},
     )
     assert replace.status_code == 403
+
+
+def test_list_jobs_none_is_capped_and_explicit_limit_is_kept(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "board.db")
+    tenant = db.compat_tenant
+    try:
+        for i in range(101):
+            db.insert_job(
+                tenant,
+                {"id": f"cap__{i:03d}", "company": f"Co{i}", "title": "Role"},
+            )
+        assert len(db.list_jobs(tenant)) == 100
+        assert len(db.list_jobs(tenant, limit=None)) == 100
+        assert len(db.list_jobs(tenant, limit=500)) == 101
+        assert db.count_jobs(tenant) == 101
+    finally:
+        db.close()
+
+
+def test_job_search_caps_terms_and_escapes_wildcards(tmp_path: Path) -> None:
+    tenant = TenantContext("acc_search")
+    where, args = _jobs_where(tenant, q="100%_" + ("x" * 80))
+    assert where.count("ESCAPE") == 10
+    assert "LIKE ?" not in where
+    assert args[0] == "acc_search"
+    assert args[1] == "100\\%\\_" + ("x" * (SEARCH_CAP - len("100%_")))
+    assert all(arg == args[1] for arg in args[1:])
+
+    db = BoardDB(tmp_path / "board.db")
+    tenant = db.compat_tenant
+    try:
+        db.insert_job(tenant, {"id": "wild__pct", "company": "100% Ready", "title": "Staff"})
+        db.insert_job(tenant, {"id": "wild__plain", "company": "Acme", "title": "Staff", "notes": "A" * 48 + "TAIL"})
+        db.insert_job(tenant, {"id": "wild__under", "company": "A_B", "title": "Staff"})
+        db.insert_job(tenant, {"id": "wild__underx", "company": "AXB", "title": "Staff"})
+        assert {row["id"] for row in db.list_jobs(tenant, q="%", limit=50)} == {"wild__pct"}
+        assert {row["id"] for row in db.list_jobs(tenant, q="A_B", limit=50)} == {"wild__under"}
+        assert {row["id"] for row in db.list_jobs(tenant, company="100%", limit=50)} == {"wild__pct"}
+        capped = {row["id"] for row in db.list_jobs(tenant, q=("A" * 48) + "NOPE", limit=50)}
+        assert "wild__plain" in capped
+    finally:
+        db.close()
+
+
+def test_delete_jobs_for_account_removes_the_tenant_in_one_call(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "board.db")
+    tenant = db.compat_tenant
+    try:
+        db.insert_job(tenant, {"id": "wipe__1", "company": "A", "title": "T"})
+        db.insert_job(tenant, {"id": "wipe__2", "company": "B", "title": "T"})
+        deleted = db.jobs.delete_jobs_for_account(tenant.account_id)
+        assert deleted == 2
+        assert db.list_jobs(tenant, limit=50) == []
+    finally:
+        db.close()
 
 
 def test_ui_is_served(client: TestClient) -> None:
