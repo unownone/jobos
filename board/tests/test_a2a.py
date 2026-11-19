@@ -382,3 +382,70 @@ def test_peer_list_has_default_limit_and_task_update_is_one_statement(tmp_path: 
     assert "SELECT" not in compact
     assert update_task(db, task["id"], state="failed", tenant=bob) is None
     assert get_task(db, task["id"], tenant=alice)["state"] == "working"
+
+
+def test_missing_task_update_leaves_uncommitted_work(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "pending.db")
+    alice = TenantContext("acc_alice")
+    now = "2020-01-01T00:00:00Z"
+    db.conn.execute(
+        """
+        INSERT INTO a2a_tasks (
+            id, account_id, context_id, state, skill_id, from_user_id, message_id,
+            request_json, result_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, '{}', '{}', ?, ?)
+        """,
+        ("task_pending", alice.account_id, "ctx_pending", "submitted", now, now),
+    )
+    rollbacks: list[str] = []
+    real_rollback = db.conn.rollback
+
+    def wrapped_rollback() -> None:
+        rollbacks.append("rollback")
+        real_rollback()
+
+    db.conn.rollback = wrapped_rollback
+    try:
+        assert update_task(db, "task_missing", state="failed", tenant=alice) is None
+        pending = db.conn.execute(
+            "SELECT id, state FROM a2a_tasks WHERE id = ?",
+            ("task_pending",),
+        ).fetchone()
+    finally:
+        db.conn.rollback = real_rollback
+    assert rollbacks == []
+    assert pending is not None
+    assert pending["id"] == "task_pending"
+    assert pending["state"] == "submitted"
+    db.conn.rollback()
+    gone = db.conn.execute(
+        "SELECT id FROM a2a_tasks WHERE id = ?",
+        ("task_pending",),
+    ).fetchone()
+    assert gone is None
+
+
+def test_ensure_drops_single_column_card_url_unique_index(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "card-index.db")
+    db.conn.execute("CREATE UNIQUE INDEX idx_peers_card_only ON a2a_peers (card_url)")
+    db.conn.commit()
+    alice = TenantContext("acc_alice")
+    bob = TenantContext("acc_bob")
+    kept = _peer(db, alice)
+    ensure_a2a_schema(db.conn)
+    db.conn.commit()
+    assert get_peer(db, kept["id"], tenant=alice)["card_url"] == CARD_URL
+    other = _peer(db, bob)
+    assert other["id"] != kept["id"]
+    assert other["card_url"] == CARD_URL
+    names = {
+        row["indexname"]
+        for row in db.conn.execute(
+            """
+            SELECT indexname FROM pg_indexes
+            WHERE schemaname = current_schema() AND tablename = 'a2a_peers'
+            """
+        ).fetchall()
+    }
+    assert "idx_peers_card_only" not in names
+    assert "idx_a2a_peers_account_card" in names

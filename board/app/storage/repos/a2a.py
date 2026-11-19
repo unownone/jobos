@@ -70,6 +70,26 @@ WHERE nsp.nspname = current_schema()
   ) = 'card_url'
 """
 
+# int2vector subscripts are zero-based. A constraint-backed index is removed
+# with the constraint, so this only catches CREATE UNIQUE INDEX leftovers.
+_CARD_URL_ONLY_UNIQUE_INDEXES = """
+SELECT ic.relname AS name
+FROM pg_index ix
+JOIN pg_class ic ON ic.oid = ix.indexrelid
+JOIN pg_class rel ON rel.oid = ix.indrelid
+JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+WHERE nsp.nspname = current_schema()
+  AND rel.relname = 'a2a_peers'
+  AND ix.indisunique
+  AND ix.indnkeyatts = 1
+  AND (
+    SELECT att.attname
+    FROM pg_attribute att
+    WHERE att.attrelid = rel.oid
+      AND att.attnum = ix.indkey[0]
+  ) = 'card_url'
+"""
+
 TASK_STATES = (
     "submitted",
     "working",
@@ -88,17 +108,21 @@ def ensure_a2a_schema(conn: Any) -> None:
     _drop_card_url_only_unique(conn)
 
 
+def _drop_ident(conn: Any, statement: str, name: str) -> None:
+    if _IDENT.fullmatch(name) is None or name == "idx_a2a_peers_account_card":
+        return
+    conn.execute(f"{statement} {name}")
+
+
 def _drop_card_url_only_unique(conn: Any) -> None:
     """Uniqueness is (account_id, card_url). Do not delete peer rows."""
     if not hasattr(conn, "schema"):
         return
     conn.execute(_DROP_CARD_URL_UNIQUE)
-    rows = conn.execute(_CARD_URL_ONLY_UNIQUES).fetchall()
-    for row in rows:
-        name = str(row["name"])
-        if _IDENT.fullmatch(name) is None or name == "idx_a2a_peers_account_card":
-            continue
-        conn.execute(f"ALTER TABLE a2a_peers DROP CONSTRAINT {name}")
+    for row in conn.execute(_CARD_URL_ONLY_UNIQUES).fetchall():
+        _drop_ident(conn, "ALTER TABLE a2a_peers DROP CONSTRAINT", str(row["name"]))
+    for row in conn.execute(_CARD_URL_ONLY_UNIQUE_INDEXES).fetchall():
+        _drop_ident(conn, "DROP INDEX IF EXISTS", str(row["name"]))
 
 
 def _now() -> str:
@@ -221,7 +245,10 @@ class A2ARepo:
         message_id: str | None = None,
         tenant: Any | None = None,
     ) -> dict[str, Any] | None:
-        """One UPDATE scoped by id and account. Omitted fields keep stored values."""
+        """One UPDATE scoped by id and account. Omitted fields keep stored values.
+
+        A miss returns None and leaves the connection's open transaction alone.
+        """
         result_json = None if result is None else json.dumps(result, ensure_ascii=False)
         row = self._db.conn.execute(
             """
@@ -243,9 +270,6 @@ class A2ARepo:
             ),
         ).fetchone()
         if row is None:
-            rollback = getattr(self._db.conn, "rollback", None)
-            if callable(rollback):
-                rollback()
             return None
         self._db.conn.commit()
         return _task_row(row)
