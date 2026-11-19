@@ -2,15 +2,31 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Any, Iterator
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from psycopg.errors import UniqueViolation
 
+from app.a2a_store import (
+    PEER_LIST_DEFAULT_LIMIT,
+    SCHEMA as A2A_SCHEMA,
+    ensure_a2a_schema,
+    get_peer,
+    get_task,
+    insert_peer,
+    insert_task,
+    list_peers,
+    update_task,
+)
 from app.constants import ROLES
+from app.db import BoardDB
 from app.main import create_app
 from app.settings import Settings
+from app.tenant import TenantContext
 
 TOKENS = {role: f"test-token-{role}-not-real" for role in ROLES}
 
@@ -241,3 +257,195 @@ def test_a2a_send_requires_candidate(tmp_path: Path) -> None:
     err = res.json()["error"]
     assert err["code"] == -32090
     assert err["data"]["onboarding_url"] == "/onboarding"
+
+
+CARD_URL = "https://peer.example/.well-known/agent-card.json"
+CARD = {"name": "Peer", "url": "https://peer.example/a2a"}
+
+
+def _peer(db: BoardDB, tenant: TenantContext, card_url: str = CARD_URL) -> dict[str, Any]:
+    return insert_peer(
+        db,
+        name="Peer",
+        card_url=card_url,
+        agent_url="https://peer.example/a2a",
+        card=CARD,
+        tenant=tenant,
+    )
+
+
+@contextmanager
+def _spy_execute(conn: Any) -> Iterator[list[tuple[str, tuple[Any, ...]]]]:
+    calls: list[tuple[str, tuple[Any, ...]]] = []
+    real = conn.execute
+
+    def wrapped(sql: str, params: Any = ()) -> Any:
+        bound = params if isinstance(params, tuple) else tuple(params or ())
+        calls.append((sql, bound))
+        return real(sql, params)
+
+    conn.execute = wrapped
+    try:
+        yield calls
+    finally:
+        conn.execute = real
+
+
+def test_two_accounts_can_store_the_same_card_url(tmp_path: Path) -> None:
+    assert "card_url TEXT NOT NULL UNIQUE" not in A2A_SCHEMA
+    assert "UNIQUE (card_url)" not in A2A_SCHEMA
+    assert "idx_a2a_peers_account_card" in A2A_SCHEMA
+
+    fresh = BoardDB(tmp_path / "fresh.db")
+    alice = TenantContext("acc_alice")
+    bob = TenantContext("acc_bob")
+    first = _peer(fresh, alice)
+    second = _peer(fresh, bob)
+    assert first["id"] != second["id"]
+    assert first["card_url"] == second["card_url"] == CARD_URL
+    assert get_peer(fresh, first["id"], tenant=alice)["card"]["url"] == CARD["url"]
+    assert get_peer(fresh, first["id"], tenant=bob) is None
+    assert get_peer(fresh, second["id"], tenant=alice) is None
+    index = fresh.conn.execute(
+        """
+        SELECT indexname FROM pg_indexes
+        WHERE schemaname = current_schema() AND indexname = 'idx_a2a_peers_account_card'
+        """
+    ).fetchone()
+    assert index is not None
+    with pytest.raises(UniqueViolation):
+        _peer(fresh, alice)
+    fresh.conn.rollback()
+
+    migrated = BoardDB(tmp_path / "migrated.db")
+    migrated.conn.execute(
+        "ALTER TABLE a2a_peers ADD CONSTRAINT a2a_peers_card_url_key UNIQUE (card_url)"
+    )
+    migrated.conn.commit()
+    kept = _peer(migrated, alice)
+    ensure_a2a_schema(migrated.conn)
+    migrated.conn.commit()
+    still = get_peer(migrated, kept["id"], tenant=alice)
+    assert still is not None
+    assert still["name"] == "Peer"
+    assert still["card"] == CARD
+    other = _peer(migrated, bob)
+    assert other["id"] != kept["id"]
+    assert get_peer(migrated, kept["id"], tenant=alice)["card_url"] == CARD_URL
+    lone = migrated.conn.execute(
+        """
+        SELECT con.conname AS name
+        FROM pg_constraint con
+        JOIN pg_class rel ON rel.oid = con.conrelid
+        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+        WHERE nsp.nspname = current_schema()
+          AND rel.relname = 'a2a_peers'
+          AND con.contype = 'u'
+          AND array_length(con.conkey, 1) = 1
+        """
+    ).fetchone()
+    assert lone is None
+
+
+def test_peer_list_has_default_limit_and_task_update_is_one_statement(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "limits.db")
+    alice = TenantContext("acc_alice")
+    bob = TenantContext("acc_bob")
+    for index in range(3):
+        _peer(db, alice, card_url=f"https://peer.example/cards/{index}")
+    assert len(list_peers(db, tenant=alice, limit=2)) == 2
+    with _spy_execute(db.conn) as calls:
+        listed = list_peers(db, tenant=alice)
+    assert len(listed) == 3
+    limited = [params for sql, params in calls if "a2a_peers" in sql and "LIMIT" in sql.upper()]
+    assert limited
+    assert limited[0][-1] == PEER_LIST_DEFAULT_LIMIT == 200
+
+    task = insert_task(
+        db,
+        state="submitted",
+        result={"kept": True},
+        message_id="msg_1",
+        tenant=alice,
+    )
+    with _spy_execute(db.conn) as calls:
+        updated = update_task(db, task["id"], state="working", tenant=alice)
+    assert updated is not None
+    assert updated["state"] == "working"
+    assert updated["result"] == {"kept": True}
+    assert updated["message_id"] == "msg_1"
+    statements = [sql for sql, _params in calls]
+    assert len(statements) == 1
+    compact = " ".join(statements[0].split()).upper()
+    assert compact.startswith("UPDATE")
+    assert "WHERE" in compact and "ACCOUNT_ID" in compact
+    assert "SELECT" not in compact
+    assert update_task(db, task["id"], state="failed", tenant=bob) is None
+    assert get_task(db, task["id"], tenant=alice)["state"] == "working"
+
+
+def test_missing_task_update_leaves_uncommitted_work(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "pending.db")
+    alice = TenantContext("acc_alice")
+    now = "2020-01-01T00:00:00Z"
+    db.conn.execute(
+        """
+        INSERT INTO a2a_tasks (
+            id, account_id, context_id, state, skill_id, from_user_id, message_id,
+            request_json, result_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, '{}', '{}', ?, ?)
+        """,
+        ("task_pending", alice.account_id, "ctx_pending", "submitted", now, now),
+    )
+    rollbacks: list[str] = []
+    real_rollback = db.conn.rollback
+
+    def wrapped_rollback() -> None:
+        rollbacks.append("rollback")
+        real_rollback()
+
+    db.conn.rollback = wrapped_rollback
+    try:
+        assert update_task(db, "task_missing", state="failed", tenant=alice) is None
+        pending = db.conn.execute(
+            "SELECT id, state FROM a2a_tasks WHERE id = ?",
+            ("task_pending",),
+        ).fetchone()
+    finally:
+        db.conn.rollback = real_rollback
+    assert rollbacks == []
+    assert pending is not None
+    assert pending["id"] == "task_pending"
+    assert pending["state"] == "submitted"
+    db.conn.rollback()
+    gone = db.conn.execute(
+        "SELECT id FROM a2a_tasks WHERE id = ?",
+        ("task_pending",),
+    ).fetchone()
+    assert gone is None
+
+
+def test_ensure_drops_single_column_card_url_unique_index(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "card-index.db")
+    db.conn.execute("CREATE UNIQUE INDEX idx_peers_card_only ON a2a_peers (card_url)")
+    db.conn.commit()
+    alice = TenantContext("acc_alice")
+    bob = TenantContext("acc_bob")
+    kept = _peer(db, alice)
+    ensure_a2a_schema(db.conn)
+    db.conn.commit()
+    assert get_peer(db, kept["id"], tenant=alice)["card_url"] == CARD_URL
+    other = _peer(db, bob)
+    assert other["id"] != kept["id"]
+    assert other["card_url"] == CARD_URL
+    names = {
+        row["indexname"]
+        for row in db.conn.execute(
+            """
+            SELECT indexname FROM pg_indexes
+            WHERE schemaname = current_schema() AND tablename = 'a2a_peers'
+            """
+        ).fetchall()
+    }
+    assert "idx_peers_card_only" not in names
+    assert "idx_a2a_peers_account_card" in names
