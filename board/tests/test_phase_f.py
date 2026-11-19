@@ -269,7 +269,7 @@ def test_people_search_escapes_like_and_caps_at_48(hub: tuple[TestClient, Settin
     assert "acme__plain" not in _person_ids(capped.json())
 
 
-def test_people_list_defaults_to_200(hub: tuple[TestClient, Settings]) -> None:
+def test_people_none_limit_is_unbounded_and_http_caps_at_200(hub: tuple[TestClient, Settings]) -> None:
     client, _settings = hub
     db = client.app.state.db
     tenant = TenantContext(COMPAT_ACCOUNT_ID)
@@ -287,13 +287,17 @@ def test_people_list_defaults_to_200(hub: tuple[TestClient, Settings]) -> None:
                 "updated_at": stamp,
             },
         )
-    listed = list_people(db, tenant)
-    assert len(listed) == 200
-    ids = {person["id"] for person in listed}
+    unbounded = list_people(db, tenant, limit=None)
+    assert len(unbounded) == 201
+    assert len(list_people(db, tenant)) == 201
+    capped = list_people(db, tenant, limit=200)
+    ids = {person["id"] for person in capped}
+    assert len(capped) == 200
     assert "bulk__p0200" in ids
     assert "bulk__p0000" not in ids
-    everyone = list_people(db, tenant, limit=500)
-    assert len(everyone) == 201
     api = client.get("/api/people", headers=h("admin"))
     assert api.status_code == 200, api.text
     assert api.json()["count"] == 200
+    widened = client.get("/api/people", headers=h("admin"), params={"limit": 500})
+    assert widened.status_code == 200, widened.text
+    assert widened.json()["count"] == 201

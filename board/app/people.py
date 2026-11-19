@@ -105,7 +105,7 @@ def list_people(
     *,
     job_id: str | None = None,
     q: str | None = None,
-    limit: int | None = LIST_DEFAULT_LIMIT,
+    limit: int | None = None,
 ) -> list[dict[str, Any]]:
     return PeopleRepo(db).list(tenant, job_id=job_id, q=q, limit=limit)
 
@@ -132,10 +132,13 @@ def create_people_router(principal_dep: Any) -> APIRouter:
         principal: Principal = Depends(principal_dep),
         job_id: str | None = None,
         q: str | None = None,
+        limit: int | None = None,
     ) -> dict[str, Any]:
         ensure_can_people(principal.role)
         db: Any = request.app.state.db
-        people = list_people(db, principal.tenant, job_id=job_id, q=q)
+        # The repository treats None as every row. The HTTP list caps when the request omits limit.
+        applied = LIST_DEFAULT_LIMIT if limit is None else limit
+        people = list_people(db, principal.tenant, job_id=job_id, q=q, limit=applied)
         return {"people": people, "count": len(people)}
 
     @router.post("/api/people", status_code=201)

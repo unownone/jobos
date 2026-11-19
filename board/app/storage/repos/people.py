@@ -80,9 +80,10 @@ def capped_search(q: str | None) -> str | None:
     return text[:SEARCH_MAX_CHARS]
 
 
-def _normalize_limit(limit: int | None) -> int:
+def _normalize_limit(limit: int | None) -> int | None:
+    """``None`` means no LIMIT. A non-positive value falls back to the list default."""
     if limit is None:
-        return LIST_DEFAULT_LIMIT
+        return None
     value = int(limit)
     if value < 1:
         return LIST_DEFAULT_LIMIT
@@ -129,7 +130,7 @@ class PeopleRepo:
         *,
         job_id: str | None = None,
         q: str | None = None,
-        limit: int | None = LIST_DEFAULT_LIMIT,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
         clauses = ["account_id = ?"]
         args: list[Any] = [tenant.account_id]
@@ -141,12 +142,15 @@ class PeopleRepo:
             like = f"%{escape_like(needle)}%"
             clauses.append(_SEARCH_SQL)
             args.extend([like, like, like])
-        args.append(_normalize_limit(limit))
         sql = (
             f"SELECT {_COLUMN_SQL} FROM people WHERE "
             + " AND ".join(clauses)
-            + " ORDER BY updated_at DESC LIMIT ?"
+            + " ORDER BY updated_at DESC"
         )
+        bounded = _normalize_limit(limit)
+        if bounded is not None:
+            sql += " LIMIT ?"
+            args.append(bounded)
         cur = self._db.conn.execute(sql, args)
         return [row_to_person(row) for row in cur.fetchall()]
 
