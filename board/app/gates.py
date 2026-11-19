@@ -6,7 +6,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
-from app.auth import authenticate, has_request_credentials
 from app.profile import hub_public_candidate_status
 
 CANDIDATE_REQUIRED_CODE = "candidate_required"
@@ -81,24 +80,8 @@ class CandidateGateMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         settings = getattr(request.app.state, "settings", None)
         db = getattr(request.app.state, "db", None)
-        tenant = None
-        if settings is not None and db is not None and has_request_credentials(request):
-            try:
-                principal = authenticate(
-                    settings,
-                    db,
-                    request=None,
-                    authorization=request.headers.get("authorization"),
-                    x_hub_key=request.headers.get("x-hub-key"),
-                    x_role=request.headers.get("x-role"),
-                    x_token=request.headers.get("x-token"),
-                    x_actor=request.headers.get("x-actor"),
-                    hub_session=request.cookies.get("hub_session"),
-                    hub_csrf=request.cookies.get("hub_csrf"),
-                )
-                tenant = principal.tenant
-            except Exception:
-                tenant = None
+        principal = getattr(request.state, "principal", None)
+        tenant = principal.tenant if principal is not None else None
         onboarded = False
         if settings is not None:
             # Unauthenticated / compat must match GET /health: operator tenant,

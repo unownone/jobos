@@ -379,13 +379,22 @@ def record_activity(
     }
 
 
+def _principal_on_request(request: Request, principal: Principal | None) -> Principal | None:
+    """Prefer the principal resolved once by auth middleware."""
+    state_principal = getattr(request.state, "principal", None)
+    if state_principal is not None:
+        return state_principal
+    return principal
+
+
 def wrap_principal_with_activity(principal_dep: Any, db: BoardDB) -> Any:
     async def dependency(
         request: Request,
         principal: Principal = Depends(principal_dep),
     ) -> Principal:
+        principal = _principal_on_request(request, principal)
         try:
-            if should_auto_heartbeat(request):
+            if principal is not None and should_auto_heartbeat(request):
                 record_activity(db, principal, request, explicit=False)
         except Exception:
             pass
@@ -399,6 +408,7 @@ def wrap_optional_principal_with_activity(principal_dep: Any, db: BoardDB) -> An
         request: Request,
         principal: Principal | None = Depends(principal_dep),
     ) -> Principal | None:
+        principal = _principal_on_request(request, principal)
         if principal is None:
             return None
         try:

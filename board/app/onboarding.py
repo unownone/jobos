@@ -81,27 +81,34 @@ def create_onboarding_router(
                 "invite": row,
                 "unrestricted": False,
             }
-        try:
-            principal = authenticate(
-                settings,
-                db,
-                request=request,
-                authorization=authorization,
-                x_hub_key=x_hub_key,
-                x_role=x_role,
-                x_token=x_token,
-                x_actor=x_actor,
-                x_csrf=x_csrf,
-                hub_session=hub_session,
-                hub_csrf=hub_csrf,
+        principal = getattr(request.state, "principal", None)
+        if principal is not None and not principal.csrf_ok:
+            raise HTTPException(
+                status_code=403,
+                detail="missing or invalid X-CSRF (required for cookie-authenticated writes)",
             )
-        except HTTPException as exc:
-            if exc.status_code == 401:
-                raise HTTPException(
-                    status_code=401,
-                    detail="unauthenticated onboarding without invite",
-                ) from exc
-            raise
+        if principal is None:
+            try:
+                principal = authenticate(
+                    settings,
+                    db,
+                    request=request,
+                    authorization=authorization,
+                    x_hub_key=x_hub_key,
+                    x_role=x_role,
+                    x_token=x_token,
+                    x_actor=x_actor,
+                    x_csrf=x_csrf,
+                    hub_session=hub_session,
+                    hub_csrf=hub_csrf,
+                )
+            except HTTPException as exc:
+                if exc.status_code == 401:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="unauthenticated onboarding without invite",
+                    ) from exc
+                raise
         chosen = canonical_track(track) if track else None
         resolved = chosen or principal.track or ("discovery" if _unrestricted(principal) else None)
         if not resolved:

@@ -129,4 +129,8 @@ def load_settings() -> Settings:
         queue_adapter=queue_adapter,
         blob_root=blob_root,
         blob_adapter=blob_adapter,
+        auth_methods=(merged.get("AUTH_METHODS") or "hub_key,session").strip() or "hub_key,session",
+        access_team_domain=(merged.get("ACCESS_TEAM_DOMAIN") or "").strip(),
+        access_aud=(merged.get("ACCESS_AUD") or "").strip(),
+        access_jwt_public_key=(merged.get("ACCESS_JWT_PUBLIC_KEY") or "").strip(),
     )

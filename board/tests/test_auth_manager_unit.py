@@ -403,7 +403,7 @@ def test_first_method_wins_when_both_resolve_the_same_user(tmp_path: Path) -> No
     assert principal.user_id == user["id"]
 
 
-def test_different_users_from_two_methods_are_401(tmp_path: Path) -> None:
+def test_hub_key_wins_over_a_different_session_cookie(tmp_path: Path) -> None:
     store = MemoryDirectory()
     first = store.add_user(agent_user(user_id="usr_a", email="a@example.test"))
     second = store.add_user(agent_user(user_id="usr_b", email="b@example.test", account_id="acc_b"))
@@ -411,20 +411,50 @@ def test_different_users_from_two_methods_are_401(tmp_path: Path) -> None:
     store.add_key(secret, first)
     store.add_session("sess-b", second, csrf="csrf")
     manager = AuthManager.from_settings(make_settings(tmp_path), store)
+    principal = manager.resolve(
+        make_request(
+            "GET",
+            "/api/jobs",
+            headers={"Authorization": f"Bearer {secret}"},
+            cookies={"hub_session": "sess-b", "hub_csrf": "csrf"},
+        )
+    )
+    assert principal is not None
+    assert principal.user_id == "usr_a"
+    assert principal.auth == "agent_key"
+    assert secret not in str(principal)
+
+
+def test_access_jwt_and_session_for_different_users_conflict(tmp_path: Path) -> None:
+    private_pem, public_pem = rsa_pems(tmp_path, "session-conflict")
+    store = MemoryDirectory()
+    store.add_user(agent_user(user_id="usr_mail", email="ada@example.test", account_id="acc_mail"))
+    session_user = store.add_user(
+        agent_user(user_id="usr_sess", email="sess@example.test", account_id="acc_sess")
+    )
+    store.add_session("sess-other", session_user, csrf="csrf")
+    token = access_token(private_pem, email="ada@example.test")
+    settings = make_settings(
+        tmp_path,
+        auth_methods="session,access_jwt",
+        access_team_domain="contoso.cloudflareaccess.com",
+        access_aud=AUDIENCE,
+        access_jwt_public_key=public_pem,
+    )
     with pytest.raises(AuthConflict) as exc:
-        manager.resolve(
+        AuthManager.from_settings(settings, store).resolve(
             make_request(
                 "GET",
                 "/api/jobs",
-                headers={"Authorization": f"Bearer {secret}"},
-                cookies={"hub_session": "sess-b", "hub_csrf": "csrf"},
+                headers={"Cf-Access-Jwt-Assertion": token},
+                cookies={"hub_session": "sess-other", "hub_csrf": "csrf"},
             )
         )
     assert exc.value.status_code == 401
     detail = str(exc.value.detail)
-    assert secret not in detail
-    assert "usr_a" not in detail
-    assert "usr_b" not in detail
+    assert token not in detail
+    assert "usr_mail" not in detail
+    assert "usr_sess" not in detail
 
 
 def test_revoked_key_does_not_fall_through_to_a_valid_session(tmp_path: Path) -> None:
@@ -596,6 +626,28 @@ def test_compat_tokens_still_authenticate_without_a_hub_key_or_session(tmp_path:
     assert principal.role == "discovery"
     assert principal.actor == "pytest"
     assert principal.account_id == COMPAT_ACCOUNT_ID
+
+
+def test_role_token_wins_over_a_session_cookie(tmp_path: Path) -> None:
+    store = MemoryDirectory()
+    admin = store.add_user(
+        agent_user(user_id="usr_admin", email="owner@example.test", account_id="acc_admin", kind="admin")
+    )
+    store.add_session("sess-admin", admin, csrf="csrf")
+    manager = AuthManager.from_settings(make_settings(tmp_path), store)
+    principal = manager.resolve(
+        make_request(
+            "GET",
+            "/api/jobs",
+            headers={"X-Role": "apply", "X-Token": "token-apply"},
+            cookies={"hub_session": "sess-admin", "hub_csrf": "csrf"},
+        )
+    )
+    assert principal is not None
+    assert principal.auth == "compat_role"
+    assert principal.role == "apply"
+    assert principal.account_id == COMPAT_ACCOUNT_ID
+    assert store.touches == []
 
 
 def test_authenticate_without_credentials_is_401(tmp_path: Path) -> None:

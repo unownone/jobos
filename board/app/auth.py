@@ -5,14 +5,11 @@ from __future__ import annotations
 import hmac
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Annotated
 
-from fastapi import Cookie, Header, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 
-from app.bootstrap import sha256_hex
 from app.constants import ROLE_TO_TRACK, ROLES, role_for_track
 from app.db import BoardDB
-from app.identity import session_expiry
 from app.settings import Settings
 from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 
@@ -61,15 +58,6 @@ def has_request_credentials(request: Request) -> bool:
             (request.cookies.get("hub_session") or "").strip(),
         ]
     )
-
-
-def _extract_bearer(authorization: str | None, x_hub_key: str | None) -> str:
-    if x_hub_key and x_hub_key.strip():
-        return x_hub_key.strip()
-    auth = (authorization or "").strip()
-    if auth.lower().startswith("bearer "):
-        return auth.split(" ", 1)[1].strip()
-    return ""
 
 
 def _safe_equals(left: str, right: str) -> bool:
@@ -137,6 +125,12 @@ def authenticate_compat(
     )
 
 
+def _credential(explicit: str | None, fallback: str | None) -> str | None:
+    if explicit is not None:
+        return explicit
+    return fallback
+
+
 def authenticate(
     settings: Settings,
     db: BoardDB,
@@ -151,133 +145,56 @@ def authenticate(
     hub_session: str | None = None,
     hub_csrf: str | None = None,
 ) -> Principal:
-    bearer = _extract_bearer(authorization, x_hub_key)
-    if bearer:
-        if bearer.startswith("jh_boot_") or bearer.startswith("jh_inv_"):
-            raise _unauthorized("this key cannot authenticate API calls; use join or bootstrap endpoints")
-        row = db.get_api_key_by_hash(sha256_hex(bearer))
-        if not row or row.get("revoked_at"):
-            raise _unauthorized("invalid API key")
-        user = db.get_user(row["user_id"])
-        if user is None:
-            raise _unauthorized("invalid API key")
-        auth = "owner_key" if user["kind"] == "owner" else "agent_key"
-        if user["kind"] == "admin":
-            auth = "admin_key"
-        return _principal_from_user(user, auth=auth, actor_override=x_actor or None)
+    # Deferred: AuthManager imports Principal and the helpers defined above.
+    from app.auth_manager import AuthManager, CSRF_DETAIL, request_for_credentials
 
-    if (x_role or "").strip() and (x_token or "").strip():
-        return authenticate_compat(settings, x_role, x_token, x_actor)
-
-    session_token = (hub_session or "").strip()
-    if session_token:
-        sess = db.get_session_by_token_hash(sha256_hex(session_token))
-        if sess is None:
-            raise _unauthorized("invalid session")
-        expires = _parse_ts(sess.get("expires_at"))
-        if expires and datetime.now(timezone.utc) > expires:
-            db.delete_session(sess["id"])
-            raise _unauthorized("session expired")
-        user = db.get_user(sess["user_id"])
-        if user is None:
-            raise _unauthorized("invalid session")
-        method = (request.method if request is not None else "GET").upper()
-        csrf_ok = True
-        if method not in {"GET", "HEAD", "OPTIONS"}:
-            cookie_csrf = (hub_csrf or "").strip()
-            header_csrf = (x_csrf or "").strip()
-            stored = str(sess.get("csrf_hash") or "")
-            csrf_ok = bool(
-                cookie_csrf
-                and header_csrf
-                and _safe_equals(cookie_csrf, header_csrf)
-                and stored
-                and _safe_equals(stored, sha256_hex(header_csrf))
-            )
-            if not csrf_ok:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="missing or invalid X-CSRF (required for cookie-authenticated writes)",
-                )
-        db.touch_session(sess["id"], session_expiry())
-        principal = _principal_from_user(user, auth="session", actor_override=x_actor or None)
-        return Principal(
-            role=principal.role,
-            actor=principal.actor,
-            user_id=principal.user_id,
-            track=principal.track,
-            kind=principal.kind,
-            auth="session",
-            csrf_ok=csrf_ok,
-            account_id=principal.account_id,
-        )
-
-    return authenticate_compat(settings, x_role, x_token, x_actor)
+    header = request.headers.get if request is not None else lambda _name: None
+    cookie = request.cookies.get if request is not None else lambda _name: None
+    synthetic = request_for_credentials(
+        method=request.method if request is not None else "GET",
+        authorization=_credential(authorization, header("authorization")),
+        x_hub_key=_credential(x_hub_key, header("x-hub-key")),
+        x_role=_credential(x_role, header("x-role")),
+        x_token=_credential(x_token, header("x-token")),
+        x_actor=_credential(x_actor, header("x-actor")),
+        x_csrf=_credential(x_csrf, header("x-csrf")),
+        hub_session=_credential(hub_session, cookie("hub_session")),
+        hub_csrf=_credential(hub_csrf, cookie("hub_csrf")),
+        cf_access_jwt=header("cf-access-jwt-assertion"),
+    )
+    principal = AuthManager.from_settings(settings, db).resolve(synthetic)
+    if principal is None:
+        raise _unauthorized("missing credentials")
+    if not principal.csrf_ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CSRF_DETAIL)
+    return principal
 
 
 def require_principal(settings: Settings, db: BoardDB):
-    async def dependency(
-        request: Request,
-        authorization: Annotated[str | None, Header()] = None,
-        x_hub_key: Annotated[str | None, Header(alias="X-Hub-Key")] = None,
-        x_role: Annotated[str | None, Header()] = None,
-        x_token: Annotated[str | None, Header()] = None,
-        x_actor: Annotated[str | None, Header()] = None,
-        x_csrf: Annotated[str | None, Header(alias="X-CSRF")] = None,
-        hub_session: Annotated[str | None, Cookie()] = None,
-        hub_csrf: Annotated[str | None, Cookie()] = None,
-    ) -> Principal:
-        return authenticate(
-            settings,
-            db,
-            request=request,
-            authorization=authorization,
-            x_hub_key=x_hub_key,
-            x_role=x_role,
-            x_token=x_token,
-            x_actor=x_actor,
-            x_csrf=x_csrf,
-            hub_session=hub_session,
-            hub_csrf=hub_csrf,
-        )
+    """Read the principal the auth middleware already stored. Does not authenticate again."""
+
+    async def dependency(request: Request) -> Principal:
+        principal = getattr(request.state, "principal", None)
+        if principal is None:
+            raise _unauthorized("authentication required")
+        if not principal.csrf_ok:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="missing or invalid X-CSRF (required for cookie-authenticated writes)",
+            )
+        return principal
 
     return dependency
 
 
 def optional_principal(settings: Settings, db: BoardDB):
-    """A2A JSON-RPC: missing/invalid creds become None instead of HTTP 401."""
+    """A2A JSON-RPC: missing creds stay None. Reads the middleware principal."""
 
-    async def dependency(
-        request: Request,
-        authorization: Annotated[str | None, Header()] = None,
-        x_hub_key: Annotated[str | None, Header(alias="X-Hub-Key")] = None,
-        x_role: Annotated[str | None, Header()] = None,
-        x_token: Annotated[str | None, Header()] = None,
-        x_actor: Annotated[str | None, Header()] = None,
-        x_csrf: Annotated[str | None, Header(alias="X-CSRF")] = None,
-        hub_session: Annotated[str | None, Cookie()] = None,
-        hub_csrf: Annotated[str | None, Cookie()] = None,
-    ) -> Principal | None:
-        if not has_request_credentials(request):
+    async def dependency(request: Request) -> Principal | None:
+        principal = getattr(request.state, "principal", None)
+        if principal is None or not principal.csrf_ok:
             return None
-        try:
-            return authenticate(
-                settings,
-                db,
-                request=request,
-                authorization=authorization,
-                x_hub_key=x_hub_key,
-                x_role=x_role,
-                x_token=x_token,
-                x_actor=x_actor,
-                x_csrf=x_csrf,
-                hub_session=hub_session,
-                hub_csrf=hub_csrf,
-            )
-        except HTTPException as exc:
-            if exc.status_code in {401, 403}:
-                return None
-            raise
+        return principal
 
     return dependency
 
