@@ -7,6 +7,8 @@ R2 binding). R2 uses the Workers binding shape, not boto3 or the S3 API.
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import json
 import re
 from dataclasses import dataclass
@@ -182,6 +184,30 @@ class FilesystemBlobStore:
         return existed
 
 
+async def _await_binding(awaitable: Any) -> Any:
+    return await awaitable
+
+
+def _complete(value: Any, method: str) -> Any:
+    """Return a sync binding result unchanged.
+
+    A coroutine or other awaitable is finished with ``asyncio.run`` when this
+    thread has no running loop. A running loop is not nested; the call fails
+    and names ``method``.
+    """
+    if not inspect.isawaitable(value):
+        return value
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_await_binding(value))
+    if inspect.iscoroutine(value):
+        value.close()
+    raise RuntimeError(
+        f"R2 binding {method}() returned an awaitable while an event loop is already running"
+    )
+
+
 def _put_binding(binding: Any, key: str, value: bytes, http_metadata: dict[str, str] | None) -> None:
     """Call ``put(key, value, httpMetadata?)`` on a Cloudflare R2 binding.
 
@@ -189,25 +215,28 @@ def _put_binding(binding: Any, key: str, value: bytes, http_metadata: dict[str, 
     argument is an options object whose ``httpMetadata`` field is optional.
     """
     try:
-        binding.put(key, value, httpMetadata=http_metadata)
+        result = binding.put(key, value, httpMetadata=http_metadata)
     except TypeError:
-        binding.put(key, value, {"httpMetadata": http_metadata or {}})
+        result = binding.put(key, value, {"httpMetadata": http_metadata or {}})
+    _complete(result, "put")
 
 
 def _body_bytes(obj: Any) -> bytes:
     reader = getattr(obj, "arrayBuffer", None)
     if callable(reader):
-        raw = reader()
+        raw = _complete(reader(), "arrayBuffer")
         if isinstance(raw, str):
             return raw.encode("utf-8")
         return bytes(raw)
     reader = getattr(obj, "text", None)
     if callable(reader):
-        text = reader()
+        text = _complete(reader(), "text")
         if isinstance(text, bytes):
             return text
         return str(text).encode("utf-8")
     body = getattr(obj, "body", None)
+    if inspect.isawaitable(body):
+        body = _complete(body, "body")
     if isinstance(body, (bytes, bytearray, memoryview)):
         return bytes(body)
     raise TypeError("R2 object does not expose arrayBuffer(), text(), or a bytes body")
@@ -292,13 +321,13 @@ class R2BlobStore:
 
     def get(self, tenant: TenantContext, key: str) -> Blob | None:
         norm, data_key, meta_key = self._keys(tenant, key)
-        obj = self._binding.get(data_key)
+        obj = _complete(self._binding.get(data_key), "get")
         if obj is None:
             return None
         content = _body_bytes(obj)
         http_meta = _http_metadata(obj)
         meta: dict[str, Any] = {}
-        meta_obj = self._binding.get(meta_key)
+        meta_obj = _complete(self._binding.get(meta_key), "get")
         if meta_obj is not None:
             try:
                 loaded = json.loads(_body_bytes(meta_obj).decode("utf-8"))
@@ -320,9 +349,9 @@ class R2BlobStore:
 
     def delete(self, tenant: TenantContext, key: str) -> bool:
         _norm, data_key, meta_key = self._keys(tenant, key)
-        existed = self._binding.get(data_key) is not None
-        self._binding.delete(data_key)
-        self._binding.delete(meta_key)
+        existed = _complete(self._binding.get(data_key), "get") is not None
+        _complete(self._binding.delete(data_key), "delete")
+        _complete(self._binding.delete(meta_key), "delete")
         return existed
 
 

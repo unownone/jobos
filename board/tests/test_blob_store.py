@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -141,6 +142,74 @@ def test_r2_blob_store_accepts_options_object_binding() -> None:
     assert loaded.content == b"hello"
     assert loaded.content_type == "text/plain"
     assert loaded.filename == "note.txt"
+
+
+class _AsyncR2Object:
+    def __init__(self, body: bytes, http_metadata: dict | None = None) -> None:
+        self._body = bytes(body)
+        self.httpMetadata = dict(http_metadata or {})
+
+    async def arrayBuffer(self) -> bytes:
+        return self._body
+
+    async def text(self) -> str:
+        return self._body.decode("utf-8")
+
+
+class AsyncMemoryR2Binding:
+    """Async stand-in for a Workers R2 binding. Methods return coroutines."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, _AsyncR2Object] = {}
+
+    async def put(self, key: str, value: bytes, httpMetadata: dict | None = None) -> None:
+        meta = httpMetadata or {}
+        if "httpMetadata" in meta and "contentType" not in meta:
+            nested = meta.get("httpMetadata")
+            meta = nested if isinstance(nested, dict) else {}
+        self.objects[key] = _AsyncR2Object(value, meta)
+
+    async def get(self, key: str) -> _AsyncR2Object | None:
+        return self.objects.get(key)
+
+    async def delete(self, key: str) -> None:
+        self.objects.pop(key, None)
+
+
+def test_r2_blob_store_round_trips_bytes_through_async_binding() -> None:
+    binding = AsyncMemoryR2Binding()
+    store = R2BlobStore(binding)
+    tenant = TenantContext("acc_async")
+    payload = b"\xff\xfeasync-pdf\x00"
+    stored = store.put(
+        tenant,
+        "resumes/b.pdf",
+        payload,
+        content_type="application/pdf",
+        filename="b.pdf",
+    )
+    assert stored.content == payload
+    held = asyncio.run(binding.get("acc_async/resumes/b.pdf"))
+    assert held is not None
+    assert asyncio.run(held.arrayBuffer()) == payload
+    loaded = store.get(tenant, "resumes/b.pdf")
+    assert loaded is not None
+    assert loaded.content == payload
+    assert loaded.content_type == "application/pdf"
+    assert loaded.filename == "b.pdf"
+    assert store.delete(tenant, "resumes/b.pdf") is True
+    assert store.get(tenant, "resumes/b.pdf") is None
+    assert asyncio.run(binding.get("acc_async/resumes/b.pdf")) is None
+
+
+def test_r2_blob_store_refuses_awaitable_when_loop_is_running() -> None:
+    store = R2BlobStore(AsyncMemoryR2Binding())
+
+    async def _put_inside_loop() -> None:
+        store.put(TenantContext("acc_loop"), "a.bin", b"x")
+
+    with pytest.raises(RuntimeError, match=r"put\(\)"):
+        asyncio.run(_put_inside_loop())
 
 
 def test_build_blob_store_keeps_filesystem_without_r2_binding(tmp_path: Path) -> None:
