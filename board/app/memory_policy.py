@@ -54,6 +54,7 @@ WORKER_TTL_DAYS = 7
 LOW_IMPORTANCE_TTL_DAYS = 30
 MAX_NEWLINES = 8
 COMPACT_BODY_CHARS = 240
+SEARCH_TERM_MAX = 48
 HEARTBEAT_LIMIT = 6
 RECALL_LIMIT_DEFAULT = 12
 RECALL_LIMIT_MAX = 24
@@ -383,6 +384,21 @@ def fts_match_query(raw: str | None) -> str | None:
     if not tokens:
         return None
     return " AND ".join(f'"{tok}"' for tok in tokens)
+
+
+def search_like_pattern(raw: str | None) -> str | None:
+    """LIKE term capped at 48 characters, with \\, %, and _ escaped.
+
+    Tokens past the cap are not searchable. Returns None when the bounded
+    term has no word token, so callers skip the predicate.
+    """
+    if raw is None:
+        return None
+    term = raw.strip()[:SEARCH_TERM_MAX]
+    if fts_match_query(term) is None:
+        return None
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
 
 
 def compact_body(body: str, limit: int = COMPACT_BODY_CHARS) -> str:
