@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from app.db import utc_now
+from app.storage.repos.registry import McpRepo, apply_mcp_schema
 from app.tenant import COMPAT_ACCOUNT_ID, TenantContext
 from app.tenant_schema import ensure_tenant_schema
 
@@ -17,51 +18,9 @@ MCP_KINDS = ("mcp", "http", "builtin", "local", "cli")
 MCP_STATUSES = ("adopted", "wanted", "rejected")
 MCP_ORIGINS = ("github", "recording", "mutation", "memory")
 
-MCP_SCHEMA = """
-CREATE TABLE IF NOT EXISTS mcps (
-    account_id TEXT NOT NULL,
-    id TEXT NOT NULL,
-    slug TEXT NOT NULL,
-    name TEXT NOT NULL,
-    kind TEXT NOT NULL DEFAULT 'mcp',
-    status TEXT NOT NULL DEFAULT 'adopted',
-    verdict TEXT,
-    capability_json TEXT NOT NULL DEFAULT '[]',
-    roles_json TEXT NOT NULL DEFAULT '[]',
-    platforms_json TEXT NOT NULL DEFAULT '[]',
-    source TEXT,
-    install TEXT,
-    auth TEXT,
-    notes TEXT,
-    reason TEXT,
-    next_action TEXT,
-    config_json TEXT,
-    hosted TEXT,
-    origin TEXT NOT NULL DEFAULT 'github',
-    origin_ref TEXT,
-    version INTEGER NOT NULL DEFAULT 1,
-    content_hash TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    PRIMARY KEY (account_id, id)
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_mcps_account_slug ON mcps(account_id, slug);
-CREATE INDEX IF NOT EXISTS idx_mcps_status ON mcps(status);
-CREATE INDEX IF NOT EXISTS idx_mcps_kind ON mcps(kind);
-CREATE INDEX IF NOT EXISTS idx_mcps_origin ON mcps(origin);
-"""
-
-
 def ensure_mcp_schema(conn: Any) -> None:
-    conn.executescript(MCP_SCHEMA)
+    apply_mcp_schema(conn)
     ensure_tenant_schema(conn)
-
-
-def _dump(value: Any) -> str | None:
-    if value is None:
-        return None
-    return json.dumps(value, ensure_ascii=False)
 
 
 def _load(raw: str | None, default: Any) -> Any:
@@ -209,25 +168,18 @@ class McpStore:
         self.tenant = tenant or TenantContext(COMPAT_ACCOUNT_ID)
         ensure_mcp_schema(self.db.conn)
         self.db.conn.commit()
+        self.repo = McpRepo(self.db.conn)
 
     @property
     def account_id(self) -> str:
         return self.tenant.account_id
 
     def get(self, mcp_id: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute(
-            "SELECT * FROM mcps WHERE id = ? AND account_id = ?",
-            (mcp_id, self.account_id),
-        )
-        row = cur.fetchone()
+        row = self.repo.get(self.account_id, mcp_id)
         return row_to_mcp(row) if row else None
 
     def get_by_slug(self, slug: str) -> dict[str, Any] | None:
-        cur = self.db.conn.execute(
-            "SELECT * FROM mcps WHERE account_id = ? AND slug = ?",
-            (self.account_id, slug),
-        )
-        row = cur.fetchone()
+        row = self.repo.get_by_slug(self.account_id, slug)
         return row_to_mcp(row) if row else None
 
     def get_by_id_or_slug(self, key: str) -> dict[str, Any] | None:
@@ -247,12 +199,9 @@ class McpStore:
         limit: int = 500,
     ) -> list[dict[str, Any]]:
         limit = max(1, min(int(limit), 1000))
-        cur = self.db.conn.execute(
-            "SELECT * FROM mcps WHERE account_id = ? ORDER BY status, slug LIMIT ?",
-            (self.account_id, limit),
-        )
+        rows = self.repo.list_mcps(self.account_id, limit)
         out: list[dict[str, Any]] = []
-        for row in cur.fetchall():
+        for row in rows:
             item = row_to_mcp(row)
             if mcp_matches_query(
                 item,
@@ -281,46 +230,33 @@ class McpStore:
         if origin not in MCP_ORIGINS:
             origin = "github"
         digest = fields.get("content_hash") or content_hash_for({**fields, "slug": slug})
-        self.db.conn.execute(
-            """
-            INSERT INTO mcps (
-                id, account_id, slug, name, kind, status, verdict, capability_json, roles_json,
-                platforms_json, source, install, auth, notes, reason, next_action,
-                config_json, hosted, origin, origin_ref, version, content_hash,
-                created_at, updated_at
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?,
-                ?, ?
-            )
-            """,
-            (
-                mcp_id,
-                self.account_id,
-                slug,
-                fields["name"],
-                kind,
-                status,
-                fields.get("verdict") or "",
-                _dump(_normalize_str_list(fields.get("capability"))),
-                _dump(_normalize_str_list(fields.get("roles"))),
-                _dump(_normalize_str_list(fields.get("platforms"))),
-                fields.get("source") or "",
-                fields.get("install") or "",
-                fields.get("auth") or "",
-                fields.get("notes") or "",
-                fields.get("reason") or "",
-                fields.get("next_action") or "",
-                _dump(fields.get("config") or {}),
-                fields.get("hosted") or "",
-                origin,
-                fields.get("origin_ref") or "",
-                int(fields.get("version") or 1),
-                digest,
-                fields.get("created_at") or now,
-                fields.get("updated_at") or now,
-            ),
+        self.repo.insert_mcp(
+            self.account_id,
+            {
+                "id": mcp_id,
+                "slug": slug,
+                "name": fields["name"],
+                "kind": kind,
+                "status": status,
+                "verdict": fields.get("verdict") or "",
+                "capability": _normalize_str_list(fields.get("capability")),
+                "roles": _normalize_str_list(fields.get("roles")),
+                "platforms": _normalize_str_list(fields.get("platforms")),
+                "source": fields.get("source") or "",
+                "install": fields.get("install") or "",
+                "auth": fields.get("auth") or "",
+                "notes": fields.get("notes") or "",
+                "reason": fields.get("reason") or "",
+                "next_action": fields.get("next_action") or "",
+                "config": fields.get("config") or {},
+                "hosted": fields.get("hosted") or "",
+                "origin": origin,
+                "origin_ref": fields.get("origin_ref") or "",
+                "version": int(fields.get("version") or 1),
+                "content_hash": digest,
+                "created_at": fields.get("created_at") or now,
+                "updated_at": fields.get("updated_at") or now,
+            },
         )
         if commit:
             self.db.conn.commit()
@@ -337,41 +273,7 @@ class McpStore:
         merged.update(fields)
         merged["content_hash"] = content_hash_for(merged)
         now = utc_now()
-        self.db.conn.execute(
-            """
-            UPDATE mcps SET
-                slug = ?, name = ?, kind = ?, status = ?, verdict = ?,
-                capability_json = ?, roles_json = ?, platforms_json = ?,
-                source = ?, install = ?, auth = ?, notes = ?, reason = ?,
-                next_action = ?, config_json = ?, hosted = ?, origin = ?,
-                origin_ref = ?, version = ?, content_hash = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                merged["slug"],
-                merged["name"],
-                merged["kind"],
-                merged["status"],
-                merged.get("verdict") or "",
-                _dump(list(merged.get("capability") or [])),
-                _dump(list(merged.get("roles") or [])),
-                _dump(list(merged.get("platforms") or [])),
-                merged.get("source") or "",
-                merged.get("install") or "",
-                merged.get("auth") or "",
-                merged.get("notes") or "",
-                merged.get("reason") or "",
-                merged.get("next_action") or "",
-                _dump(merged.get("config") or {}),
-                merged.get("hosted") or "",
-                merged["origin"],
-                merged.get("origin_ref") or "",
-                int(merged.get("version") or 1),
-                merged["content_hash"],
-                now,
-                mcp_id,
-            ),
-        )
+        self.repo.update_mcp(self.account_id, mcp_id, merged, updated_at=now)
         if commit:
             self.db.conn.commit()
         stored = self.get(mcp_id)

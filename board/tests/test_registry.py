@@ -353,3 +353,38 @@ def test_match_url_filters_workday(hub: tuple[TestClient, Settings]) -> None:
     )
     miss_slugs = {row["slug"] for row in miss.json()["skills"]}
     assert "apply-workday-local" not in miss_slugs
+
+
+def test_skill_list_keeps_body_unless_detail_is_false(hub: tuple[TestClient, Settings]) -> None:
+    """Default list JSON still includes body. detail=false is the summary page."""
+    client, _ = hub
+    apply_keys = mint_track_agents(client, "application", ["apply-detail"])
+    created = client.post(
+        "/api/registry/skills",
+        headers=bearer(apply_keys[0]),
+        json={
+            "slug": "apply-detail-body",
+            "name": "Detail body",
+            "role": "apply",
+            "tags": ["apply"],
+            "body": "DETAIL-BODY-MARKER req id",
+        },
+    )
+    assert created.status_code == 200, created.text
+    skill_id = created.json()["skill"]["id"]
+    headers = bearer(apply_keys[0])
+
+    default = client.get("/api/registry/skills", headers=headers)
+    assert default.status_code == 200, default.text
+    row = next(item for item in default.json()["skills"] if item["id"] == skill_id)
+    assert "DETAIL-BODY-MARKER" in row["body"]
+
+    summary = client.get("/api/registry/skills", headers=headers, params={"detail": "false"})
+    assert summary.status_code == 200, summary.text
+    assert "DETAIL-BODY-MARKER" not in summary.text
+    for item in summary.json()["skills"]:
+        assert "body" not in item
+
+    one = client.get(f"/api/registry/skills/{skill_id}", headers=headers)
+    assert one.status_code == 200, one.text
+    assert "DETAIL-BODY-MARKER" in one.json()["skill"]["body"]
