@@ -71,6 +71,32 @@ def test_metrics_summary_is_maintainer_only(client: TestClient) -> None:
     assert body["by_tool"][0]["name"] == "job-apply"
 
 
+def test_summary_aggregates_groups_and_percentiles(client: TestClient) -> None:
+    burns = [
+        {"tool_name": "job-apply", "skill": "apply", "prompt_tokens": 10, "duration_ms": 10},
+        {"tool_name": "job-apply", "skill": "apply", "prompt_tokens": 30, "duration_ms": 30},
+        {"tool_name": "exa-mcp", "skill": "", "prompt_tokens": 5},
+    ]
+    for row in burns:
+        res = client.post("/api/metrics/token_burn", headers=h("maintenance"), json=row)
+        assert res.status_code == 201, res.text
+    summary = client.get("/api/metrics/summary", headers=h("maintenance"))
+    assert summary.status_code == 200, summary.text
+    body = summary.json()
+    assert body["n"] == 3
+    assert body["totals"]["prompt_tokens"] == 45
+    assert body["totals"]["total_tokens"] == 45
+    assert body["totals"]["n_with_duration"] == 2
+    assert body["totals"]["duration_ms_p50"] == pytest.approx(20)
+    assert body["totals"]["duration_ms_p95"] == pytest.approx(29)
+    assert [row["name"] for row in body["by_tool"]] == ["job-apply", "exa-mcp"]
+    assert body["by_tool"][0]["n"] == 2
+    assert body["by_tool"][0]["total_tokens"] == 40
+    skills = {row["name"]: row["n"] for row in body["by_skill"]}
+    assert skills["apply"] == 2
+    assert skills["(none)"] == 1
+
+
 def test_pause_freezes_without_closing(client: TestClient) -> None:
     created = client.post(
         "/api/jobs",
