@@ -66,7 +66,8 @@ def translate_placeholders(sql: str) -> str:
 
     ``%s``, ``%b``, ``%t``, ``%%``, and ``%(name)s`` outside quotes are already
     psycopg placeholders (the Postgres dialect emits ``%s``) and stay as they are.
-    Question marks inside strings, comments, and dollar quotes stay literal.
+    Question marks inside strings, escape strings, comments, and dollar quotes
+    stay literal. A backslash in an ``E'...'`` literal escapes the next character.
     """
     out: list[str] = []
     index = 0
@@ -85,8 +86,16 @@ def translate_placeholders(sql: str) -> str:
             out.append(sql[index:end].replace("%", "%%"))
             index = end
             continue
-        if char in {"'", '"'}:
-            end = _quoted_end(sql, index, char)
+        if char == "'":
+            if _is_escape_string(sql, index):
+                end = _escape_string_end(sql, index)
+            else:
+                end = _quoted_end(sql, index, "'")
+            out.append(sql[index:end].replace("%", "%%"))
+            index = end
+            continue
+        if char == '"':
+            end = _quoted_end(sql, index, '"')
             out.append(sql[index:end].replace("%", "%%"))
             index = end
             continue
@@ -212,12 +221,17 @@ class PostgresDatabase:
         if conn is not None and not bool(getattr(conn, "closed", True)):
             return conn
         self._reset()
-        self._conn = psycopg.connect(
-            self._dsn,
-            row_factory=dict_row,
-            autocommit=False,
-            connect_timeout=10,
-        )
+        try:
+            self._conn = psycopg.connect(
+                self._dsn,
+                row_factory=dict_row,
+                autocommit=False,
+                connect_timeout=10,
+            )
+        except Exception as exc:
+            # One attempt. A database that is still starting (57P03) is transient,
+            # and a failed connect must not replay a batch or loop.
+            self._raise(exc)
         return self._conn
 
     def _reset(self) -> None:
@@ -255,6 +269,38 @@ def _dropped(exc: BaseException) -> bool:
         return False
     text = str(exc).lower()
     return "connection" in text and any(word in text for word in _LOST_WORDS)
+
+
+def _is_escape_string(sql: str, quote_index: int) -> bool:
+    """True when the quote opens an ``E'...'`` literal, not an identifier ending in E."""
+    if quote_index < 1 or sql[quote_index] != "'":
+        return False
+    if sql[quote_index - 1] not in {"E", "e"}:
+        return False
+    if quote_index == 1:
+        return True
+    before = sql[quote_index - 2]
+    return not (before.isalnum() or before == "_")
+
+
+def _escape_string_end(sql: str, start: int) -> int:
+    """Return the index just after an ``E'...'`` literal. ``start`` is the opening quote."""
+    index = start + 1
+    length = len(sql)
+    while index < length:
+        char = sql[index]
+        if char == "\\":
+            if index + 1 >= length:
+                return length
+            index += 2
+            continue
+        if char == "'":
+            if index + 1 < length and sql[index + 1] == "'":
+                index += 2
+                continue
+            return index + 1
+        index += 1
+    return length
 
 
 def _quoted_end(sql: str, start: int, quote: str) -> int:

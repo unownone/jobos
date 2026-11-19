@@ -165,6 +165,9 @@ def test_dialect_icontains_uses_strpos_lower(monkeypatch: pytest.MonkeyPatch) ->
         ("SELECT n % 2", (), "SELECT n %% 2"),
         ("SELECT ? -- really?", (1,), "SELECT %s -- really?"),
         ("SELECT $q$what? 100%$q$", (), "SELECT $q$what? 100%%$q$"),
+        ("SELECT E'can\\'t ?', ?", ("Acme",), "SELECT E'can\\'t ?', %s"),
+        ("SELECT 'it''s ?', ?", (1,), "SELECT 'it''s ?', %s"),
+        ('SELECT "quoted ?", ?', (1,), 'SELECT "quoted ?", %s'),
     ],
 )
 def test_execute_translates_qmark_placeholders_for_psycopg(
@@ -258,6 +261,30 @@ def test_execute_maps_sqlstate_without_a_database(
     assert connects[0].statements == [("INSERT INTO items (name) VALUES (%s)", ("Acme",))]
     assert connects[0].rollbacks == 1
     assert db.queries.count == 1
+
+
+@pytest.mark.unit
+def test_connect_failure_while_database_starts_is_transient(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def connect(*args: object, **kwargs: object) -> FakeConnection:
+        nonlocal calls
+        calls += 1
+        raise psycopg.errors.CannotConnectNow("the database system is starting up")
+
+    _install(monkeypatch, connect)
+    db = PostgresDatabase("postgresql://unused")
+    with pytest.raises(TransientError) as caught:
+        db.execute("SELECT 1")
+    assert calls == 1
+    assert not isinstance(caught.value, psycopg.Error)
+    assert getattr(caught.value.__cause__, "sqlstate", None) == "57P03"
+    with pytest.raises(TransientError) as batched:
+        db.batch([Stmt("INSERT INTO items (name) VALUES (?)", ("Acme",))])
+    assert calls == 2
+    assert not isinstance(batched.value, psycopg.Error)
 
 
 @pytest.mark.unit
