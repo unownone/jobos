@@ -2,11 +2,44 @@
 
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
+
+import psycopg
+import pytest
 
 from app.db import BoardDB
 from app.metrics import MetricsStore
-from app.sql import adapt_sql, schema_name_for_path
+from app.sql import adapt_sql, connect_params, schema_name_for_path
+
+
+def _backend_pid(db: BoardDB) -> int:
+    return int(db.conn.execute("SELECT pg_backend_pid() AS pid").fetchone()["pid"])
+
+
+def _drop_session(db: BoardDB) -> int:
+    """Kill the Hub's server session, as Neon does when a compute scales to zero."""
+    pid = _backend_pid(db)
+    with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as admin:
+        admin.execute("SELECT pg_terminate_backend(%s)", (pid,))
+        deadline = time.monotonic() + 10
+        while admin.execute("SELECT 1 FROM pg_stat_activity WHERE pid = %s", (pid,)).fetchone():
+            assert time.monotonic() < deadline, "backend did not exit"
+            time.sleep(0.02)
+    return pid
+
+
+def _session_state(pid: int) -> str:
+    with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as admin:
+        row = admin.execute("SELECT state FROM pg_stat_activity WHERE pid = %s", (pid,)).fetchone()
+    return row[0]
+
+
+def _insert_kv(db: BoardDB, key: str) -> None:
+    db.conn.execute(
+        "INSERT INTO hub_kv (key, value, updated_at) VALUES (?, ?, ?)", (key, "v", "t")
+    )
 
 
 def test_adapt_sql_qmark_and_named() -> None:
@@ -45,6 +78,107 @@ def test_jobs_and_events_roundtrip(tmp_path: Path) -> None:
     assert db.get_job(tenant, "gh__pg1")["company"] == "Acme"
     assert db.list_events(tenant, job_id="gh__pg1")[0]["action"] == "created"
     db.close()
+
+
+def test_connect_params_fill_only_what_the_url_leaves_out() -> None:
+    neon = (
+        "postgresql://app:pw@ep-x-pooler.ap-southeast-1.aws.neon.tech/neondb"
+        "?sslmode=require&channel_binding=require"
+    )
+    assert connect_params(neon) == {
+        "connect_timeout": "10",
+        "keepalives": "1",
+        "keepalives_idle": "30",
+        "keepalives_interval": "10",
+        "keepalives_count": "3",
+    }
+    assert "connect_timeout" not in connect_params(neon + "&connect_timeout=3")
+    assert "keepalives_idle" not in connect_params("host=db dbname=jobos keepalives_idle=60")
+
+
+def test_reads_and_writes_survive_a_dropped_session(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "board.db")
+    tenant = db.compat_tenant
+    db.insert_job(tenant, {"id": "gh__drop1", "company": "Acme", "title": "Staff"})
+    first = _drop_session(db)
+    assert db.get_job(tenant, "gh__drop1")["company"] == "Acme"
+    assert _backend_pid(db) != first
+    _drop_session(db)
+    db.insert_job(tenant, {"id": "gh__drop2", "company": "Beta", "title": "Staff"})
+    db.close()
+    again = BoardDB(tmp_path / "board.db")
+    assert again.get_job(again.compat_tenant, "gh__drop2")["company"] == "Beta"
+    again.close()
+
+
+def test_reads_leave_the_session_idle_not_in_transaction(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "board.db")
+    tenant = db.compat_tenant
+    db.insert_job(tenant, {"id": "gh__idle1", "company": "Acme", "title": "Staff"})
+    db.get_job(tenant, "gh__idle1")
+    db.list_jobs(tenant)
+    assert _session_state(_backend_pid(db)) == "idle"
+    _insert_kv(db, "idle.pending")
+    assert _session_state(_backend_pid(db)) == "idle in transaction"
+    assert db.get_kv("idle.pending") == "v"
+    db.conn.commit()
+    db.close()
+
+
+def test_session_lost_mid_transaction_is_never_half_committed(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "board.db")
+    _insert_kv(db, "tx.first")
+    _drop_session(db)
+    with pytest.raises(psycopg.OperationalError):
+        _insert_kv(db, "tx.second")
+    with pytest.raises(psycopg.OperationalError, match="nothing was committed"):
+        db.conn.commit()
+    assert db.get_kv("tx.first") is None
+    assert db.get_kv("tx.second") is None
+    db.put_kv("tx.after", "ok")
+    assert db.get_kv("tx.after") == "ok"
+    db.close()
+
+
+def test_read_that_notices_a_lost_transaction_blocks_its_commit(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "board.db")
+    _insert_kv(db, "shared.first")
+    _drop_session(db)
+    # Another request on the shared connection hits the dead session first.
+    with pytest.raises(psycopg.OperationalError):
+        db.get_kv("shared.first")
+    _insert_kv(db, "shared.second")
+    with pytest.raises(psycopg.OperationalError, match="nothing was committed"):
+        db.conn.commit()
+    assert db.get_kv("shared.first") is None
+    assert db.get_kv("shared.second") is None
+    db.close()
+
+
+def test_commit_or_rollback_on_a_dropped_session_then_recovers(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "board.db")
+    _insert_kv(db, "commit.lost")
+    _drop_session(db)
+    with pytest.raises(psycopg.OperationalError):
+        db.conn.commit()
+    assert db.get_kv("commit.lost") is None
+
+    _insert_kv(db, "rollback.lost")
+    _drop_session(db)
+    with pytest.raises(psycopg.OperationalError):
+        _insert_kv(db, "rollback.second")
+    db.rollback()
+    db.put_kv("rollback.after", "ok")
+    assert db.get_kv("rollback.lost") is None
+    assert db.get_kv("rollback.after") == "ok"
+    db.close()
+
+
+def test_closed_connection_does_not_reconnect(tmp_path: Path) -> None:
+    db = BoardDB(tmp_path / "board.db")
+    db.close()
+    with pytest.raises(psycopg.OperationalError):
+        db.get_kv("anything")
 
 
 def test_schema_isolation(tmp_path: Path) -> None:

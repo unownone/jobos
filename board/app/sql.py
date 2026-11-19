@@ -14,12 +14,25 @@ from pathlib import Path
 from typing import Any
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
+from psycopg.pq import TransactionStatus
 from psycopg.rows import dict_row
 
 _NAMED = re.compile(r"(?<!:):([a-zA-Z_][a-zA-Z0-9_]*)")
 _SAFE_IDENT = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _ON_CONFLICT = re.compile(r"ON CONFLICT\s*\(([^)]+)\)", re.I)
 _LIKE = re.compile(r"\bLIKE\b", re.I)
+_ROW_LOCK = re.compile(r"\bFOR (?:NO KEY )?(?:UPDATE|SHARE|KEY SHARE)\b")
+
+# Applied only when DATABASE_URL does not set them. Managed Postgres (Neon) drops
+# sessions on scale-to-zero and wakes on connect; fail fast instead of hanging a worker.
+_CONNECT_DEFAULTS = {
+    "connect_timeout": "10",
+    "keepalives": "1",
+    "keepalives_idle": "30",
+    "keepalives_interval": "10",
+    "keepalives_count": "3",
+}
 
 
 class SqlCursor:
@@ -52,11 +65,22 @@ class SqlCursor:
 
 
 class SqlConnection:
-    """Thin psycopg wrapper so existing `?` / `:name` SQL keeps working."""
+    """Thin psycopg wrapper so existing `?` / `:name` SQL keeps working.
 
-    def __init__(self, raw: psycopg.Connection, *, schema: str) -> None:
+    Survives the server dropping the session (Neon scale-to-zero, restarts,
+    idle timeouts): the next statement reconnects, and is replayed when no
+    transaction was open. If one was open, its writes are gone, so the next
+    commit() raises instead of committing a fresh, empty session. A plain
+    SELECT outside a write transaction runs in autocommit, so an idle worker
+    is never left "idle in transaction".
+    """
+
+    def __init__(self, raw: psycopg.Connection, *, schema: str, database_url: str) -> None:
         self._raw = raw
         self.schema = schema
+        self._database_url = database_url
+        self._closed_by_caller = False
+        self._tx_lost = False
         self._lock = threading.Lock()
 
     def execute(self, sql: str, params: Any = ()) -> SqlCursor:
@@ -80,16 +104,26 @@ class SqlConnection:
 
         pg_sql, pg_params = adapt_sql(text, params)
         with self._lock:
-            cur = self._raw.execute(pg_sql, pg_params)
-            rows: list[Any] = []
-            lastrowid = None
-            rowcount = cur.rowcount if cur.rowcount is not None else -1
-            if cur.description:
-                rows = list(cur.fetchall())
-                if returning_id and rows:
-                    lastrowid = rows[0]["id"]
-                    rows = []
-            return SqlCursor(rows, lastrowid=lastrowid, rowcount=rowcount)
+            rows, rowcount = self._run(pg_sql, pg_params, plain_read=_is_plain_read(upper))
+        lastrowid = None
+        if returning_id and rows:
+            lastrowid = rows[0]["id"]
+            rows = []
+        return SqlCursor(rows, lastrowid=lastrowid, rowcount=rowcount)
+
+    def _run(self, sql: str, params: Any, *, plain_read: bool) -> tuple[list[Any], int]:
+        raw = self._live()
+        idle = raw.info.transaction_status == TransactionStatus.IDLE
+        try:
+            return _query(raw, sql, params, autocommit=idle and plain_read)
+        except psycopg.OperationalError:
+            if not raw.closed or self._closed_by_caller:
+                raise
+            if not idle:
+                self._tx_lost = True
+                raise
+        # Nothing was open on the dead session, so replaying cannot double-apply.
+        return _query(self._live(), sql, params, autocommit=plain_read)
 
     def executescript(self, script: str) -> None:
         for stmt in split_sql(script):
@@ -97,15 +131,39 @@ class SqlConnection:
 
     def commit(self) -> None:
         with self._lock:
-            self._raw.commit()
+            if self._tx_lost:
+                self._rollback()
+                raise psycopg.OperationalError(
+                    "database session was lost mid-transaction; nothing was committed"
+                )
+            self._live().commit()
 
     def rollback(self) -> None:
         with self._lock:
-            self._raw.rollback()
+            self._rollback()
 
     def close(self) -> None:
         with self._lock:
+            self._closed_by_caller = True
             self._raw.close()
+
+    def _rollback(self) -> None:
+        self._tx_lost = False
+        raw = self._raw
+        if raw.closed and not self._closed_by_caller:
+            return  # The server discarded the transaction along with the session.
+        try:
+            raw.rollback()
+        except psycopg.OperationalError:
+            if not raw.closed or self._closed_by_caller:
+                raise
+
+    def _live(self) -> psycopg.Connection:
+        if self._raw.closed and not self._closed_by_caller:
+            stale = self._raw
+            self._raw = _open_raw(self._database_url, self.schema)
+            stale.close()
+        return self._raw
 
     def _pragma(self, sql: str) -> SqlCursor:
         match = re.search(r"PRAGMA\s+table_info\((\w+)\)", sql, re.I)
@@ -116,6 +174,26 @@ class SqlConnection:
         # sqlite PRAGMA table_info: cid, name, type, notnull, dflt_value, pk
         rows = [{"name": n, 1: n} for n in sorted(names)]
         return SqlCursor(rows, lastrowid=None, rowcount=len(rows))
+
+
+def _is_plain_read(upper: str) -> bool:
+    """A SELECT that takes no row locks and creates nothing (no SELECT ... INTO)."""
+    return upper.startswith("SELECT ") and not _ROW_LOCK.search(upper) and " INTO " not in upper
+
+
+def _query(
+    raw: psycopg.Connection, sql: str, params: Any, *, autocommit: bool
+) -> tuple[list[Any], int]:
+    if autocommit:
+        raw.autocommit = True
+    try:
+        cur = raw.execute(sql, params)
+        rowcount = cur.rowcount if cur.rowcount is not None else -1
+        rows = list(cur.fetchall()) if cur.description else []
+        return rows, rowcount
+    finally:
+        if autocommit and not raw.closed:
+            raw.autocommit = False
 
 
 def adapt_sql(sql: str, params: Any) -> tuple[str, Any]:
@@ -205,13 +283,30 @@ def column_names(conn: SqlConnection, table: str) -> set[str]:
 def connect_url(database_url: str, *, schema: str | None = None) -> SqlConnection:
     if not database_url:
         raise RuntimeError("DATABASE_URL is required (PostgreSQL). SQLite volumes are gone.")
-    raw = psycopg.connect(database_url, row_factory=dict_row, autocommit=True)
     schema_name = schema or "public"
-    ident = quote_ident(schema_name)
-    raw.execute(f"CREATE SCHEMA IF NOT EXISTS {ident}")
-    raw.execute(f"SET search_path TO {ident}")
-    raw.autocommit = False
-    return SqlConnection(raw, schema=schema_name)
+    raw = _open_raw(database_url, schema_name)
+    return SqlConnection(raw, schema=schema_name, database_url=database_url)
+
+
+def connect_params(database_url: str) -> dict[str, str]:
+    """libpq keyword defaults that DATABASE_URL does not already set."""
+    given = conninfo_to_dict(database_url)
+    return {key: value for key, value in _CONNECT_DEFAULTS.items() if key not in given}
+
+
+def _open_raw(database_url: str, schema: str) -> psycopg.Connection:
+    ident = quote_ident(schema)
+    raw = psycopg.connect(
+        database_url, row_factory=dict_row, autocommit=True, **connect_params(database_url)
+    )
+    try:
+        raw.execute(f"CREATE SCHEMA IF NOT EXISTS {ident}")
+        raw.execute(f"SET search_path TO {ident}")
+        raw.autocommit = False
+    except BaseException:
+        raw.close()
+        raise
+    return raw
 
 
 def resolve_database_url(explicit: str | None = None) -> str:

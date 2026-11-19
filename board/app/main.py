@@ -480,6 +480,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict[str, Any]:
         return _health_payload(db, settings)
 
+    @app.get("/livez")
+    def livez() -> dict[str, bool]:
+        # Liveness without a query: a container healthcheck must not keep a
+        # scale-to-zero database (Neon) awake.
+        return {"ok": True}
+
     @app.get("/ready")
     def ready() -> dict[str, Any]:
         payload = _health_payload(db, settings)

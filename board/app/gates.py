@@ -16,6 +16,7 @@ _ALLOW_EXACT = frozenset(
         "/",
         "/start",
         "/health",
+        "/livez",
         "/ready",
         "/favicon.ico",
         "/llms.txt",
