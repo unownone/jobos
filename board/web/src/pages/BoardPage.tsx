@@ -598,10 +598,14 @@ export function BoardPage() {
           <span id="queueStats">{queueStats}</span>
         </div>
         <div id="main" className={cn("flex min-w-0 flex-1", stageScrolls ? "min-h-[8rem]" : "min-h-0")}>
-          <aside
+          <motion.aside
             id="presenceRail"
+            key={pane === "presence" ? "presence-on" : "presence-off"}
+            initial={pane === "presence" ? panel.initial : false}
+            animate={pane === "presence" ? panel.animate : { opacity: 1 }}
+            transition={transition}
             className={cn(
-              "w-56 shrink-0 overflow-y-auto border-r border-border p-3",
+              "w-56 shrink-0 overflow-y-auto border-r border-border p-3 max-[959px]:w-full max-[959px]:border-r-0",
               stageScrolls ? "min-h-[8rem]" : "min-h-0",
               pane === "jobs" && "max-[959px]:hidden",
             )}
@@ -627,9 +631,13 @@ export function BoardPage() {
                 </div>
               ))}
             </div>
-          </aside>
-          <section
+          </motion.aside>
+          <motion.section
             id="list"
+            key={pane === "jobs" ? "jobs-on" : "jobs-off"}
+            initial={pane === "jobs" ? panel.initial : false}
+            animate={pane === "jobs" ? panel.animate : { opacity: 1 }}
+            transition={transition}
             className={cn(
               "min-w-0 flex-1 overflow-y-auto",
               stageScrolls ? "min-h-[8rem]" : "min-h-0",
@@ -672,7 +680,7 @@ export function BoardPage() {
                 </tbody>
               </Table>
             )}
-          </section>
+          </motion.section>
           <TicketFrame
             narrow={narrow}
             open={selected !== null}
