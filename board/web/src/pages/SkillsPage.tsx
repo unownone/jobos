@@ -163,6 +163,7 @@ export function SkillsPage() {
         <p id="msg" className="m-0 text-sm">
           {msg}
         </p>
+        <h2 className="m-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Skills</h2>
         <RecordDeck>
           {skills.map((skill) => (
             <RecordCard key={skill.slug} title={skill.slug || ""} subtitle={skill.role || ""}>
@@ -196,6 +197,8 @@ export function SkillsPage() {
             </tbody>
           </Table>
         </div>
+        <h2 className="m-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Recordings</h2>
+        {recordings.length === 0 ? <p className="m-0 text-sm text-muted-foreground">No recordings yet.</p> : null}
         <RecordDeck>
           {recordings.map((recording, index) => (
             <RecordCard key={recording.id || index} title={recording.skill || "Recording"} subtitle={recording.id || ""}>

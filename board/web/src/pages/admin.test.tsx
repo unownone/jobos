@@ -273,6 +273,8 @@ describe("admin pages", () => {
       expect(apiMock.mock.calls.some((call) => String(call[0]).includes("tag=source"))).toBe(true);
     });
     expect(document.getElementById("skills")?.closest("table")?.className).toContain("table-fixed");
+    expect(document.getElementById("recordings")).toBeTruthy();
+    expect(document.body).toHaveTextContent("No recordings yet.");
     expect(document.querySelectorAll("#logout")).toHaveLength(0);
     expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
     fireEvent.click(document.getElementById("seed") as HTMLButtonElement);
@@ -312,6 +314,7 @@ describe("admin pages", () => {
     expect(note?.className).toContain("break-words");
     expect(note?.className).not.toContain("max-[959px]:hidden");
     expect(note?.className).not.toContain("truncate");
+    expect(document.body).not.toHaveTextContent("No recordings yet.");
   });
 
   it("names the skill registry from the session user", async () => {
