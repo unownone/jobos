@@ -209,7 +209,10 @@ describe("BoardPage", () => {
     });
     expect(byId("side").tagName).toBe("ASIDE");
     expect(byId("side").className).toContain("min-w-0");
-    expect(byId("side").querySelector("h2")?.className).toContain("break-all");
+    expect(byId("side").querySelector("h2")?.textContent).toBe("TicketCo");
+    expect(byId("side").querySelector("h2")?.className).toContain("truncate");
+    expect(byId("side").querySelector("p")?.textContent).toBe(JOB.id);
+    expect(byId("list").querySelector("table")?.className).toContain("table-fixed");
     expect(byId("list").contains(byId("pager"))).toBe(false);
     expect(byId("main").contains(byId("pager"))).toBe(false);
     expect(byId("main").contains(byId("list"))).toBe(true);

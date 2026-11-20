@@ -263,6 +263,7 @@ describe("admin pages", () => {
 
     render(<MemoryPage />);
     await waitFor(() => expect(document.querySelector("[data-edit='mem1']")).toBeInTheDocument());
+    expect(document.querySelector("button[data-edit]")?.getAttribute("data-edit")).toBe("mem1");
 
     fireEvent.click(document.querySelector("[data-edit='mem1']") as HTMLButtonElement);
     expect(document.getElementById("compose-status")).toHaveTextContent("Editing.");

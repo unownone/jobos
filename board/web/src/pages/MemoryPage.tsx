@@ -326,17 +326,7 @@ export function MemoryPage() {
             <Button id="share-go" type="button" variant="outline" data-share={sharingId ?? "pending"} disabled={!sharingId} onClick={() => void shareItem()}>
               Share
             </Button>
-            <span className="sr-only">
-              <Button type="button" variant="outline" data-edit="pending" disabled>
-                Edit
-              </Button>
-              <Button type="button" variant="outline" data-solidify="pending" disabled>
-                Solidify
-              </Button>
-              <Button type="button" variant="destructive" data-delete="pending" disabled>
-                Delete
-              </Button>
-            </span>
+            <span hidden data-edit="" data-solidify="" data-delete="" />
           </div>
           <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-left text-sm">

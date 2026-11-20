@@ -511,12 +511,12 @@ export function BoardPage() {
         <div ref={toolbarRef} data-board-toolbar className="shrink-0">
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
             <div className="hidden items-center gap-1 rounded-full border border-primary p-0.5 max-[959px]:inline-flex" role="tablist" aria-label="Board pane">
-              <button type="button" data-board-pane="jobs" className="min-h-[2.75rem] rounded-full px-3" aria-pressed={pane === "jobs"} onClick={() => setPane("jobs")}>
+              <Button type="button" data-board-pane="jobs" variant={pane === "jobs" ? "default" : "ghost"} className="rounded-full" aria-pressed={pane === "jobs"} onClick={() => setPane("jobs")}>
                 Jobs
-              </button>
-              <button type="button" data-board-pane="presence" className="min-h-[2.75rem] rounded-full px-3" aria-pressed={pane === "presence"} onClick={() => setPane("presence")}>
+              </Button>
+              <Button type="button" data-board-pane="presence" variant={pane === "presence" ? "default" : "ghost"} className="rounded-full" aria-pressed={pane === "presence"} onClick={() => setPane("presence")}>
                 Live
-              </button>
+              </Button>
             </div>
             <Input id="q" value={q} placeholder="Search company / title / not" className="min-w-40 flex-1" onChange={(event) => { setOffset(0); setQ(event.target.value); }} />
             <DropdownMenu>
@@ -622,32 +622,32 @@ export function BoardPage() {
             ) : jobs.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No jobs on this page.</p>
             ) : (
-              <table className="w-full text-left text-sm">
+              <table className="w-full table-fixed text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-card">
                   <tr>
-                    <th className="px-3 py-2">Company</th>
-                    <th className="px-3 py-2">Title</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">Score</th>
-                    <th className="px-3 py-2">Pay</th>
-                    <th className="px-3 py-2">Posted</th>
-                    <th className="px-3 py-2">Claim</th>
+                    <th className="w-[22%] px-3 py-2">Company</th>
+                    <th className="w-[24%] px-3 py-2">Title</th>
+                    <th className="w-[14%] px-3 py-2">Status</th>
+                    <th className="w-[8%] px-3 py-2">Score</th>
+                    <th className="w-[10%] px-3 py-2">Pay</th>
+                    <th className="w-[12%] px-3 py-2">Posted</th>
+                    <th className="w-[10%] px-3 py-2">Claim</th>
                   </tr>
                 </thead>
                 <tbody>
                   {jobs.map((job) => (
                     <tr key={job.id} data-id={job.id} className="cursor-pointer border-t border-border" onClick={() => void openJob(job.id)}>
-                      <td className="px-3 py-2">{job.company}</td>
-                      <td className="px-3 py-2">{job.title}</td>
+                      <td className="truncate px-3 py-2" title={job.company}>{job.company}</td>
+                      <td className="truncate px-3 py-2" title={job.title}>{job.title}</td>
                       <td className="px-3 py-2">
-                        <Badge variant="outline" className="border-dashed border-current">
+                        <Badge variant="outline" className="max-w-full truncate border-dashed border-current">
                           {job.stopped ? "stopped" : job.status}
                         </Badge>
                       </td>
                       <td className="px-3 py-2">{job.score ?? ""}</td>
-                      <td className="px-3 py-2">{job.pay || "—"}</td>
-                      <td className="px-3 py-2">{dayLabel(job.posted_at) || dayLabel(job.created_at)}</td>
-                      <td className="px-3 py-2">{job.claim?.claimed_by || job.claim?.kind || ""}</td>
+                      <td className="truncate px-3 py-2" title={job.pay || ""}>{job.pay || "—"}</td>
+                      <td className="truncate px-3 py-2">{dayLabel(job.posted_at) || dayLabel(job.created_at)}</td>
+                      <td className="truncate px-3 py-2">{job.claim?.claimed_by || job.claim?.kind || ""}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -680,9 +680,14 @@ export function BoardPage() {
                 className="flex flex-col gap-1 p-3"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="m-0 min-w-0 flex-1 break-all font-display text-lg leading-tight font-extrabold [font-family:var(--font-display)]">
-                    #{selected.id} · {selected.company}
-                  </h2>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="m-0 truncate font-display text-lg leading-tight font-extrabold [font-family:var(--font-display)]" title={selected.company}>
+                      {selected.company || "Job"}
+                    </h2>
+                    <p className="m-0 truncate font-mono text-xs text-muted-foreground" title={selected.id}>
+                      {selected.id}
+                    </p>
+                  </div>
                   <Button id="closeSide" type="button" variant="outline" aria-label="Close" onClick={closeTicket}>
                     Close
                   </Button>
