@@ -350,6 +350,41 @@ describe("admin pages", () => {
       expect(document.getElementById("msg")).toHaveTextContent("seed could not write the registry");
     });
     expect(document.getElementById("msg")?.className).toContain("text-destructive");
+    expect(document.body).toHaveTextContent("No recordings yet.");
+  });
+
+  it("does not call a failed recording list empty", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ display_name: "Ada", kind: "admin" });
+      if (path.startsWith("/api/registry/skills")) return Promise.resolve({ skills: [] });
+      if (path === "/api/registry/recordings") return Promise.reject(new Error("recordings unavailable"));
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<SkillsPage />);
+    await waitFor(() => expect(document.getElementById("msg")).toHaveTextContent("recordings unavailable"));
+    expect(document.body).not.toHaveTextContent("No recordings yet.");
+  });
+
+  it("does not call a failed data tab an empty filter", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada", kind: "admin" });
+      if (path.startsWith("/api/jobs")) return Promise.reject(new Error("jobs unavailable"));
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<DataPage />);
+    await waitFor(() => expect(document.getElementById("err")).toHaveTextContent("jobs unavailable"));
+    expect(document.body).not.toHaveTextContent("No rows match these filters.");
+  });
+
+  it("does not call a failed memory load an empty pod", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada", role: "admin" });
+      if (path === "/api/memory/pods") return Promise.reject(new Error("memory unavailable"));
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<MemoryPage />);
+    await waitFor(() => expect(document.getElementById("err")).toHaveTextContent("memory unavailable"));
+    expect(document.body).not.toHaveTextContent("No facts in this view.");
   });
 
   it("wraps a skill recording id and note", async () => {

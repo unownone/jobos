@@ -346,7 +346,7 @@ export function MemoryPage() {
             </Button>
             <span hidden data-edit="" data-solidify="" data-delete="" />
           </div>
-          {items.length === 0 ? <p className="m-0 text-sm text-muted-foreground">No facts in this view.</p> : null}
+          {items.length === 0 && !err ? <p className="m-0 text-sm text-muted-foreground">No facts in this view.</p> : null}
           <RecordDeck>
             {items.map((item) => {
               const canSolidify = item.pod_scope !== "worker" && (item.solidify_status || "none") === "none";

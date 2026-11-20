@@ -717,6 +717,8 @@ export function BoardPage() {
           >
             {!loaded ? (
               <p className="p-4 text-sm text-muted-foreground">Loading jobs…</p>
+            ) : statsFailed ? (
+              <p className="p-4 text-sm text-destructive">{statsText}</p>
             ) : jobs.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No jobs on this page.</p>
             ) : (

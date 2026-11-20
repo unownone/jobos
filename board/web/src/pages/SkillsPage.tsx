@@ -36,6 +36,7 @@ export function SkillsPage() {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [msg, setMsg] = useState("");
   const [failed, setFailed] = useState(false);
+  const [recordingsFailed, setRecordingsFailed] = useState(false);
   function report(message: string, isError = false) {
     setMsg(message);
     setFailed(isError);
@@ -53,8 +54,10 @@ export function SkillsPage() {
     try {
       const data = await api<{ recordings?: Recording[] }>("/api/registry/recordings");
       setRecordings(data.recordings ?? []);
+      setRecordingsFailed(false);
     } catch (error) {
       setRecordings([]);
+      setRecordingsFailed(true);
       report(error instanceof Error ? error.message : "Could not load recordings", true);
     }
   }
@@ -189,7 +192,7 @@ export function SkillsPage() {
           </Table>
         </div>
         <h2 className="m-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Recordings</h2>
-        {recordings.length === 0 ? <p className="m-0 text-sm text-muted-foreground">No recordings yet.</p> : null}
+        {recordings.length === 0 && !recordingsFailed ? <p className="m-0 text-sm text-muted-foreground">No recordings yet.</p> : null}
         <RecordDeck>
           {recordings.map((recording, index) => (
             <RecordCard key={recording.id || index} title={recording.skill || "Recording"} subtitle={recording.id || ""}>

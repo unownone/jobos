@@ -559,7 +559,8 @@ describe("BoardPage", () => {
     render(<BoardPage />);
     await waitFor(() => expect(byId("stats")).toHaveTextContent("job list unavailable"));
     expect(byId("stats").className).toContain("text-destructive");
-    expect(byId("list")).toHaveTextContent("No jobs on this page.");
+    expect(byId("list")).toHaveTextContent("job list unavailable");
+    expect(byId("list")).not.toHaveTextContent("No jobs on this page.");
   });
 
   it("does not load the queue for a lane worker", async () => {

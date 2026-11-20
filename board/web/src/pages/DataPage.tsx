@@ -337,7 +337,7 @@ export function DataPage() {
         </p>
         <div id="table" className="min-w-0">
           {rows.length === 0 ? (
-            <p className="m-0 p-4 text-sm text-muted-foreground">No rows match these filters.</p>
+            err ? null : <p className="m-0 p-4 text-sm text-muted-foreground">No rows match these filters.</p>
           ) : (
             <>
             <RecordDeck>
