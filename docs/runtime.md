@@ -24,6 +24,8 @@ docker compose --profile data --profile cache --profile blobs up -d --build
 
 `HUB_PLUGINS` defaults to `auto` in Compose. When `postgres`, `redis`, or `minio` resolves on the API network, the empty driver switches to that service: Postgres at `postgres:5432`, Redis at `redis:6379`, and MinIO at `http://minio:9000` with bucket `jobos`. The API creates the bucket on startup and retries Postgres until it accepts connections. Set `DATABASE_URL`, `REDIS_URL`, or `BLOB_DRIVER` to keep a driver you chose yourself. Set `HUB_PLUGINS=off` to leave every optional service unused even when it is running.
 
+The API image is built from the repo root (`dockerfile: server/Dockerfile`) and ships `skills/`, `docs/`, `mcp/`, `scripts/`, `handoffs/`, and `AGENTS.md` at `HUB_REPO_ROOT=/opt/jobos`, so onboarding works without a bind mount.
+
 The SPA is `http://127.0.0.1:8080`. The API is also on `http://127.0.0.1:8081` for agents that should not go through nginx.
 
 `GET /health` reports `store`, `cache`, `blob`, and `"rabbitmq": false`.

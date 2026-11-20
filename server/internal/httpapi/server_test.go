@@ -419,6 +419,61 @@ func mintTrack(t *testing.T, client *http.Client, base, csrf, track string) stri
 	return payload.APIKey
 }
 
+func TestA2AMessageSendLandsInInbox(t *testing.T) {
+	ts := testServer(t)
+	defer ts.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"ada","password":"long-enough"}`, "")
+	csrf := res.Header.Get("X-CSRF")
+	res.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\n", csrf)
+	if res.StatusCode != 200 {
+		t.Fatalf("candidate %d %s", res.StatusCode, readBody(res))
+	}
+	res.Body.Close()
+
+	res = postJSON(t, client, ts.URL+"/a2a", `{"jsonrpc":"2.0","id":1,"method":"nope","params":{}}`, csrf)
+	if !strings.Contains(readBody(res), "-32601") {
+		t.Fatal("expected method not found")
+	}
+	res = postJSON(t, client, ts.URL+"/a2a", `{"jsonrpc":"2.0","id":2,"method":"message/send","params":{"message":{"parts":[{"kind":"text","text":"please review the packet"},{"kind":"data","data":{"to_track":"outreach","type":"handoff"}}]}}}`, csrf)
+	body := readBody(res)
+	if res.StatusCode != 200 || !strings.Contains(body, `"state":"completed"`) || !strings.Contains(body, "hub-inbox") {
+		t.Fatalf("send %d %s", res.StatusCode, body)
+	}
+	var sent struct {
+		Result struct {
+			ID string `json:"id"`
+		} `json:"result"`
+	}
+	_ = json.Unmarshal([]byte(body), &sent)
+	res = postJSON(t, client, ts.URL+"/a2a", `{"jsonrpc":"2.0","id":3,"method":"tasks/get","params":{"id":"`+sent.Result.ID+`"}}`, csrf)
+	if !strings.Contains(readBody(res), sent.Result.ID) {
+		t.Fatal("tasks/get missed the stored task")
+	}
+	res = postJSON(t, client, ts.URL+"/a2a", `{"jsonrpc":"2.0","id":4,"method":"tasks/cancel","params":{"id":"`+sent.Result.ID+`"}}`, csrf)
+	if !strings.Contains(readBody(res), "-32002") {
+		t.Fatal("completed task should not cancel")
+	}
+
+	outreach := mintTrack(t, client, ts.URL, csrf, "outreach")
+	discovery := mintTrack(t, client, ts.URL, csrf, "discovery")
+	agent := &http.Client{}
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/messages", nil)
+	req.Header.Set("Authorization", "Bearer "+outreach)
+	res, _ = agent.Do(req)
+	if !strings.Contains(readBody(res), "please review the packet") {
+		t.Fatal("outreach inbox missed the A2A handoff")
+	}
+	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/api/messages", nil)
+	req.Header.Set("Authorization", "Bearer "+discovery)
+	res, _ = agent.Do(req)
+	if strings.Contains(readBody(res), "please review the packet") {
+		t.Fatal("discovery saw an outreach handoff")
+	}
+}
+
 func readBody(res *http.Response) string {
 	defer res.Body.Close()
 	b, _ := io.ReadAll(res.Body)

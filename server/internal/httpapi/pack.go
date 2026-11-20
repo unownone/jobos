@@ -270,6 +270,9 @@ func connectorsFor(track string) []gin.H {
 }
 
 func gitSHA(root string) string {
+	if sha := strings.TrimSpace(os.Getenv("HUB_GIT_SHA")); sha != "" {
+		return sha
+	}
 	if root == "" {
 		return ""
 	}

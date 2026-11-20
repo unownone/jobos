@@ -366,6 +366,8 @@ type Store interface {
 	SavePeer(ctx context.Context, p Peer) error
 	ListPeers(ctx context.Context, accountID string) ([]Peer, error)
 	SaveTask(ctx context.Context, t Task) error
+	Task(ctx context.Context, accountID, id string) (Task, error)
+	ListTasks(ctx context.Context, accountID string, limit int) ([]Task, error)
 
 	PutKV(ctx context.Context, key, value, at string) error
 	GetKV(ctx context.Context, key string) (string, error)

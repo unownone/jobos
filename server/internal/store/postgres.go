@@ -1007,9 +1007,45 @@ func (p *Postgres) ListPeers(ctx context.Context, accountID string) ([]Peer, err
 }
 
 func (p *Postgres) SaveTask(ctx context.Context, t Task) error {
-	_, err := p.pool.Exec(ctx, `INSERT INTO a2a_tasks (id, account_id, track, state, payload_json, created_at) VALUES ($1,$2,$3,$4,$5,$6)`,
+	_, err := p.pool.Exec(ctx, `
+		INSERT INTO a2a_tasks (id, account_id, track, state, payload_json, created_at) VALUES ($1,$2,$3,$4,$5,$6)
+		ON CONFLICT (id) DO UPDATE SET state=EXCLUDED.state, track=EXCLUDED.track, payload_json=EXCLUDED.payload_json`,
 		t.ID, t.AccountID, t.Track, t.State, rawOr(t.Payload, "{}"), t.CreatedAt)
 	return err
+}
+
+func (p *Postgres) Task(ctx context.Context, accountID, id string) (Task, error) {
+	var t Task
+	var payload string
+	err := p.pool.QueryRow(ctx, `SELECT id, account_id, track, state, payload_json, created_at FROM a2a_tasks WHERE account_id=$1 AND id=$2`, accountID, id).
+		Scan(&t.ID, &t.AccountID, &t.Track, &t.State, &payload, &t.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Task{}, ErrNotFound
+	}
+	t.Payload = []byte(payload)
+	return t, err
+}
+
+func (p *Postgres) ListTasks(ctx context.Context, accountID string, limit int) ([]Task, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := p.pool.Query(ctx, `SELECT id, account_id, track, state, payload_json, created_at FROM a2a_tasks WHERE account_id=$1 ORDER BY created_at DESC LIMIT $2`, accountID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Task
+	for rows.Next() {
+		var t Task
+		var payload string
+		if err := rows.Scan(&t.ID, &t.AccountID, &t.Track, &t.State, &payload, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		t.Payload = []byte(payload)
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }
 
 func (p *Postgres) PutKV(ctx context.Context, key, value, at string) error {

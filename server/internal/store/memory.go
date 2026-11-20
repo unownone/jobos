@@ -780,8 +780,40 @@ func (m *Memory) ListPeers(_ context.Context, accountID string) ([]Peer, error) 
 func (m *Memory) SaveTask(_ context.Context, t Task) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	for i, existing := range m.tasks {
+		if existing.ID == t.ID {
+			m.tasks[i] = t
+			return nil
+		}
+	}
 	m.tasks = append(m.tasks, t)
 	return nil
+}
+
+func (m *Memory) Task(_ context.Context, accountID, id string) (Task, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, t := range m.tasks {
+		if t.AccountID == accountID && t.ID == id {
+			return t, nil
+		}
+	}
+	return Task{}, ErrNotFound
+}
+
+func (m *Memory) ListTasks(_ context.Context, accountID string, limit int) ([]Task, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if limit <= 0 {
+		limit = 50
+	}
+	var out []Task
+	for i := len(m.tasks) - 1; i >= 0 && len(out) < limit; i-- {
+		if m.tasks[i].AccountID == accountID {
+			out = append(out, m.tasks[i])
+		}
+	}
+	return out, nil
 }
 
 func (m *Memory) PutKV(_ context.Context, key, value, _ string) error {

@@ -9,7 +9,8 @@ name: jobos
 services:
   api:
     build:
-      context: ./server
+      context: .
+      dockerfile: server/Dockerfile
     environment:
       HUB_ADDR: ":8080"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8080}"
