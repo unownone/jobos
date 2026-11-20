@@ -251,6 +251,9 @@ describe("admin pages", () => {
     render(<SkillsPage />);
 
     expect(document.querySelector("h1")).toHaveTextContent("Skill registry");
+    await waitFor(() => {
+      expect(document.getElementById("who")).toHaveTextContent("Ada · admin");
+    });
     expect(document.getElementById("tag")?.parentElement).toHaveTextContent("Tag");
     expect(document.getElementById("tag")?.hasAttribute("aria-label")).toBe(false);
     expect(document.getElementById("scope")?.parentElement).toHaveTextContent("Scope");
@@ -266,6 +269,29 @@ describe("admin pages", () => {
     await waitFor(() => {
       expect(document.getElementById("msg")).toHaveTextContent("Seeded");
     });
+  });
+
+  it("names the skill registry from the session user", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") {
+        return Promise.resolve({
+          role: "admin",
+          actor: "auditoperator",
+          kind: "admin",
+          user: { display_name: "auditoperator" },
+        });
+      }
+      if (path.startsWith("/api/registry/skills")) return Promise.resolve({ skills: [] });
+      if (path === "/api/registry/recordings") return Promise.resolve({ recordings: [] });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<SkillsPage />);
+
+    await waitFor(() => {
+      expect(document.getElementById("who")).toHaveTextContent("auditoperator · admin");
+    });
+    expect(document.getElementById("who")).not.toHaveTextContent("admin · admin");
   });
 
   it("stores a memory fact and solidifies it", async () => {

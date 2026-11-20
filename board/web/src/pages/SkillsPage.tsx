@@ -25,6 +25,22 @@ type Recording = {
   note?: string;
 };
 
+type Session = {
+  display_name?: string;
+  actor?: string;
+  role?: string;
+  track?: string | null;
+  kind?: string;
+  user?: { display_name?: string };
+};
+
+function sessionLine(me: Session): string {
+  const name = me.user?.display_name?.trim() || me.display_name?.trim() || me.actor?.trim() || me.role?.trim() || "signed in";
+  const lane = me.track?.trim() || me.kind?.trim() || "";
+  if (!lane || lane === name) return name;
+  return `${name} · ${lane}`;
+}
+
 export function SkillsPage() {
   const [who, setWho] = useState("Checking session…");
   const [conn, setConn] = useState<ShellConn>("signing in");
@@ -56,9 +72,9 @@ export function SkillsPage() {
     let cancelled = false;
     async function boot() {
       try {
-        const me = await api<{ display_name?: string; role?: string; track?: string; kind?: string }>("/api/auth/me");
+        const me = await api<Session>("/api/auth/me");
         if (cancelled) return;
-        setWho(`${me.display_name || me.role || "signed in"} · ${me.track || me.kind || ""}`);
+        setWho(sessionLine(me));
         setConn("signed in");
         await loadSkills();
         await loadRecordings();
