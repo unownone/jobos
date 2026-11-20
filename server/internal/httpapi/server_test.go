@@ -215,6 +215,12 @@ func TestPackMCPAndMemoryCaps(t *testing.T) {
 		t.Fatalf("zip open %v files=%d", err, len(zr.File))
 	}
 
+	res = send(t, client, http.MethodGet, ts.URL+"/api/mcp/hosted/indeed.json", "", "", csrf)
+	hosted := readBody(res)
+	if res.StatusCode != 200 || !strings.Contains(hosted, "indeed") {
+		t.Fatalf("hosted mcp %d %s", res.StatusCode, hosted)
+	}
+
 	res, err = client.Get(ts.URL + "/api/registry/mcps")
 	if err != nil {
 		t.Fatal(err)

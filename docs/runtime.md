@@ -40,7 +40,7 @@ The SPA is `http://127.0.0.1:8080`. The API is also on `http://127.0.0.1:8081` f
 
 `GET /health` reports `store`, `cache`, `blob`, and `"rabbitmq": false`.
 
-Onboarding files come from `HUB_REPO_ROOT`. `GET /api/onboarding` lists the track's skills and readings. `GET /api/packs/current/skills.zip` zips those skill folders. `GET /api/docs/*`, `GET /api/skills/:name/*`, `GET /api/mcp/example.json`, and `GET /api/scripts/:name` serve the same tree. Discovery agents only receive discovery skills; admin and maintenance receive every skill. `POST /api/packs/rebuild` (admin or maintenance) re-seeds skills and MCPs.
+Onboarding files come from `HUB_REPO_ROOT`. `GET /api/onboarding` lists the track's skills and readings. `GET /api/packs/current/skills.zip` zips those skill folders. `GET /api/docs/*`, `GET /api/skills/:name/*`, `GET /api/mcp/example.json`, `GET /api/mcp/hosted/:name.json`, and `GET /api/scripts/:name` serve the same tree. Discovery agents only receive discovery skills; admin and maintenance receive every skill. `POST /api/packs/rebuild` (admin or maintenance) re-seeds skills and MCPs.
 
 `GET /api/registry/mcps` lists connectors seeded from `mcp/mcp.example.json` when the repo root is set. `POST /api/registry/skills/:id/fork` copies a skill into the caller's local scope.
 

@@ -161,6 +161,9 @@ func (s *Server) Router() *gin.Engine {
 	authed.GET("/api/docs/*path", s.getDoc)
 	authed.GET("/api/skills/:name/*file", s.getSkillFile)
 	authed.GET("/api/mcp/example.json", func(c *gin.Context) { s.sendRepo(c, "mcp/mcp.example.json") })
+	authed.GET("/api/mcp/hosted/*name", func(c *gin.Context) {
+		s.sendRepo(c, "mcp/hosted/"+strings.TrimPrefix(c.Param("name"), "/"))
+	})
 	authed.GET("/api/scripts/:name", func(c *gin.Context) { s.sendRepo(c, "scripts/"+c.Param("name")) })
 	authed.GET("/api/packs/current/skills.zip", s.skillsZip)
 	authed.POST("/api/packs/rebuild", s.rebuildPack)
