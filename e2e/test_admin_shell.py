@@ -143,8 +143,9 @@ def test_board_job_ticket_patch_pause_resume(page: Page) -> None:
     expect(page.locator("#f_company_remarks")).to_have_value("Went with another candidate.")
     expect(page.locator("#f_user_remarks")).to_have_value("Skip this company next cycle.")
 
-    page.once("dialog", lambda dialog: dialog.accept("e2e pause"))
     page.click("#pauseBtn")
+    page.fill("#laneReason", "e2e pause")
+    page.click("#laneConfirm")
     expect(page.locator("#list")).to_contain_text("stopped", timeout=10_000)
     page.locator("#list tr", has_text="TicketCo").click()
     page.click("#resumeBtn")

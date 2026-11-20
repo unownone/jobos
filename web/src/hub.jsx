@@ -280,6 +280,8 @@ export function Board({ me }) {
   const [draft, setDraft] = useState(null);
   const [side, setSide] = useState("");
   const [error, setError] = useState("");
+  const [pausing, setPausing] = useState(false);
+  const [pauseReason, setPauseReason] = useState("");
 
   async function load(query = q) {
     const data = await api(`/api/jobs?q=${encodeURIComponent(query)}`);
@@ -322,10 +324,10 @@ export function Board({ me }) {
     setSide("Saved");
   }
 
-  async function pause() {
-    const reason = window.prompt("Why pause this job?");
-    if (reason === null) return;
-    await api(`/api/jobs/${selected}/pause`, { method: "POST", body: JSON.stringify({ reason }) });
+  async function confirmPause() {
+    await api(`/api/jobs/${selected}/pause`, { method: "POST", body: JSON.stringify({ reason: pauseReason }) });
+    setPauseReason("");
+    setPausing(false);
     const rows = await load();
     const fresh = rows.find((job) => job.id === selected);
     if (fresh) open(fresh);
@@ -376,9 +378,15 @@ export function Board({ me }) {
             <p id="sideErr">{side}</p>
             <div className="row">
               <button id="saveBtn" type="submit">Save</button>
-              <button id="pauseBtn" type="button" onClick={pause}>Pause</button>
+              <button id="pauseBtn" type="button" onClick={() => setPausing(true)}>Pause</button>
               <button id="resumeBtn" type="button" onClick={resume}>Resume</button>
             </div>
+            {pausing ? (
+              <div className="row">
+                <input id="laneReason" value={pauseReason} placeholder="Why pause" onChange={(e) => setPauseReason(e.target.value)} />
+                <button id="laneConfirm" type="button" onClick={confirmPause}>Confirm pause</button>
+              </div>
+            ) : null}
           </form>
         ) : null}
       </div>
