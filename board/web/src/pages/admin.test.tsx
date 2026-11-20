@@ -202,6 +202,41 @@ describe("admin pages", () => {
     });
   });
 
+  it("uses a kind the selected pod allows", async () => {
+    apiMock.mockImplementation((path: string, opts?: { method?: string; body?: { kind?: string } }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada", role: "admin" });
+      if (path === "/api/memory/pods") {
+        return Promise.resolve({
+          pods: [
+            { id: "worker:ada", label: "worker", writable: true },
+            { id: "track:discovery", label: "discovery", writable: true },
+          ],
+          kinds: { worker: ["fact"], track: ["portal_quirk"] },
+          write_policy: { store_when: "When it will matter next round.", caps: {} },
+        });
+      }
+      if (path.startsWith("/api/memory/items?")) return Promise.resolve({ items: [] });
+      if (path === "/api/memory/items" && opts?.method === "POST") return Promise.resolve({ status: "stored", id: "mem2" });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<MemoryPage />);
+    await waitFor(() => expect((document.getElementById("write-kind") as HTMLSelectElement).value).toBe("fact"));
+
+    fireEvent.change(document.getElementById("write-pod") as HTMLSelectElement, { target: { value: "track:discovery" } });
+    expect((document.getElementById("write-kind") as HTMLSelectElement).value).toBe("portal_quirk");
+    fireEvent.change(document.getElementById("write-title") as HTMLInputElement, { target: { value: "Greenhouse" } });
+    fireEvent.change(document.getElementById("write-body") as HTMLTextAreaElement, { target: { value: "Page two asks." } });
+    fireEvent.click(document.getElementById("add-item") as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith("/api/memory/items", expect.objectContaining({
+        method: "POST",
+        body: expect.objectContaining({ pod: "track:discovery", kind: "portal_quirk" }),
+      }));
+    });
+  });
+
   it("edits, shares, and deletes a memory row", async () => {
     apiMock.mockImplementation((path: string, opts?: { method?: string; body?: unknown }) => {
       if (path === "/api/auth/me") return Promise.resolve({ actor: "ada", role: "admin" });
@@ -238,6 +273,7 @@ describe("admin pages", () => {
         method: "PATCH",
         body: { title: "Lever public", body: "Use the public board." },
       });
+      expect(document.getElementById("compose-status")).toHaveTextContent("Updated");
     });
 
     fireEvent.click(document.querySelector("[data-share='mem1']") as HTMLButtonElement);

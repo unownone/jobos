@@ -26,6 +26,12 @@ function scopeOf(podId: string): string {
   return "track";
 }
 
+function allowedKind(podId: string, current: string, catalog: Record<string, string[]>): string {
+  const allowed = catalog[scopeOf(podId)] ?? [];
+  if (current && allowed.includes(current)) return current;
+  return allowed[0] ?? "";
+}
+
 export function MemoryPage() {
   const [who, setWho] = useState("");
   const [conn, setConn] = useState<ShellConn>("signing in");
@@ -164,7 +170,7 @@ export function MemoryPage() {
       setBody("");
       setCompany("");
       await loadItems();
-      setStatus("Saved.");
+      setStatus("Updated.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not save");
     }
@@ -210,7 +216,10 @@ export function MemoryPage() {
             <NativeSelect
               id="write-pod"
               value={writePod}
-              onChange={setWritePod}
+              onChange={(next) => {
+                setWritePod(next);
+                setWriteKind((current) => allowedKind(next, current, kinds));
+              }}
               options={pods
                 .filter((pod) => pod.writable !== false)
                 .map((pod) => ({ value: pod.id, label: pod.label }))}

@@ -13,14 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  NativeSelect,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
@@ -164,19 +157,14 @@ function Choice({
   onChange: (value: string) => void;
 }) {
   return (
-    <Select value={value || undefined} onValueChange={(next) => onChange(next === "any" ? "" : next)}>
-      <SelectTrigger id={id} aria-label={label} className="w-auto min-w-[9rem]">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="any">{placeholder}</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <NativeSelect
+      id={id}
+      label={label}
+      value={value}
+      className="w-auto min-w-[9rem] shrink-0"
+      onChange={onChange}
+      options={[{ value: "", label: placeholder }, ...options]}
+    />
   );
 }
 
@@ -787,16 +775,18 @@ export function BoardPage() {
             <Button id="prevPage" type="button" variant="outline" disabled={meta.offset <= 0} onClick={() => setOffset((value) => Math.max(0, value - (meta.limit || pageSize)))}>
               Prev
             </Button>
-            <Select value={String(pageSize)} onValueChange={(value) => { setOffset(0); setPageSize(Number(value) || 25); }}>
-              <SelectTrigger id="pageSize" aria-label="Page size" className="w-auto">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="25">25 / page</SelectItem>
-                <SelectItem value="50">50 / page</SelectItem>
-                <SelectItem value="100">100 / page</SelectItem>
-              </SelectContent>
-            </Select>
+            <NativeSelect
+              id="pageSize"
+              label="Page size"
+              value={String(pageSize)}
+              className="w-auto shrink-0"
+              onChange={(value) => { setOffset(0); setPageSize(Number(value) || 25); }}
+              options={[
+                { value: "25", label: "25 / page" },
+                { value: "50", label: "50 / page" },
+                { value: "100", label: "100 / page" },
+              ]}
+            />
             <Button id="nextPage" type="button" variant="outline" disabled={meta.offset + meta.count >= meta.matched} onClick={() => setOffset((value) => value + (meta.limit || pageSize))}>
               Next
             </Button>

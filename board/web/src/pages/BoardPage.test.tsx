@@ -175,7 +175,9 @@ describe("BoardPage", () => {
     expect(document.body).not.toHaveTextContent("Select a job");
     expect(document.getElementById("connectForm")).not.toBeInTheDocument();
     expect(byId("list").contains(byId("pager"))).toBe(false);
-    expect(byId("stopped").getAttribute("data-slot")).toBe("select-trigger");
+    expect(byId("stopped").tagName).toBe("SELECT");
+    expect(byId("stopped").getAttribute("data-slot")).toBe("select");
+    expect(byId("pageSize").tagName).toBe("SELECT");
     expect(byId("presenceRail").className).toContain("overflow-y-auto");
     expect(byId("presenceRail").className).toContain("max-[959px]:hidden");
     expect(document.querySelector("[data-nav='/board']")).toHaveAttribute("aria-current", "page");
