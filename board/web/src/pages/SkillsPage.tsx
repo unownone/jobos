@@ -209,21 +209,21 @@ export function SkillsPage() {
           <Table>
             <thead>
               <tr>
-                <Th>Recording</Th>
-                <Th>Skill</Th>
-                <Th className="max-[959px]:hidden">Scope</Th>
-                <Th className="max-[959px]:hidden">Status</Th>
-                <Th className="max-[959px]:hidden">Note</Th>
+                <Th className="w-[22%] max-[959px]:w-[34%]">Recording</Th>
+                <Th className="w-[16%] max-[959px]:w-[22%]">Skill</Th>
+                <Th className="w-[12%] max-[959px]:hidden">Scope</Th>
+                <Th className="w-[12%] max-[959px]:hidden">Status</Th>
+                <Th className="w-[38%] max-[959px]:w-[44%]">Note</Th>
               </tr>
             </thead>
             <tbody id="recordings">
               {recordings.map((recording, index) => (
                 <tr key={recording.id || index} className="border-t border-border">
-                  <Td title={recording.id}>{recording.id}</Td>
-                  <Td title={recording.skill}>{recording.skill}</Td>
-                  <Td className="max-[959px]:hidden" title={recording.scope}>{recording.scope}</Td>
-                  <Td className="max-[959px]:hidden" title={recording.status}>{recording.status}</Td>
-                  <Td className="max-[959px]:hidden" title={recording.note}>{recording.note}</Td>
+                  <Td truncate={false} className="break-all" title={recording.id}>{recording.id}</Td>
+                  <Td truncate={false} className="break-words" title={recording.skill}>{recording.skill}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden" title={recording.scope}>{recording.scope}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden" title={recording.status}>{recording.status}</Td>
+                  <Td truncate={false} className="break-words" title={recording.note}>{recording.note}</Td>
                 </tr>
               ))}
             </tbody>

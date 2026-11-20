@@ -282,6 +282,38 @@ describe("admin pages", () => {
     });
   });
 
+  it("wraps a skill recording id and note", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ display_name: "Ada", kind: "admin" });
+      if (path.startsWith("/api/registry/skills")) return Promise.resolve({ skills: [] });
+      if (path === "/api/registry/recordings") {
+        return Promise.resolve({
+          recordings: [{
+            id: "rec_board__audit-fixture-co-staff-software-engineer",
+            skill: "job-discovery",
+            scope: "shared",
+            status: "recorded",
+            note: "Portal quirk: the apply form rejects a resume unless the content type is application/pdf.",
+          }],
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<SkillsPage />);
+    await waitFor(() => {
+      expect(document.getElementById("recordings")).toHaveTextContent("Portal quirk");
+    });
+    const cells = [...document.querySelectorAll("#recordings td")];
+    expect(cells[0]?.textContent).toBe("rec_board__audit-fixture-co-staff-software-engineer");
+    expect(cells[0]?.className).toContain("break-all");
+    expect(cells[0]?.className).not.toContain("truncate");
+    const note = cells[4];
+    expect(note?.className).toContain("break-words");
+    expect(note?.className).not.toContain("max-[959px]:hidden");
+    expect(note?.className).not.toContain("truncate");
+  });
+
   it("names the skill registry from the session user", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/auth/me") {
