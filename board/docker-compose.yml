@@ -1,5 +1,7 @@
 # Prefer repo-root: docker compose up -d --build
 # Postgres is internal-only. Data: named volume pgdata (Coolify-safe).
+# Outside Postgres: set DATABASE_URL in secrets. Unset uses this bundled service.
+# From inside Hub, a host database is host.docker.internal, not 127.0.0.1.
 name: jobos
 
 services:
@@ -28,11 +30,18 @@ services:
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
-      DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
+      JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
+      JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
+      JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
+      JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8787:8787"
     depends_on:

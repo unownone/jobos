@@ -9,6 +9,10 @@
 # First operator step after signup is always /onboarding.
 #
 # HUB_PUBLIC_HOST may be a hostname, IPv4, or IP:port (invites use that origin).
+#
+# Outside Postgres: set secret DATABASE_URL (Coolify/Railway, repo-root .env,
+# or the shell). Unset uses the bundled `postgres` service.
+# A database on the Docker host is host.docker.internal, not 127.0.0.1.
 
 name: jobos-traefik
 
@@ -66,7 +70,12 @@ services:
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
-      DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
+      JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
+      JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
+      JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
+      JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
       AMQP_URL: "amqp://${JOBOS_AMQP_USER:-jobos}:${JOBOS_AMQP_PASSWORD:-jobos}@rabbitmq:5672/%2F"
       QUEUE_ADAPTER: "rabbitmq"
       BLOB_ROOT: "/var/lib/jobos/blobs"
@@ -77,6 +86,8 @@ services:
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
       - "blobs:/var/lib/jobos/blobs"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "8787"
     depends_on:

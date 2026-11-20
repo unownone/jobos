@@ -158,6 +158,67 @@ def test_durable_data_uses_named_volumes() -> None:
     assert failures == []
 
 
+def test_hub_database_url_comes_from_secrets() -> None:
+    """Bundled Postgres stays in the file. Hub must not hardcode over a secret URL."""
+    failures: list[str] = []
+    for path, doc in _compose_docs():
+        services = doc.get("services") or {}
+        hub = services.get("hub")
+        if not isinstance(hub, dict):
+            failures.append(f"{_rel(path)}: hub service missing")
+            continue
+        environment = hub.get("environment") or {}
+        if not isinstance(environment, dict):
+            failures.append(f"{_rel(path)}: hub environment is not a mapping")
+            continue
+        secret = environment.get("DATABASE_URL")
+        if secret != "${DATABASE_URL:-}":
+            failures.append(
+                f"{_rel(path)}: DATABASE_URL must pass through the secret, got {secret!r}"
+            )
+        if "DATABASE_URL_FROM_SECRET" in environment:
+            failures.append(f"{_rel(path)}: DATABASE_URL_FROM_SECRET is redundant")
+        for key, default in (
+            ("JOBOS_PG_USER", "jobos"),
+            ("JOBOS_PG_PASSWORD", "jobos"),
+            ("JOBOS_PG_HOST", "postgres"),
+            ("JOBOS_PG_PORT", "5432"),
+            ("JOBOS_PG_DB", "jobos"),
+        ):
+            expected = f"${{{key}:-{default}}}"
+            if environment.get(key) != expected:
+                failures.append(f"{_rel(path)}: {key}={environment.get(key)!r}, want {expected}")
+        hosts = hub.get("extra_hosts") or []
+        if "host.docker.internal:host-gateway" not in hosts:
+            failures.append(f"{_rel(path)}: hub cannot reach a Postgres on the Docker host")
+        postgres = services.get("postgres") if isinstance(services, dict) else None
+        if isinstance(postgres, dict):
+            pg_env = postgres.get("environment") or {}
+            if isinstance(pg_env, dict) and pg_env.get("POSTGRES_USER") not in {None, "jobos"}:
+                failures.append(
+                    f"{_rel(path)}: bundled POSTGRES_USER must stay jobos for existing pgdata volumes"
+                )
+            if isinstance(pg_env, dict) and pg_env.get("POSTGRES_DB") not in {None, "jobos"}:
+                failures.append(
+                    f"{_rel(path)}: bundled POSTGRES_DB must stay jobos for existing pgdata volumes"
+                )
+    assert failures == []
+
+
+def test_env_example_does_not_publish_a_loopback_database_url() -> None:
+    """Copying board/.env.example must not override the bundled Compose Postgres."""
+    example = REPO / "board" / ".env.example"
+    active: list[str] = []
+    for raw in example.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key.strip() == "DATABASE_URL" and value.strip():
+            active.append(value.strip())
+    assert active == []
+
+
 def test_repo_relative_binds_are_coolify_safe() -> None:
     for path, doc in _compose_docs():
         for service, entry in _service_volumes(doc):

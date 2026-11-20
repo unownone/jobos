@@ -35,6 +35,8 @@ Env (optional file: $HOME/.jobos/deploy.env):
   HUB_PUBLIC_HOST       Hostname, IP, or IP:port for invite URLs
   HUB_PUBLIC_URL        Full origin (wins over HUB_PUBLIC_HOST)
   JOBOS_PG_PASSWORD    Postgres password (default: jobos). Not published; Hub-only.
+                       Used when DATABASE_URL is unset (bundled service).
+  DATABASE_URL         Outside Postgres. Secret / repo-root .env. Wins over the bundled URL.
                        Durable data is named volumes pgdata, blobs, rabbitmq.
 EOF
 }
