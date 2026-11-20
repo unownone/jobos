@@ -35,7 +35,10 @@ describe("OnboardingPage", () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/auth/me") return Promise.resolve({ kind: "admin", actor: "ada", user: { email: "ada@example.test" } });
       if (path === "/api/candidate") {
-        return Promise.resolve({ profile: { identity: { full_name: "Ada Lovelace", email: "ada@example.test" } } });
+        return Promise.resolve({
+          profile: { identity: { full_name: "Ada Lovelace", email: "ada@example.test" } },
+          revision: "blob-1",
+        });
       }
       return Promise.reject(new Error(`unexpected ${path}`));
     });
@@ -46,6 +49,7 @@ describe("OnboardingPage", () => {
     expect(document.getElementById("email")).toHaveValue("ada@example.test");
     expect(document.getElementById("who")).toHaveTextContent("Signed in as ada@example.test");
     expect(document.getElementById("err")).toHaveTextContent("");
+    expect(document.getElementById("revLine")).toHaveTextContent("revision blob-1");
   });
 
   it("blocks step 2 until name and email are present", async () => {

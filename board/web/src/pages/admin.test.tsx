@@ -49,6 +49,27 @@ describe("admin pages", () => {
     });
   });
 
+  it("shows revoked when the invite carries revoked_at", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada" });
+      if (path === "/api/invites") {
+        return Promise.resolve({
+          invites: [{ id: "inv1", track: "outreach", mode: "owner_then_agents", revoked_at: "2026-11-20T00:00:00Z" }],
+        });
+      }
+      if (path === "/api/meta") return Promise.resolve({ coming_soon_roles: [] });
+      if (path === "/api/presence/heartbeat") return Promise.resolve({});
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<InvitesPage />);
+
+    await waitFor(() => {
+      expect(document.getElementById("rows")).toHaveTextContent("revoked");
+    });
+    expect(document.getElementById("rows")).not.toHaveTextContent("Revoke");
+  });
+
   it("lists directory rows", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/users") {
@@ -87,6 +108,30 @@ describe("admin pages", () => {
     expect(document.getElementById("stopped")).toBeInTheDocument();
     expect(document.getElementById("go")).toBeInTheDocument();
     expect(document.getElementById("table")).toBeInTheDocument();
+  });
+
+  it("opens the data tab named in the query", async () => {
+    window.history.replaceState({}, "", "/admin/data?tab=memory");
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada" });
+      if (path.startsWith("/api/jobs")) return Promise.resolve({ jobs: [], count: 0, total: 0 });
+      if (path.startsWith("/api/memory/items")) {
+        return Promise.resolve({
+          items: [{ id: "m1", pod: "track:discovery", kind: "search_coverage", title: "E2E Wellfound pagination", body: "Public search" }],
+          count: 1,
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    try {
+      render(<DataPage />);
+      await waitFor(() => {
+        expect(document.getElementById("table")).toHaveTextContent("Wellfound");
+      });
+    } finally {
+      window.history.replaceState({}, "", "/");
+    }
   });
 
   it("seeds the skill registry", async () => {

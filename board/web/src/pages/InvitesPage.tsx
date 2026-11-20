@@ -15,7 +15,12 @@ type Invite = {
   track: string;
   mode?: string;
   revoked?: boolean;
+  revoked_at?: string | null;
 };
+
+function inviteRevoked(invite: Invite): boolean {
+  return Boolean(invite.revoked || invite.revoked_at);
+}
 
 type Created = {
   join_url?: string;
@@ -98,8 +103,13 @@ export function InvitesPage() {
   }
 
   async function revoke(id: string) {
-    await api(`/api/invites/${encodeURIComponent(id)}/revoke`, { method: "POST" });
-    await loadInvites();
+    setErr("");
+    try {
+      await api(`/api/invites/${encodeURIComponent(id)}/revoke`, { method: "POST" });
+      await loadInvites();
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : "Could not revoke the invite");
+    }
   }
 
   return (
@@ -211,7 +221,7 @@ export function InvitesPage() {
                     <td>{invite.track}</td>
                     <td>{invite.mode}</td>
                     <td>
-                      {invite.revoked ? (
+                      {inviteRevoked(invite) ? (
                         "revoked"
                       ) : (
                         <Button type="button" variant="outline" onClick={() => void revoke(invite.id)}>

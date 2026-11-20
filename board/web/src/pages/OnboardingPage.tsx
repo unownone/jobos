@@ -106,9 +106,12 @@ export function OnboardingPage() {
         setHeaderWho(actor);
         setWho(`Signed in as ${actor}. Fill a real profile.`);
         setConn("signed in");
-        const loaded = await api<{ profile?: Profile }>("/api/candidate");
+        const loaded = await api<{ profile?: Profile; revision?: string }>("/api/candidate");
         const profile = loaded.profile;
         if (cancelled || !profile) return;
+        if (loaded.revision) {
+          setRevLine(`revision ${loaded.revision} · Cache-Control: no-store · heartbeat returns candidate_revision`);
+        }
         const identity = profile.identity ?? {};
         const target = profile.target ?? {};
         const proof = profile.proof ?? {};

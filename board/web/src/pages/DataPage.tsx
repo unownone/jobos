@@ -35,6 +35,11 @@ export function DataPage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab") ?? "";
+    if (isTab(requested)) setTab(requested);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     api<{ actor?: string; user?: { email?: string } }>("/api/auth/me")
       .then((me) => {
