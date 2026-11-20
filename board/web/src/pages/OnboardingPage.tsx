@@ -255,10 +255,18 @@ export function OnboardingPage() {
     <AppShell title="Candidate onboarding" scroll="page" path="/onboarding" subtitle="A real profile. Agents must not invent one." who={headerWho} conn={conn}>
       <main id="main" className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5">
         <p id="who" className="m-0 text-sm text-muted-foreground">{who}</p>
-        <ol className="m-0 flex list-none gap-3 p-0 text-sm">
+        <ol className="m-0 flex list-none gap-2 p-0">
           {STEPS.map((id, index) => (
-            <li key={id} id={`s${index + 1}`} className={step === id ? "text-primary" : "text-muted-foreground"}>
-              {index + 1}
+            <li key={id} id={`s${index + 1}`}>
+              <Button
+                type="button"
+                variant={step === id ? "default" : "outline"}
+                aria-current={step === id ? "step" : undefined}
+                className="min-w-11"
+                onClick={() => setStep(id)}
+              >
+                {index + 1}
+              </Button>
             </li>
           ))}
         </ol>

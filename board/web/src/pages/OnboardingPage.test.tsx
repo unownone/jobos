@@ -31,6 +31,16 @@ function mockCandidate(put?: (body: unknown) => void) {
 }
 
 describe("OnboardingPage", () => {
+  it("opens a later step from its number", () => {
+    mockCandidate();
+    render(<OnboardingPage />);
+    expect(document.getElementById("step2")).toHaveAttribute("hidden");
+    fireEvent.click(document.querySelector("#s2 button") as HTMLButtonElement);
+    expect(document.getElementById("step2")).not.toHaveAttribute("hidden");
+    expect(document.getElementById("titles")).toBeInTheDocument();
+    expect(document.querySelector("#s2 button")).toHaveAttribute("aria-current", "step");
+  });
+
   it("fills the form from the JSON profile envelope", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/auth/me") return Promise.resolve({ kind: "admin", actor: "ada", user: { email: "ada@example.test" } });
