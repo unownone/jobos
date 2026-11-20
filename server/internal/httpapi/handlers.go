@@ -951,7 +951,57 @@ func (s *Server) queueClaim(c *gin.Context) {
 		claimed = []store.QueueItem{}
 	}
 	s.RT.Publish(p.AccountID, "queue", gin.H{"action": "claim", "count": len(claimed)})
-	c.JSON(http.StatusOK, gin.H{"items": claimed})
+	jobID, company := "", ""
+	if len(claimed) > 0 {
+		jobID = claimed[0].JobID
+		if job, err := s.DB.Job(c.Request.Context(), p.AccountID, jobID); err == nil {
+			company = job.Company
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"items": claimed, "count": len(claimed), "memory": s.compactRecall(c, p, jobID, company)})
+}
+
+func (s *Server) compactRecall(c *gin.Context, p principal, jobID, company string) gin.H {
+	items := s.recallMemory(c, p, "", "", jobID, company, "", 6, true)
+	buckets := map[string][]store.MemoryItem{
+		"worker": {},
+		"track":  {},
+		"common": {},
+	}
+	for _, item := range items {
+		scope := podScope(item.Pod)
+		buckets[scope] = append(buckets[scope], item)
+	}
+	nullIfEmpty := func(v string) any {
+		if v == "" {
+			return nil
+		}
+		return v
+	}
+	pods := []string{"common"}
+	if p.UserID != "" {
+		pods = append([]string{"worker:" + p.UserID}, pods...)
+	}
+	if p.Track != "" {
+		pods = append(pods, "track:"+p.Track)
+	}
+	return gin.H{
+		"recall_url": "/api/memory/recall", "write_url": "/api/memory/items",
+		"move_url": "/api/memory/items/{id}/move", "solidify_url": "/api/memory/items/{id}/solidify",
+		"hint":    "Use these facts this round. Store only if another bot would need them tomorrow. Solidify track/common facts that should become skills.",
+		"pods":    pods,
+		"items":   items,
+		"by_pod":  buckets,
+		"counts":  gin.H{"worker": len(buckets["worker"]), "track": len(buckets["track"]), "common": len(buckets["common"])},
+		"query":   nil,
+		"job_id":  nullIfEmpty(jobID),
+		"company": nullIfEmpty(company),
+		"compact": true,
+		"write_policy": gin.H{
+			"window_s": 15 * 60,
+			"caps":     gin.H{"worker": 6, "track": 3, "common": 2},
+		},
+	}
 }
 
 func (s *Server) queueAck(c *gin.Context) {
@@ -1527,6 +1577,7 @@ func (s *Server) heartbeat(c *gin.Context) {
 	var body struct {
 		Status string `json:"status"`
 		TaskID string `json:"task_id"`
+		JobID  string `json:"job_id"`
 	}
 	_ = c.ShouldBindJSON(&body)
 	if body.Status == "" {
@@ -1535,7 +1586,7 @@ func (s *Server) heartbeat(c *gin.Context) {
 	pr := store.Presence{AccountID: p.AccountID, UserID: p.UserID, Status: body.Status, TaskID: body.TaskID, LastBeat: now(), UserAgent: c.GetHeader("User-Agent")}
 	_ = s.DB.SavePresence(c.Request.Context(), pr)
 	s.RT.Publish(p.AccountID, "presence", pr)
-	c.JSON(http.StatusOK, gin.H{"presence": pr})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "presence": pr, "memory": s.compactRecall(c, p, body.JobID, "")})
 }
 
 func (s *Server) listPresence(c *gin.Context) {

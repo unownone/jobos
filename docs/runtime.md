@@ -7,7 +7,7 @@ jobOS Hub is two containers.
 | `web` | `web/` | React SPA. No server render. nginx proxies `/api`, `/ws`, `/health`, `/llms.txt`, `/agents.txt`, and `/a2a` to the API. |
 | `api` | `server/` | Go + Gin. Jobs, auth, queue, skill and MCP registry, memory, presence, onboarding packs. |
 
-RabbitMQ is not part of this runtime. Work leases live in the `queue_items` table. Live updates use `GET /api/stream` (SSE) and `GET /ws` (WebSocket).
+RabbitMQ is not part of this runtime. Work leases live in the `queue_items` table. `POST /api/queue/claim` and `POST /api/presence/heartbeat` include a compact memory recall for that beat. Live updates use `GET /api/stream` (SSE) and `GET /ws` (WebSocket).
 
 ## Drivers
 

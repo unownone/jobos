@@ -64,6 +64,14 @@ func TestSignupOnboardJobQueueAndStream(t *testing.T) {
 		t.Fatalf("patch %d %s", res.StatusCode, readBody(res))
 	}
 
+	id := jobID(t, client, ts.URL)
+	note := `{"pod":"common","kind":"hub_note","title":"Greenhouse quirk","job_id":"` + id + `","company":"Analytical Engines","body":"Greenhouse drops the session after one submit click on the apply form."}`
+	res = postJSON(t, client, ts.URL+"/api/memory/items", note, csrf)
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		t.Fatalf("memory %d %s", res.StatusCode, readBody(res))
+	}
+	res.Body.Close()
+
 	invite := mintAgent(t, client, ts.URL, csrf)
 	agent := &http.Client{}
 	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/api/queue/claim", strings.NewReader(`{"kinds":["apply.ready"]}`))
@@ -74,7 +82,7 @@ func TestSignupOnboardJobQueueAndStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := readBody(res)
-	if res.StatusCode != 200 || !strings.Contains(body, "apply.ready") {
+	if res.StatusCode != 200 || !strings.Contains(body, "apply.ready") || !strings.Contains(body, "Greenhouse quirk") || !strings.Contains(body, `"recall_url":"/api/memory/recall"`) {
 		t.Fatalf("claim %d %s", res.StatusCode, body)
 	}
 
