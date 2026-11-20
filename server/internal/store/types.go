@@ -301,6 +301,7 @@ type Store interface {
 	CreateUser(ctx context.Context, u User) error
 	User(ctx context.Context, id string) (User, error)
 	ListUsers(ctx context.Context, accountID, kind, track string) ([]User, error)
+	FirstAdmin(ctx context.Context) (User, error)
 	SaveUser(ctx context.Context, u User) error
 
 	CreateSession(ctx context.Context, s Session) error

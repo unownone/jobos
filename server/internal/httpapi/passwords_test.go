@@ -19,6 +19,27 @@ import (
 
 const pythonArgon2 = "$argon2id$v=19$m=65536,t=3,p=4$iDStID8zd9immTbvsyDNlQ$ShyjGfR3NLR1cCA9NP59YJo+jJO4DwWm9PnXDzTnSnQ"
 
+func TestHealthNextStepBeforeSignup(t *testing.T) {
+	ts := testServer(t)
+	defer ts.Close()
+	res, err := http.Get(ts.URL + "/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := readBody(res)
+	if res.StatusCode != 200 || !strings.Contains(body, `"next_step":"signup"`) || !strings.Contains(body, `"admin_bootstrapped":false`) {
+		t.Fatalf("fresh health %s", body)
+	}
+	res, err = http.Get(ts.URL + "/api/candidate/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = readBody(res)
+	if !strings.Contains(body, `"onboarding_url":"/onboarding"`) || !strings.Contains(body, `"source":"missing"`) {
+		t.Fatalf("status %s", body)
+	}
+}
+
 func TestLoginAcceptsPythonArgon2AndBcrypt(t *testing.T) {
 	if !checkPassword(pythonArgon2, "long-enough") || checkPassword(pythonArgon2, "nope") || checkPassword("!locked", "long-enough") {
 		t.Fatal("python argon2id hash did not verify")

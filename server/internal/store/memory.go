@@ -115,6 +115,26 @@ func (m *Memory) User(_ context.Context, id string) (User, error) {
 	return u, nil
 }
 
+func (m *Memory) FirstAdmin(_ context.Context) (User, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var found User
+	ok := false
+	for _, u := range m.users {
+		if u.Kind != "admin" || u.DisabledAt != "" {
+			continue
+		}
+		if !ok || u.CreatedAt < found.CreatedAt {
+			found = u
+			ok = true
+		}
+	}
+	if !ok {
+		return User{}, ErrNotFound
+	}
+	return found, nil
+}
+
 func (m *Memory) ListUsers(_ context.Context, accountID, kind, track string) ([]User, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

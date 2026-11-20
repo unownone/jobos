@@ -28,7 +28,7 @@ The API image is built from the repo root (`dockerfile: server/Dockerfile`) and 
 
 The SPA is `http://127.0.0.1:8080`. The API is also on `http://127.0.0.1:8081` for agents that should not go through nginx.
 
-`GET /health` reports `store`, `cache`, `blob`, and `"rabbitmq": false`.
+`GET /health` reports `store`, `cache`, `blob`, and `"rabbitmq": false`. It also reports `admin_bootstrapped`, `candidate_onboarded`, `resume_present`, `ready_for_agents`, and `next_step` (`signup`, `onboarding`, `resume`, or `ready`) for the earliest admin account. `GET /api/candidate/status` returns the same candidate fields.
 
 Onboarding files come from `HUB_REPO_ROOT`. `GET /api/onboarding` returns the track contract: process rules, reading URLs with sha256, skill file URLs, connectors, queues, and the memory endpoints. `GET /api/packs/current/skills.zip` zips those skill folders. `GET /api/docs/*`, `GET /api/skills/:name/*`, `GET /api/mcp/example.json`, `GET /api/mcp/hosted/:name.json`, and `GET /api/scripts/:name` serve the same tree. Discovery agents only receive discovery skills; admin and maintenance receive every skill. `POST /api/packs/rebuild` (admin or maintenance) re-seeds skills and MCPs.
 

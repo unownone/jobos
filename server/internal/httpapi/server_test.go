@@ -83,7 +83,7 @@ func TestSignupOnboardJobQueueAndStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	hb := readBody(health)
-	if !strings.Contains(hb, `"rabbitmq":false`) || !strings.Contains(hb, `"store":"memory"`) {
+	if !strings.Contains(hb, `"rabbitmq":false`) || !strings.Contains(hb, `"store":"memory"`) || !strings.Contains(hb, `"next_step":"ready"`) || !strings.Contains(hb, `"ready_for_agents":true`) {
 		t.Fatalf("health %s", hb)
 	}
 

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -420,20 +421,87 @@ func constEq(a, b string) bool {
 }
 
 func (s *Server) health(c *gin.Context) {
-	dbOK := s.DB.Ping(c.Request.Context()) == nil
-	c.JSON(http.StatusOK, gin.H{
-		"ok": true, "db": dbOK, "store": s.DB.Name(), "cache": s.Cache.Name(), "blob": s.Blobs.Name(),
-		"queue": "postgres-table", "rabbitmq": false,
-	})
+	c.JSON(http.StatusOK, s.healthBody(c, false))
 }
 
 func (s *Server) ready(c *gin.Context) {
-	dbOK := s.DB.Ping(c.Request.Context()) == nil
+	body := s.healthBody(c, true)
 	code := http.StatusOK
-	if !dbOK {
+	if body["db"] != true {
 		code = http.StatusServiceUnavailable
 	}
-	c.JSON(code, gin.H{"ok": dbOK, "db": dbOK, "ready": dbOK})
+	c.JSON(code, body)
+}
+
+func (s *Server) healthBody(c *gin.Context, ready bool) gin.H {
+	dbOK := s.DB.Ping(c.Request.Context()) == nil
+	admin, err := s.DB.FirstAdmin(c.Request.Context())
+	boot := err == nil && admin.ID != ""
+	account := ""
+	if boot {
+		account = admin.AccountID
+	}
+	state := s.candidateState(c, account)
+	next := state["next_step"]
+	if !boot {
+		next = "signup"
+	}
+	roles := make([]string, 0, len(s.Cfg.CompatTokens))
+	for role := range s.Cfg.CompatTokens {
+		roles = append(roles, role)
+	}
+	sort.Strings(roles)
+	allRoles := map[string]bool{"discovery": true, "apply": true, "outreach": true, "admin": true, "maintenance": true}
+	for _, role := range roles {
+		delete(allRoles, role)
+	}
+	body := gin.H{
+		"ok": true, "db": dbOK, "store": s.DB.Name(), "cache": s.Cache.Name(), "blob": s.Blobs.Name(),
+		"queue": "postgres-table", "rabbitmq": false,
+		"roles_configured": roles, "all_roles_configured": len(allRoles) == 0,
+		"admin_bootstrapped": boot, "candidate_onboarded": state["onboarded"],
+		"resume_present": state["resume_present"], "ready_for_agents": boot && state["ready_for_agents"] == true,
+		"next_step": next,
+	}
+	if ready {
+		body["ready"] = dbOK
+		if !dbOK {
+			body["ok"] = false
+		}
+	}
+	return body
+}
+
+func (s *Server) candidateState(c *gin.Context, account string) gin.H {
+	present := false
+	onboarded := false
+	resume := false
+	source := "missing"
+	if account != "" {
+		if obj, err := s.Blobs.Get(c.Request.Context(), account, candidateKey); err == nil && len(obj.Content) > 0 {
+			present = true
+			source = "blob"
+			onboarded = realCandidate(string(obj.Content))
+		}
+		if _, err := s.Blobs.Get(c.Request.Context(), account, resumeKey); err == nil {
+			resume = true
+		}
+	}
+	next := "onboarding"
+	if onboarded && resume {
+		next = "ready"
+	} else if onboarded {
+		next = "resume"
+	}
+	missing := []string{}
+	if !onboarded {
+		missing = []string{"name"}
+	}
+	return gin.H{
+		"present": present, "onboarded": onboarded, "resume_present": resume,
+		"ready_for_agents": onboarded && resume, "missing": missing,
+		"onboarding_url": "/onboarding", "next_step": next, "source": source,
+	}
 }
 
 func (s *Server) briefing(name string) gin.HandlerFunc {

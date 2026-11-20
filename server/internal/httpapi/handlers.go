@@ -772,8 +772,12 @@ func (s *Server) candidatePublic(c *gin.Context) {
 			account = p.AccountID
 		}
 	}
-	present := account != "" && s.onboarded(c, account)
-	c.JSON(http.StatusOK, gin.H{"present": present, "onboarded": present})
+	if account == "" {
+		if admin, err := s.DB.FirstAdmin(c.Request.Context()); err == nil {
+			account = admin.AccountID
+		}
+	}
+	c.JSON(http.StatusOK, s.candidateState(c, account))
 }
 
 func (s *Server) candidateStatus(c *gin.Context) { s.candidatePublic(c) }

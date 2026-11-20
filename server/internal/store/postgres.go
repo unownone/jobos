@@ -160,6 +160,11 @@ func (p *Postgres) User(ctx context.Context, id string) (User, error) {
 	return scanUser(p.pool.QueryRow(ctx, userSelect+` WHERE id=$1`, id))
 }
 
+func (p *Postgres) FirstAdmin(ctx context.Context) (User, error) {
+	row := p.pool.QueryRow(ctx, userSelect+` WHERE kind='admin' AND disabled_at='' ORDER BY created_at LIMIT 1`)
+	return scanUser(row)
+}
+
 func (p *Postgres) ListUsers(ctx context.Context, accountID, kind, track string) ([]User, error) {
 	q := userSelect + ` WHERE account_id=$1`
 	args := []any{accountID}
