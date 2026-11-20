@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
@@ -321,8 +322,9 @@ export function MemoryPage() {
                 options={(kinds[scopeOf(sharePod)] ?? []).map((kind) => ({ value: kind, label: kind }))}
               />
             </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input id="share-copy" type="checkbox" checked={shareCopy} onChange={(event) => setShareCopy(event.target.checked)} /> copy (leave original)
+            <label className="flex min-h-11 items-center gap-2 text-sm">
+              <Checkbox id="share-copy" checked={shareCopy} onChange={(event) => setShareCopy(event.target.checked)} />
+              copy (leave original)
             </label>
             <Button id="share-go" type="button" variant="outline" data-share={sharingId ?? "pending"} disabled={!sharingId} onClick={() => void shareItem()}>
               Share

@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
@@ -165,8 +166,8 @@ export function InvitesPage() {
                 <Input id="ttl" name="ttl" type="number" min={1} max={720} defaultValue={72} />
               </label>
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input id="multi" name="multi" type="checkbox" className="size-4" />
+            <label className="flex min-h-11 items-center gap-2 text-sm">
+              <Checkbox id="multi" name="multi" />
               Allow multiple owners on this track
             </label>
             <Button type="submit">Create invite</Button>

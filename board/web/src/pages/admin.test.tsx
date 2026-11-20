@@ -38,11 +38,19 @@ describe("admin pages", () => {
     expect(document.getElementById("track")?.tagName).toBe("SELECT");
     expect(document.getElementById("track")).toHaveAttribute("name", "track");
     expect(document.getElementById("track")).toHaveAttribute("data-slot", "select");
+    expect(document.getElementById("multi")?.tagName).toBe("INPUT");
+    expect(document.getElementById("multi")).toHaveAttribute("name", "multi");
+    expect(document.getElementById("multi")).toHaveAttribute("data-slot", "checkbox");
     expect(document.querySelector("[data-testid='hub-scroll']")?.className).toContain("overflow-y-auto");
 
+    fireEvent.click(document.getElementById("multi") as HTMLInputElement);
     fireEvent.submit(document.getElementById("form") as HTMLFormElement);
 
     await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith("/api/invites", expect.objectContaining({
+        method: "POST",
+        body: expect.objectContaining({ allow_multiple_owners: true }),
+      }));
       expect(document.getElementById("created")).toHaveTextContent("/join/");
     });
     expect(document.getElementById("url")).toHaveTextContent("/join/inv1");
