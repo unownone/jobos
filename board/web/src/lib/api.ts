@@ -10,7 +10,7 @@ export function csrfToken(): string {
 
 export async function api<T>(
   path: string,
-  opts?: { method?: string; body?: unknown; raw?: BodyInit | null; contentType?: string },
+  opts?: { method?: string; body?: unknown; raw?: BodyInit | ArrayBufferView | null; contentType?: string },
 ): Promise<T> {
   const headers: Record<string, string> = {};
   const token = csrfToken();
@@ -31,7 +31,7 @@ export async function api<T>(
     headers,
   };
   if (opts?.raw !== undefined) {
-    init.body = opts.raw;
+    init.body = opts.raw as BodyInit;
   } else if (opts?.body !== undefined) {
     init.body = JSON.stringify(opts.body);
   }

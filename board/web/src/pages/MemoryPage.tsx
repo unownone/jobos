@@ -204,6 +204,9 @@ export function MemoryPage() {
           <p id="policy" className="m-0 text-sm text-muted-foreground">
             {policy}
           </p>
+          <p className="m-0 text-sm text-muted-foreground">
+            Rows update through /api/memory/items/{"{id}"}. Share and move use /move.
+          </p>
           <p id="err" className="m-0 text-sm text-destructive">
             {err}
           </p>
@@ -233,8 +236,17 @@ export function MemoryPage() {
             <label className="flex items-center gap-2 text-sm">
               <input id="share-copy" type="checkbox" /> copy (leave original)
             </label>
-            <Button id="share-go" type="button" variant="outline" disabled>
+            <Button id="share-go" type="button" variant="outline" data-share="pending" disabled>
               Share
+            </Button>
+            <Button type="button" variant="outline" data-edit="pending" disabled>
+              Edit
+            </Button>
+            <Button type="button" variant="outline" data-solidify="pending" disabled>
+              Solidify
+            </Button>
+            <Button type="button" variant="destructive" data-delete="pending" disabled>
+              Delete
             </Button>
           </div>
           <div className="min-w-0 overflow-x-auto">
@@ -258,11 +270,22 @@ export function MemoryPage() {
                       <td className="px-3 py-2">{item.title}</td>
                       <td className="px-3 py-2">{item.body}</td>
                       <td className="px-3 py-2">
-                        {canSolidify ? (
-                          <Button type="button" variant="outline" data-solidify={item.id} onClick={() => void solidify(item.id)}>
-                            Solidify
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" variant="outline" data-edit={item.id} disabled>
+                            Edit
                           </Button>
-                        ) : null}
+                          <Button type="button" variant="outline" data-share={item.id} disabled>
+                            Share
+                          </Button>
+                          {canSolidify ? (
+                            <Button type="button" variant="outline" data-solidify={item.id} onClick={() => void solidify(item.id)}>
+                              Solidify
+                            </Button>
+                          ) : null}
+                          <Button type="button" variant="destructive" data-delete={item.id} disabled>
+                            Delete
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );

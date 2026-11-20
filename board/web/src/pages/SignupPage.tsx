@@ -9,6 +9,7 @@ import { assignHref, errorText, postJson } from "@/lib/auth-post";
 const display = "font-display tracking-[-0.03em] [font-family:var(--font-display)]";
 
 function bootstrapFromHash(): string {
+  if (typeof window === "undefined") return "";
   const hash = window.location.hash.replace(/^#/, "");
   return new URLSearchParams(hash).get("bootstrap") ?? "";
 }

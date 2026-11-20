@@ -83,6 +83,9 @@ export function SkillsPage() {
   return (
     <AppShell title="Skill registry" scroll="page" path="/admin/skills">
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
+        <p className="m-0 text-sm text-muted-foreground">
+          GitHub starters seed shared skills. Local forks stay on the owning bot. Only maintainer consumes skill.record after proctor.
+        </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p id="who" className="m-0 text-sm text-muted-foreground">
             {who}

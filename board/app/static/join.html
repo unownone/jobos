@@ -1,107 +1,15 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b1220" />
-  <title>jobOS Harness — Join</title>
-  <link rel="icon" href="/brand/favicon.png" type="image/png" />
-  <link rel="stylesheet" href="/static/theme.css" />
-  <link rel="stylesheet" href="/static/hub.css" />
-</head>
-<body class="hub-auth">
-  <main class="ticket" style="width:min(32rem,100%)">
-    <h1 id="title">Join a track</h1>
-    <p id="blurb">Loading invite…</p>
-    <pre id="payload" style="white-space:pre-wrap;font-size:12px;color:var(--muted);background:var(--console);padding:0.75rem;border-radius:var(--radius);overflow:auto;max-height:12rem;border:1px solid var(--line)"></pre>
-    <form id="form" hidden>
-      <label for="name">Display name (unique on this track)</label>
-      <input id="name" required placeholder="grok-discovery-1" />
-      <label for="model">model</label>
-      <input id="model" placeholder="grok-4" />
-      <label for="harness">harness</label>
-      <input id="harness" placeholder="cursor-cloud" />
-      <label for="bed">bed</label>
-      <input id="bed" placeholder="cursor" />
-      <label for="provider">provider</label>
-      <input id="provider" placeholder="xai" />
-      <label for="capabilities">capabilities (comma-separated)</label>
-      <input id="capabilities" placeholder="browser, mcp" />
-      <label for="extra">extra JSON (optional)</label>
-      <textarea id="extra" rows="3" placeholder='{"notes":""}'></textarea>
-      <button type="submit">Register</button>
-    </form>
-    <p class="err" id="err"></p>
-    <p class="ok" id="key"></p>
-  </main>
-  <script>
-    const parts = location.pathname.split("/").filter(Boolean);
-    const inviteId = parts[1] || "";
-    const secret = new URLSearchParams(location.search).get("s") || "";
-    async function load() {
-      const err = document.getElementById("err");
-      if (!inviteId || !secret) {
-        err.textContent = "This join link is missing the invite id or secret.";
-        return;
-      }
-      const res = await fetch("/api/join/" + encodeURIComponent(inviteId) + "?s=" + encodeURIComponent(secret));
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
-        return;
-      }
-      document.getElementById("title").textContent = "Joining " + body.track;
-      if (body.join_blocked || !(body.candidate && body.candidate.onboarded)) {
-        document.getElementById("blurb").textContent =
-          "Candidate onboarding is not complete. The human admin must finish /onboarding with a truthful profile before any agent can join. Do not invent a candidate.";
-        document.getElementById("payload").textContent = JSON.stringify(body, null, 2);
-        return;
-      }
-      document.getElementById("blurb").textContent =
-        "You are joining the " + body.track + " track (" + body.mode + "). First redemption is the owner unless the track already has one. Copy the API key after register — it is shown once. Send Authorization: Bearer or X-Hub-Key. Fetch GET /api/onboarding?invite_id=&s= for skills, MCP example, install scripts, and connectors (no secrets; do not clone the hunt repo).";
-      document.getElementById("payload").textContent = JSON.stringify(body, null, 2);
-      document.getElementById("form").hidden = false;
-    }
-    document.getElementById("form").addEventListener("submit", async (ev) => {
-      ev.preventDefault();
-      const err = document.getElementById("err");
-      err.textContent = "";
-      let extra = {};
-      const raw = document.getElementById("extra").value.trim();
-      if (raw) {
-        try { extra = JSON.parse(raw); } catch (e) {
-          err.textContent = "extra JSON is invalid";
-          return;
-        }
-      }
-      const caps = document.getElementById("capabilities").value.split(",").map((s) => s.trim()).filter(Boolean);
-      const metadata = Object.assign({}, extra, {
-        model: document.getElementById("model").value || undefined,
-        harness: document.getElementById("harness").value || undefined,
-        bed: document.getElementById("bed").value || undefined,
-        provider: document.getElementById("provider").value || undefined,
-        capabilities: caps.length ? caps : undefined,
-      });
-      const res = await fetch("/api/auth/join", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          invite_id: inviteId,
-          s: secret,
-          display_name: document.getElementById("name").value,
-          metadata,
-        }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
-        return;
-      }
-      document.getElementById("form").hidden = true;
-      document.getElementById("key").innerHTML =
-        "Registered as <strong>" + body.kind + "</strong> on <strong>" + body.track + "</strong>. API key (copy now):<br><code>" + body.api_key + "</code>";
-    });
-    load();
-  </script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>jobOS — Join</title>
+    <link rel="icon" href="/brand/favicon.png" />
+    <link rel="stylesheet" href="/static/theme.css" />
+    <link rel="stylesheet" href="/static/app/assets/index-CLK9QEde.css" />
+  </head>
+  <body data-page="join">
+    <div id="root"><div class="flex h-dvh flex-col overflow-hidden bg-background text-foreground"><main id="main" class="min-h-0 flex-1 overflow-y-auto"><div class="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 py-10"><h1 id="title" class="m-0 font-display text-[2.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Join</h1><p id="blurb" class="m-0 text-muted-foreground"></p><pre id="payload" class="overflow-auto border border-border bg-secondary p-3 text-sm"></pre><form id="form" hidden="" class="flex flex-col gap-3"><label class="text-sm">Display name<input data-slot="input" class="flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" id="name" value=""/></label><label class="text-sm">Model<input data-slot="input" class="flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" id="model" value=""/></label><label class="text-sm">Harness<input data-slot="input" class="flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" id="harness" value=""/></label><label class="text-sm">Bed<input data-slot="input" class="flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" id="bed" value=""/></label><label class="text-sm">Provider<input data-slot="input" class="flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" id="provider" value=""/></label><label class="text-sm">Capabilities<input data-slot="input" class="flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" id="capabilities" value=""/></label><label class="text-sm">extra JSON<textarea data-slot="textarea" class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" id="extra"></textarea></label><button data-slot="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg]:size-4 [&amp;_svg]:shrink-0 min-h-[2.75rem] bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2" type="submit">Register</button></form><p id="err" class="m-0 text-sm text-destructive"></p><p id="key" class="m-0 text-sm"></p></div></main></div></div>
+    <script type="module" src="/static/app/assets/index-Bu6hndWA.js"></script>
+  </body>
 </html>

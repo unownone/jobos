@@ -18,6 +18,7 @@ type CandidateStatus = {
 };
 
 function savedUsername(): string {
+  if (typeof window === "undefined") return "";
   try {
     return window.localStorage.getItem("jobos_username") ?? "";
   } catch {

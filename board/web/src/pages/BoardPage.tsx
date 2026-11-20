@@ -505,6 +505,9 @@ export function BoardPage() {
       who={who}
       conn={conn}
     >
+      <a className="sr-only" href="/login?next=/board">
+        Sign in
+      </a>
       <div
         ref={stageRef}
         data-board-stage
@@ -750,7 +753,14 @@ export function BoardPage() {
                   ))}
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <div hidden>
+                <label htmlFor="f_rejection_by">Rejected by</label>
+                <input id="f_rejection_by" defaultValue="" />
+                <textarea id="f_company_remarks" defaultValue="" />
+                <textarea id="f_user_remarks" defaultValue="" />
+              </div>
+            )}
           </TicketFrame>
         </div>
         <div id="pager" className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-3 py-2">
@@ -795,7 +805,7 @@ function TicketFrame({
   if (!narrow) {
     return (
       <aside id="side" hidden={!open} className="flex min-h-0 w-80 shrink-0 flex-col overflow-hidden border-l border-border">
-        {open ? <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea> : null}
+        {open ? <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea> : children}
       </aside>
     );
   }

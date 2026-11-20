@@ -1,83 +1,15 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b1220" />
-  <title>jobOS Harness login</title>
-  <link rel="icon" href="/brand/favicon.png" type="image/png" />
-  <link rel="stylesheet" href="/static/theme.css" />
-  <link rel="stylesheet" href="/static/hub.css" />
-</head>
-<body class="hub-auth">
-  <main class="ticket">
-    <div class="brand" style="margin-bottom:0.85rem">
-      <img src="/brand/mascot.png" alt="jobOS Stitch" width="40" height="40" />
-      <div>
-        <h1>jobOS Harness</h1>
-        <p style="margin:0">Log in or create an account. Each account is isolated — jobs, resumes, and queue traffic stay in your tenant.</p>
-      </div>
-    </div>
-    <form id="form">
-      <label for="username">Username</label>
-      <input id="username" type="text" autocomplete="username" required />
-      <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" required />
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-        <button type="submit">Log in</button>
-        <button type="button" id="signupBtn" class="secondary">Create account</button>
-      </div>
-      <div class="err" id="err"></div>
-    </form>
-    <p class="muted">Session lasts 12 hours of idle. Username + password only — no dashboard token.</p>
-    <p class="muted"><a href="/">Back to landing</a></p>
-  </main>
-  <script>
-    function nextPath() {
-      const requested = new URLSearchParams(location.search).get("next") || "";
-      if (!requested || requested === "/" || requested === "/start") return "/board";
-      if (!requested.startsWith("/") || requested.startsWith("//")) return "/board";
-      return requested;
-    }
-    const saved = localStorage.getItem("jobos_username") || "";
-    if (saved) document.getElementById("username").value = saved;
-    fetch("/api/auth/me", { credentials: "same-origin" }).then((r) => {
-      if (r.ok) location.href = nextPath();
-    }).catch(() => {});
-
-    async function submit(kind) {
-      const err = document.getElementById("err");
-      err.textContent = "";
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value;
-      const url = kind === "signup" ? "/api/auth/signup" : "/api/auth/login";
-      const res = await fetch(url, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
-        return;
-      }
-      try { localStorage.setItem("jobos_username", username); } catch (e) {}
-      const status = await fetch("/api/candidate/status", { credentials: "same-origin" }).then((r) => r.json()).catch(() => ({}));
-      if (!status.onboarded) {
-        location.href = "/onboarding";
-        return;
-      }
-      location.href = nextPath();
-    }
-    document.getElementById("form").addEventListener("submit", (ev) => {
-      ev.preventDefault();
-      submit("login");
-    });
-    document.getElementById("signupBtn").addEventListener("click", (ev) => {
-      ev.preventDefault();
-      submit("signup");
-    });
-  </script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>jobOS Harness login</title>
+    <link rel="icon" href="/brand/favicon.png" />
+    <link rel="stylesheet" href="/static/theme.css" />
+    <link rel="stylesheet" href="/static/app/assets/index-CLK9QEde.css" />
+  </head>
+  <body data-page="login">
+    <div id="root"><link rel="preload" as="image" href="/brand/mascot.png"/><main class="grid min-h-dvh place-items-center bg-background px-4 py-8 text-foreground"><div data-slot="card" class="rounded-md border border-border bg-card text-card-foreground shadow-xs w-full max-w-md"><div data-slot="card-header" class="flex flex-col gap-1.5 p-6"><div class="flex items-start gap-3"><img src="/brand/mascot.png" alt="jobOS Stitch" width="40" height="40" class="size-10 rounded-md object-cover"/><div class="flex flex-col gap-1"><h1 class="font-display tracking-[-0.03em] [font-family:var(--font-display)] text-[1.7rem] leading-none font-extrabold">jobOS Harness</h1><p class="text-sm text-muted-foreground">Log in or create an account. Each account is isolated — jobs, resumes, and queue traffic stay in your tenant.</p></div></div></div><div data-slot="card-content" class="p-6 pt-0"><form id="form" class="flex flex-col gap-4"><div class="flex flex-col gap-1.5"><label data-slot="label" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" for="username">Username</label><input type="text" data-slot="input" class="flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" id="username" autoComplete="username" required="" name="username" value=""/></div><div class="flex flex-col gap-1.5"><label data-slot="label" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" for="password">Password</label><input type="password" data-slot="input" class="flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" id="password" autoComplete="current-password" required="" name="password" value=""/></div><div class="flex flex-wrap gap-2"><button data-slot="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg]:size-4 [&amp;_svg]:shrink-0 min-h-[2.75rem] bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 min-w-[8rem] flex-1" type="submit">Log in</button><button data-slot="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg]:size-4 [&amp;_svg]:shrink-0 min-h-[2.75rem] bg-secondary text-secondary-foreground hover:bg-secondary/80 px-4 py-2 min-w-[8rem] flex-1" type="button" id="signupBtn">Create account</button></div><div id="err" class="min-h-5 text-sm text-destructive" role="alert"></div></form><p class="mt-4 text-sm text-muted-foreground">Session lasts 12 hours of idle. Username + password only — no dashboard token.</p><p class="mt-2 text-sm"><a href="/" class="text-accent-foreground underline-offset-4 hover:underline">Back to landing</a></p></div></div></main></div>
+    <script type="module" src="/static/app/assets/index-Bu6hndWA.js"></script>
+  </body>
 </html>

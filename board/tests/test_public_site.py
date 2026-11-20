@@ -39,7 +39,7 @@ def test_landing_explains_harness_and_points_home(tmp_path: Path) -> None:
     assert "Outreach" in text
     assert "Maintainer" in text
     assert "/static/theme.css" in text
-    assert "/static/public.css" in text
+    assert "/static/app/" in text
     assert "/static/hub.css" not in text
 
 
@@ -54,7 +54,7 @@ def test_get_started_is_public_and_honest_about_blockers(tmp_path: Path) -> None
     assert "not shipped" in text.lower() or "Coming soon" in text
     assert "https://github.com/unownone/jobos" in text
     assert "/static/theme.css" in text
-    assert "/static/public.css" in text
+    assert "/static/app/" in text
 
 
 def test_public_css_and_fonts_are_reachable(tmp_path: Path) -> None:
