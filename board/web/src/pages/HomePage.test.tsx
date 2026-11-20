@@ -204,9 +204,33 @@ describe("HomePage", () => {
     expect(byId("kpiAppliedToday")).toHaveTextContent("0");
     expect(byId("kpiOldestDays")).toHaveTextContent("—");
     expect(byId("agentWorking")).toHaveTextContent("0");
+    expect(byId("oldestBody")).toHaveTextContent("Pipeline is empty");
     expect(byId("oldestBody")).not.toHaveTextContent("TicketCo");
     const legend = [...byId("funnelLegend").querySelectorAll("li")].map((item) => item.textContent?.replace(/\s+/g, " ").trim());
     expect(legend).toEqual(["Found 0", "Applied 0", "Outreached 0"]);
+  });
+
+  it("says found rows are not open when none can age", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve({ display_name: "Ada", kind: "owner" });
+      if (path === "/api/dashboard") {
+        return Promise.resolve({
+          funnel: { found: 1, applied: 0, outreached: 0 },
+          agents: { total: 0, working: 0, live: 0 },
+          today: { found: 1, applied: 0, day_start: "2026-11-20T00:00:00Z" },
+          oldest_in_pipeline: null,
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<HomePage />);
+    await waitFor(() => {
+      expect(byId("oldestBody")).toHaveTextContent("No open job to age");
+    });
+    expect(byId("kpiOldestSub")).toHaveTextContent("Found rows are stopped or closed");
+    expect(byId("funnelLegend")).toHaveTextContent("Found");
+    expect(byId("funnelLegend")).toHaveTextContent("1");
   });
 
   it("falls back to user id and kind", async () => {

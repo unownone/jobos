@@ -74,7 +74,10 @@ function oldestDays(dashboard: Dashboard | undefined): string {
 function oldestHint(dashboard: Dashboard | undefined): string {
   if (!dashboard) return "Open jobs only · posted date when known";
   const oldest = dashboard.oldest_in_pipeline;
-  if (!oldest) return "No open jobs in the pipeline";
+  if (!oldest) {
+    if (dashboard.funnel.found > 0) return "Found rows are stopped or closed";
+    return "No open jobs in the pipeline";
+  }
   if (oldest.days_in_pipeline == null) return "Age unknown";
   if (oldest.days_in_pipeline === 1) return "1 day in pipeline";
   return `${oldest.days_in_pipeline} days in pipeline`;
@@ -292,7 +295,11 @@ export function HomePage() {
               ) : !dashboard ? (
                 <p className="m-0 text-muted-foreground">Loading pipeline…</p>
               ) : !dashboard.oldest_in_pipeline ? (
-                <p className="m-0 text-muted-foreground">Pipeline is empty. Discovery POSTs rows; then they age here.</p>
+                <p className="m-0 text-muted-foreground">
+                  {dashboard.funnel.found > 0
+                    ? "No open job to age. Found rows are stopped or outside the open statuses."
+                    : "Pipeline is empty. Discovery POSTs rows; then they age here."}
+                </p>
               ) : (
                 <OldestBody job={dashboard.oldest_in_pipeline} />
               )}
