@@ -721,6 +721,7 @@ func (s *Server) meta(c *gin.Context) {
 		"rabbitmq":            false,
 		"streams":             gin.H{"sse": "/api/stream", "websocket": "/ws"},
 		"candidate_onboarded": s.onboarded(c, p.AccountID),
+		"registry":            "/api/registry/skills",
 	})
 }
 

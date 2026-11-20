@@ -886,7 +886,7 @@ func (s *Server) queuePush(c *gin.Context) {
 		return
 	}
 	s.RT.Publish(p.AccountID, "queue", gin.H{"action": "push", "id": item.ID, "kind": item.Kind})
-	c.JSON(http.StatusCreated, gin.H{"item": item})
+	c.JSON(http.StatusOK, gin.H{"item": item})
 }
 
 func contains(list []string, v string) bool {
@@ -1210,10 +1210,15 @@ func (s *Server) patchPerson(c *gin.Context) {
 
 func (s *Server) memoryPods(c *gin.Context) {
 	p := principalFrom(c)
-	pods := []string{"worker:" + p.UserID, "common"}
-	if p.Track != "" {
-		pods = append([]string{"worker:" + p.UserID, "track:" + p.Track}, "common")
+	pods := []string{"worker:" + p.UserID}
+	if p.Role == "admin" || p.Role == "maintenance" {
+		for _, track := range hubTracks {
+			pods = append(pods, "track:"+track)
+		}
+	} else if p.Track != "" {
+		pods = append(pods, "track:"+p.Track)
 	}
+	pods = append(pods, "common")
 	c.JSON(http.StatusOK, gin.H{
 		"pods": pods,
 		"write_policy": gin.H{
@@ -1402,17 +1407,25 @@ func (s *Server) patchMemory(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Body string `json:"body"`
-		Kind string `json:"kind"`
+		Title string `json:"title"`
+		Body  string `json:"body"`
+		Kind  string `json:"kind"`
 	}
 	if err := c.BindJSON(&body); err != nil {
 		return
 	}
+	if body.Title != "" {
+		item.Title = strings.Join(strings.Fields(body.Title), " ")
+	}
 	if body.Body != "" {
-		item.Body = body.Body
+		item.Body = strings.TrimSpace(body.Body)
 	}
 	if body.Kind != "" {
-		item.Kind = body.Kind
+		item.Kind = strings.ToLower(strings.TrimSpace(body.Kind))
+	}
+	if errText := validateMemory(item.Pod, item.Kind, item.Title, item.Body); errText != "" {
+		fail(c, 422, errText)
+		return
 	}
 	item.UpdatedAt = now()
 	_ = s.DB.SaveMemory(c.Request.Context(), item)

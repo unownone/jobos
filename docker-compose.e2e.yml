@@ -3,7 +3,7 @@
 # or:
 #   docker compose -f docker-compose.e2e.yml -p jobos-e2e up -d --build
 #
-# Hub: http://127.0.0.1:18787  (does not clash with a laptop Hub on 8787)
+# SPA: http://127.0.0.1:18787  (does not clash with a laptop Hub on 8080)
 # Tear down data: docker compose -f docker-compose.e2e.yml -p jobos-e2e down -v
 
 name: jobos-e2e
@@ -25,35 +25,41 @@ services:
       retries: 20
     restart: unless-stopped
 
-  hub:
+  api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: server/Dockerfile
     environment:
-      JOBOS_NONINTERACTIVE: "1"
-      BOARD_HOST: "0.0.0.0"
-      BOARD_PORT: "8787"
-      BOARD_DB: "/tmp/board.db"
-      HUB_PACKS_DIR: "/tmp/jobos-packs"
-      DATABASE_URL: "postgresql://jobos:jobos@postgres:5432/jobos"
-      QUEUE_ADAPTER: "memory"
+      HUB_ADDR: ":8080"
+      HUB_PLUGINS: "off"
+      DATABASE_URL: "postgresql://jobos:jobos@postgres:5432/jobos?sslmode=disable"
+      BLOB_DRIVER: "filesystem"
       BLOB_ROOT: "/var/lib/jobos/blobs"
-      BLOB_ADAPTER: "filesystem"
-      HUB_PUBLIC_HOST: "127.0.0.1:18787"
       HUB_PUBLIC_URL: "http://127.0.0.1:18787"
-      WEB_CONCURRENCY: "1"
-      OTEL_SERVICE_NAME: "jobos-hub-e2e"
-      OTEL_LOGS_EXPORTER: "console"
     volumes:
       - "e2e-blobs:/var/lib/jobos/blobs"
-    ports:
-      - "18787:8787"
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "18787:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/health"]
       interval: 5s
       timeout: 5s
       retries: 24

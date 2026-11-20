@@ -56,6 +56,26 @@ func TestJobsRequireCandidateDetail(t *testing.T) {
 	}
 }
 
+func TestMetaIncludesRegistry(t *testing.T) {
+	ts := testServer(t)
+	defer ts.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"ada","password":"long-enough"}`, "")
+	csrf := res.Header.Get("X-CSRF")
+	res.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Jordan Lee\n", csrf)
+	res.Body.Close()
+	res, err := client.Get(ts.URL + "/api/meta")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := readBody(res)
+	if res.StatusCode != 200 || !strings.Contains(body, `"registry":"/api/registry/skills"`) {
+		t.Fatalf("meta %d %s", res.StatusCode, body)
+	}
+}
+
 func TestLoginAcceptsPythonArgon2AndBcrypt(t *testing.T) {
 	if !checkPassword(pythonArgon2, "long-enough") || checkPassword(pythonArgon2, "nope") || checkPassword("!locked", "long-enough") {
 		t.Fatal("python argon2id hash did not verify")

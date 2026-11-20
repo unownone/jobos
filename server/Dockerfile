@@ -1,6 +1,7 @@
 FROM golang:1.22-bookworm AS build
 WORKDIR /src/server
 COPY server/go.mod server/go.sum ./
+COPY server/third_party ./third_party
 RUN go mod download
 COPY server/ ./
 RUN CGO_ENABLED=0 go build -o /hub ./cmd/hub

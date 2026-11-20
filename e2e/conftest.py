@@ -6,7 +6,6 @@ import os
 import shutil
 import socket
 import subprocess
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -115,65 +114,64 @@ def _start_local() -> HubHandle:
     data_dir.mkdir(parents=True, exist_ok=True)
     server = pgserver.get_server(data_dir, cleanup_mode="stop")
     uri = server.get_uri()
+    if "sslmode=" not in uri:
+        uri = uri + ("&" if "?" in uri else "?") + "sslmode=disable"
+    api_port = _free_port()
     port = int(os.environ.get("E2E_PORT") or _free_port())
     url = f"http://127.0.0.1:{port}"
     env = os.environ.copy()
     env.update(
         {
             "DATABASE_URL": uri,
-            "TEST_DATABASE_URL": uri,
-            "QUEUE_ADAPTER": "memory",
-            "BLOB_ADAPTER": "memory",
-            "BOARD_HOST": "127.0.0.1",
-            "BOARD_PORT": str(port),
-            "JOBOS_NONINTERACTIVE": "1",
+            "HUB_ADDR": f"127.0.0.1:{api_port}",
+            "HUB_PLUGINS": "off",
+            "BLOB_DRIVER": "memory",
             "HUB_PUBLIC_URL": url,
-            "HUB_PUBLIC_HOST": f"127.0.0.1:{port}",
             "HUB_REPO_ROOT": str(ROOT),
-            "HUB_PACKS_DIR": "/tmp/jobos-e2e-packs",
-            "BOARD_DB": "/tmp/jobos-e2e-board.db",
-            "WEB_CONCURRENCY": "1",
-            "PYTHONPATH": str(ROOT / "board"),
+            "HUB_PROXY": f"http://127.0.0.1:{api_port}",
         }
     )
-    python = str(ROOT / "board" / ".venv" / "bin" / "python")
-    if not Path(python).is_file():
-        python = sys.executable
     log_path = Path("/tmp/jobos-e2e-hub.log")
     log_file = log_path.open("w", encoding="utf-8")
-    proc = subprocess.Popen(
-        [
-            python,
-            "-m",
-            "uvicorn",
-            "app.main:create_app",
-            "--factory",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(port),
-        ],
-        cwd=str(ROOT / "board"),
+    api = subprocess.Popen(
+        ["go", "run", "./cmd/hub"],
+        cwd=str(ROOT / "server"),
         env=env,
         stdout=log_file,
         stderr=subprocess.STDOUT,
         text=True,
     )
+    web = None
     try:
+        _wait_http(f"http://127.0.0.1:{api_port}", timeout_s=60)
+        subprocess.run(["npm", "run", "build"], cwd=str(ROOT / "web"), check=True, env=env)
+        web = subprocess.Popen(
+            ["npx", "vite", "preview", "--host", "127.0.0.1", "--port", str(port), "--strictPort"],
+            cwd=str(ROOT / "web"),
+            env=env,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
         _wait_http(url, timeout_s=60)
     except Exception:
         log_file.flush()
         logs = log_path.read_text(encoding="utf-8")[-4000:]
-        proc.kill()
+        api.kill()
+        if web:
+            web.kill()
         server.cleanup()
-        raise RuntimeError(f"local Hub failed to start (exit {proc.poll()}): {logs}") from None
+        raise RuntimeError(f"local Hub failed to start: {logs}") from None
 
     def stop() -> None:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        for proc in (web, api):
+            if proc is None:
+                continue
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
         log_file.close()
         server.cleanup()
 

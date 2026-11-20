@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Browser e2e: Compose Hub when Docker exists, else local uvicorn + Postgres.
+# Browser e2e: Compose Hub when Docker exists, else the local Go API and SPA.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
