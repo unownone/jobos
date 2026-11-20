@@ -730,6 +730,7 @@ func (s *Server) rotateKey(c *gin.Context) {
 		return
 	}
 	_ = s.DB.RevokeUserKeys(c.Request.Context(), user.ID, now())
+	s.bumpUser(c.Request.Context(), user.ID)
 	plain := "jh_agt_" + random(16)
 	prefix := "jh_agt_"
 	if user.Kind == "owner" {
@@ -762,6 +763,7 @@ func (s *Server) disableAgent(c *gin.Context) {
 	user.DisabledAt = now()
 	_ = s.DB.SaveUser(c.Request.Context(), user)
 	_ = s.DB.RevokeUserKeys(c.Request.Context(), user.ID, now())
+	s.bumpUser(c.Request.Context(), user.ID)
 	c.JSON(http.StatusOK, gin.H{"user": publicUser(user)})
 }
 
@@ -815,6 +817,7 @@ func (s *Server) putCandidate(c *gin.Context) {
 		fail(c, 500, err.Error())
 		return
 	}
+	_ = s.Cache.DeletePrefix(c.Request.Context(), "cand:"+p.AccountID)
 	c.JSON(http.StatusOK, gin.H{"ok": true, "onboarded": s.onboarded(c, p.AccountID)})
 }
 
@@ -962,6 +965,13 @@ func (s *Server) queueClaim(c *gin.Context) {
 }
 
 func (s *Server) compactRecall(c *gin.Context, p principal, jobID, company string) gin.H {
+	key := "recall:" + p.AccountID + ":" + p.UserID + ":" + jobID + ":" + company
+	if raw, ok, err := s.Cache.Get(c.Request.Context(), key); err == nil && ok {
+		var hit gin.H
+		if json.Unmarshal(raw, &hit) == nil {
+			return hit
+		}
+	}
 	items := s.recallMemory(c, p, "", "", jobID, company, "", 6, true)
 	buckets := map[string][]store.MemoryItem{
 		"worker": {},
@@ -985,7 +995,7 @@ func (s *Server) compactRecall(c *gin.Context, p principal, jobID, company strin
 	if p.Track != "" {
 		pods = append(pods, "track:"+p.Track)
 	}
-	return gin.H{
+	card := gin.H{
 		"recall_url": "/api/memory/recall", "write_url": "/api/memory/items",
 		"move_url": "/api/memory/items/{id}/move", "solidify_url": "/api/memory/items/{id}/solidify",
 		"hint":    "Use these facts this round. Store only if another bot would need them tomorrow. Solidify track/common facts that should become skills.",
@@ -1002,6 +1012,10 @@ func (s *Server) compactRecall(c *gin.Context, p principal, jobID, company strin
 			"caps":     gin.H{"worker": 6, "track": 3, "common": 2},
 		},
 	}
+	if body, err := json.Marshal(card); err == nil {
+		_ = s.Cache.Set(c.Request.Context(), key, body, recallCacheTTL)
+	}
+	return card
 }
 
 func (s *Server) queueAck(c *gin.Context) {
@@ -1396,6 +1410,7 @@ func (s *Server) createMemory(c *gin.Context) {
 		fail(c, 500, err.Error())
 		return
 	}
+	s.invalidateRecall(c, p.AccountID)
 	c.JSON(http.StatusCreated, gin.H{"item": item, "status": "stored"})
 }
 
@@ -1429,6 +1444,7 @@ func (s *Server) patchMemory(c *gin.Context) {
 	}
 	item.UpdatedAt = now()
 	_ = s.DB.SaveMemory(c.Request.Context(), item)
+	s.invalidateRecall(c, p.AccountID)
 	c.JSON(http.StatusOK, gin.H{"item": item})
 }
 
@@ -1443,6 +1459,7 @@ func (s *Server) deleteMemory(c *gin.Context) {
 		fail(c, 404, "memory item not found")
 		return
 	}
+	s.invalidateRecall(c, p.AccountID)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
@@ -1492,6 +1509,7 @@ func (s *Server) moveMemory(c *gin.Context) {
 		action = "memory_copy"
 	}
 	_, _ = s.DB.AddEvent(c.Request.Context(), store.Event{AccountID: p.AccountID, TS: now(), ActorRole: p.Role, Actor: p.Actor, Action: action, Note: pod})
+	s.invalidateRecall(c, p.AccountID)
 	c.JSON(http.StatusOK, gin.H{"item": moved, "copied": body.KeepOriginal})
 }
 
@@ -1508,6 +1526,7 @@ func (s *Server) solidifyMemory(c *gin.Context) {
 	rec := store.Recording{ID: newID("rec_"), AccountID: p.AccountID, SkillID: item.ID, SubmitterID: p.UserID, Origin: "memory", Body: item.Body, Status: "pending", CreatedAt: now()}
 	_ = s.DB.SaveRecording(c.Request.Context(), rec)
 	_ = s.DB.SaveQueue(c.Request.Context(), store.QueueItem{ID: newID("qi_"), AccountID: p.AccountID, Kind: "skill.record", Track: "maintenance", Payload: mustJSON(gin.H{"recording_id": rec.ID}), Status: "open", DedupeKey: "skill.record:" + rec.ID, CreatedAt: now()})
+	s.invalidateRecall(c, p.AccountID)
 	c.JSON(http.StatusOK, gin.H{"item": item, "recording": rec})
 }
 

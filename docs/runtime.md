@@ -14,7 +14,7 @@ RabbitMQ is not part of this runtime. Work leases live in the `queue_items` tabl
 | Concern | Off | On |
 | --- | --- | --- |
 | Database | empty `DATABASE_URL` → in-memory store | Postgres (`--profile data` or any `DATABASE_URL`) |
-| Cache | empty `REDIS_URL` and `CACHE_DRIVER` unset → nop | `REDIS_URL` selects Redis. `CACHE_DRIVER=memory` is the single-process cache. Job lists are cached for 15s and dropped on writes. |
+| Cache | empty `REDIS_URL` and `CACHE_DRIVER` unset → nop | `REDIS_URL` selects Redis. `CACHE_DRIVER=memory` is the single-process cache. Job lists (15s), API keys and sessions (2m, dropped when a key is rotated or a user is disabled), the candidate flag (60s), and heartbeat recall cards (10s) stay off the database until a write drops them. |
 | Blobs | `BLOB_DRIVER=memory` | `filesystem` (`BLOB_ROOT`, persisted on the `blobs` volume) or `s3` (MinIO and any other S3 API). Resume PDFs and candidate YAML go through this seam. |
 
 ```bash

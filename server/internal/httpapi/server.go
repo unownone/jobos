@@ -271,6 +271,9 @@ func (s *Server) authenticate(c *gin.Context) (principal, error) {
 		if strings.HasPrefix(bearer, "jh_boot_") || strings.HasPrefix(bearer, "jh_inv_") {
 			return principal{}, &httpError{http.StatusUnauthorized, "this key cannot authenticate API calls"}
 		}
+		if p, ok := s.cachedPrincipal(c, bearer); ok {
+			return p, nil
+		}
 		key, err := s.DB.APIKeyByHash(c.Request.Context(), hash(bearer))
 		if err != nil || key.RevokedAt != "" {
 			return principal{}, &httpError{http.StatusUnauthorized, "invalid API key"}
@@ -279,6 +282,7 @@ func (s *Server) authenticate(c *gin.Context) (principal, error) {
 		if err != nil || user.DisabledAt != "" {
 			return principal{}, &httpError{http.StatusUnauthorized, "invalid API key"}
 		}
+		s.storeKey(c, bearer, user)
 		return principalFromUser(user, authKind(user.Kind), c.GetHeader("X-Actor")), nil
 	}
 	role := strings.ToLower(strings.TrimSpace(c.GetHeader("X-Role")))
@@ -300,6 +304,9 @@ func (s *Server) authenticate(c *gin.Context) (principal, error) {
 	if err != nil || raw == "" {
 		return principal{}, &httpError{http.StatusUnauthorized, "missing credentials"}
 	}
+	if p, ok := s.cachedSession(c, raw); ok {
+		return p, nil
+	}
 	sess, err := s.DB.SessionByHash(c.Request.Context(), hash(raw))
 	if err != nil {
 		return principal{}, &httpError{http.StatusUnauthorized, "invalid session"}
@@ -319,6 +326,7 @@ func (s *Server) authenticate(c *gin.Context) (principal, error) {
 	if err != nil || user.DisabledAt != "" {
 		return principal{}, &httpError{http.StatusUnauthorized, "invalid session"}
 	}
+	s.storeSession(c, raw, sess, user)
 	p := principalFromUser(user, "session", "")
 	p.SessionID = sess.ID
 	return p, nil
@@ -402,11 +410,18 @@ func openWithoutCandidate(path string) bool {
 }
 
 func (s *Server) onboarded(c *gin.Context, accountID string) bool {
-	obj, err := s.Blobs.Get(c.Request.Context(), accountID, candidateKey)
-	if err != nil {
-		return false
+	key := "cand:" + accountID
+	if raw, ok, err := s.Cache.Get(c.Request.Context(), key); err == nil && ok {
+		return len(raw) == 1 && raw[0] == '1'
 	}
-	return realCandidate(string(obj.Content))
+	obj, err := s.Blobs.Get(c.Request.Context(), accountID, candidateKey)
+	on := err == nil && realCandidate(string(obj.Content))
+	val := []byte("0")
+	if on {
+		val = []byte("1")
+	}
+	_ = s.Cache.Set(c.Request.Context(), key, val, candidateTTL)
+	return on
 }
 
 func realCandidate(text string) bool {
@@ -733,6 +748,9 @@ func (s *Server) login(c *gin.Context) {
 
 func (s *Server) logout(c *gin.Context) {
 	p := principalFrom(c)
+	if raw, err := c.Cookie(cookieSession); err == nil {
+		s.dropSession(c, raw)
+	}
 	if p.SessionID != "" {
 		_ = s.DB.DeleteSession(c.Request.Context(), p.SessionID)
 	}
