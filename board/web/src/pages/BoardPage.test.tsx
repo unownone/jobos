@@ -213,7 +213,11 @@ describe("BoardPage", () => {
     expect(byId("main").contains(byId("list"))).toBe(true);
     for (const id of TICKET_IDS) expect(document.getElementById(id), id).toBeInTheDocument();
     expect(document.querySelector("label[for='f_rejection_by']")).toHaveTextContent("Rejected by");
-    expect(byId("f_status").getAttribute("data-slot")).toBe("select-trigger");
+    expect(byId("locationFilter").className).toContain("w-44");
+    expect(byId("sourceFilter").className).toContain("w-44");
+    expect(byId("f_status").tagName).toBe("SELECT");
+    expect(byId("f_status").getAttribute("data-slot")).toBe("select");
+    expect(byId("f_rejection_by").tagName).toBe("SELECT");
     expect(byId("side").querySelector("[data-slot='scroll-area']")).toBeTruthy();
     expect(document.querySelectorAll("#f_company")).toHaveLength(1);
 

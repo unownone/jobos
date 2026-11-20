@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  NativeSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -576,8 +577,8 @@ export function BoardPage() {
             { value: "true", label: "Pay stated" },
             { value: "false", label: "Pay missing" },
           ]} />
-          <Input id="locationFilter" value={location} placeholder="Location" aria-label="Location" onChange={(event) => { setOffset(0); setLocation(event.target.value); }} />
-          <Input id="sourceFilter" value={source} placeholder="Source" aria-label="Source" onChange={(event) => { setOffset(0); setSource(event.target.value); }} />
+          <Input id="locationFilter" value={location} placeholder="Location" aria-label="Location" className="w-44 shrink-0" onChange={(event) => { setOffset(0); setLocation(event.target.value); }} />
+          <Input id="sourceFilter" value={source} placeholder="Source" aria-label="Source" className="w-44 shrink-0" onChange={(event) => { setOffset(0); setSource(event.target.value); }} />
         </div>
         <div id="queueRail" hidden={!queueVisible} className="flex shrink-0 gap-2 px-3 py-1 text-sm text-muted-foreground">
           <span>Queue</span>
@@ -682,16 +683,13 @@ export function BoardPage() {
                 <label className="text-sm" htmlFor="f_source">Source</label>
                 <Input id="f_source" value={sourceText} onChange={(event) => setSourceText(event.target.value)} />
                 <label className="text-sm" htmlFor="f_status">Status</label>
-                <Select value={selected.status || undefined} onValueChange={(value) => updateJob({ status: value })}>
-                  <SelectTrigger id="f_status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map((status) => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <NativeSelect
+                  id="f_status"
+                  label="Status"
+                  value={selected.status || ""}
+                  options={statusOptions.map((status) => ({ value: status, label: status }))}
+                  onChange={(value) => updateJob({ status: value })}
+                />
                 <label className="text-sm" htmlFor="f_score">Score</label>
                 <Input id="f_score" type="number" min={1} max={5} step={1} value={selected.score == null ? "" : String(selected.score)} onChange={(event) => updateJob({ score: event.target.value === "" ? null : Number(event.target.value) })} />
                 <label className="text-sm" htmlFor="f_location">Location</label>
@@ -709,19 +707,17 @@ export function BoardPage() {
                 <label className="text-sm" htmlFor="f_notes">Notes</label>
                 <Textarea id="f_notes" value={selected.notes ?? ""} onChange={(event) => updateJob({ notes: event.target.value })} />
                 <label className="text-sm" htmlFor="f_rejection_by">Rejected by</label>
-                <Select
+                <NativeSelect
+                  id="f_rejection_by"
+                  label="Rejected by"
                   value={selected.rejection?.by || "none"}
-                  onValueChange={(value) => updateJob({ rejection: { ...selected.rejection, by: value === "none" ? "" : value } })}
-                >
-                  <SelectTrigger id="f_rejection_by" aria-label="Rejected by">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">—</SelectItem>
-                    <SelectItem value="company">company</SelectItem>
-                    <SelectItem value="user">user</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: "none", label: "—" },
+                    { value: "company", label: "company" },
+                    { value: "user", label: "user" },
+                  ]}
+                  onChange={(value) => updateJob({ rejection: { ...selected.rejection, by: value === "none" ? "" : value } })}
+                />
                 <label className="text-sm" htmlFor="f_company_remarks">Company remarks</label>
                 <Textarea id="f_company_remarks" value={selected.rejection?.company_remarks ?? ""} onChange={(event) => updateJob({ rejection: { ...selected.rejection, company_remarks: event.target.value } })} />
                 <label className="text-sm" htmlFor="f_user_remarks">User remarks</label>

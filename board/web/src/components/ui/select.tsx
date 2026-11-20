@@ -91,4 +91,40 @@ function SelectItem({ className, children, ...props }: ComponentProps<typeof Sel
   );
 }
 
-export { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue };
+function NativeSelect({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  className,
+}: {
+  id: string;
+  label?: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  return (
+    <select
+      id={id}
+      aria-label={label}
+      data-slot="select"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className={cn(
+        "flex min-h-[2.75rem] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+        className,
+      )}
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export { NativeSelect, Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue };
