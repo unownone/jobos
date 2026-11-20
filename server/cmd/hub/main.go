@@ -17,12 +17,22 @@ import (
 
 func main() {
 	cfg := config.Load()
+	cfg.Plug()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	db, err := store.Open(ctx, cfg.DatabaseURL)
-	if err != nil {
-		log.Fatalf("store: %v", err)
+	var db store.Store
+	var err error
+	for {
+		db, err = store.Open(ctx, cfg.DatabaseURL)
+		if err == nil || cfg.DatabaseURL == "" {
+			break
+		}
+		if ctx.Err() != nil {
+			log.Fatalf("store: %v", err)
+		}
+		log.Printf("store: %v; retrying", err)
+		time.Sleep(time.Second)
 	}
 	defer db.Close()
 
@@ -32,6 +42,11 @@ func main() {
 	})
 	if err != nil {
 		log.Fatalf("blob: %v", err)
+	}
+	if ready, ok := blobs.(interface{ EnsureBucket(context.Context) error }); ok {
+		if err := ready.EnsureBucket(ctx); err != nil {
+			log.Fatalf("blob bucket: %v", err)
+		}
 	}
 	hot, err := cache.Open(cfg.RedisURL, os.Getenv("CACHE_DRIVER"))
 	if err != nil {

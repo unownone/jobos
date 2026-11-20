@@ -22,19 +22,7 @@ docker compose up -d --build
 docker compose --profile data --profile cache --profile blobs up -d --build
 ```
 
-With the data, cache, and blobs profiles, set:
-
-```bash
-DATABASE_URL=postgres://jobos:jobos@postgres:5432/jobos?sslmode=disable
-REDIS_URL=redis://redis:6379/0
-BLOB_DRIVER=s3
-S3_ENDPOINT=http://minio:9000
-S3_ACCESS_KEY=jobos
-S3_SECRET_KEY=jobossecret
-S3_BUCKET=jobos
-```
-
-Create the MinIO bucket once (`mc mb local/jobos` or the MinIO console on port 9001). The API does not create buckets.
+`HUB_PLUGINS` defaults to `auto` in Compose. When `postgres`, `redis`, or `minio` resolves on the API network, the empty driver switches to that service: Postgres at `postgres:5432`, Redis at `redis:6379`, and MinIO at `http://minio:9000` with bucket `jobos`. The API creates the bucket on startup and retries Postgres until it accepts connections. Set `DATABASE_URL`, `REDIS_URL`, or `BLOB_DRIVER` to keep a driver you chose yourself. Set `HUB_PLUGINS=off` to leave every optional service unused even when it is running.
 
 The SPA is `http://127.0.0.1:8080`. The API is also on `http://127.0.0.1:8081` for agents that should not go through nginx.
 

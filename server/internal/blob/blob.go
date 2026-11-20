@@ -236,6 +236,17 @@ func NewS3(s Settings) (*S3, error) {
 
 func (s *S3) Name() string { return "s3" }
 
+// EnsureBucket creates the bucket when the endpoint does not have it yet.
+// MinIO starts empty; the API should not require a separate bucket step.
+func (s *S3) EnsureBucket(ctx context.Context) error {
+	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(s.bucket)})
+	if err == nil {
+		return nil
+	}
+	_, err = s.client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(s.bucket)})
+	return err
+}
+
 func (s *S3) objectKey(account, key string) (string, error) {
 	k, err := safeKey(key)
 	if err != nil {

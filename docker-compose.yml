@@ -13,6 +13,10 @@ services:
     environment:
       HUB_ADDR: ":8080"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8080}"
+      HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
+      JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
+      JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
+      JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
       DATABASE_URL: "${DATABASE_URL:-}"
       REDIS_URL: "${REDIS_URL:-}"
       CACHE_DRIVER: "${CACHE_DRIVER:-memory}"

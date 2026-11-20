@@ -84,6 +84,7 @@ func NewRedis(url string) (*Redis, error) {
 	if err != nil {
 		return nil, err
 	}
+	opt.Protocol = 2
 	return &Redis{client: redis.NewClient(opt)}, nil
 }
 
