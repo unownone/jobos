@@ -15,7 +15,10 @@ describe("AppShell", () => {
     expect(frame.className).toContain("h-dvh");
     expect(port.className).toContain("overflow-y-auto");
     expect(port.className).toContain("min-h-0");
-    expect(screen.getByRole("navigation", { name: "Hub" })).toBeInTheDocument();
+    const hub = screen.getByRole("navigation", { name: "Hub" });
+    expect(hub).toBeInTheDocument();
+    expect(hub.textContent).not.toMatch(/Log out/);
+    expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute("href", "/admin/users");
     expect(screen.getByText("helps find jobs")).toBeInTheDocument();
   });

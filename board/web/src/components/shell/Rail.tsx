@@ -1,9 +1,5 @@
-import { LogOut } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-import { logout } from "./logout";
 import { NAV } from "./nav";
 import { NavLink } from "./NavLink";
 
@@ -33,18 +29,6 @@ export function Rail({ narrow, pathname }: { narrow: boolean; pathname: string }
           ))}
         </div>
       </ScrollArea>
-      <Button
-        type="button"
-        variant="ghost"
-        data-hub-logout
-        className="mt-1 h-auto w-full shrink-0 flex-col gap-0.5 px-1 py-1.5 text-[0.65rem] font-semibold text-muted-foreground"
-        onClick={() => {
-          void logout();
-        }}
-      >
-        <LogOut aria-hidden="true" />
-        Log out
-      </Button>
     </nav>
   );
 }
