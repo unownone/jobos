@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { panelVariants, usePageTransition, usePanelPlay } from "@/lib/motion";
 
 const TABS = ["jobs", "people", "candidate", "skills", "mcps", "memory"] as const;
 type Tab = (typeof TABS)[number];
@@ -17,6 +19,10 @@ function isTab(value: string): value is Tab {
 }
 
 export function DataPage() {
+  const reduce = useReducedMotion() === true;
+  const play = usePanelPlay();
+  const panel = panelVariants(reduce, play);
+  const transition = usePageTransition();
   const [tab, setTab] = useState<Tab>("jobs");
   const [who, setWho] = useState("Checking session…");
   const [conn, setConn] = useState<ShellConn>("signing in");
@@ -269,6 +275,7 @@ export function DataPage() {
             {tab === "memory" ? "Recall" : tab === "mcps" || tab === "candidate" ? "Refresh" : "Filter"}
           </Button>
         </div>
+        <motion.div key={tab} initial={panel.initial} animate={panel.animate} transition={transition} className="flex flex-col gap-4">
         <p id="stats" className="m-0 text-sm text-muted-foreground">
           {stats}
         </p>
@@ -303,6 +310,7 @@ export function DataPage() {
             </table>
           )}
         </div>
+        </motion.div>
       </main>
     </AppShell>
   );

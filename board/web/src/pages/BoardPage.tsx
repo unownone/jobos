@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 
 import { AppShell } from "@/components/shell/AppShell";
 import type { ShellConn } from "@/components/shell/TopBar";
@@ -23,6 +24,7 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
+import { panelVariants, usePageTransition, usePanelPlay } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 type Who = {
@@ -179,6 +181,10 @@ function Choice({
 }
 
 export function BoardPage() {
+  const reduce = useReducedMotion() === true;
+  const play = usePanelPlay();
+  const panel = panelVariants(reduce, play);
+  const transition = usePageTransition();
   const stageRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const filtersRef = useRef<HTMLDivElement>(null);
@@ -678,7 +684,13 @@ export function BoardPage() {
             ) : null}
           >
             {selected ? (
-              <div className="flex flex-col gap-1 p-3">
+              <motion.div
+                key={selected.id}
+                initial={panel.initial}
+                animate={panel.animate}
+                transition={transition}
+                className="flex flex-col gap-1 p-3"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="m-0 min-w-0 flex-1 break-all font-display text-lg leading-tight font-extrabold [font-family:var(--font-display)]">
                     #{selected.id} · {selected.company}
@@ -756,7 +768,7 @@ export function BoardPage() {
                     </p>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             ) : (
               <div hidden>
                 <label htmlFor="f_rejection_by">Rejected by</label>

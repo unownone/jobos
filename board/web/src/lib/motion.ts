@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 
 export const pageMotion = {
@@ -27,4 +28,21 @@ export function usePageTransition() {
   const reduce = useReducedMotion();
   if (reduce) return { duration: 0 };
   return { duration: 0.18, ease: [0.2, 0.8, 0.2, 1] as const };
+}
+
+/** In-page enter. `play` stays false for the prerender so the first paint is not opacity 0. Reduced motion fades only, with no transform. */
+export function panelVariants(reduce: boolean, play: boolean) {
+  if (!play) {
+    return { initial: false as const, animate: { opacity: 1 } };
+  }
+  if (reduce) {
+    return { initial: { opacity: 0 }, animate: { opacity: 1 } };
+  }
+  return { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } };
+}
+
+export function usePanelPlay() {
+  const [play, setPlay] = useState(false);
+  useEffect(() => setPlay(true), []);
+  return play;
 }

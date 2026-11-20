@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { assignHref } from "@/lib/auth-post";
 import { api } from "@/lib/api";
-import { pageVariants, usePageTransition } from "@/lib/motion";
+import { panelVariants, usePageTransition, usePanelPlay } from "@/lib/motion";
 
 type Step = "step1" | "step2" | "step3" | "step4";
 
@@ -55,7 +55,8 @@ const STEPS: Step[] = ["step1", "step2", "step3", "step4"];
 
 export function OnboardingPage() {
   const reduce = useReducedMotion() === true;
-  const variants = pageVariants(reduce);
+  const play = usePanelPlay();
+  const panel = panelVariants(reduce, play);
   const transition = usePageTransition();
   const [step, setStep] = useState<Step>("step1");
   const [who, setWho] = useState("Checking session…");
@@ -267,7 +268,13 @@ export function OnboardingPage() {
           <p id="revLine" className="m-0 text-sm text-muted-foreground">{revLine}</p>
           {STEPS.map((id) => (
             <div key={id} id={id} hidden={step !== id}>
-              <motion.div initial={variants.initial} animate={variants.animate} exit={variants.exit} transition={transition} className="flex flex-col gap-3">
+              <motion.div
+                key={step === id ? `${id}-on` : `${id}-off`}
+                initial={step === id ? panel.initial : false}
+                animate={step === id ? panel.animate : { opacity: 1 }}
+                transition={transition}
+                className="flex flex-col gap-3"
+              >
                 {id === "step1" ? (
                   <>
                     <h2 className="m-0 font-display text-[1.6rem] leading-none font-extrabold [font-family:var(--font-display)]">Identity</h2>
