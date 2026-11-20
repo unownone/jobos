@@ -332,6 +332,24 @@ describe("admin pages", () => {
     await waitFor(() => {
       expect(document.getElementById("msg")).toHaveTextContent("Seeded");
     });
+    expect(document.getElementById("msg")?.className).not.toContain("text-destructive");
+  });
+
+  it("shows a rejected skill seed as an error", async () => {
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ display_name: "Ada", kind: "admin" });
+      if (path.startsWith("/api/registry/skills")) return Promise.resolve({ skills: [] });
+      if (path === "/api/registry/recordings") return Promise.resolve({ recordings: [] });
+      if (path === "/api/registry/seed" && opts?.method === "POST") return Promise.reject(new Error("seed could not write the registry"));
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<SkillsPage />);
+    await waitFor(() => expect(document.getElementById("seed")).toBeEnabled());
+    fireEvent.click(document.getElementById("seed") as HTMLButtonElement);
+    await waitFor(() => {
+      expect(document.getElementById("msg")).toHaveTextContent("seed could not write the registry");
+    });
+    expect(document.getElementById("msg")?.className).toContain("text-destructive");
   });
 
   it("wraps a skill recording id and note", async () => {

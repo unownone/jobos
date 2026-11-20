@@ -9,6 +9,7 @@ import { Table, Td, Th } from "@/components/ui/table";
 import { NativeSelect } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { sessionLine, type SessionLine } from "@/lib/session";
+import { cn } from "@/lib/utils";
 
 type Skill = {
   slug: string;
@@ -34,6 +35,11 @@ export function SkillsPage() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [msg, setMsg] = useState("");
+  const [failed, setFailed] = useState(false);
+  function report(message: string, isError = false) {
+    setMsg(message);
+    setFailed(isError);
+  }
 
   async function loadSkills(nextTag = tag, nextScope = scope) {
     const params = new URLSearchParams();
@@ -49,7 +55,7 @@ export function SkillsPage() {
       setRecordings(data.recordings ?? []);
     } catch (error) {
       setRecordings([]);
-      setMsg(error instanceof Error ? error.message : "Could not load recordings");
+      report(error instanceof Error ? error.message : "Could not load recordings", true);
     }
   }
 
@@ -77,13 +83,13 @@ export function SkillsPage() {
   }, []);
 
   async function seed() {
-    setMsg("");
+    report("");
     try {
       const data = await api<{ counts?: Record<string, number> }>("/api/registry/seed", { method: "POST" });
-      setMsg(`Seeded: ${JSON.stringify(data.counts || {})}`);
+      report(`Seeded: ${JSON.stringify(data.counts || {})}`);
       await loadSkills();
     } catch (error) {
-      setMsg(error instanceof Error ? error.message : "Seed failed");
+      report(error instanceof Error ? error.message : "Seed failed", true);
     }
   }
 
@@ -145,7 +151,7 @@ export function SkillsPage() {
             Seed
           </Button>
         </div>
-        <p id="msg" className="m-0 text-sm">
+        <p id="msg" className={cn("m-0 text-sm", failed && "text-destructive")}>
           {msg}
         </p>
         <h2 className="m-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Skills</h2>
