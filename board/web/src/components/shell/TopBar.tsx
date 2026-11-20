@@ -37,7 +37,7 @@ export function TopBar({
         <h1 className="truncate font-display text-[1.35rem] leading-none font-extrabold tracking-[-0.03em] [font-family:var(--font-display)]">
           {title}
         </h1>
-        {subtitle ? <p className="truncate text-sm text-muted-foreground">{subtitle}</p> : null}
+        {subtitle ? <p className="text-sm text-muted-foreground min-[960px]:truncate">{subtitle}</p> : null}
       </div>
       <div className="flex min-w-0 items-center justify-between gap-2 min-[960px]:justify-end">
         {conn !== undefined ? (

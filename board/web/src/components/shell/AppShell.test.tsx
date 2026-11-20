@@ -20,7 +20,7 @@ describe("AppShell", () => {
     expect(hub.textContent).not.toMatch(/Log out/);
     expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute("href", "/admin/users");
-    expect(screen.getByText("helps find jobs")).toBeInTheDocument();
+    expect(screen.getByText("helps find jobs").className).toContain("min-[960px]:truncate");
   });
 
   it("does not scroll the stage when panes own the scroll", () => {
