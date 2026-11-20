@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -219,20 +220,20 @@ export function InvitesPage() {
             Existing invites
           </h2>
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <Table>
               <thead>
                 <tr>
-                  <th>Track</th>
-                  <th>Mode</th>
-                  <th></th>
+                  <Th className="w-[34%]">Track</Th>
+                  <Th className="w-[40%]">Mode</Th>
+                  <Th className="w-[26%]"></Th>
                 </tr>
               </thead>
               <tbody id="rows">
                 {invites.map((invite) => (
-                  <tr key={invite.id}>
-                    <td>{invite.track}</td>
-                    <td>{invite.mode}</td>
-                    <td>
+                  <tr key={invite.id} className="border-t border-border">
+                    <Td title={invite.track}>{invite.track}</Td>
+                    <Td title={invite.mode}>{invite.mode}</Td>
+                    <Td truncate={false}>
                       {inviteRevoked(invite) ? (
                         "revoked"
                       ) : (
@@ -240,11 +241,11 @@ export function InvitesPage() {
                           Revoke
                         </Button>
                       )}
-                    </td>
+                    </Td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         </section>
       </main>

@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { api } from "@/lib/api";
@@ -286,28 +287,26 @@ export function DataPage() {
           {rows.length === 0 ? (
             <p className="m-0 p-4 text-sm text-muted-foreground">No rows match these filters.</p>
           ) : (
-            <table className="w-full text-left text-sm">
+            <Table>
               <thead>
                 <tr>
-                  {headers.map((header) => (
-                    <th key={header} className="px-3 py-2">
-                      {header}
-                    </th>
+                  {headers.map((header, index) => (
+                    <Th key={header} className={index > 2 ? "max-[959px]:hidden" : undefined}>{header}</Th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, index) => (
                   <tr key={`${tab}-${index}`} className="border-t border-border">
-                    {headers.map((header) => (
-                      <td key={header} className="px-3 py-2">
+                    {headers.map((header, index) => (
+                      <Td key={header} className={index > 2 ? "max-[959px]:hidden" : undefined} title={row[header]}>
                         {row[header]}
-                      </td>
+                      </Td>
                     ))}
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           )}
         </div>
         </motion.div>

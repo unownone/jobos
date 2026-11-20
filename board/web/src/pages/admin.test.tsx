@@ -150,6 +150,7 @@ describe("admin pages", () => {
     render(<SkillsPage />);
 
     expect(document.querySelector("h1")).toHaveTextContent("Skill registry");
+    expect(document.getElementById("skills")?.closest("table")?.className).toContain("table-fixed");
     expect(document.querySelectorAll("#logout")).toHaveLength(0);
     expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
     fireEvent.click(document.getElementById("seed") as HTMLButtonElement);

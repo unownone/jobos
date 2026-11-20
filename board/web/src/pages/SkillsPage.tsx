@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { Table, Td, Th } from "@/components/ui/table";
 import { NativeSelect } from "@/components/ui/select";
 import { api } from "@/lib/api";
 
@@ -137,52 +138,52 @@ export function SkillsPage() {
           {msg}
         </p>
         <div className="min-w-0 overflow-x-auto border border-border bg-card">
-          <table className="w-full text-left text-sm">
+          <Table>
             <thead>
               <tr>
-                <th className="px-3 py-2">Slug</th>
-                <th className="px-3 py-2">Role</th>
-                <th className="px-3 py-2">Tags</th>
-                <th className="px-3 py-2">Scope</th>
-                <th className="px-3 py-2">Status</th>
+                <Th>Slug</Th>
+                <Th>Role</Th>
+                <Th className="max-[959px]:hidden">Tags</Th>
+                <Th className="max-[959px]:hidden">Scope</Th>
+                <Th className="max-[959px]:hidden">Status</Th>
               </tr>
             </thead>
             <tbody id="skills">
               {skills.map((skill) => (
                 <tr key={skill.slug} className="border-t border-border">
-                  <td className="px-3 py-2">{skill.slug}</td>
-                  <td className="px-3 py-2">{skill.role}</td>
-                  <td className="px-3 py-2">{(skill.tags ?? []).join(", ")}</td>
-                  <td className="px-3 py-2">{skill.scope}</td>
-                  <td className="px-3 py-2">{skill.status}</td>
+                  <Td title={skill.slug}>{skill.slug}</Td>
+                  <Td title={skill.role}>{skill.role}</Td>
+                  <Td className="max-[959px]:hidden" title={(skill.tags ?? []).join(", ")}>{(skill.tags ?? []).join(", ")}</Td>
+                  <Td className="max-[959px]:hidden" title={skill.scope}>{skill.scope}</Td>
+                  <Td className="max-[959px]:hidden" title={skill.status}>{skill.status}</Td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
         <div className="min-w-0 overflow-x-auto border border-border bg-card">
-          <table className="w-full text-left text-sm">
+          <Table>
             <thead>
               <tr>
-                <th className="px-3 py-2">Recording</th>
-                <th className="px-3 py-2">Skill</th>
-                <th className="px-3 py-2">Scope</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Note</th>
+                <Th>Recording</Th>
+                <Th>Skill</Th>
+                <Th className="max-[959px]:hidden">Scope</Th>
+                <Th className="max-[959px]:hidden">Status</Th>
+                <Th className="max-[959px]:hidden">Note</Th>
               </tr>
             </thead>
             <tbody id="recordings">
               {recordings.map((recording, index) => (
                 <tr key={recording.id || index} className="border-t border-border">
-                  <td className="px-3 py-2">{recording.id}</td>
-                  <td className="px-3 py-2">{recording.skill}</td>
-                  <td className="px-3 py-2">{recording.scope}</td>
-                  <td className="px-3 py-2">{recording.status}</td>
-                  <td className="px-3 py-2">{recording.note}</td>
+                  <Td title={recording.id}>{recording.id}</Td>
+                  <Td title={recording.skill}>{recording.skill}</Td>
+                  <Td className="max-[959px]:hidden" title={recording.scope}>{recording.scope}</Td>
+                  <Td className="max-[959px]:hidden" title={recording.status}>{recording.status}</Td>
+                  <Td className="max-[959px]:hidden" title={recording.note}>{recording.note}</Td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       </main>
     </AppShell>

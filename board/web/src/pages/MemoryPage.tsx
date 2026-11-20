@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -329,14 +330,14 @@ export function MemoryPage() {
             <span hidden data-edit="" data-solidify="" data-delete="" />
           </div>
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <Table>
               <thead>
                 <tr>
-                  <th className="px-3 py-2">Pod</th>
-                  <th className="px-3 py-2">Kind</th>
-                  <th className="px-3 py-2">Title</th>
-                  <th className="px-3 py-2">Fact</th>
-                  <th className="px-3 py-2"></th>
+                  <Th className="w-[16%] max-[959px]:hidden">Pod</Th>
+                  <Th className="w-[16%] max-[959px]:hidden">Kind</Th>
+                  <Th className="w-[20%]">Title</Th>
+                  <Th className="w-[22%]">Fact</Th>
+                  <Th className="w-[26%]"></Th>
                 </tr>
               </thead>
               <tbody id="rows">
@@ -344,11 +345,11 @@ export function MemoryPage() {
                   const canSolidify = item.pod_scope !== "worker" && (item.solidify_status || "none") === "none";
                   return (
                     <tr key={item.id} className="border-t border-border">
-                      <td className="px-3 py-2">{item.pod}</td>
-                      <td className="px-3 py-2">{item.kind}</td>
-                      <td className="px-3 py-2">{item.title}</td>
-                      <td className="px-3 py-2">{item.body}</td>
-                      <td className="px-3 py-2">
+                      <Td className="max-[959px]:hidden" title={item.pod}>{item.pod}</Td>
+                      <Td className="max-[959px]:hidden" title={item.kind}>{item.kind}</Td>
+                      <Td title={item.title}>{item.title}</Td>
+                      <Td title={item.body}>{item.body}</Td>
+                      <Td truncate={false}>
                         <div className="flex flex-wrap gap-2">
                           <Button type="button" variant="outline" data-edit={item.id} onClick={() => startEdit(item)}>
                             Edit
@@ -365,12 +366,12 @@ export function MemoryPage() {
                             Delete
                           </Button>
                         </div>
-                      </td>
+                      </Td>
                     </tr>
                   );
                 })}
               </tbody>
-            </table>
+            </Table>
           </div>
         </section>
       </main>

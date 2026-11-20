@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AppShell } from "@/components/shell/AppShell";
 import type { ShellConn } from "@/components/shell/TopBar";
 import { Badge } from "@/components/ui/badge";
+import { Table } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -622,7 +623,7 @@ export function BoardPage() {
             ) : jobs.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No jobs on this page.</p>
             ) : (
-              <table className="w-full table-fixed text-left text-sm">
+              <Table>
                 <thead className="sticky top-0 z-10 bg-card">
                   <tr>
                     <th className="w-[22%] px-3 py-2">Company</th>
@@ -651,7 +652,7 @@ export function BoardPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
           </section>
           <TicketFrame

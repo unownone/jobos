@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
+import { Table, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
 
 type DirectoryUser = {
@@ -55,38 +56,41 @@ export function UsersPage() {
           {who}
         </p>
         <div className="min-w-0 overflow-x-auto border border-border bg-card">
-          <table className="w-full text-left text-sm">
+          <Table>
             <thead className="sticky top-0 bg-card">
               <tr>
-                <th className="px-3 py-2">Name</th>
-                <th className="px-3 py-2">Kind</th>
-                <th className="px-3 py-2">Track</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Model</th>
-                <th className="px-3 py-2">Harness</th>
-                <th className="px-3 py-2">Bed</th>
-                <th className="px-3 py-2">Last active</th>
-                <th className="px-3 py-2">Task</th>
+                <Th>Name</Th>
+                <Th>Kind</Th>
+                <Th className="max-[959px]:hidden">Track</Th>
+                <Th>Status</Th>
+                <Th className="max-[959px]:hidden">Model</Th>
+                <Th className="max-[959px]:hidden">Harness</Th>
+                <Th className="max-[959px]:hidden">Bed</Th>
+                <Th className="max-[959px]:hidden">Last active</Th>
+                <Th className="max-[959px]:hidden">Task</Th>
               </tr>
             </thead>
             <tbody id="rows">
-              {users.map((user) => (
-                <tr key={user.user_id || user.display_name} className="border-t border-border">
-                  <td className="px-3 py-2">{user.display_name || user.user_id}</td>
-                  <td className="px-3 py-2">{user.kind}</td>
-                  <td className="px-3 py-2">
-                    {user.track} / {user.role}
-                  </td>
-                  <td className="px-3 py-2">{user.status}</td>
-                  <td className="px-3 py-2">{user.model}</td>
-                  <td className="px-3 py-2">{user.harness}</td>
-                  <td className="px-3 py-2">{user.bed}</td>
-                  <td className="px-3 py-2">{user.last_active || user.last_seen}</td>
-                  <td className="px-3 py-2">{user.current_task?.id}</td>
-                </tr>
-              ))}
+              {users.map((user) => {
+                const name = user.display_name || user.user_id || "";
+                const track = `${user.track || ""} / ${user.role || ""}`;
+                const seen = user.last_active || user.last_seen || "";
+                return (
+                  <tr key={user.user_id || user.display_name} className="border-t border-border">
+                    <Td title={name}>{name}</Td>
+                    <Td title={user.kind}>{user.kind}</Td>
+                    <Td className="max-[959px]:hidden" title={track}>{track}</Td>
+                    <Td title={user.status}>{user.status}</Td>
+                    <Td className="max-[959px]:hidden" title={user.model}>{user.model}</Td>
+                    <Td className="max-[959px]:hidden" title={user.harness}>{user.harness}</Td>
+                    <Td className="max-[959px]:hidden" title={user.bed}>{user.bed}</Td>
+                    <Td className="max-[959px]:hidden" title={seen}>{seen}</Td>
+                    <Td className="max-[959px]:hidden" title={user.current_task?.id}>{user.current_task?.id}</Td>
+                  </tr>
+                );
+              })}
             </tbody>
-          </table>
+          </Table>
         </div>
       </main>
     </AppShell>
