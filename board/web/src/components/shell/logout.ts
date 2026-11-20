@@ -1,3 +1,5 @@
+import { assignHref } from "@/lib/auth-post";
+
 function readCsrf(): string {
   const hit = document.cookie.split("; ").find((part) => part.startsWith("hub_csrf="));
   if (!hit) return "";
@@ -22,5 +24,5 @@ export async function logout(): Promise<void> {
   } catch {
     // Still leave. A failed POST must not trap the operator on the page.
   }
-  window.location.href = "/login";
+  assignHref("/login");
 }
