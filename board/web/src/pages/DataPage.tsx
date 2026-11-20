@@ -293,31 +293,33 @@ export function DataPage() {
           ) : null}
           {tab === "skills" ? (
             <>
-              <NativeSelect
-                id="tag"
-                label="Tag"
-                value={tag}
-                className="w-auto shrink-0"
-                onChange={setTag}
-                options={[
-                  { value: "", label: "all tags" },
-                  { value: "source", label: "source" },
-                  { value: "apply", label: "apply" },
-                  { value: "outreach", label: "outreach" },
-                ]}
-              />
-              <NativeSelect
-                id="scope"
-                label="Scope"
-                value={scope}
-                className="w-auto shrink-0"
-                onChange={setScope}
-                options={[
-                  { value: "", label: "shared + mine" },
-                  { value: "shared", label: "shared" },
-                  { value: "local", label: "local" },
-                ]}
-              />
+              <Field className="w-44 max-w-full shrink-0">
+                Tag
+                <NativeSelect
+                  id="tag"
+                  value={tag}
+                  onChange={setTag}
+                  options={[
+                    { value: "", label: "all tags" },
+                    { value: "source", label: "source" },
+                    { value: "apply", label: "apply" },
+                    { value: "outreach", label: "outreach" },
+                  ]}
+                />
+              </Field>
+              <Field className="w-44 max-w-full shrink-0">
+                Scope
+                <NativeSelect
+                  id="scope"
+                  value={scope}
+                  onChange={setScope}
+                  options={[
+                    { value: "", label: "shared + mine" },
+                    { value: "shared", label: "shared" },
+                    { value: "local", label: "local" },
+                  ]}
+                />
+              </Field>
             </>
           ) : null}
           <Button id="go" type="button" onClick={() => setReloadKey((key) => key + 1)}>

@@ -146,6 +146,23 @@ describe("admin pages", () => {
     expect(document.getElementById("table")).toBeInTheDocument();
   });
 
+  it("labels the data skill filters", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada" });
+      if (path.startsWith("/api/jobs")) return Promise.resolve({ jobs: [], count: 0, total: 0 });
+      if (path.startsWith("/api/registry/skills")) return Promise.resolve({ skills: [], count: 0 });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<DataPage />);
+    fireEvent.click(document.querySelector("[data-tab='skills']") as HTMLButtonElement);
+    await waitFor(() => {
+      expect(document.getElementById("tag")?.parentElement).toHaveTextContent("Tag");
+    });
+    expect(document.getElementById("tag")?.hasAttribute("aria-label")).toBe(false);
+    expect(document.getElementById("tag")?.closest("label")?.className).toContain("w-44");
+    expect(document.getElementById("scope")?.parentElement).toHaveTextContent("Scope");
+  });
+
   it("opens the data tab named in the query", async () => {
     window.history.replaceState({}, "", "/admin/data?tab=memory");
     apiMock.mockImplementation((path: string) => {
