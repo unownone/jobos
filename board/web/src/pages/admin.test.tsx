@@ -111,6 +111,8 @@ describe("admin pages", () => {
     await waitFor(() => {
       expect(document.getElementById("rows")).toHaveTextContent("Ada");
     });
+    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Name")?.className).toContain("w-[16%]");
+    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Track")?.className).toContain("w-[12%]");
     expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Last active")?.className).toContain("w-[8%]");
     expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Task")?.className).toContain("w-[14%]");
     expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Model")?.className).toContain("w-[14%]");
