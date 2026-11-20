@@ -10,14 +10,18 @@ export function csrfToken(): string {
 
 export async function api<T>(
   path: string,
-  opts?: { method?: string; body?: unknown },
+  opts?: { method?: string; body?: unknown; raw?: BodyInit | null; contentType?: string },
 ): Promise<T> {
   const headers: Record<string, string> = {};
   const token = csrfToken();
   if (token) {
     headers["X-CSRF"] = token;
   }
-  if (opts?.body !== undefined) {
+  if (opts?.raw !== undefined) {
+    if (opts.contentType) {
+      headers["Content-Type"] = opts.contentType;
+    }
+  } else if (opts?.body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
 
@@ -26,7 +30,9 @@ export async function api<T>(
     credentials: "same-origin",
     headers,
   };
-  if (opts?.body !== undefined) {
+  if (opts?.raw !== undefined) {
+    init.body = opts.raw;
+  } else if (opts?.body !== undefined) {
     init.body = JSON.stringify(opts.body);
   }
 

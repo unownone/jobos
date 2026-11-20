@@ -6,6 +6,21 @@ export const pageMotion = {
   exit: { opacity: 0, y: -6 },
 };
 
+export function pageVariants(reduce: boolean) {
+  if (reduce) {
+    return {
+      initial: false as const,
+      animate: { opacity: 1 },
+      exit: { opacity: 0 },
+    };
+  }
+  return {
+    initial: pageMotion.initial,
+    animate: pageMotion.animate,
+    exit: pageMotion.exit,
+  };
+}
+
 export function usePageTransition() {
   const reduce = useReducedMotion();
   if (reduce) return { duration: 0 };

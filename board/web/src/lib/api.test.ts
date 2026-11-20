@@ -17,6 +17,21 @@ describe("api", () => {
     expect(init.credentials).toBe("same-origin");
     expect((init.headers as Record<string, string>)["X-CSRF"]).toBe("abc=123");
     expect(init.body).toBe(JSON.stringify({ title: "Staff" }));
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+  });
+
+  it("sends a resume as raw pdf bytes", async () => {
+    const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await api("/api/candidate/resume", {
+      method: "PUT",
+      raw: pdf,
+      contentType: "application/pdf",
+    });
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.body).toBe(pdf);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/pdf");
   });
 
   it("redirects 401 to the board when next would be root", async () => {

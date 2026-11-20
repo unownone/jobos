@@ -19,10 +19,21 @@
 - `data-solidify` stays on the memory Solidify button. `id="add-item"` stays on the memory Add button.
 - Unauthorized `/board` redirects to `/login?next=/board`, never `/login?next=/`. A `next` of `/` or empty becomes `/board` (`nextPath` below).
 - Session is the `hub_csrf` cookie. Mutating fetches send header `X-CSRF` and `credentials: "same-origin"`.
-- `prefers-reduced-motion: reduce` disables Framer transitions (duration 0, no transform).
+- `prefers-reduced-motion: reduce` uses opacity only. Do not animate `y` or any other transform, including with duration 0. `pageVariants(true)` is the helper.
 - Do not invent a candidate, employer, or metric. Do not put secrets in the repo.
 - Python deps stay in `board/` via `uv`. Node deps stay in `board/web/`.
 - Imports go at the top of each module. Switches over unions end with a `never` check.
+
+## Corrections already in the code
+
+These were raised against the plan commit and are implemented. Later tasks must not undo them.
+
+- Login and bootstrap POST do not go through `api()`. A 401 must stay on the form and fill `#err`. `api()` still redirects other 401s.
+- The login card's Create account button posts `{ username, password }` to `/api/auth/signup`. `/admin/signup` posts `{ email, password, token }` to `/api/auth/bootstrap`.
+- Candidate status uses `onboarded` from `GET /api/candidate/status`. `candidate_onboarded` is only a fallback when that field is a boolean.
+- `nextPath` resolves the value against an app origin and returns `/board` when the origin differs, or when the decoded path contains `\` or starts with `//`.
+- `api()` accepts `raw` plus `contentType` for the resume PDF. Object `body` stays JSON.
+- `AppShell` takes an optional `path`. Prerender passes the route. The browser falls back to `window.location.pathname`.
 
 ## Why the current UI fails
 
@@ -596,7 +607,7 @@ This is the page `test_board.py` and `e2e/test_admin_shell.py` grep. The first r
 - no text `Select a job`
 - no `id="connectForm"`
 
-Layout inside the non-scrolling stage: toolbar (does not scroll), `#moreFilters` (does not scroll), then a row `min-h-0 flex-1` containing `#presenceRail` (`overflow-y-auto`) and `#list` (`overflow-y-auto`) and `#side`. `#pager` sits under that row and does not scroll away. Below 960px, presence is hidden unless the Jobs/Live switch (`data-board-pane`) is `presence`, and `#side` is a shadcn `Sheet` (`side="bottom"`).
+Layout inside the stage: toolbar and `#moreFilters` stay put when they fit. When their combined height leaves the list shorter than `8rem`, the stage itself scrolls (`overflow-y-auto`) so the toolbar, filters, list, and `#pager` all stay reachable. Otherwise the stage does not scroll, and a row `min-h-0 flex-1` contains `#presenceRail` (`overflow-y-auto`), `#list` (`overflow-y-auto`), and `#side`. `#pager` sits under that row and does not scroll away with the list. Below 960px, presence is hidden unless the Jobs/Live switch (`data-board-pane`) is `presence`, and `#side` is a shadcn `Sheet` (`side="bottom"`). Pass `path` into `AppShell` (the route string). Do not read `window.location` during prerender.
 
 Boot sequence from `board/app/static/index.html`:
 
@@ -677,7 +688,7 @@ Read the current pages and preserve behavior:
 
 Onboarding heading text is `Candidate onboarding`. Steps are four regions. ids that exist in the document even when hidden: `step1`, `step2`, `step3`, `step4`, `s1`, `s2`, `s3`, `s4`, `formPanel`, `full_name`, `preferred_name`, `email`, `phone`, `location`, `timezone`, `work_authorization`, `linkedin_url`, `github_url`, `to2`, `titles`, `locations_t`, `seniority`, `domains`, `remote`, `must_haves`, `deal_breakers`, `back1`, `to3`, `headline`, `years`, `stack`, `highlights`, `do_not_claim`, `writing_voice`, `back2`, `save`, `resume`, `uploadResume`, `skipResume`, `resumeOk`, `err`, `ok`, `revLine`, `who`.
 
-`GET /api/candidate` prefills the fields. `to2` with empty name or email sets `#err` to text containing `Full name and email` and does not reveal step 2. `to3` with empty titles sets `#err` to text containing `title`. Save `PUT /api/candidate` with the same JSON shape `onboarding.html` sends today (read that file's save handler and copy the keys). Success sets `#ok` to text containing `Profile saved` and reveals `#step4`. Resume upload `PUT /api/candidate/resume` with `Content-Type: application/pdf`. Skip sets location to `/board`, never `/` and never `/admin`.
+`GET /api/candidate` prefills the fields. `to2` with empty name or email sets `#err` to text containing `Full name and email` and does not reveal step 2. `to3` with empty titles sets `#err` to text containing `title`. Save `PUT /api/candidate` with the same JSON shape `onboarding.html` sends today (read that file's save handler and copy the keys). Success sets `#ok` to text containing `Profile saved` and reveals `#step4`. Resume upload calls `api("/api/candidate/resume", { method: "PUT", raw: fileBytes, contentType: "application/pdf" })`. Do not `JSON.stringify` the PDF. Skip sets location to `/board`, never `/` and never `/admin`. Pass `path` into `AppShell`.
 
 Join page is not inside the operator rail. Heading contains `Join`. ids `title`, `blurb`, `payload`, `form`, `name`, `model`, `harness`, `bed`, `provider`, `capabilities`, `extra`, `err`, `key`. Load `GET /api/join/{id}?s=`. Register `POST /api/auth/join`. The one-time key renders in `#key` and includes the text `API key`. If the API says onboarding is incomplete, `#blurb` contains `Candidate onboarding`.
 
@@ -716,7 +727,7 @@ Join page is not inside the operator rail. Heading contains `Join`. ids `title`,
 
 **Interfaces:**
 - Consumes: every page component
-- Produces: static HTML containing the pinned strings, plus `<script type="module" src="/static/app/main.js">` (hashed filename is allowed if the script tag in the HTML matches the file Vite emitted). `main.tsx` hydrates `#root` by choosing the page from `<body data-page="...">`.
+- Produces: static HTML containing the pinned strings, plus a module script whose `src` is the file Vite emitted (read `manifest.json`; do not invent a hashed name). `main.tsx` hydrates `#root` by choosing the page from `<body data-page="...">`. The Vite entry is `board/web/index.html`, which already exists. Pass each route into `AppShell` as `path` so prerender does not touch `window`.
 
 Prerender uses `renderToString` for the logged-out shell of each page so the strings exist without running the browser. `data-page` values: `landing`, `start`, `login`, `signup`, `home`, `board`, `invites`, `data`, `users`, `skills`, `memory`, `onboarding`, `join`.
 
@@ -725,12 +736,14 @@ Each HTML document includes:
 ```html
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="stylesheet" href="/static/theme.css" />
-<link rel="stylesheet" href="/static/app/app.css" />
+<link rel="stylesheet" href="/static/app/APP_CSS" />
 ```
+
+`APP_CSS` is the stylesheet path Vite wrote, taken from the build manifest. Do not hardcode `app.css` unless `build.rollupOptions.output.assetFileNames` actually emits that name. The test must assert the href that the built HTML contains.
 
 `test_ui_shell.py` today asserts vanilla source (`function fillForm`, `function nextPath`, `hub.css` on every page). Replace those assertions with:
 
-- every page file contains `viewport-fit=cover`, `/static/theme.css`, and `/static/app/app.css`
+- every page file contains `viewport-fit=cover`, `/static/theme.css`, and the same `/static/app/` stylesheet href the prerender wrote
 - authenticated pages `index.html`, `home.html`, `admin.html`, `data.html`, `users.html`, `skills.html`, `memory.html`, `onboarding.html` contain `hub-frame` or `data-testid="hub-frame"` and the link `/admin/memory`
 - `index.html` contains `id="f_rejection_by"`, `id="f_company_remarks"`, `id="f_user_remarks"`, `Rejected by`, and `/login?next=/board`, and does not contain `/login?next=/`
 - `onboarding.html` contains `id="full_name"` and the string `/board` as the post-save destination, and does not contain `location.href = "/"` or `location.href = "/admin"`

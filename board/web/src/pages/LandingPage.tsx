@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from "framer-motion";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { pageMotion, usePageTransition } from "@/lib/motion";
+import { pageVariants, usePageTransition } from "@/lib/motion";
 
 const GITHUB = "https://github.com/unownone/jobos";
 const AUTHOR = "https://github.com/unownone";
@@ -204,15 +204,16 @@ function LoopStep({ n, title, children }: { n: string; title: string; children: 
 
 export function LandingPage() {
   const reduceMotion = useReducedMotion() === true;
+  const variants = pageVariants(reduceMotion);
   const transition = usePageTransition();
 
   return (
     <PublicFrame page="landing">
       <motion.div
         className={`${wrap} grid grid-cols-1 items-center gap-10 py-12 max-[880px]:pt-7 min-[881px]:grid-cols-[minmax(0,1.15fr)_minmax(16rem,0.85fr)] min-[881px]:gap-x-12`}
-        initial={reduceMotion ? false : pageMotion.initial}
-        animate={reduceMotion ? { opacity: 1 } : pageMotion.animate}
-        exit={reduceMotion ? { opacity: 0 } : pageMotion.exit}
+        initial={variants.initial}
+        animate={variants.animate}
+        exit={variants.exit}
         transition={transition}
       >
         <div>

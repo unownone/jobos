@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 
-import { pageMotion, usePageTransition } from "@/lib/motion";
+import { pageVariants, usePageTransition } from "@/lib/motion";
 
 import { PublicFrame, PublicLink, PublicMono, PublicStep, publicDisplay } from "./LandingPage";
 
@@ -16,15 +16,16 @@ const column =
 
 export function StartPage() {
   const reduceMotion = useReducedMotion() === true;
+  const variants = pageVariants(reduceMotion);
   const transition = usePageTransition();
 
   return (
     <PublicFrame page="start">
       <motion.div
         className={`${column} py-10`}
-        initial={reduceMotion ? false : pageMotion.initial}
-        animate={reduceMotion ? { opacity: 1 } : pageMotion.animate}
-        exit={reduceMotion ? { opacity: 0 } : pageMotion.exit}
+        initial={variants.initial}
+        animate={variants.animate}
+        exit={variants.exit}
         transition={transition}
       >
         <h1 className={`${publicDisplay} mb-3 text-[clamp(2.2rem,5vw,3.6rem)] leading-[0.95] font-extrabold`}>

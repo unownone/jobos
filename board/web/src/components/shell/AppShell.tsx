@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
-import { pageMotion, usePageTransition } from "@/lib/motion";
+import { pageVariants, usePageTransition } from "@/lib/motion";
 
 import { Dock } from "./Dock";
 import { Rail } from "./Rail";
@@ -60,17 +60,20 @@ export function AppShell({
   subtitle,
   scroll,
   who,
+  path,
   children,
 }: {
   title: string;
   subtitle?: string;
   scroll: ShellScroll;
   who?: string;
+  path?: string;
   children: ReactNode;
 }) {
   const narrow = useNarrowViewport();
-  const pathname = window.location.pathname;
+  const pathname = path ?? (typeof window === "undefined" ? "/" : window.location.pathname);
   const reduceMotion = useReducedMotion() === true;
+  const variants = pageVariants(reduceMotion);
   const transition = usePageTransition();
 
   return (
@@ -90,9 +93,9 @@ export function AppShell({
         >
           <motion.div
             className={motionClass(scroll)}
-            initial={reduceMotion ? false : pageMotion.initial}
-            animate={reduceMotion ? { opacity: 1 } : pageMotion.animate}
-            exit={reduceMotion ? { opacity: 0 } : pageMotion.exit}
+            initial={variants.initial}
+            animate={variants.animate}
+            exit={variants.exit}
             transition={transition}
           >
             {children}
