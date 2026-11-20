@@ -8,6 +8,7 @@ import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card
 import { Table, Td, Th } from "@/components/ui/table";
 import { NativeSelect } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { sessionLine, type SessionLine } from "@/lib/session";
 
 type Skill = {
   slug: string;
@@ -24,22 +25,6 @@ type Recording = {
   status?: string;
   note?: string;
 };
-
-type Session = {
-  display_name?: string;
-  actor?: string;
-  role?: string;
-  track?: string | null;
-  kind?: string;
-  user?: { display_name?: string };
-};
-
-function sessionLine(me: Session): string {
-  const name = me.user?.display_name?.trim() || me.display_name?.trim() || me.actor?.trim() || me.role?.trim() || "signed in";
-  const lane = me.track?.trim() || me.kind?.trim() || "";
-  if (!lane || lane === name) return name;
-  return `${name} · ${lane}`;
-}
 
 export function SkillsPage() {
   const [who, setWho] = useState("Checking session…");
@@ -72,7 +57,7 @@ export function SkillsPage() {
     let cancelled = false;
     async function boot() {
       try {
-        const me = await api<Session>("/api/auth/me");
+        const me = await api<SessionLine>("/api/auth/me");
         if (cancelled) return;
         setWho(sessionLine(me));
         setConn("signed in");

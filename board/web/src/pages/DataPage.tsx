@@ -10,6 +10,7 @@ import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { sessionLine, type SessionLine } from "@/lib/session";
 import { panelVariants, usePageTransition, usePanelPlay } from "@/lib/motion";
 
 const TABS = ["jobs", "people", "candidate", "skills", "mcps", "memory"] as const;
@@ -82,10 +83,10 @@ export function DataPage() {
 
   useEffect(() => {
     let cancelled = false;
-    api<{ actor?: string; user?: { email?: string } }>("/api/auth/me")
+    api<SessionLine>("/api/auth/me")
       .then((me) => {
         if (!cancelled) {
-          setWho(me.user?.email || me.actor || "signed in");
+          setWho(sessionLine(me));
           setConn("signed in");
         }
       })

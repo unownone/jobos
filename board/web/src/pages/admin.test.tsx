@@ -207,6 +207,29 @@ describe("admin pages", () => {
     expect(document.getElementById("stopped")?.className).toContain("w-auto");
     expect(document.getElementById("go")).toBeInTheDocument();
     expect(document.getElementById("table")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.getElementById("who")).toHaveTextContent("ada");
+    });
+  });
+
+  it("names the data operator and their lane", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") {
+        return Promise.resolve({
+          actor: "auditoperator",
+          role: "admin",
+          kind: "admin",
+          user: { display_name: "auditoperator" },
+        });
+      }
+      if (path.startsWith("/api/jobs")) return Promise.resolve({ jobs: [], count: 0, total: 0 });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<DataPage />);
+    await waitFor(() => {
+      expect(document.getElementById("who")).toHaveTextContent("auditoperator · admin");
+    });
+    expect(document.getElementById("whoLabel")).toHaveTextContent("auditoperator · admin");
   });
 
   it("labels the data skill filters", async () => {
