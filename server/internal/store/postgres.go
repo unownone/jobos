@@ -45,6 +45,7 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS company TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE`,
 		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS tags_json TEXT NOT NULL DEFAULT '[]'`,
+		`CREATE INDEX IF NOT EXISTS memory_items_fts ON memory_items USING GIN (to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(body,'') || ' ' || coalesce(company,'')))`,
 	} {
 		if _, err := p.pool.Exec(ctx, stmt); err != nil {
 			return err

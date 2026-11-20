@@ -16,7 +16,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/unownone/jobos/server/internal/blob"
 	"github.com/unownone/jobos/server/internal/cache"
@@ -418,15 +417,6 @@ func constEq(a, b string) bool {
 		v |= a[i] ^ b[i]
 	}
 	return v == 0
-}
-
-func hashPassword(pw string) (string, error) {
-	b, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
-	return string(b), err
-}
-
-func checkPassword(hash, pw string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }
 
 func (s *Server) health(c *gin.Context) {

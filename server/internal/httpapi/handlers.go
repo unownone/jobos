@@ -1172,10 +1172,9 @@ func (s *Server) memoryPods(c *gin.Context) {
 
 func (s *Server) memoryRecall(c *gin.Context) {
 	p := principalFrom(c)
-	items := s.visibleMemory(c, p, "")
 	limit := queryLimit(c, 12, 24)
 	compact := c.Query("compact") == "1" || c.Query("compact") == "true"
-	kept := filterMemory(items, c.Query("q"), c.Query("job_id"), c.Query("company"), "", limit, compact)
+	kept := s.recallMemory(c, p, "", c.Query("q"), c.Query("job_id"), c.Query("company"), "", limit, compact)
 	c.JSON(http.StatusOK, gin.H{"items": kept, "count": len(kept)})
 }
 
@@ -1192,10 +1191,39 @@ func (s *Server) listMemory(c *gin.Context) {
 			pod = raw
 		}
 	}
-	items := s.visibleMemory(c, p, pod)
 	limit := queryLimit(c, 12, 100)
-	kept := filterMemory(items, c.Query("q"), c.Query("job_id"), c.Query("company"), c.Query("kind"), limit, false)
+	kept := s.recallMemory(c, p, pod, c.Query("q"), c.Query("job_id"), c.Query("company"), c.Query("kind"), limit, false)
 	c.JSON(http.StatusOK, gin.H{"items": kept, "count": len(kept)})
+}
+
+func (s *Server) recallMemory(c *gin.Context, p principal, pod, q, jobID, company, kind string, limit int, compact bool) []store.MemoryItem {
+	if searcher, ok := s.DB.(interface {
+		SearchMemory(ctx context.Context, q store.MemoryQuery) ([]store.MemoryItem, error)
+	}); ok {
+		query := store.MemoryQuery{
+			AccountID: p.AccountID, Pod: pod, Kind: kind, JobID: jobID, Company: company, Q: q, Now: now(), Limit: limit,
+		}
+		if pod == "" && p.Role != "admin" && p.Role != "maintenance" {
+			query.Pods = []string{"common", "worker:" + p.UserID}
+			if p.Track != "" {
+				query.Pods = append(query.Pods, "track:"+p.Track)
+			}
+		}
+		items, err := searcher.SearchMemory(c.Request.Context(), query)
+		if err == nil {
+			if compact {
+				for i := range items {
+					items[i].Body = compactBody(items[i].Body)
+				}
+			}
+			if items == nil {
+				items = []store.MemoryItem{}
+			}
+			return items
+		}
+	}
+	items := s.visibleMemory(c, p, pod)
+	return filterMemory(items, q, jobID, company, kind, limit, compact)
 }
 
 func (s *Server) visibleMemory(c *gin.Context, p principal, pod string) []store.MemoryItem {
@@ -2037,4 +2065,3 @@ func (s *Server) sendPeer(c *gin.Context) {
 	_ = s.DB.SaveTask(c.Request.Context(), task)
 	c.JSON(http.StatusOK, gin.H{"task": task, "peer_id": c.Param("id")})
 }
-

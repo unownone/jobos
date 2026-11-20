@@ -4,7 +4,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/unownone/jobos/server/internal/store"
 )
@@ -187,16 +186,12 @@ func memoryMatches(item store.MemoryItem, q, jobID, company, kind string) bool {
 	if company != "" && !strings.EqualFold(item.Company, company) {
 		return false
 	}
-	if q == "" {
+	fts := store.MemoryFTS(q)
+	if fts == "" {
 		return true
 	}
 	hay := strings.ToLower(item.Title + "\n" + item.Body + "\n" + item.Company)
-	for _, tok := range strings.FieldsFunc(strings.ToLower(q), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
-	}) {
-		if len(tok) < 2 {
-			continue
-		}
+	for _, tok := range strings.Split(fts, " & ") {
 		if !strings.Contains(hay, tok) {
 			return false
 		}
