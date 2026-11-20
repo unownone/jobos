@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.agent_flow import evaluate_lane, plan_loop, redirect_uri_allowed
+from app.mcp_http import _with_query
 
 
 def _session(lanes: list[str], *, browser: bool = False, email: bool = False, reported: bool = False) -> dict:
@@ -65,6 +66,18 @@ def test_apply_loop_names_one_ready_job() -> None:
     assert step["continue"] is True
     blocked = plan_loop({"lane": "apply"}, [])
     assert blocked["status"] == "blocked"
+
+
+def test_oauth_callback_keeps_registered_query_parameters() -> None:
+    uri = "https://client.example/callback?app=jobos&desk=1"
+    merged = _with_query(uri, {"code": "abc", "state": "s1"})
+    assert "app=jobos" in merged
+    assert "desk=1" in merged
+    assert "code=abc" in merged
+    assert "state=s1" in merged
+    denied = _with_query(uri, {"error": "access_denied", "state": "s1"})
+    assert "app=jobos" in denied
+    assert "error=access_denied" in denied
 
 
 def test_redirect_uris_allow_loopback_and_https_only() -> None:

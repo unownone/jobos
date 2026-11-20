@@ -5,14 +5,17 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.constants import ROLES
 from app.main import create_app
 from app.settings import Settings
+from app.tenant import TenantContext
 
 TOKENS = {role: f"test-token-{role}-not-real" for role in ROLES}
 REDIRECT = "http://127.0.0.1:9/callback"
@@ -294,3 +297,261 @@ def test_mcp_oauth_lanes_loops_and_legacy_jobs(tmp_path: Path) -> None:
         json={"jsonrpc": "2.0", "id": 13, "method": "ping"},
     )
     assert dead.status_code == 401
+
+
+def _bootstrap(client: TestClient) -> None:
+    token = client.app.state.bootstrap_token
+    boot = client.post(
+        "/api/auth/bootstrap",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"email": "owner@example.test", "password": "correct-horse"},
+    )
+    assert boot.status_code == 200, boot.text
+
+
+def _account_id(client: TestClient) -> str:
+    row = client.app.state.db.conn.execute(
+        "SELECT account_id FROM users WHERE email = ?",
+        ("owner@example.test",),
+    ).fetchone()
+    assert row is not None
+    return row["account_id"]
+
+
+def _connect(client: TestClient, redirect: str = REDIRECT) -> str:
+    registered = client.post(
+        "/oauth/register",
+        json={
+            "client_name": "Test AI",
+            "redirect_uris": [redirect],
+            "token_endpoint_auth_method": "none",
+        },
+    )
+    assert registered.status_code == 201, registered.text
+    client_id = registered.json()["client_id"]
+    verifier, challenge = _pkce()
+    approved = client.post(
+        "/oauth/authorize",
+        headers=_csrf(client),
+        json={
+            "client_id": client_id,
+            "redirect_uri": redirect,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "state": "s1",
+            "decision": "approve",
+        },
+    )
+    assert approved.status_code == 200, approved.text
+    parsed = urlparse(approved.json()["redirect"])
+    query = parse_qs(parsed.query)
+    issued = client.post(
+        "/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": client_id,
+            "code": query["code"][0],
+            "redirect_uri": redirect,
+            "code_verifier": verifier,
+        },
+    )
+    assert issued.status_code == 200, issued.text
+    return issued.json()["access_token"]
+
+
+def _open_session(client: TestClient, access: str) -> str:
+    init = client.post(
+        "/mcp",
+        headers={"Authorization": f"Bearer {access}"},
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "test", "version": "0"}},
+        },
+    )
+    assert init.status_code == 200, init.text
+    return init.headers["mcp-session-id"]
+
+
+def _raw_tool(client: TestClient, token: str, session_id: str, name: str, arguments: dict, msg_id: int) -> dict:
+    res = client.post(
+        "/mcp",
+        headers={"Authorization": f"Bearer {token}", "Mcp-Session-Id": session_id},
+        json={"jsonrpc": "2.0", "id": msg_id, "method": "tools/call", "params": {"name": name, "arguments": arguments}},
+    )
+    assert res.status_code == 200, res.text
+    return res.json()["result"]
+
+
+def _arm(client: TestClient, access: str, session_id: str, lanes: list[str], *, browser: bool, email: bool) -> None:
+    _tool(client, access, session_id, "set_session_lanes", {"lanes": lanes}, msg_id=2)
+    _tool(client, access, session_id, "report_capabilities", {"browser": browser, "email": email}, msg_id=3)
+
+
+def _stamp(minutes: int) -> str:
+    moment = datetime(2020, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=minutes)
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_find_lane_cannot_record_an_application(tmp_path: Path) -> None:
+    client = TestClient(create_app(_settings(tmp_path)))
+    _bootstrap(client)
+    access = _connect(client)
+    session_id = _open_session(client, access)
+    _arm(client, access, session_id, ["find"], browser=True, email=False)
+    forged = _raw_tool(
+        client,
+        access,
+        session_id,
+        "create_job",
+        {
+            "company": "Acme",
+            "title": "Already Applied",
+            "apply_url": "https://jobs.example.test/forged",
+            "status": "applied",
+        },
+        4,
+    )
+    assert forged["isError"] is True
+    assert "discovery lane" in forged["content"][0]["text"]
+    created = _tool(
+        client,
+        access,
+        session_id,
+        "create_job",
+        {"company": "Acme", "title": "Staff Engineer", "apply_url": "https://jobs.example.test/lane-acme"},
+        msg_id=9,
+    )
+    job_id = created["job"]["id"]
+    applied = _raw_tool(
+        client,
+        access,
+        session_id,
+        "update_job",
+        {"lane": "find", "job_id": job_id, "patch": {"status": "applied"}},
+        5,
+    )
+    assert applied["isError"] is True
+    assert "applied" in applied["content"][0]["text"]
+    kept = _tool(
+        client,
+        access,
+        session_id,
+        "update_job",
+        {"lane": "find", "job_id": job_id, "patch": {"status": "shortlisted"}},
+        msg_id=6,
+    )
+    assert kept["job"]["status"] == "shortlisted"
+    _tool(client, access, session_id, "set_session_lanes", {"lanes": ["find", "apply"]}, msg_id=7)
+    recorded = _tool(
+        client,
+        access,
+        session_id,
+        "update_job",
+        {"lane": "apply", "job_id": job_id, "patch": {"status": "applied"}},
+        msg_id=8,
+    )
+    assert recorded["job"]["status"] == "applied"
+
+
+@pytest.mark.no_candidate
+def test_outreach_loop_stops_until_the_candidate_is_onboarded(tmp_path: Path) -> None:
+    client = TestClient(create_app(_settings(tmp_path)))
+    _bootstrap(client)
+    access = _connect(client)
+    session_id = _open_session(client, access)
+    _arm(client, access, session_id, ["outreach"], browser=False, email=True)
+    client.app.state.db.insert_job(
+        TenantContext(_account_id(client)),
+        {
+            "id": "board__ready",
+            "company": "Acme",
+            "title": "Staff Engineer",
+            "status": "outreach_ready",
+            "updated_at": _stamp(0),
+        },
+    )
+    started = _raw_tool(client, access, session_id, "start_loop", {"lane": "outreach"}, 4)
+    text = started["content"][0]["text"]
+    assert started["isError"] is True
+    assert "onboard" in text.lower()
+    assert "Email for" not in text
+
+
+def test_loop_planning_includes_jobs_older_than_the_first_page(tmp_path: Path) -> None:
+    client = TestClient(create_app(_settings(tmp_path)))
+    _bootstrap(client)
+    access = _connect(client)
+    session_id = _open_session(client, access)
+    _arm(client, access, session_id, ["find", "apply"], browser=True, email=False)
+    db = client.app.state.db
+    tenant = TenantContext(_account_id(client))
+    db.insert_job(
+        tenant,
+        {
+            "id": "old__apply",
+            "company": "Old Co",
+            "title": "Staff Engineer",
+            "status": "apply_ready",
+            "updated_at": _stamp(0),
+        },
+    )
+    for index in range(12):
+        db.insert_job(
+            tenant,
+            {
+                "id": f"old__short{index}",
+                "company": f"Short {index}",
+                "title": "Staff Engineer",
+                "status": "shortlisted",
+                "updated_at": _stamp(10 + index),
+            },
+        )
+    for index in range(200):
+        db.insert_job(
+            tenant,
+            {
+                "id": f"new__disc{index}",
+                "company": f"New {index}",
+                "title": "Engineer",
+                "status": "discovered",
+                "updated_at": _stamp(100 + index),
+            },
+        )
+    found = _tool(client, access, session_id, "start_loop", {"lane": "find"}, msg_id=4)
+    assert found["status"] == "done"
+    assert found["shortlist_count"] >= 12
+    applying = _tool(client, access, session_id, "start_loop", {"lane": "apply"}, msg_id=5)
+    assert applying["job_id"] == "old__apply"
+    assert applying["continue"] is True
+
+
+def test_oauth_redirect_keeps_the_registered_query(tmp_path: Path) -> None:
+    redirect = "http://127.0.0.1:9/callback?app=jobos&desk=1"
+    client = TestClient(create_app(_settings(tmp_path)))
+    _bootstrap(client)
+    registered = client.post(
+        "/oauth/register",
+        json={"client_name": "Test AI", "redirect_uris": [redirect], "token_endpoint_auth_method": "none"},
+    )
+    assert registered.status_code == 201, registered.text
+    _verifier, challenge = _pkce()
+    approved = client.post(
+        "/oauth/authorize",
+        headers=_csrf(client),
+        json={
+            "client_id": registered.json()["client_id"],
+            "redirect_uri": redirect,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "state": "s1",
+            "decision": "approve",
+        },
+    )
+    assert approved.status_code == 200, approved.text
+    query = parse_qs(urlparse(approved.json()["redirect"]).query)
+    assert query["app"] == ["jobos"]
+    assert query["desk"] == ["1"]
+    assert query["state"] == ["s1"]
+    assert query["code"][0]

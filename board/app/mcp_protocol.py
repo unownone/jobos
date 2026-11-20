@@ -32,6 +32,7 @@ PROTOCOL = "2025-03-26"
 SUPPORTED = {PROTOCOL, "2025-06-18", "2024-11-05"}
 ID_RE = re.compile(r"^[a-z0-9]+__[a-zA-Z0-9._-]+$")
 SLUG_RE = re.compile(r"[^a-z0-9]+")
+_ROLE_FOR_LANE = {"find": "discovery", "apply": "apply", "outreach": "outreach"}
 
 INSTRUCTIONS = (
     "You are connected to jobOS as one agent. You are not stuck in a single lane. "
@@ -324,6 +325,26 @@ class McpEngine:
             raise ValueError(result["instruction"])
         return result
 
+    def _role_for(self, lane: str) -> str:
+        """Hub role that matches the session lane. Find cannot write apply statuses."""
+        canonical = str(self._gate(lane)["lane"])
+        role = _ROLE_FOR_LANE.get(canonical)
+        if role is None:
+            raise ValueError("lane must be find, apply, or outreach")
+        return role
+
+    def _open_jobs(self) -> list[dict[str, Any]]:
+        """Every open job, not the latest page. Loop planning must see older ready work."""
+        page = 200
+        offset = 0
+        jobs: list[dict[str, Any]] = []
+        while True:
+            batch = self.db.list_jobs(self.tenant, stopped=False, limit=page, offset=offset)
+            jobs.extend(batch)
+            if len(batch) < page:
+                return jobs
+            offset += len(batch)
+
     def _candidate_ready(self) -> dict[str, Any]:
         status = candidate_status(self.settings, self.db, tenant=self.tenant)
         if not status["onboarded"]:
@@ -507,9 +528,9 @@ class McpEngine:
 
     def tool_create_job(self, args: dict[str, Any]) -> dict[str, Any]:
         self._candidate_ready()
-        self._gate("find")
+        role = self._role_for("find")
         payload = {key: value for key, value in args.items() if value not in (None, "")}
-        payload = authorize_create("admin", payload)
+        payload = authorize_create(role, payload)
         if payload.get("id"):
             job_id = str(payload["id"]).strip()
             if not ID_RE.match(job_id):
@@ -528,12 +549,12 @@ class McpEngine:
         if dup:
             raise ValueError(f"duplicate job: {dup['id']}")
         payload["id"] = job_id
-        payload["created_by_role"] = "admin"
+        payload["created_by_role"] = role
         stored = self.db.insert_job(self.tenant, payload)
         self.db.add_event(
             self.tenant,
             job_id=job_id,
-            actor_role="admin",
+            actor_role=role,
             actor=self.principal.actor,
             action="create",
             from_status=None,
@@ -543,13 +564,12 @@ class McpEngine:
         )
         queue = getattr(self.request.app.state, "queue", None)
         if queue is not None:
-            queue.sync_system_items(self.tenant, stored, actor_role="admin", actor=self.principal.actor)
+            queue.sync_system_items(self.tenant, stored, actor_role=role, actor=self.principal.actor)
         return {"job": _summary(stored), "instruction": "Do not apply from find. Call next_loop when this source is done."}
 
     def tool_update_job(self, args: dict[str, Any]) -> dict[str, Any]:
         self._candidate_ready()
-        lane = str(args.get("lane") or "")
-        self._gate(lane)
+        role = self._role_for(str(args.get("lane") or ""))
         job_id = str(args.get("job_id") or "").strip()
         current = self.db.get_job(self.tenant, job_id)
         if current is None:
@@ -557,12 +577,12 @@ class McpEngine:
         incoming = args.get("patch")
         if not isinstance(incoming, dict) or not incoming:
             raise ValueError("patch object is required")
-        patch = authorize_patch("admin", current, incoming)
+        patch = authorize_patch(role, current, incoming)
         stored = self.db.update_job(self.tenant, job_id, patch)
         self.db.add_event(
             self.tenant,
             job_id=job_id,
-            actor_role="admin",
+            actor_role=role,
             actor=self.principal.actor,
             action="patch",
             from_status=current["status"],
@@ -572,7 +592,7 @@ class McpEngine:
         )
         queue = getattr(self.request.app.state, "queue", None)
         if queue is not None:
-            queue.sync_system_items(self.tenant, stored, actor_role="admin", actor=self.principal.actor)
+            queue.sync_system_items(self.tenant, stored, actor_role=role, actor=self.principal.actor)
         return {"job": _summary(stored)}
 
     def tool_list_people(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -600,15 +620,14 @@ class McpEngine:
     def tool_start_loop(self, args: dict[str, Any]) -> dict[str, Any]:
         lane = str(args.get("lane") or "")
         gate = self._gate(lane)
-        if gate["lane"] in {"find", "apply"}:
-            self._candidate_ready()
+        self._candidate_ready()
         loop = self.flow.start_loop(
             self.grant["account_id"],
             self.session["id"],
             lane=gate["lane"],
             goal=str(args.get("goal") or ""),
         )
-        jobs = self.db.list_jobs(self.tenant, limit=200)
+        jobs = self._open_jobs()
         step = plan_loop(loop, jobs)
         step["loop_id"] = loop["id"]
         step["steers"] = self.flow.list_steers(self.grant["account_id"], session_id=self.session["id"], limit=3)
@@ -624,6 +643,7 @@ class McpEngine:
             return {"loop_id": loop["id"], "status": loop["status"], "continue": False, "instruction": "This loop is not running."}
         try:
             self._gate(loop["lane"])
+            self._candidate_ready()
         except ValueError as exc:
             saved = self.flow.save_loop(
                 self.grant["account_id"], loop["id"], status="blocked", step=int(loop["step"]) + 1
@@ -634,7 +654,7 @@ class McpEngine:
                 "continue": False,
                 "instruction": str(exc),
             }
-        jobs = self.db.list_jobs(self.tenant, limit=200)
+        jobs = self._open_jobs()
         step = plan_loop(loop, jobs)
         saved = self.flow.save_loop(
             self.grant["account_id"],

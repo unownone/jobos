@@ -86,9 +86,13 @@ def _oauth_error(status_code: int, error: str, description: str) -> JSONResponse
 
 
 def _with_query(uri: str, params: dict[str, str]) -> str:
+    """Add the OAuth response without dropping query parameters the client registered."""
     parts = urlparse(uri)
-    query = urlencode(params)
-    return urlunparse(parts._replace(query=query))
+    merged: dict[str, str] = {}
+    for key, values in parse_qs(parts.query, keep_blank_values=True).items():
+        merged[key] = values[-1] if values else ""
+    merged.update(params)
+    return urlunparse(parts._replace(query=urlencode(merged)))
 
 
 def _session_user(request: Request) -> Principal | None:
