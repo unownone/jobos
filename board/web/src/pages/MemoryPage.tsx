@@ -45,6 +45,9 @@ export function MemoryPage() {
   const [query, setQuery] = useState("");
   const [sharePod, setSharePod] = useState("");
   const [shareKind, setShareKind] = useState("");
+  const [shareCopy, setShareCopy] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
 
   const writeKinds = kinds[scopeOf(writePod)] ?? [];
 
@@ -74,8 +77,11 @@ export function MemoryPage() {
         setKinds(podData.kinds ?? {});
         const writable = list.filter((pod) => pod.writable !== false);
         const first = writable[0]?.id ?? "";
+        const firstKind = (podData.kinds?.[scopeOf(first)] ?? [])[0] ?? "";
         setWritePod(first);
         setSharePod(first);
+        setWriteKind((current) => current || firstKind);
+        setShareKind((current) => current || firstKind);
         const policyText = podData.write_policy;
         setPolicy(`${policyText?.store_when || ""} Caps / 15m: ${JSON.stringify(policyText?.caps || {})}`);
         await loadItems();
@@ -122,6 +128,74 @@ export function MemoryPage() {
     }
   }
 
+  function startEdit(item: Item) {
+    setEditingId(item.id);
+    setSharingId(null);
+    setTitle(item.title ?? "");
+    setBody(item.body ?? "");
+    if (item.pod) setWritePod(item.pod);
+    if (item.kind) setWriteKind(item.kind);
+    setStatus("Editing.");
+    setErr("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setTitle("");
+    setBody("");
+    setCompany("");
+    setStatus("");
+  }
+
+  async function saveItem() {
+    if (!editingId) return;
+    setStatus("");
+    try {
+      await api(`/api/memory/items/${encodeURIComponent(editingId)}`, {
+        method: "PATCH",
+        body: { title: title.trim(), body: body.trim() },
+      });
+      setEditingId(null);
+      setTitle("");
+      setBody("");
+      setCompany("");
+      await loadItems();
+      setStatus("Saved.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not save");
+    }
+  }
+
+  async function removeItem(id: string) {
+    if (!window.confirm("Delete this memory?")) return;
+    setErr("");
+    try {
+      await api(`/api/memory/items/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (editingId === id) cancelEdit();
+      if (sharingId === id) setSharingId(null);
+      await loadItems();
+      setStatus("Deleted.");
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : "Could not delete");
+    }
+  }
+
+  async function shareItem() {
+    if (!sharingId) return;
+    setErr("");
+    try {
+      await api(`/api/memory/items/${encodeURIComponent(sharingId)}/move`, {
+        method: "POST",
+        body: { pod: sharePod, copy: shareCopy, kind: shareKind || undefined },
+      });
+      setSharingId(null);
+      await loadItems();
+      setStatus(shareCopy ? "Copied." : "Moved.");
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : "Could not share");
+    }
+  }
+
   return (
     <AppShell title="Memory pods" scroll="page" path="/admin/memory">
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
@@ -165,10 +239,10 @@ export function MemoryPage() {
             <Button id="add-item" type="button" onClick={() => void addItem()}>
               Add
             </Button>
-            <Button id="save-item" type="button" variant="outline" disabled>
+            <Button id="save-item" type="button" variant="outline" disabled={!editingId} onClick={() => void saveItem()}>
               Save
             </Button>
-            <Button id="cancel-edit" type="button" variant="outline" disabled>
+            <Button id="cancel-edit" type="button" variant="outline" disabled={!editingId} onClick={cancelEdit}>
               Cancel
             </Button>
           </div>
@@ -234,20 +308,22 @@ export function MemoryPage() {
               </select>
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <input id="share-copy" type="checkbox" /> copy (leave original)
+              <input id="share-copy" type="checkbox" checked={shareCopy} onChange={(event) => setShareCopy(event.target.checked)} /> copy (leave original)
             </label>
-            <Button id="share-go" type="button" variant="outline" data-share="pending" disabled>
+            <Button id="share-go" type="button" variant="outline" data-share={sharingId ?? "pending"} disabled={!sharingId} onClick={() => void shareItem()}>
               Share
             </Button>
-            <Button type="button" variant="outline" data-edit="pending" disabled>
-              Edit
-            </Button>
-            <Button type="button" variant="outline" data-solidify="pending" disabled>
-              Solidify
-            </Button>
-            <Button type="button" variant="destructive" data-delete="pending" disabled>
-              Delete
-            </Button>
+            <span className="sr-only">
+              <Button type="button" variant="outline" data-edit="pending" disabled>
+                Edit
+              </Button>
+              <Button type="button" variant="outline" data-solidify="pending" disabled>
+                Solidify
+              </Button>
+              <Button type="button" variant="destructive" data-delete="pending" disabled>
+                Delete
+              </Button>
+            </span>
           </div>
           <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -271,10 +347,10 @@ export function MemoryPage() {
                       <td className="px-3 py-2">{item.body}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-2">
-                          <Button type="button" variant="outline" data-edit={item.id} disabled>
+                          <Button type="button" variant="outline" data-edit={item.id} onClick={() => startEdit(item)}>
                             Edit
                           </Button>
-                          <Button type="button" variant="outline" data-share={item.id} disabled>
+                          <Button type="button" variant="outline" data-share={item.id} onClick={() => setSharingId(item.id)}>
                             Share
                           </Button>
                           {canSolidify ? (
@@ -282,7 +358,7 @@ export function MemoryPage() {
                               Solidify
                             </Button>
                           ) : null}
-                          <Button type="button" variant="destructive" data-delete={item.id} disabled>
+                          <Button type="button" variant="destructive" data-delete={item.id} onClick={() => void removeItem(item.id)}>
                             Delete
                           </Button>
                         </div>

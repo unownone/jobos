@@ -662,8 +662,8 @@ export function BoardPage() {
           <TicketFrame narrow={narrow} open={selected !== null} onClose={closeTicket}>
             {selected ? (
               <div className="flex flex-col gap-2 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="m-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="m-0 min-w-0 flex-1 break-all font-display text-lg leading-tight font-extrabold [font-family:var(--font-display)]">
                     #{selected.id} · {selected.company}
                   </h2>
                   <Button id="closeSide" type="button" variant="outline" aria-label="Close" onClick={closeTicket}>
@@ -804,7 +804,7 @@ function TicketFrame({
 }) {
   if (!narrow) {
     return (
-      <aside id="side" hidden={!open} className="flex min-h-0 w-80 shrink-0 flex-col overflow-hidden border-l border-border">
+      <aside id="side" hidden={!open} className="flex min-h-0 w-80 min-w-0 max-w-80 shrink-0 flex-col overflow-hidden border-l border-border">
         {open ? <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea> : children}
       </aside>
     );

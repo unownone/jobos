@@ -149,4 +149,58 @@ describe("admin pages", () => {
       expect(apiMock).toHaveBeenCalledWith("/api/memory/items/mem1/solidify", { method: "POST" });
     });
   });
+
+  it("edits, shares, and deletes a memory row", async () => {
+    apiMock.mockImplementation((path: string, opts?: { method?: string; body?: unknown }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada", role: "admin" });
+      if (path === "/api/memory/pods") {
+        return Promise.resolve({
+          pods: [
+            { id: "track:discovery", label: "discovery", writable: true },
+            { id: "common", label: "common", writable: true },
+          ],
+          kinds: { track: ["portal"], common: ["portal"] },
+          write_policy: { store_when: "When it will matter next round.", caps: {} },
+        });
+      }
+      if (path.startsWith("/api/memory/items?")) {
+        return Promise.resolve({
+          items: [{ id: "mem1", pod: "track:discovery", kind: "portal", title: "Lever", body: "Use the public board.", pod_scope: "track", solidify_status: "none" }],
+        });
+      }
+      if (path === "/api/memory/items/mem1" && opts?.method === "PATCH") return Promise.resolve({ item: {} });
+      if (path === "/api/memory/items/mem1" && opts?.method === "DELETE") return Promise.resolve({});
+      if (path === "/api/memory/items/mem1/move") return Promise.resolve({ item: {} });
+      return Promise.reject(new Error(`unexpected ${path} ${opts?.method ?? "GET"}`));
+    });
+
+    render(<MemoryPage />);
+    await waitFor(() => expect(document.querySelector("[data-edit='mem1']")).toBeInTheDocument());
+
+    fireEvent.click(document.querySelector("[data-edit='mem1']") as HTMLButtonElement);
+    expect(document.getElementById("compose-status")).toHaveTextContent("Editing.");
+    fireEvent.change(document.getElementById("write-title") as HTMLInputElement, { target: { value: "Lever public" } });
+    fireEvent.click(document.getElementById("save-item") as HTMLButtonElement);
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith("/api/memory/items/mem1", {
+        method: "PATCH",
+        body: { title: "Lever public", body: "Use the public board." },
+      });
+    });
+
+    fireEvent.click(document.querySelector("[data-share='mem1']") as HTMLButtonElement);
+    fireEvent.click(document.getElementById("share-go") as HTMLButtonElement);
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith("/api/memory/items/mem1/move", {
+        method: "POST",
+        body: { pod: "track:discovery", copy: false, kind: "portal" },
+      });
+    });
+
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(document.querySelector("[data-delete='mem1']") as HTMLButtonElement);
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith("/api/memory/items/mem1", { method: "DELETE" });
+    });
+  });
 });
