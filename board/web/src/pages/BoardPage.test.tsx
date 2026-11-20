@@ -125,9 +125,14 @@ function listPayload(jobs: unknown[], matched = jobs.length === 0 ? 0 : 2) {
   };
 }
 
-function mockBoard(jobs: unknown[] = [JOB], presence: unknown[] = [], memories: unknown[] = []) {
+function mockBoard(
+  jobs: unknown[] = [JOB],
+  presence: unknown[] = [],
+  memories: unknown[] = [],
+  who: Record<string, unknown> = ADMIN,
+) {
   apiMock.mockImplementation((path: string, opts?: { method?: string; body?: unknown }) => {
-    if (path === "/api/whoami") return Promise.resolve(ADMIN);
+    if (path === "/api/whoami") return Promise.resolve(who);
     if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered", "rejected"], apply_kinds: ["ats"] });
     if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload(jobs));
     if (path === "/api/jobs/1" && opts?.method === "PATCH") return Promise.resolve({});
@@ -276,6 +281,9 @@ describe("BoardPage", () => {
     expect(byId("f_company").parentElement?.parentElement).toBe(byId("f_title").parentElement?.parentElement);
     expect(byId("f_description").parentElement?.className).toContain("@min-[36rem]:col-span-2");
     expect(byId("f_status").tagName).toBe("SELECT");
+    expect(byId("f_status").hasAttribute("aria-label")).toBe(false);
+    expect(byId("f_status").closest("label")?.textContent).toContain("Status");
+    expect(byId("f_rejection_by").hasAttribute("aria-label")).toBe(false);
     expect(byId("f_status").getAttribute("data-slot")).toBe("select");
     expect(byId("f_rejection_by").tagName).toBe("SELECT");
     expect(byId("side").querySelector("[data-slot='scroll-area']")).toBeTruthy();
@@ -292,6 +300,23 @@ describe("BoardPage", () => {
     });
     const patch = apiMock.mock.calls.find((call) => call[0] === "/api/jobs/1" && call[1]?.method === "PATCH");
     expect(patch?.[1]?.body).toEqual({ company: "TicketCo", title: "Staff Engineer", status: "discovered" });
+  });
+
+  it("closes ticket fields the role cannot patch", async () => {
+    mockBoard([JOB], [], [], {
+      ...ADMIN,
+      role: "apply",
+      patch_fields: ["status", "notes", "rejection"],
+    });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("list")).toHaveTextContent("TicketCo"));
+    fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
+    await waitFor(() => expect(byId("f_company")).toHaveValue("TicketCo"));
+    expect((byId("f_company") as HTMLInputElement).disabled).toBe(true);
+    expect((byId("f_title") as HTMLInputElement).disabled).toBe(true);
+    expect((byId("f_notes") as HTMLTextAreaElement).disabled).toBe(false);
+    expect((byId("f_status") as HTMLSelectElement).disabled).toBe(false);
+    expect((byId("f_rejection_by") as HTMLSelectElement).disabled).toBe(false);
   });
 
   it("says there are no jobs after an empty page loads", async () => {

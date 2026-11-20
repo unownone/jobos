@@ -415,6 +415,10 @@ export function BoardPage() {
     setSelected(job);
   }
 
+  function canEdit(field: string): boolean {
+    return Boolean(caps?.can_patch) && (caps?.patch_fields ?? []).includes(field);
+  }
+
   function updateJob(patch: Partial<Job>) {
     setSelected((current) => (current ? { ...current, ...patch } : current));
   }
@@ -780,32 +784,32 @@ export function BoardPage() {
                   </p>
                 ) : null}
                 <div className="grid gap-3 @min-[36rem]:grid-cols-2">
-                  <Field htmlFor="f_company">Company<Input id="f_company" value={selected.company ?? ""} onChange={(event) => updateJob({ company: event.target.value })} /></Field>
-                  <Field htmlFor="f_title">Title<Input id="f_title" value={selected.title ?? ""} onChange={(event) => updateJob({ title: event.target.value })} /></Field>
+                  <Field htmlFor="f_company">Company<Input id="f_company" disabled={!canEdit("company")} value={selected.company ?? ""} onChange={(event) => updateJob({ company: event.target.value })} /></Field>
+                  <Field htmlFor="f_title">Title<Input id="f_title" disabled={!canEdit("title")} value={selected.title ?? ""} onChange={(event) => updateJob({ title: event.target.value })} /></Field>
                   <Field htmlFor="f_status">
                     Status
                     <NativeSelect
                       id="f_status"
-                      label="Status"
+                      disabled={!canEdit("status")}
                       value={selected.status || ""}
                       options={statusOptions.map((status) => ({ value: status, label: status }))}
                       onChange={(value) => updateJob({ status: value })}
                     />
                   </Field>
-                  <Field htmlFor="f_source">Source<Input id="f_source" value={sourceText} onChange={(event) => setSourceText(event.target.value)} /></Field>
-                  <Field htmlFor="f_score">Score<Input id="f_score" type="number" min={1} max={5} step={1} value={selected.score == null ? "" : String(selected.score)} onChange={(event) => updateJob({ score: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
-                  <Field htmlFor="f_pay">Pay<Input id="f_pay" value={selected.pay ?? ""} placeholder="as the posting states it" onChange={(event) => updateJob({ pay: event.target.value })} /></Field>
-                  <Field htmlFor="f_location">Location<Input id="f_location" value={selected.location ?? ""} onChange={(event) => updateJob({ location: event.target.value })} /></Field>
-                  <Field htmlFor="f_posted_at">Posted<Input id="f_posted_at" value={selected.posted_at ?? ""} placeholder="2026-09-01T00:00:00Z" onChange={(event) => updateJob({ posted_at: event.target.value })} /></Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_apply_url">Apply URL<Input id="f_apply_url" value={selected.apply_url ?? ""} onChange={(event) => updateJob({ apply_url: event.target.value })} /></Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_description">Job description<Textarea id="f_description" value={selected.description ?? ""} onChange={(event) => updateJob({ description: event.target.value })} /></Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_expectations">Expectations<Textarea id="f_expectations" value={selected.expectations ?? ""} onChange={(event) => updateJob({ expectations: event.target.value })} /></Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_notes">Notes<Textarea id="f_notes" value={selected.notes ?? ""} onChange={(event) => updateJob({ notes: event.target.value })} /></Field>
+                  <Field htmlFor="f_source">Source<Input id="f_source" disabled={!canEdit("sources")} value={sourceText} onChange={(event) => setSourceText(event.target.value)} /></Field>
+                  <Field htmlFor="f_score">Score<Input id="f_score" type="number" min={1} max={5} step={1} disabled={!canEdit("score")} value={selected.score == null ? "" : String(selected.score)} onChange={(event) => updateJob({ score: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
+                  <Field htmlFor="f_pay">Pay<Input id="f_pay" disabled={!canEdit("pay")} value={selected.pay ?? ""} placeholder="as the posting states it" onChange={(event) => updateJob({ pay: event.target.value })} /></Field>
+                  <Field htmlFor="f_location">Location<Input id="f_location" disabled={!canEdit("location")} value={selected.location ?? ""} onChange={(event) => updateJob({ location: event.target.value })} /></Field>
+                  <Field htmlFor="f_posted_at">Posted<Input id="f_posted_at" disabled={!canEdit("posted_at")} value={selected.posted_at ?? ""} placeholder="2026-09-01T00:00:00Z" onChange={(event) => updateJob({ posted_at: event.target.value })} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_apply_url">Apply URL<Input id="f_apply_url" disabled={!canEdit("apply_url")} value={selected.apply_url ?? ""} onChange={(event) => updateJob({ apply_url: event.target.value })} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_description">Job description<Textarea id="f_description" disabled={!canEdit("description")} value={selected.description ?? ""} onChange={(event) => updateJob({ description: event.target.value })} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_expectations">Expectations<Textarea id="f_expectations" disabled={!canEdit("expectations")} value={selected.expectations ?? ""} onChange={(event) => updateJob({ expectations: event.target.value })} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_notes">Notes<Textarea id="f_notes" disabled={!canEdit("notes")} value={selected.notes ?? ""} onChange={(event) => updateJob({ notes: event.target.value })} /></Field>
                   <Field className="@min-[36rem]:col-span-2" htmlFor="f_rejection_by">
                     Rejected by
                     <NativeSelect
                       id="f_rejection_by"
-                      label="Rejected by"
+                      disabled={!canEdit("rejection")}
                       value={selected.rejection?.by || "none"}
                       options={[
                         { value: "none", label: "—" },
@@ -815,12 +819,12 @@ export function BoardPage() {
                       onChange={(value) => updateJob({ rejection: { ...selected.rejection, by: value === "none" ? "" : value } })}
                     />
                   </Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_company_remarks">Company remarks<Textarea id="f_company_remarks" value={selected.rejection?.company_remarks ?? ""} onChange={(event) => updateJob({ rejection: { ...selected.rejection, company_remarks: event.target.value } })} /></Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_user_remarks">User remarks<Textarea id="f_user_remarks" value={selected.rejection?.user_remarks ?? ""} onChange={(event) => updateJob({ rejection: { ...selected.rejection, user_remarks: event.target.value } })} /></Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_owners">Owners JSON<Textarea id="f_owners" value={packets.owners} onChange={(event) => setPackets((current) => ({ ...current, owners: event.target.value }))} /></Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_apply_packet">Apply packet JSON<Textarea id="f_apply_packet" value={packets.apply_packet} onChange={(event) => setPackets((current) => ({ ...current, apply_packet: event.target.value }))} /></Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_outreach_packet">Outreach packet JSON<Textarea id="f_outreach_packet" value={packets.outreach_packet} onChange={(event) => setPackets((current) => ({ ...current, outreach_packet: event.target.value }))} /></Field>
-                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_proof">Proof JSON<Textarea id="f_proof" value={packets.proof} onChange={(event) => setPackets((current) => ({ ...current, proof: event.target.value }))} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_company_remarks">Company remarks<Textarea id="f_company_remarks" disabled={!canEdit("rejection")} value={selected.rejection?.company_remarks ?? ""} onChange={(event) => updateJob({ rejection: { ...selected.rejection, company_remarks: event.target.value } })} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_user_remarks">User remarks<Textarea id="f_user_remarks" disabled={!canEdit("rejection")} value={selected.rejection?.user_remarks ?? ""} onChange={(event) => updateJob({ rejection: { ...selected.rejection, user_remarks: event.target.value } })} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_owners">Owners JSON<Textarea id="f_owners" disabled={!canEdit("owners")} value={packets.owners} onChange={(event) => setPackets((current) => ({ ...current, owners: event.target.value }))} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_apply_packet">Apply packet JSON<Textarea id="f_apply_packet" disabled={!canEdit("apply_packet")} value={packets.apply_packet} onChange={(event) => setPackets((current) => ({ ...current, apply_packet: event.target.value }))} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_outreach_packet">Outreach packet JSON<Textarea id="f_outreach_packet" disabled={!canEdit("outreach_packet")} value={packets.outreach_packet} onChange={(event) => setPackets((current) => ({ ...current, outreach_packet: event.target.value }))} /></Field>
+                  <Field className="@min-[36rem]:col-span-2" htmlFor="f_proof">Proof JSON<Textarea id="f_proof" disabled={!canEdit("proof")} value={packets.proof} onChange={(event) => setPackets((current) => ({ ...current, proof: event.target.value }))} /></Field>
                 </div>
                 <div>
                   <h2 className="font-display text-[1.2rem] leading-none font-extrabold [font-family:var(--font-display)]">Events</h2>

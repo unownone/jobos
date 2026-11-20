@@ -98,6 +98,7 @@ function NativeSelect({
   value,
   options,
   onChange,
+  disabled,
   className,
 }: {
   id: string;
@@ -106,6 +107,7 @@ function NativeSelect({
   value: string;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
+  disabled?: boolean;
   className?: string;
 }) {
   return (
@@ -115,6 +117,7 @@ function NativeSelect({
       aria-label={label}
       data-slot="select"
       value={value}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
       className={cn(
         "flex min-h-[2.75rem] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
