@@ -65,6 +65,7 @@ export function MemoryPage() {
   const [sharePod, setSharePod] = useState("");
   const [shareKind, setShareKind] = useState("");
   const [shareCopy, setShareCopy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
 
@@ -194,10 +195,10 @@ export function MemoryPage() {
   }
 
   async function removeItem(id: string) {
-    if (!window.confirm("Delete this memory?")) return;
     setErr("");
     try {
       await api(`/api/memory/items/${encodeURIComponent(id)}`, { method: "DELETE" });
+      setPendingDelete("");
       if (editingId === id) cancelEdit();
       if (sharingId === id) setSharingId(null);
       await loadItems();
@@ -368,9 +369,15 @@ export function MemoryPage() {
                           Solidify
                         </Button>
                       ) : null}
-                      <Button type="button" variant="destructive" onClick={() => void removeItem(item.id)}>
-                        Delete
-                      </Button>
+                      {pendingDelete === item.id ? (
+                        <Button type="button" variant="destructive" onClick={() => void removeItem(item.id)}>
+                          Delete fact
+                        </Button>
+                      ) : (
+                        <Button type="button" variant="destructive" onClick={() => setPendingDelete(item.id)}>
+                          Delete
+                        </Button>
+                      )}
                     </>
                   }
                 >
@@ -413,9 +420,15 @@ export function MemoryPage() {
                               Solidify
                             </Button>
                           ) : null}
-                          <Button type="button" variant="destructive" data-delete={item.id} onClick={() => void removeItem(item.id)}>
-                            Delete
-                          </Button>
+                          {pendingDelete === item.id ? (
+                            <Button type="button" variant="destructive" onClick={() => void removeItem(item.id)}>
+                              Delete fact
+                            </Button>
+                          ) : (
+                            <Button type="button" variant="destructive" data-delete={item.id} onClick={() => setPendingDelete(item.id)}>
+                              Delete
+                            </Button>
+                          )}
                         </div>
                       </Td>
                     </tr>

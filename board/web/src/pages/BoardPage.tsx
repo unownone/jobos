@@ -204,6 +204,8 @@ export function BoardPage() {
   const [selected, setSelected] = useState<Job | null>(null);
   const [events, setEvents] = useState<JobEvent[]>([]);
   const [eventsError, setEventsError] = useState("");
+  const [laneAsk, setLaneAsk] = useState<"" | "pause" | "stop" | "delete">("");
+  const [laneReason, setLaneReason] = useState("");
   const [packets, setPackets] = useState<Packets>(EMPTY_PACKETS);
   const [sourceText, setSourceText] = useState("");
   const [sideErr, setSideErr] = useState("");
@@ -429,6 +431,8 @@ export function BoardPage() {
     setSelected(null);
     setEvents([]);
     setEventsError("");
+    setLaneAsk("");
+    setLaneReason("");
     note("");
   }
 
@@ -517,29 +521,27 @@ export function BoardPage() {
     setReloadKey((key) => key + 1);
   }
 
-  async function pauseJob() {
-    if (!selected) return;
-    const id = selected.id;
-    const reason = window.prompt("Pause reason (required). Status stays; lanes cannot patch until Resume.");
-    if (!reason) return;
-    try {
-      await api(`/api/jobs/${encodeURIComponent(id)}/pause`, { method: "POST", body: { reason } });
-      await settleLane(id, "Paused.");
-    } catch (error) {
-      note(error instanceof Error ? error.message : "Could not pause", true);
-    }
+  function askLane(kind: "pause" | "stop" | "delete") {
+    setLaneAsk(kind);
+    setLaneReason("");
+    note("");
   }
 
-  async function stopJob() {
-    if (!selected) return;
+  async function confirmLane() {
+    if (!selected || (laneAsk !== "pause" && laneAsk !== "stop")) return;
+    const reason = laneReason.trim();
+    if (!reason) {
+      note("A reason is required.", true);
+      return;
+    }
     const id = selected.id;
-    const reason = window.prompt("Stop reason (required). Sets closed_withdrawn and freezes the row.");
-    if (!reason) return;
+    const kind = laneAsk;
     try {
-      await api(`/api/jobs/${encodeURIComponent(id)}/stop`, { method: "POST", body: { reason } });
-      await settleLane(id, "Stopped.");
+      await api(`/api/jobs/${encodeURIComponent(id)}/${kind}`, { method: "POST", body: { reason } });
+      setLaneAsk("");
+      await settleLane(id, kind === "pause" ? "Paused." : "Stopped.");
     } catch (error) {
-      note(error instanceof Error ? error.message : "Could not stop", true);
+      note(error instanceof Error ? error.message : "Could not update the lane", true);
     }
   }
 
@@ -554,11 +556,11 @@ export function BoardPage() {
     }
   }
 
-  async function deleteJob() {
+  async function confirmDelete() {
     if (!selected) return;
-    if (!window.confirm(`Delete ${selected.id}? This cannot be undone.`)) return;
+    const id = selected.id;
     try {
-      await api(`/api/jobs/${encodeURIComponent(selected.id)}`, { method: "DELETE" });
+      await api(`/api/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
       closeTicket();
       setReloadKey((key) => key + 1);
     } catch (error) {
@@ -809,11 +811,37 @@ export function BoardPage() {
               <div className="shrink-0 border-t border-border bg-card p-3">
                 <div className="flex flex-wrap gap-2">
                   <Button id="saveBtn" type="button" disabled={!caps?.can_patch} onClick={() => void saveJob()}>Save patch</Button>
-                  <Button id="pauseBtn" type="button" variant="outline" disabled={!caps?.can_stop || Boolean(selected.stopped)} onClick={() => void pauseJob()}>Pause</Button>
-                  <Button id="stopBtn" type="button" variant="outline" disabled={!caps?.can_stop || Boolean(selected.stopped)} onClick={() => void stopJob()}>Stop</Button>
+                  <Button id="pauseBtn" type="button" variant="outline" disabled={!caps?.can_stop || Boolean(selected.stopped)} onClick={() => askLane("pause")}>Pause</Button>
+                  <Button id="stopBtn" type="button" variant="outline" disabled={!caps?.can_stop || Boolean(selected.stopped)} onClick={() => askLane("stop")}>Stop</Button>
                   <Button id="resumeBtn" type="button" variant="secondary" disabled={!caps?.can_stop || !selected.stopped} onClick={() => void resumeJob()}>Resume</Button>
-                  <Button id="delBtn" type="button" variant="destructive" disabled={!caps?.can_delete} onClick={() => void deleteJob()}>Delete</Button>
+                  <Button id="delBtn" type="button" variant="destructive" disabled={!caps?.can_delete} onClick={() => askLane("delete")}>Delete</Button>
                 </div>
+                {laneAsk === "pause" || laneAsk === "stop" ? (
+                  <div className="mt-2 flex flex-col gap-2">
+                    <Field htmlFor="laneReason" className="min-w-0 w-full">
+                      {laneAsk === "pause" ? "Pause reason" : "Stop reason"}
+                      <Input
+                        id="laneReason"
+                        value={laneReason}
+                        onChange={(event) => {
+                          setLaneReason(event.target.value);
+                          if (event.target.value.trim()) note("");
+                        }}
+                      />
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      <Button id="laneConfirm" type="button" onClick={() => void confirmLane()}>{laneAsk === "pause" ? "Pause job" : "Stop job"}</Button>
+                      <Button type="button" variant="outline" onClick={() => setLaneAsk("")}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : null}
+                {laneAsk === "delete" ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <p className="m-0 text-sm text-muted-foreground">Delete this job? This cannot be undone.</p>
+                    <Button id="deleteConfirm" type="button" variant="destructive" onClick={() => void confirmDelete()}>Delete job</Button>
+                    <Button type="button" variant="outline" onClick={() => setLaneAsk("")}>Cancel</Button>
+                  </div>
+                ) : null}
                 <p id="sideErr" className={cn("mt-2 text-sm", sideFailed && "text-destructive")}>{sideErr}</p>
               </div>
             ) : null}

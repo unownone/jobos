@@ -465,13 +465,13 @@ describe("BoardPage", () => {
     fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
     await waitFor(() => expect(byId("pauseBtn")).toBeEnabled());
 
-    const prompt = vi.spyOn(window, "prompt").mockReturnValue("");
     fireEvent.click(byId("stopBtn"));
-    expect(prompt).toHaveBeenCalledWith("Stop reason (required). Sets closed_withdrawn and freezes the row.");
+    fireEvent.click(byId("laneConfirm"));
+    expect(byId("sideErr")).toHaveTextContent("A reason is required.");
     expect(apiMock.mock.calls.some((call) => call[0] === "/api/jobs/1/stop")).toBe(false);
 
-    prompt.mockReturnValue("done");
-    fireEvent.click(byId("stopBtn"));
+    fireEvent.change(byId("laneReason"), { target: { value: "done" } });
+    fireEvent.click(byId("laneConfirm"));
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/api/jobs/1/stop", { method: "POST", body: { reason: "done" } });
     });
@@ -482,16 +482,13 @@ describe("BoardPage", () => {
     });
     expect(byId("list")).toHaveTextContent("closed_withdrawn · stopped");
 
-    prompt.mockReturnValue("hold");
     fireEvent.click(byId("pauseBtn"));
     expect(apiMock.mock.calls.some((call) => call[0] === "/api/jobs/1/pause")).toBe(false);
 
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     fireEvent.click(byId("delBtn"));
-    expect(confirm).toHaveBeenCalledWith("Delete 1? This cannot be undone.");
+    expect(byId("deleteConfirm")).toBeInTheDocument();
     expect(apiMock.mock.calls.some((call) => call[1]?.method === "DELETE")).toBe(false);
-    confirm.mockReturnValue(true);
-    fireEvent.click(byId("delBtn"));
+    fireEvent.click(byId("deleteConfirm"));
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/api/jobs/1", { method: "DELETE" });
     });
@@ -525,8 +522,9 @@ describe("BoardPage", () => {
     await waitFor(() => expect(byId("list")).toHaveTextContent("TicketCo"));
     fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
     await waitFor(() => expect(byId("pauseBtn")).toBeEnabled());
-    vi.spyOn(window, "prompt").mockReturnValue("hold");
     fireEvent.click(byId("pauseBtn"));
+    fireEvent.change(byId("laneReason"), { target: { value: "hold" } });
+    fireEvent.click(byId("laneConfirm"));
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/api/jobs/1/pause", { method: "POST", body: { reason: "hold" } });
     });

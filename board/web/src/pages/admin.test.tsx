@@ -660,8 +660,9 @@ describe("admin pages", () => {
       });
     });
 
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     fireEvent.click(document.querySelector("[data-delete='mem1']") as HTMLButtonElement);
+    const confirmDelete = [...document.querySelectorAll("#rows button")].find((button) => button.textContent === "Delete fact");
+    fireEvent.click(confirmDelete as HTMLButtonElement);
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/api/memory/items/mem1", { method: "DELETE" });
     });
