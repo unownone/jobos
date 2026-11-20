@@ -1,13 +1,10 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/lib/api";
 
 import { HomePage } from "./HomePage";
+import homeSource from "./HomePage.tsx?raw";
 
 vi.mock("@/lib/api", () => ({
   api: vi.fn(),
@@ -74,6 +71,16 @@ function byId(id: string): HTMLElement {
 beforeEach(() => {
   window.history.replaceState({}, "", "/home");
   apiMock.mockReset();
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+    onchange: null,
+  }));
 });
 
 afterEach(() => {
@@ -103,6 +110,7 @@ describe("HomePage", () => {
     for (const id of REQUIRED_IDS) {
       expect(document.getElementById(id)).toBeInTheDocument();
     }
+    expect(document.querySelector("header #connLabel")).toBe(byId("connLabel"));
     expect(byId("connLabel")).toHaveTextContent("signing in");
     expect(byId("whoLabel").textContent).toBe("");
     expect(byId("kpiFoundToday")).toHaveTextContent("—");
@@ -143,12 +151,11 @@ describe("HomePage", () => {
     expect((funnel?.querySelector("[data-funnel='Applied']") as HTMLElement | null)?.style.width).toBe("33%");
     expect((funnel?.querySelector("[data-funnel='Outreached']") as HTMLElement | null)?.style.width).toBe("0%");
 
-    const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "HomePage.tsx"), "utf8");
-    expect(source).not.toMatch(/chart\.js|chartjs|Chart/i);
-    expect(source).toContain('from "@/components/shell/AppShell"');
-    expect(source).toContain('from "@/lib/api"');
-    expect(source).toContain('from "@/components/ui/card"');
-    expect(source).toContain('scroll="page"');
+    expect(homeSource).not.toMatch(/chart\.js|chartjs|Chart/i);
+    expect(homeSource).toContain('from "@/components/shell/AppShell"');
+    expect(homeSource).toContain('from "@/lib/api"');
+    expect(homeSource).toContain('from "@/components/ui/card"');
+    expect(homeSource).toContain('scroll="page"');
   });
 
   it("uses an em dash when the pipeline is empty and falls back to actor and role", async () => {
@@ -201,13 +208,48 @@ describe("HomePage", () => {
     });
   });
 
+  it("keeps Home current when the window path is somewhere else", () => {
+    window.history.replaceState({}, "", "/board");
+    apiMock.mockImplementation(() => new Promise(() => {}));
+
+    render(<HomePage />);
+
+    expect(document.querySelector("[data-nav='/home']")).toHaveAttribute("aria-current", "page");
+    expect(document.querySelector("[data-nav='/board']")).not.toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows an em dash when the open job has no age", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve({ display_name: "Ada", kind: "owner" });
+      if (path === "/api/dashboard") {
+        return Promise.resolve({
+          ...DASHBOARD,
+          oldest_in_pipeline: { ...DASHBOARD.oldest_in_pipeline, days_in_pipeline: null },
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<HomePage />);
+
+    await waitFor(() => {
+      expect(byId("kpiOldestDays")).toHaveTextContent("—");
+    });
+    expect(byId("kpiOldestSub")).toHaveTextContent("Age unknown");
+    expect(byId("oldestBody")).toHaveTextContent("TicketCo");
+    expect(byId("oldestBody")).toHaveTextContent("Staff");
+    expect(byId("oldestBody")).toHaveTextContent("discovered");
+  });
+
   it("posts logout and leaves for /login", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/whoami") return Promise.resolve(WHO);
       if (path === "/api/dashboard") return Promise.resolve(DASHBOARD);
       return Promise.reject(new Error(`unexpected ${path}`));
     });
-    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () => new Response(null, { status: 204 }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     render(<HomePage />);
@@ -216,10 +258,10 @@ describe("HomePage", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalled();
     });
-    const [url, init] = fetchMock.mock.calls[0] ?? [];
-    expect(url).toBe("/api/auth/logout");
-    expect(init?.method).toBe("POST");
-    expect(init?.credentials).toBe("same-origin");
+    const call = fetchMock.mock.calls[0];
+    expect(call?.[0]).toBe("/api/auth/logout");
+    expect(call?.[1]?.method).toBe("POST");
+    expect(call?.[1]?.credentials).toBe("same-origin");
     await waitFor(() => {
       expect(window.location.pathname).toBe("/login");
     });

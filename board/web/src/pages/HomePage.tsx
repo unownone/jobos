@@ -4,7 +4,6 @@ import { AppShell } from "@/components/shell/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 const display =
   "font-display tracking-[-0.03em] [font-family:var(--font-display)]";
@@ -26,7 +25,7 @@ type Dashboard = {
     pay: string;
     posted_at: string;
     created_at: string;
-    days_in_pipeline: number;
+    days_in_pipeline: number | null;
     posted_known: boolean;
   };
 };
@@ -66,14 +65,16 @@ function countText(value: number | undefined): string {
 }
 
 function oldestDays(dashboard: Dashboard | undefined): string {
-  if (!dashboard?.oldest_in_pipeline) return "—";
-  return String(dashboard.oldest_in_pipeline.days_in_pipeline);
+  const days = dashboard?.oldest_in_pipeline?.days_in_pipeline;
+  if (days == null) return "—";
+  return String(days);
 }
 
 function oldestHint(dashboard: Dashboard | undefined): string {
   if (!dashboard) return "Open jobs only · posted date when known";
   const oldest = dashboard.oldest_in_pipeline;
   if (!oldest) return "No open jobs in the pipeline";
+  if (oldest.days_in_pipeline == null) return "Age unknown";
   if (oldest.days_in_pipeline === 1) return "1 day in pipeline";
   return `${oldest.days_in_pipeline} days in pipeline`;
 }
@@ -91,21 +92,6 @@ function dayLabel(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso.slice(0, 10);
   return date.toISOString().slice(0, 10);
-}
-
-function connDotClass(conn: Conn): string {
-  switch (conn) {
-    case "signing in":
-      return "bg-muted-foreground";
-    case "signed in":
-      return "bg-primary";
-    case "sign in required":
-      return "bg-destructive";
-    default: {
-      const exhaustive: never = conn;
-      return exhaustive;
-    }
-  }
 }
 
 function Kpi({
@@ -201,13 +187,9 @@ export function HomePage() {
       scroll="page"
       path="/home"
       who={who}
+      conn={conn}
     >
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5">
-        <p className="m-0 flex items-center gap-2 text-sm text-muted-foreground">
-          <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", connDotClass(conn))} />
-          <span id="connLabel">{conn}</span>
-        </p>
-
         <div className="grid gap-3 md:grid-cols-3">
           <Kpi
             label="Found today"

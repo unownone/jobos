@@ -60,6 +60,7 @@ export function AppShell({
   subtitle,
   scroll,
   who,
+  conn,
   path,
   children,
 }: {
@@ -67,6 +68,7 @@ export function AppShell({
   subtitle?: string;
   scroll: ShellScroll;
   who?: string;
+  conn?: string;
   path?: string;
   children: ReactNode;
 }) {
@@ -86,7 +88,7 @@ export function AppShell({
         >
           Skip to content
         </a>
-        <TopBar title={title} subtitle={subtitle} who={who} />
+        <TopBar title={title} subtitle={subtitle} who={who} conn={conn} />
         <div
           data-testid="hub-scroll"
           className={cn("flex min-h-0 min-w-0 flex-1 flex-col", scrollPortClass(scroll))}
