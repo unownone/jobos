@@ -8,13 +8,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${JOBOS_PG_USER:-jobos}
+      POSTGRES_USER: jobos
       POSTGRES_PASSWORD: ${JOBOS_PG_PASSWORD:-jobos}
-      POSTGRES_DB: ${JOBOS_PG_DB:-jobos}
+      POSTGRES_DB: jobos
     volumes:
       - "pgdata:/var/lib/postgresql/data"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -24,16 +24,13 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    env_file:
-      - path: .env
-        required: false
     environment:
       JOBOS_NONINTERACTIVE: "1"
       BOARD_HOST: "0.0.0.0"
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
-      DATABASE_URL_FROM_SECRET: "${DATABASE_URL:-}"
+      DATABASE_URL: "${DATABASE_URL:-}"
       JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
       JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"

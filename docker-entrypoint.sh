@@ -26,8 +26,8 @@ if [[ -z "${HUB_PUBLIC_URL:-}" && -n "${HUB_PUBLIC_HOST:-}" ]]; then
   fi
 fi
 
-# Platform secrets arrive as DATABASE_URL_FROM_SECRET. board/.env may also
-# set DATABASE_URL. Empty means the bundled Compose Postgres service.
+# DATABASE_URL comes from secrets (Coolify/Railway, repo-root .env, or the shell).
+# Empty means the bundled Compose Postgres service.
 export DATABASE_URL="$(
   cd /app/board
   python -c 'from app.database_url import resolve_database_url; print(resolve_database_url(), end="")'

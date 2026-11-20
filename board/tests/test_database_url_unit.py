@@ -1,4 +1,4 @@
-"""DATABASE_URL resolution: secrets first, bundled Compose Postgres otherwise."""
+"""DATABASE_URL resolution: the secret when set, bundled Compose Postgres otherwise."""
 
 from __future__ import annotations
 
@@ -17,13 +17,12 @@ def test_unset_uses_bundled_compose_service() -> None:
     assert resolve_database_url({}) == BUNDLED
 
 
-def test_platform_secret_wins_over_board_env_and_parts() -> None:
+def test_database_url_secret_is_used_as_given() -> None:
     url = "postgresql://app:s3cret@db.internal:5432/jobos?sslmode=require"
     assert (
         resolve_database_url(
             {
-                "DATABASE_URL_FROM_SECRET": url,
-                "DATABASE_URL": "postgresql://other:x@elsewhere:5432/jobos",
+                "DATABASE_URL": f"  {url}  ",
                 "JOBOS_PG_HOST": "postgres",
             }
         )
@@ -31,22 +30,8 @@ def test_platform_secret_wins_over_board_env_and_parts() -> None:
     )
 
 
-def test_platform_secret_may_be_loopback_when_explicit() -> None:
+def test_explicit_loopback_url_is_kept() -> None:
     url = "postgresql://jobos:jobos@127.0.0.1:5432/jobos"
-    assert resolve_database_url({"DATABASE_URL_FROM_SECRET": f"  {url}  "}) == url
-
-
-def test_board_env_loopback_does_not_replace_bundled_service() -> None:
-    for url in (
-        "postgresql://jobos:jobos@127.0.0.1:5432/jobos",
-        "postgresql://jobos:jobos@localhost:5432/jobos",
-        "postgresql://jobos:jobos@[::1]:5432/jobos",
-    ):
-        assert resolve_database_url({"DATABASE_URL": url}) == BUNDLED
-
-
-def test_board_env_outside_host_is_used() -> None:
-    url = "postgresql://jobos:secret@db.example:5432/jobos?sslmode=require"
     assert resolve_database_url({"DATABASE_URL": url}) == url
 
 
@@ -65,16 +50,20 @@ def test_parts_build_outside_host_and_encode_password() -> None:
     )
 
 
-def test_docker_secret_file_when_platform_url_is_unset(tmp_path: Path) -> None:
+def test_docker_secret_file_when_database_url_is_unset(tmp_path: Path) -> None:
     secret = tmp_path / "database_url"
     secret.write_text("postgresql://u:p@secret-host:5432/jobos\n", encoding="utf-8")
     assert (
-        resolve_database_url(
-            {"DATABASE_URL": "postgresql://jobos:jobos@127.0.0.1:5432/jobos"},
-            secret_file=secret,
-        )
+        resolve_database_url({}, secret_file=secret)
         == "postgresql://u:p@secret-host:5432/jobos"
     )
+
+
+def test_database_url_wins_over_secret_file(tmp_path: Path) -> None:
+    secret = tmp_path / "database_url"
+    secret.write_text("postgresql://u:p@secret-host:5432/jobos\n", encoding="utf-8")
+    url = "postgresql://app:s3cret@db.internal:5432/jobos"
+    assert resolve_database_url({"DATABASE_URL": url}, secret_file=secret) == url
 
 
 def test_missing_secret_file_is_ignored(tmp_path: Path) -> None:

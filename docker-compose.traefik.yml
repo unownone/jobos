@@ -10,8 +10,8 @@
 #
 # HUB_PUBLIC_HOST may be a hostname, IPv4, or IP:port (invites use that origin).
 #
-# Outside Postgres: set DATABASE_URL in secrets (repo-root .env, Coolify/Railway,
-# or a non-loopback URL in board/.env). Unset uses the bundled `postgres` service.
+# Outside Postgres: set secret DATABASE_URL (Coolify/Railway, repo-root .env,
+# or the shell). Unset uses the bundled `postgres` service.
 # A database on the Docker host is host.docker.internal, not 127.0.0.1.
 
 name: jobos-traefik
@@ -20,13 +20,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${JOBOS_PG_USER:-jobos}
+      POSTGRES_USER: jobos
       POSTGRES_PASSWORD: ${JOBOS_PG_PASSWORD:-jobos}
-      POSTGRES_DB: ${JOBOS_PG_DB:-jobos}
+      POSTGRES_DB: jobos
     volumes:
       - "pgdata:/var/lib/postgresql/data"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -64,16 +64,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    env_file:
-      - path: board/.env
-        required: false
     environment:
       JOBOS_NONINTERACTIVE: "1"
       BOARD_HOST: "0.0.0.0"
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
-      DATABASE_URL_FROM_SECRET: "${DATABASE_URL:-}"
+      DATABASE_URL: "${DATABASE_URL:-}"
       JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
       JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"

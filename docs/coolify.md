@@ -29,7 +29,7 @@ Do not put `JOBOS_PGDATA`, `JOBOS_BLOBS`, `JOBOS_AMQPDATA`, `$HOME`, or `~` on v
 
 The Compose file still defines a bundled `postgres` service. Hub uses it when `DATABASE_URL` is unset.
 
-To use a database Coolify (or another host) already runs, set secret `DATABASE_URL` to that server. Hub reads the secret and does not replace it with the bundled URL. A non-loopback `DATABASE_URL` in `board/.env` works the same way. From inside the container, Postgres on the Docker host is `host.docker.internal`, not `127.0.0.1`. Add `sslmode` to the URL when the server requires TLS.
+To use a database Coolify (or another host) already runs, set secret `DATABASE_URL` to that server. Compose passes it through as `DATABASE_URL`. From inside the container, Postgres on the Docker host is `host.docker.internal`, not `127.0.0.1`. Add `sslmode` to the URL when the server requires TLS.
 
 `JOBOS_PG_PASSWORD` (and `JOBOS_PG_USER`, `JOBOS_PG_HOST`, `JOBOS_PG_PORT`, `JOBOS_PG_DB`) still apply only when `DATABASE_URL` is unset.
 

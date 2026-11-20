@@ -171,14 +171,13 @@ def test_hub_database_url_comes_from_secrets() -> None:
         if not isinstance(environment, dict):
             failures.append(f"{_rel(path)}: hub environment is not a mapping")
             continue
-        secret = environment.get("DATABASE_URL_FROM_SECRET")
+        secret = environment.get("DATABASE_URL")
         if secret != "${DATABASE_URL:-}":
             failures.append(
-                f"{_rel(path)}: DATABASE_URL_FROM_SECRET must pass through the secret, got {secret!r}"
+                f"{_rel(path)}: DATABASE_URL must pass through the secret, got {secret!r}"
             )
-        hardcoded = environment.get("DATABASE_URL")
-        if isinstance(hardcoded, str) and hardcoded.startswith("postgresql://"):
-            failures.append(f"{_rel(path)}: hub DATABASE_URL is hardcoded ({hardcoded!r})")
+        if "DATABASE_URL_FROM_SECRET" in environment:
+            failures.append(f"{_rel(path)}: DATABASE_URL_FROM_SECRET is redundant")
         for key, default in (
             ("JOBOS_PG_USER", "jobos"),
             ("JOBOS_PG_PASSWORD", "jobos"),
@@ -192,17 +191,17 @@ def test_hub_database_url_comes_from_secrets() -> None:
         hosts = hub.get("extra_hosts") or []
         if "host.docker.internal:host-gateway" not in hosts:
             failures.append(f"{_rel(path)}: hub cannot reach a Postgres on the Docker host")
-        env_file = hub.get("env_file")
-        if not isinstance(env_file, list) or not env_file:
-            failures.append(f"{_rel(path)}: hub env_file must load board secrets")
-            continue
-        entry = env_file[0]
-        if not isinstance(entry, dict) or entry.get("required") is not False:
-            failures.append(f"{_rel(path)}: board env_file must be optional, got {entry!r}")
-        source = entry.get("path")
-        expected_path = ".env" if _rel(path).startswith("board/") else "board/.env"
-        if source != expected_path:
-            failures.append(f"{_rel(path)}: env_file path {source!r}, want {expected_path}")
+        postgres = services.get("postgres") if isinstance(services, dict) else None
+        if isinstance(postgres, dict):
+            pg_env = postgres.get("environment") or {}
+            if isinstance(pg_env, dict) and pg_env.get("POSTGRES_USER") not in {None, "jobos"}:
+                failures.append(
+                    f"{_rel(path)}: bundled POSTGRES_USER must stay jobos for existing pgdata volumes"
+                )
+            if isinstance(pg_env, dict) and pg_env.get("POSTGRES_DB") not in {None, "jobos"}:
+                failures.append(
+                    f"{_rel(path)}: bundled POSTGRES_DB must stay jobos for existing pgdata volumes"
+                )
     assert failures == []
 
 

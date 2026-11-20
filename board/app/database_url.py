@@ -1,9 +1,8 @@
-"""Pick Hub's Postgres URL from secrets, or the bundled Compose service.
+"""Pick Hub's Postgres URL from DATABASE_URL, or the bundled Compose service.
 
-Compose interpolates platform secrets (Coolify, Railway, repo-root ``.env``)
-into ``DATABASE_URL_FROM_SECRET`` so an empty default does not wipe
-``board/.env``. A loopback ``DATABASE_URL`` in ``board/.env`` is the bare-metal
-example and is not used inside Compose.
+Compose passes the secret through as ``DATABASE_URL``. An empty value means
+the bundled ``postgres`` service. A mounted Docker secret at
+``/run/secrets/database_url`` is used only when ``DATABASE_URL`` is empty.
 """
 
 from __future__ import annotations
@@ -11,9 +10,8 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from urllib.parse import quote, urlparse
+from urllib.parse import quote
 
-_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 _DEFAULT_SECRET_FILE = Path("/run/secrets/database_url")
 
 
@@ -23,15 +21,12 @@ def resolve_database_url(
     secret_file: Path | None = None,
 ) -> str:
     env = dict(os.environ if environ is None else environ)
-    platform = _clean(env.get("DATABASE_URL_FROM_SECRET"))
-    if platform:
-        return platform
+    configured = _clean(env.get("DATABASE_URL"))
+    if configured:
+        return configured
     file_url = _read_secret_file(secret_file)
     if file_url:
         return file_url
-    configured = _clean(env.get("DATABASE_URL"))
-    if configured and not _is_loopback(configured):
-        return configured
     return _bundled_url(env)
 
 
@@ -49,14 +44,6 @@ def _read_secret_file(secret_file: Path | None) -> str:
     if not path.is_file():
         return ""
     return path.read_text(encoding="utf-8").strip().strip('"').strip("'")
-
-
-def _is_loopback(url: str) -> bool:
-    try:
-        host = (urlparse(url).hostname or "").lower().rstrip(".")
-    except ValueError:
-        return False
-    return host in _LOOPBACK_HOSTS
 
 
 def _or_default(env: Mapping[str, str], key: str, default: str) -> str:
