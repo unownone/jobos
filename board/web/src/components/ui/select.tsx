@@ -93,6 +93,7 @@ function SelectItem({ className, children, ...props }: ComponentProps<typeof Sel
 
 function NativeSelect({
   id,
+  name,
   label,
   value,
   options,
@@ -100,6 +101,7 @@ function NativeSelect({
   className,
 }: {
   id: string;
+  name?: string;
   label?: string;
   value: string;
   options: { value: string; label: string }[];
@@ -109,6 +111,7 @@ function NativeSelect({
   return (
     <select
       id={id}
+      name={name}
       aria-label={label}
       data-slot="select"
       value={value}

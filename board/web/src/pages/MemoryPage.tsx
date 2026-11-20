@@ -4,11 +4,9 @@ import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
-
-const selectClass =
-  "flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 text-sm text-foreground";
 
 type Pod = { id: string; label: string; writable?: boolean };
 type Item = {
@@ -209,25 +207,23 @@ export function MemoryPage() {
         <section className="grid gap-3 border border-border bg-card p-4 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             Pod
-            <select id="write-pod" className={selectClass} value={writePod} onChange={(event) => setWritePod(event.target.value)}>
-              {pods
+            <NativeSelect
+              id="write-pod"
+              value={writePod}
+              onChange={setWritePod}
+              options={pods
                 .filter((pod) => pod.writable !== false)
-                .map((pod) => (
-                  <option key={pod.id} value={pod.id}>
-                    {pod.label}
-                  </option>
-                ))}
-            </select>
+                .map((pod) => ({ value: pod.id, label: pod.label }))}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             Kind
-            <select id="write-kind" className={selectClass} value={writeKind} onChange={(event) => setWriteKind(event.target.value)}>
-              {writeKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {kind}
-                </option>
-              ))}
-            </select>
+            <NativeSelect
+              id="write-kind"
+              value={writeKind}
+              onChange={setWriteKind}
+              options={writeKinds.map((kind) => ({ value: kind, label: kind }))}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             Company
@@ -260,14 +256,16 @@ export function MemoryPage() {
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1 text-sm">
               Pod
-              <select id="pod" className={selectClass} value={filterPod} onChange={(event) => setFilterPod(event.target.value)}>
-                <option value="">visible pods</option>
-                {pods.map((pod) => (
-                  <option key={pod.id} value={pod.id}>
-                    {pod.label}
-                  </option>
-                ))}
-              </select>
+              <NativeSelect
+                id="pod"
+                value={filterPod}
+                className="w-auto shrink-0"
+                onChange={setFilterPod}
+                options={[
+                  { value: "", label: "visible pods" },
+                  ...pods.map((pod) => ({ value: pod.id, label: pod.label })),
+                ]}
+              />
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Search
@@ -293,25 +291,25 @@ export function MemoryPage() {
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1 text-sm">
               Share pod
-              <select id="share-pod" className={selectClass} value={sharePod} onChange={(event) => setSharePod(event.target.value)}>
-                {pods
+              <NativeSelect
+                id="share-pod"
+                value={sharePod}
+                className="w-auto shrink-0"
+                onChange={setSharePod}
+                options={pods
                   .filter((pod) => pod.writable !== false)
-                  .map((pod) => (
-                    <option key={pod.id} value={pod.id}>
-                      {pod.label}
-                    </option>
-                  ))}
-              </select>
+                  .map((pod) => ({ value: pod.id, label: pod.label }))}
+              />
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Share kind
-              <select id="share-kind" className={selectClass} value={shareKind} onChange={(event) => setShareKind(event.target.value)}>
-                {(kinds[scopeOf(sharePod)] ?? []).map((kind) => (
-                  <option key={kind} value={kind}>
-                    {kind}
-                  </option>
-                ))}
-              </select>
+              <NativeSelect
+                id="share-kind"
+                value={shareKind}
+                className="w-auto shrink-0"
+                onChange={setShareKind}
+                options={(kinds[scopeOf(sharePod)] ?? []).map((kind) => ({ value: kind, label: kind }))}
+              />
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input id="share-copy" type="checkbox" checked={shareCopy} onChange={(event) => setShareCopy(event.target.checked)} /> copy (leave original)

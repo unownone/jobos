@@ -35,7 +35,9 @@ describe("admin pages", () => {
     render(<InvitesPage />);
 
     expect(document.body).toHaveTextContent("jobOS Harness");
-    expect(document.getElementById("track")).toBeInTheDocument();
+    expect(document.getElementById("track")?.tagName).toBe("SELECT");
+    expect(document.getElementById("track")).toHaveAttribute("name", "track");
+    expect(document.getElementById("track")).toHaveAttribute("data-slot", "select");
     expect(document.querySelector("[data-testid='hub-scroll']")?.className).toContain("overflow-y-auto");
 
     fireEvent.submit(document.getElementById("form") as HTMLFormElement);
@@ -105,7 +107,9 @@ describe("admin pages", () => {
     expect(document.getElementById("tabs")).toBeInTheDocument();
     expect(document.getElementById("q")).toBeInTheDocument();
     expect(document.getElementById("status")).toBeInTheDocument();
-    expect(document.getElementById("stopped")).toBeInTheDocument();
+    expect(document.getElementById("stopped")?.tagName).toBe("SELECT");
+    expect(document.getElementById("stopped")).toHaveAttribute("data-slot", "select");
+    expect(document.getElementById("stopped")?.className).toContain("w-auto");
     expect(document.getElementById("go")).toBeInTheDocument();
     expect(document.getElementById("table")).toBeInTheDocument();
   });

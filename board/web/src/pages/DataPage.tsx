@@ -4,13 +4,11 @@ import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/select";
 import { api } from "@/lib/api";
 
 const TABS = ["jobs", "people", "candidate", "skills", "mcps", "memory"] as const;
 type Tab = (typeof TABS)[number];
-
-const selectClass =
-  "flex min-h-[2.75rem] rounded-md border border-input bg-background px-3 text-sm text-foreground";
 
 type Row = Record<string, string>;
 
@@ -218,11 +216,18 @@ export function DataPage() {
             <>
               <Input id="q" value={q} placeholder="Search company / title" onChange={(event) => setQ(event.target.value)} />
               <Input id="status" value={status} placeholder="status (apply_ready…)" onChange={(event) => setStatus(event.target.value)} />
-              <select id="stopped" className={selectClass} value={stopped} aria-label="Stopped" onChange={(event) => setStopped(event.target.value)}>
-                <option value="">Stopped: any</option>
-                <option value="false">active</option>
-                <option value="true">stopped</option>
-              </select>
+              <NativeSelect
+                id="stopped"
+                label="Stopped"
+                value={stopped}
+                className="w-auto shrink-0"
+                onChange={setStopped}
+                options={[
+                  { value: "", label: "Stopped: any" },
+                  { value: "false", label: "active" },
+                  { value: "true", label: "stopped" },
+                ]}
+              />
             </>
           ) : null}
           {tab === "people" || tab === "memory" ? (
@@ -233,17 +238,31 @@ export function DataPage() {
           ) : null}
           {tab === "skills" ? (
             <>
-              <select id="tag" className={selectClass} value={tag} aria-label="Tag" onChange={(event) => setTag(event.target.value)}>
-                <option value="">all tags</option>
-                <option value="source">source</option>
-                <option value="apply">apply</option>
-                <option value="outreach">outreach</option>
-              </select>
-              <select id="scope" className={selectClass} value={scope} aria-label="Scope" onChange={(event) => setScope(event.target.value)}>
-                <option value="">shared + mine</option>
-                <option value="shared">shared</option>
-                <option value="local">local</option>
-              </select>
+              <NativeSelect
+                id="tag"
+                label="Tag"
+                value={tag}
+                className="w-auto shrink-0"
+                onChange={setTag}
+                options={[
+                  { value: "", label: "all tags" },
+                  { value: "source", label: "source" },
+                  { value: "apply", label: "apply" },
+                  { value: "outreach", label: "outreach" },
+                ]}
+              />
+              <NativeSelect
+                id="scope"
+                label="Scope"
+                value={scope}
+                className="w-auto shrink-0"
+                onChange={setScope}
+                options={[
+                  { value: "", label: "shared + mine" },
+                  { value: "shared", label: "shared" },
+                  { value: "local", label: "local" },
+                ]}
+              />
             </>
           ) : null}
           <Button id="go" type="button" onClick={() => setReloadKey((key) => key + 1)}>

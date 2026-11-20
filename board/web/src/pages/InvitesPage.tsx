@@ -4,11 +4,9 @@ import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
-
-const selectClass =
-  "flex min-h-[2.75rem] w-full rounded-md border border-input bg-background px-3 text-sm text-foreground";
 
 type Invite = {
   id: string;
@@ -37,6 +35,8 @@ export function InvitesPage() {
   const [url, setUrl] = useState("");
   const [prompt, setPrompt] = useState("");
   const [err, setErr] = useState("");
+  const [track, setTrack] = useState("discovery");
+  const [mode, setMode] = useState("owner_then_agents");
 
   async function loadInvites() {
     const data = await api<{ invites?: Invite[] }>("/api/invites");
@@ -126,20 +126,32 @@ export function InvitesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">
                 Track
-                <select id="track" name="track" className={selectClass} defaultValue="discovery">
-                  <option value="discovery">discovery</option>
-                  <option value="application">application</option>
-                  <option value="outreach">outreach</option>
-                  <option value="maintenance">maintenance</option>
-                </select>
+                <NativeSelect
+                  id="track"
+                  name="track"
+                  value={track}
+                  onChange={setTrack}
+                  options={[
+                    { value: "discovery", label: "discovery" },
+                    { value: "application", label: "application" },
+                    { value: "outreach", label: "outreach" },
+                    { value: "maintenance", label: "maintenance" },
+                  ]}
+                />
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 Mode
-                <select id="mode" name="mode" className={selectClass} defaultValue="owner_then_agents">
-                  <option value="owner_then_agents">owner_then_agents</option>
-                  <option value="owner_only">owner_only</option>
-                  <option value="agents_only">agents_only</option>
-                </select>
+                <NativeSelect
+                  id="mode"
+                  name="mode"
+                  value={mode}
+                  onChange={setMode}
+                  options={[
+                    { value: "owner_then_agents", label: "owner_then_agents" },
+                    { value: "owner_only", label: "owner_only" },
+                    { value: "agents_only", label: "agents_only" },
+                  ]}
+                />
               </label>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
