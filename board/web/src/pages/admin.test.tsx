@@ -80,6 +80,21 @@ describe("admin pages", () => {
     expect(document.getElementById("rows")).not.toHaveTextContent("Revoke");
   });
 
+  it("keeps the invite session when the heartbeat fails", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada" });
+      if (path === "/api/invites") return Promise.resolve({ invites: [{ id: "inv1", track: "discovery", mode: "owner_then_agents" }] });
+      if (path === "/api/meta") return Promise.resolve({ coming_soon_roles: [] });
+      if (path === "/api/presence/heartbeat") return Promise.reject(new Error("heartbeat unavailable"));
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<InvitesPage />);
+    await waitFor(() => expect(document.getElementById("rows")).toHaveTextContent("discovery"));
+    expect(document.getElementById("who")).toHaveTextContent("Signed in as ada");
+    expect(document.getElementById("connLabel")).toHaveTextContent("signed in");
+    expect(document.getElementById("err")).toHaveTextContent("heartbeat unavailable");
+  });
+
   it("lists directory rows", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/users") {
@@ -99,6 +114,30 @@ describe("admin pages", () => {
     expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Last active")?.className).toContain("w-[8%]");
     expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Task")?.className).toContain("w-[14%]");
     expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Model")?.className).toContain("w-[14%]");
+  });
+
+  it("keeps the directory when the heartbeat fails", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/users") return Promise.resolve({ users: [{ user_id: "u1", display_name: "Ada", kind: "admin" }] });
+      if (path === "/api/presence/heartbeat") return Promise.reject(new Error("heartbeat unavailable"));
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<UsersPage />);
+    await waitFor(() => expect(document.getElementById("rows")).toHaveTextContent("Ada"));
+    expect(document.getElementById("who")).toHaveTextContent("1 person in the directory");
+    expect(document.getElementById("connLabel")).toHaveTextContent("signed in");
+    expect(document.getElementById("err")).toHaveTextContent("heartbeat unavailable");
+  });
+
+  it("does not call a failed directory a signed-out session", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/users") return Promise.reject(new Error("directory unavailable"));
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<UsersPage />);
+    await waitFor(() => expect(document.getElementById("who")).toHaveTextContent("directory unavailable"));
+    expect(document.getElementById("who")?.className).toContain("text-destructive");
+    expect(document.getElementById("connLabel")).not.toHaveTextContent("sign in required");
   });
 
   it("names a directory lane without an empty track", async () => {
@@ -363,6 +402,20 @@ describe("admin pages", () => {
     render(<SkillsPage />);
     await waitFor(() => expect(document.getElementById("msg")).toHaveTextContent("recordings unavailable"));
     expect(document.body).not.toHaveTextContent("No recordings yet.");
+  });
+
+  it("keeps the skill session when the registry fails", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ display_name: "Ada", kind: "admin" });
+      if (path.startsWith("/api/registry/skills")) return Promise.reject(new Error("skills unavailable"));
+      if (path === "/api/registry/recordings") return Promise.resolve({ recordings: [] });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<SkillsPage />);
+    await waitFor(() => expect(document.getElementById("msg")).toHaveTextContent("skills unavailable"));
+    expect(document.getElementById("msg")?.className).toContain("text-destructive");
+    expect(document.getElementById("who")).toHaveTextContent("Ada · admin");
+    expect(document.getElementById("connLabel")).toHaveTextContent("signed in");
   });
 
   it("does not call a failed data tab an empty filter", async () => {

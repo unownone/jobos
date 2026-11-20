@@ -70,14 +70,19 @@ export function SkillsPage() {
         if (cancelled) return;
         setWho(sessionLine(me));
         setConn("signed in");
-        await loadSkills();
-        await loadRecordings();
       } catch (error) {
         if (!cancelled) {
           setWho(error instanceof Error ? error.message : "Sign in required.");
           setConn("sign in required");
         }
+        return;
       }
+      try {
+        await loadSkills();
+      } catch (error) {
+        if (!cancelled) report(error instanceof Error ? error.message : "Could not load skills", true);
+      }
+      if (!cancelled) await loadRecordings();
     }
     void boot();
     return () => {

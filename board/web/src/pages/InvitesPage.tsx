@@ -57,7 +57,20 @@ export function InvitesPage() {
         setHeaderWho(name);
         setWho(`Signed in as ${name} (human admin, not a track).`);
         setConn("signed in");
+      } catch (error) {
+        if (!cancelled) {
+          setWho(error instanceof Error ? error.message : "Admin session required.");
+          setConn("sign in required");
+        }
+        return;
+      }
+      try {
         await api("/api/presence/heartbeat", { method: "POST", body: { status_hint: "logged_in" } });
+      } catch (error) {
+        if (!cancelled) setErr(error instanceof Error ? error.message : "Could not record the heartbeat");
+      }
+      if (cancelled) return;
+      try {
         await loadInvites();
         const meta = await api<{ coming_soon_roles?: { id: string; summary?: string }[] }>("/api/meta");
         if (cancelled) return;
@@ -68,8 +81,8 @@ export function InvitesPage() {
         setSoon(roles.map((row) => `${row.id} — ${row.summary || "coming soon"}`));
       } catch (error) {
         if (!cancelled) {
-          setWho(error instanceof Error ? error.message : "Admin session required.");
-          setConn("sign in required");
+          const message = error instanceof Error ? error.message : "Could not load invites";
+          setErr((current) => current || message);
         }
       }
     }

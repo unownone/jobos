@@ -6,6 +6,7 @@ import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card
 import { Table, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { softBreak } from "@/lib/soft-break";
+import { cn } from "@/lib/utils";
 
 function lane(track?: string, role?: string): string {
   const left = track?.trim() ?? "";
@@ -39,6 +40,8 @@ type DirectoryUser = {
 export function UsersPage() {
   const [who, setWho] = useState("Checking session…");
   const [conn, setConn] = useState<ShellConn>("signing in");
+  const [failed, setFailed] = useState(false);
+  const [err, setErr] = useState("");
   const [users, setUsers] = useState<DirectoryUser[]>([]);
 
   useEffect(() => {
@@ -46,16 +49,23 @@ export function UsersPage() {
     async function boot() {
       try {
         const data = await api<{ users?: DirectoryUser[] }>("/api/users");
-        await api("/api/presence/heartbeat", { method: "POST", body: { status_hint: "logged_in" } });
         if (cancelled) return;
-        setUsers(data.users ?? []);
-        const count = data.users?.length ?? 0;
-        setWho(`${count} ${count === 1 ? "person" : "people"} in the directory`);
+        const people = data.users ?? [];
+        setUsers(people);
+        setFailed(false);
+        setWho(`${people.length} ${people.length === 1 ? "person" : "people"} in the directory`);
         setConn("signed in");
+        try {
+          await api("/api/presence/heartbeat", { method: "POST", body: { status_hint: "logged_in" } });
+        } catch (error) {
+          if (!cancelled) setErr(error instanceof Error ? error.message : "Could not record the heartbeat");
+        }
       } catch (error) {
         if (!cancelled) {
-          setWho(error instanceof Error ? error.message : "Admin or maintenance session required.");
-          setConn("sign in required");
+          const message = error instanceof Error ? error.message : "Admin or maintenance session required.";
+          setWho(message);
+          setFailed(true);
+          if (message.includes("unauthorized")) setConn("sign in required");
         }
       }
     }
@@ -68,9 +78,10 @@ export function UsersPage() {
   return (
     <AppShell title="Directory" subtitle="jobOS Harness" scroll="page" path="/admin/users" who={who} conn={conn}>
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
-        <p id="who" className="m-0 text-sm text-muted-foreground">
+        <p id="who" className={cn("m-0 text-sm", failed ? "text-destructive" : "text-muted-foreground")}>
           {who}
         </p>
+        <p id="err" className="m-0 text-sm text-destructive">{err}</p>
         <RecordDeck>
           {users.map((user) => {
             const name = user.display_name || user.user_id || "";
