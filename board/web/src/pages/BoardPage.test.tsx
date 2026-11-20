@@ -317,6 +317,7 @@ describe("BoardPage", () => {
     await waitFor(() => {
       expect(byId("sideErr")).toHaveTextContent("Saved.");
     });
+    expect(byId("sideErr").className).not.toContain("text-destructive");
     const patch = apiMock.mock.calls.find((call) => call[0] === "/api/jobs/1" && call[1]?.method === "PATCH");
     expect(patch?.[1]?.body).toEqual({ company: "TicketCo", title: "Staff Engineer", status: "discovered" });
   });
@@ -570,6 +571,7 @@ describe("BoardPage", () => {
       expect(byId("sideErr").textContent ?? "").not.toBe("");
     });
     expect(byId("sideErr").textContent).not.toBe("Saved.");
+    expect(byId("sideErr").className).toContain("text-destructive");
     expect(apiMock.mock.calls.some((call) => call[1]?.method === "PATCH")).toBe(false);
   });
 });

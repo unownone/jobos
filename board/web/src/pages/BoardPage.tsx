@@ -205,6 +205,11 @@ export function BoardPage() {
   const [packets, setPackets] = useState<Packets>(EMPTY_PACKETS);
   const [sourceText, setSourceText] = useState("");
   const [sideErr, setSideErr] = useState("");
+  const [sideFailed, setSideFailed] = useState(false);
+  function note(message: string, isError = false) {
+    setSideErr(message);
+    setSideFailed(isError);
+  }
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [presenceNote, setPresenceNote] = useState("Workers appear here when they take Hub actions.");
   const [memories, setMemories] = useState<MemoryItem[]>([]);
@@ -238,7 +243,7 @@ export function BoardPage() {
     const id = url.searchParams.get("job")?.trim() ?? "";
     if (!id) return;
     void openJob(id).catch((error: unknown) => {
-      setSideErr(error instanceof Error ? error.message : "Could not open job");
+      note(error instanceof Error ? error.message : "Could not open job", true);
       url.searchParams.delete("job");
       window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
     });
@@ -395,7 +400,7 @@ export function BoardPage() {
   function closeTicket() {
     setSelected(null);
     setEvents([]);
-    setSideErr("");
+    note("");
   }
 
   function showJob(job: Job) {
@@ -410,7 +415,7 @@ export function BoardPage() {
   }
 
   async function openJob(id: string) {
-    setSideErr("");
+    note("");
     const detail = await api<{ job: Job }>(`/api/jobs/${encodeURIComponent(id)}`);
     let nextEvents: JobEvent[] = [];
     try {
@@ -464,16 +469,16 @@ export function BoardPage() {
       }
       const data = await api<{ job?: Job }>(`/api/jobs/${encodeURIComponent(selected.id)}`, { method: "PATCH", body });
       if (data?.job) showJob(data.job);
-      setSideErr("Saved.");
+      note("Saved.");
       setReloadKey((key) => key + 1);
     } catch (error) {
-      setSideErr(error instanceof Error ? error.message : "Could not save");
+      note(error instanceof Error ? error.message : "Could not save", true);
     }
   }
 
   async function settleLane(id: string, message: string) {
     await openJob(id);
-    setSideErr(message);
+    note(message);
     setReloadKey((key) => key + 1);
   }
 
@@ -486,7 +491,7 @@ export function BoardPage() {
       await api(`/api/jobs/${encodeURIComponent(id)}/pause`, { method: "POST", body: { reason } });
       await settleLane(id, "Paused.");
     } catch (error) {
-      setSideErr(error instanceof Error ? error.message : "Could not pause");
+      note(error instanceof Error ? error.message : "Could not pause", true);
     }
   }
 
@@ -499,7 +504,7 @@ export function BoardPage() {
       await api(`/api/jobs/${encodeURIComponent(id)}/stop`, { method: "POST", body: { reason } });
       await settleLane(id, "Stopped.");
     } catch (error) {
-      setSideErr(error instanceof Error ? error.message : "Could not stop");
+      note(error instanceof Error ? error.message : "Could not stop", true);
     }
   }
 
@@ -510,7 +515,7 @@ export function BoardPage() {
       await api(`/api/jobs/${encodeURIComponent(id)}/resume`, { method: "POST" });
       await settleLane(id, "Resumed.");
     } catch (error) {
-      setSideErr(error instanceof Error ? error.message : "Could not resume");
+      note(error instanceof Error ? error.message : "Could not resume", true);
     }
   }
 
@@ -522,7 +527,7 @@ export function BoardPage() {
       closeTicket();
       setReloadKey((key) => key + 1);
     } catch (error) {
-      setSideErr(error instanceof Error ? error.message : "Could not delete");
+      note(error instanceof Error ? error.message : "Could not delete", true);
     }
   }
 
@@ -772,7 +777,7 @@ export function BoardPage() {
                   <Button id="resumeBtn" type="button" variant="secondary" disabled={!caps?.can_stop || !selected.stopped} onClick={() => void resumeJob()}>Resume</Button>
                   <Button id="delBtn" type="button" variant="destructive" disabled={!caps?.can_delete} onClick={() => void deleteJob()}>Delete</Button>
                 </div>
-                <p id="sideErr" className="mt-2 text-sm">{sideErr}</p>
+                <p id="sideErr" className={cn("mt-2 text-sm", sideFailed && "text-destructive")}>{sideErr}</p>
               </div>
             ) : null}
           >
