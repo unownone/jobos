@@ -21,7 +21,7 @@ services:
       DATABASE_URL: "${DATABASE_URL:-}"
       REDIS_URL: "${REDIS_URL:-}"
       CACHE_DRIVER: "${CACHE_DRIVER:-memory}"
-      BLOB_DRIVER: "${BLOB_DRIVER:-memory}"
+      BLOB_DRIVER: "${BLOB_DRIVER:-}"
       BLOB_ROOT: /var/lib/jobos/blobs
       S3_ENDPOINT: "${S3_ENDPOINT:-}"
       S3_BUCKET: "${S3_BUCKET:-jobos}"
