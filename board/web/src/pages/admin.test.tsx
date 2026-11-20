@@ -96,7 +96,8 @@ describe("admin pages", () => {
     await waitFor(() => {
       expect(document.getElementById("rows")).toHaveTextContent("Ada");
     });
-    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Last active")?.className).toContain("w-[18%]");
+    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Last active")?.className).toContain("w-[14%]");
+    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Task")?.className).toContain("w-[18%]");
   });
 
   it("names a directory lane without an empty track", async () => {
@@ -104,7 +105,13 @@ describe("admin pages", () => {
       if (path === "/api/users") {
         return Promise.resolve({
           users: [
-            { user_id: "u1", display_name: "Ada", role: "admin", last_active: "Last active: just now" },
+            {
+              user_id: "u1",
+              display_name: "Ada",
+              role: "admin",
+              last_active: "Last active: just now",
+              current_task: { id: "board__audit-fixture-co-staff-software-engineer" },
+            },
             { user_id: "u2", display_name: "Bea", track: "discovery", role: "owner", last_seen: "2h ago" },
           ],
         });
@@ -122,6 +129,10 @@ describe("admin pages", () => {
     expect(ada?.textContent).not.toContain("/ admin");
     expect(ada?.textContent).toContain("just now");
     expect(ada?.textContent).not.toContain("Last active:");
+    const task = ada?.querySelectorAll("td")[8];
+    expect(task?.textContent).toBe("board__audit-fixture-co-staff-software-engineer");
+    expect(task?.className).toContain("break-all");
+    expect(task?.className).not.toContain("truncate");
     const bea = [...document.querySelectorAll("#rows tr")].find((row) => row.textContent?.includes("Bea"));
     expect(bea?.textContent).toContain("discovery / owner");
     expect(bea?.textContent).toContain("2h ago");

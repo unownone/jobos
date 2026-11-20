@@ -44,8 +44,8 @@ export function UsersPage() {
     let cancelled = false;
     async function boot() {
       try {
-        await api("/api/presence/heartbeat", { method: "POST", body: { status_hint: "logged_in" } });
         const data = await api<{ users?: DirectoryUser[] }>("/api/users");
+        await api("/api/presence/heartbeat", { method: "POST", body: { status_hint: "logged_in" } });
         if (cancelled) return;
         setUsers(data.users ?? []);
         const count = data.users?.length ?? 0;
@@ -92,15 +92,15 @@ export function UsersPage() {
           <Table>
             <thead className="sticky top-0 bg-card">
               <tr>
-                <Th className="w-[16%] max-[959px]:w-[46%]">Name</Th>
-                <Th className="w-[9%] max-[959px]:w-[27%]">Kind</Th>
-                <Th className="w-[14%] max-[959px]:hidden">Track</Th>
-                <Th className="w-[9%] max-[959px]:w-[27%]">Status</Th>
-                <Th className="w-[11%] max-[959px]:hidden">Model</Th>
-                <Th className="w-[9%] max-[959px]:hidden">Harness</Th>
+                <Th className="w-[14%] max-[959px]:w-[46%]">Name</Th>
+                <Th className="w-[8%] max-[959px]:w-[27%]">Kind</Th>
+                <Th className="w-[12%] max-[959px]:hidden">Track</Th>
+                <Th className="w-[8%] max-[959px]:w-[27%]">Status</Th>
+                <Th className="w-[10%] max-[959px]:hidden">Model</Th>
+                <Th className="w-[8%] max-[959px]:hidden">Harness</Th>
                 <Th className="w-[8%] max-[959px]:hidden">Bed</Th>
-                <Th className="w-[18%] max-[959px]:hidden">Last active</Th>
-                <Th className="max-[959px]:hidden">Task</Th>
+                <Th className="w-[14%] max-[959px]:hidden">Last active</Th>
+                <Th className="w-[18%] max-[959px]:hidden">Task</Th>
               </tr>
             </thead>
             <tbody id="rows">
@@ -118,7 +118,7 @@ export function UsersPage() {
                     <Td className="max-[959px]:hidden" title={user.harness}>{user.harness}</Td>
                     <Td className="max-[959px]:hidden" title={user.bed}>{user.bed}</Td>
                     <Td className="max-[959px]:hidden" title={seen}>{seen}</Td>
-                    <Td className="max-[959px]:hidden" title={user.current_task?.id}>{user.current_task?.id}</Td>
+                    <Td truncate={false} className="max-[959px]:hidden break-all" title={user.current_task?.id}>{user.current_task?.id}</Td>
                   </tr>
                 );
               })}
