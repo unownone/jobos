@@ -198,6 +198,22 @@ def test_discovery_can_patch_discovery_fields_in_lane(client: TestClient) -> Non
     assert res.json()["job"]["score"] == 5
 
 
+def test_admin_can_clear_a_score(client: TestClient) -> None:
+    created = client.post(
+        "/api/jobs",
+        headers=h("admin"),
+        json={"id": "gh__score", "company": "Acme", "title": "Staff", "status": "discovered", "score": 4},
+    )
+    assert created.status_code == 201, created.text
+    job_id = created.json()["job"]["id"]
+    cleared = client.patch(f"/api/jobs/{job_id}", headers=h("admin"), json={"score": None})
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["job"]["score"] is None
+    again = client.get(f"/api/jobs/{job_id}", headers=h("admin"))
+    assert again.status_code == 200, again.text
+    assert again.json()["job"]["score"] is None
+
+
 def test_admin_stop_freezes_job(client: TestClient) -> None:
     created = client.post(
         "/api/jobs",

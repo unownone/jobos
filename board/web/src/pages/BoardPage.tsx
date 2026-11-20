@@ -398,6 +398,17 @@ export function BoardPage() {
     setSideErr("");
   }
 
+  function showJob(job: Job) {
+    setSourceText((job.sources ?? []).join(", "));
+    setPackets({
+      owners: jsonText(job.owners),
+      apply_packet: jsonText(job.apply_packet),
+      outreach_packet: jsonText(job.outreach_packet),
+      proof: jsonText(job.proof),
+    });
+    setSelected(job);
+  }
+
   async function openJob(id: string) {
     setSideErr("");
     const detail = await api<{ job: Job }>(`/api/jobs/${encodeURIComponent(id)}`);
@@ -408,16 +419,8 @@ export function BoardPage() {
     } catch {
       nextEvents = [];
     }
-    const job = detail.job;
-    setSourceText((job.sources ?? []).join(", "));
-    setPackets({
-      owners: jsonText(job.owners),
-      apply_packet: jsonText(job.apply_packet),
-      outreach_packet: jsonText(job.outreach_packet),
-      proof: jsonText(job.proof),
-    });
     setEvents(nextEvents);
-    setSelected(job);
+    showJob(detail.job);
   }
 
   function canEdit(field: string): boolean {
@@ -453,12 +456,14 @@ export function BoardPage() {
         outreach_packet: parseJSONField(packets.outreach_packet, {}),
         proof: parseJSONField(packets.proof, {}),
       };
-      if (selected.score != null && String(selected.score) !== "") body.score = Number(selected.score);
+      const rawScore = selected.score;
+      body.score = rawScore == null || String(rawScore) === "" ? null : Number(rawScore);
       const allowed = new Set(caps?.patch_fields ?? []);
       for (const key of Object.keys(body)) {
         if (!allowed.has(key)) delete body[key];
       }
-      await api(`/api/jobs/${encodeURIComponent(selected.id)}`, { method: "PATCH", body });
+      const data = await api<{ job?: Job }>(`/api/jobs/${encodeURIComponent(selected.id)}`, { method: "PATCH", body });
+      if (data?.job) showJob(data.job);
       setSideErr("Saved.");
       setReloadKey((key) => key + 1);
     } catch (error) {

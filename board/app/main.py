@@ -969,6 +969,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if current is None:
             raise HTTPException(status_code=404, detail="job not found")
         incoming = body.model_dump(exclude_none=True)
+        if "score" in body.model_fields_set and body.score is None:
+            incoming["score"] = None
         if not incoming:
             return {"job": current, "event": None}
         patch = authorize_patch(principal.role, current, incoming)

@@ -137,7 +137,10 @@ function mockBoard(
     if (path === "/api/whoami") return Promise.resolve(who);
     if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered", "rejected", "closed_withdrawn"], apply_kinds: ["ats"] });
     if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload(rows));
-    if (path === "/api/jobs/1" && opts?.method === "PATCH") return Promise.resolve({});
+    if (path === "/api/jobs/1" && opts?.method === "PATCH") {
+      if (row && opts.body && typeof opts.body === "object") Object.assign(row, opts.body);
+      return Promise.resolve({ job: row });
+    }
     if (path === "/api/jobs/1" && opts?.method === "DELETE") return Promise.resolve({});
     if (path === "/api/jobs/1/pause") {
       if (row) row.stopped = true;
@@ -316,6 +319,24 @@ describe("BoardPage", () => {
     });
     const patch = apiMock.mock.calls.find((call) => call[0] === "/api/jobs/1" && call[1]?.method === "PATCH");
     expect(patch?.[1]?.body).toEqual({ company: "TicketCo", title: "Staff Engineer", status: "discovered" });
+  });
+
+  it("sends null when a score is cleared and shows the stored empty score", async () => {
+    mockBoard([{ ...JOB, score: 4 }], [], [], { ...ADMIN, patch_fields: ["company", "title", "status", "score"] });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("list")).toHaveTextContent("TicketCo"));
+    fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
+    await waitFor(() => expect(byId("f_score")).toHaveValue(4));
+    fireEvent.change(byId("f_score"), { target: { value: "" } });
+    fireEvent.click(byId("saveBtn"));
+    await waitFor(() => expect(byId("sideErr")).toHaveTextContent("Saved."));
+    const patch = apiMock.mock.calls.find((call) => call[0] === "/api/jobs/1" && call[1]?.method === "PATCH");
+    expect((patch?.[1]?.body as { score?: number | null }).score).toBeNull();
+    expect(byId("f_score")).toHaveValue(null);
+    await waitFor(() => {
+      const scoreCell = [...byId("list").querySelectorAll("td")][3];
+      expect(scoreCell?.textContent).toBe("");
+    });
   });
 
   it("closes ticket fields the role cannot patch", async () => {
