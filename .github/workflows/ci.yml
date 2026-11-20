@@ -87,6 +87,43 @@ jobs:
       - name: E2E tests (in-process HTTP TestClient)
         run: uv run pytest -m e2e --strict-markers --tb=short
 
+  go:
+    name: go
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: server/go.sum
+
+      - name: Test
+        working-directory: server
+        run: go test ./...
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build SPA
+        working-directory: web
+        run: npm ci && npm run build
+
   e2e-browser:
     name: e2e-browser
     runs-on: ubuntu-latest

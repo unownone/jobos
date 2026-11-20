@@ -2,7 +2,7 @@
 
 jobOS Hub is the live coordination plane for the job harness. The current Compose file runs two containers: a Go API and a React SPA. Postgres, Redis, and MinIO are optional profiles. RabbitMQ is not in that file. See [`docs/runtime.md`](runtime.md). Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
 
-`scripts/hub_deploy.sh` and `board/docker-compose.yml` still start the Python board. Compose files at the repo root start the Go API and the React SPA. Traefik also answers on port 8787 and sends that traffic to the SPA.
+`scripts/hub_deploy.sh` still starts the Python board. `board/docker-compose.yml` and the repo-root Compose files start the Go API and the React SPA. Traefik also answers on port 8787 and sends that traffic to the SPA.
 
 **Onboarding is the first thing you do after the process is up.** Until a truthful candidate profile exists, jobs, invites, queues, messages, and A2A sends return `409 candidate_required`. Do not copy `profiles/candidate.example.yaml` into production.
 
