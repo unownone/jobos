@@ -247,8 +247,8 @@ export function BoardPage() {
     const url = new URL(window.location.href);
     const id = url.searchParams.get("job")?.trim() ?? "";
     if (!id) return;
-    void openJob(id).catch((error: unknown) => {
-      note(error instanceof Error ? error.message : "Could not open job", true);
+    void openJob(id).then((opened) => {
+      if (opened) return;
       url.searchParams.delete("job");
       window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
     });
@@ -443,18 +443,24 @@ export function BoardPage() {
     setSelected(job);
   }
 
-  async function openJob(id: string) {
+  async function openJob(id: string): Promise<boolean> {
     note("");
-    const detail = await api<{ job: Job }>(`/api/jobs/${encodeURIComponent(id)}`);
     try {
-      const payload = await api<{ events?: JobEvent[] }>(`/api/events?job_id=${encodeURIComponent(id)}&limit=30`);
-      setEvents(payload.events ?? []);
-      setEventsError("");
+      const detail = await api<{ job: Job }>(`/api/jobs/${encodeURIComponent(id)}`);
+      try {
+        const payload = await api<{ events?: JobEvent[] }>(`/api/events?job_id=${encodeURIComponent(id)}&limit=30`);
+        setEvents(payload.events ?? []);
+        setEventsError("");
+      } catch (error) {
+        setEvents([]);
+        setEventsError(error instanceof Error ? error.message : "Could not load events");
+      }
+      showJob(detail.job);
+      return true;
     } catch (error) {
-      setEvents([]);
-      setEventsError(error instanceof Error ? error.message : "Could not load events");
+      note(error instanceof Error ? error.message : "Could not open job", true);
+      return false;
     }
-    showJob(detail.job);
   }
 
   function canEdit(field: string): boolean {
@@ -506,8 +512,8 @@ export function BoardPage() {
   }
 
   async function settleLane(id: string, message: string) {
-    await openJob(id);
-    note(message);
+    const opened = await openJob(id);
+    if (opened) note(message);
     setReloadKey((key) => key + 1);
   }
 

@@ -228,6 +228,25 @@ describe("BoardPage", () => {
     expect(window.location.search).not.toContain("job=");
   });
 
+  it("shows a failed row open on the board", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve(ADMIN);
+      if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered"], apply_kinds: [] });
+      if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload([JOB]));
+      if (path === "/api/jobs/1") return Promise.reject(new Error("job unavailable"));
+      if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: [] } });
+      if (path === "/api/presence") return Promise.resolve({ users: [] });
+      if (path.startsWith("/api/queue")) return Promise.resolve({ items: [] });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("list")).toHaveTextContent("TicketCo"));
+    fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
+    await waitFor(() => expect(byId("sideErr")).toHaveTextContent("job unavailable"));
+    expect(byId("sideErr").className).toContain("text-destructive");
+    expect(document.getElementById("f_company")).not.toBeInTheDocument();
+  });
+
   it("opens the job a worker is on", async () => {
     mockBoard([JOB], [{
       user_id: "u1",
