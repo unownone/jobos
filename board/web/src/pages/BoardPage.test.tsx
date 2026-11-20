@@ -285,6 +285,8 @@ describe("BoardPage", () => {
     expect(byId("list").querySelector("[data-slot='record-deck']")?.textContent).toContain("TicketCo");
     expect([...byId("list").querySelectorAll("th")].find((header) => header.textContent === "Score")?.className).toContain("max-[959px]:hidden");
     expect([...byId("list").querySelectorAll("th")].find((header) => header.textContent === "Posted")?.className).toContain("w-[16%]");
+    expect([...byId("list").querySelectorAll("th")].find((header) => header.textContent === "Status")?.className).toContain("w-[16%]");
+    expect([...byId("list").querySelectorAll("th")].find((header) => header.textContent === "Company")?.className).toContain("w-[18%]");
     expect(byId("list").contains(byId("pager"))).toBe(false);
     expect(byId("main").contains(byId("pager"))).toBe(false);
     expect(byId("main").contains(byId("list"))).toBe(true);
