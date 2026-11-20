@@ -242,7 +242,7 @@ export function MemoryPage() {
             Company
             <Input id="write-company" value={company} onChange={(event) => setCompany(event.target.value)} />
           </Field>
-          <Field className="md:col-span-2">
+          <Field>
             Title
             <Input id="write-title" value={title} onChange={(event) => setTitle(event.target.value)} />
           </Field>

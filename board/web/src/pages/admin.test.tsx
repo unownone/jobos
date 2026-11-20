@@ -216,6 +216,10 @@ describe("admin pages", () => {
 
     expect(document.querySelector("h1")).toHaveTextContent("Memory pods");
     expect(document.getElementById("add-item")).toBeInTheDocument();
+    expect(document.getElementById("write-title")?.parentElement?.parentElement).toBe(
+      document.getElementById("write-company")?.parentElement?.parentElement,
+    );
+    expect(document.getElementById("write-body")?.parentElement?.className).toContain("md:col-span-2");
 
     fireEvent.change(document.getElementById("write-title") as HTMLInputElement, { target: { value: "Lever" } });
     fireEvent.change(document.getElementById("write-body") as HTMLTextAreaElement, { target: { value: "Use the public board." } });
