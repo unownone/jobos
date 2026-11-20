@@ -334,11 +334,15 @@ func (s *Server) candidateGate(c *gin.Context) {
 		c.Next()
 		return
 	}
-	c.AbortWithStatusJSON(http.StatusConflict, gin.H{
+	c.AbortWithStatusJSON(http.StatusConflict, gin.H{"detail": candidateRequiredBody()})
+}
+
+func candidateRequiredBody() gin.H {
+	return gin.H{
 		"code":           "candidate_required",
 		"message":        "Onboard the candidate profile before using the Hub. Do not invent one.",
 		"onboarding_url": "/onboarding",
-	})
+	}
 }
 
 func openWithoutCandidate(path string) bool {

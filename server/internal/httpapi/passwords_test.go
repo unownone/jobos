@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"os/exec"
 	"strings"
@@ -37,6 +38,21 @@ func TestHealthNextStepBeforeSignup(t *testing.T) {
 	body = readBody(res)
 	if !strings.Contains(body, `"onboarding_url":"/onboarding"`) || !strings.Contains(body, `"source":"missing"`) {
 		t.Fatalf("status %s", body)
+	}
+}
+
+func TestJobsRequireCandidateDetail(t *testing.T) {
+	ts := testServer(t)
+	defer ts.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"ada","password":"long-enough"}`, "")
+	csrf := res.Header.Get("X-CSRF")
+	res.Body.Close()
+	res = postJSON(t, client, ts.URL+"/api/jobs", `{"company":"Acme","title":"Engineer","status":"discovered"}`, csrf)
+	body := readBody(res)
+	if res.StatusCode != 409 || !strings.Contains(body, `"code":"candidate_required"`) || !strings.Contains(body, `"onboarding_url":"/onboarding"`) {
+		t.Fatalf("gate %d %s", res.StatusCode, body)
 	}
 }
 

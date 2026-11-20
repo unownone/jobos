@@ -631,7 +631,7 @@ func (s *Server) join(c *gin.Context) {
 		return
 	}
 	if !s.onboarded(c, inv.AccountID) {
-		c.JSON(409, gin.H{"code": "candidate_required", "message": "Onboard the candidate profile before using the Hub. Do not invent one.", "onboarding_url": "/onboarding"})
+		c.JSON(409, gin.H{"detail": candidateRequiredBody()})
 		return
 	}
 	kind := "agent"

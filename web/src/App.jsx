@@ -2,6 +2,19 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api.js";
 
+function Logout() {
+  const navigate = useNavigate();
+  async function out() {
+    try {
+      await api("/api/auth/logout", { method: "POST" });
+    } catch {
+      // A missing session still leaves the login page.
+    }
+    navigate("/login");
+  }
+  return <button id="logoutBtn" type="button" data-hub-logout onClick={out}>Log out</button>;
+}
+
 function Shell({ me, children }) {
   return (
     <div className="shell">
@@ -11,7 +24,7 @@ function Shell({ me, children }) {
           <Link to="/board">Board</Link>
           <Link to="/onboarding">Onboarding</Link>
           <Link to="/admin">Invites</Link>
-          {me ? <span className="muted">{me.display_name || me.role}</span> : <Link to="/login">Login</Link>}
+          {me ? <Logout /> : <Link to="/login">Login</Link>}
         </nav>
       </header>
       {children}
@@ -44,7 +57,7 @@ function Login() {
         <h2>Log in</h2>
         <input id="username" placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} />
         <input id="password" placeholder="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        {error ? <p className="error">{error}</p> : null}
+        {error ? <p id="err" className="error">{error}</p> : null}
         <div className="row">
           <button id="loginBtn" type="submit">Log in</button>
           <button id="signupBtn" type="submit">Create account</button>
@@ -134,11 +147,11 @@ function Onboarding() {
     <Shell me={{ role: "admin" }}>
       <form className="stack" onSubmit={save}>
         <h2>Candidate</h2>
-        <textarea value={yaml} onChange={(e) => setYaml(e.target.value)} />
-        <button type="submit">Save profile</button>
-        <label className="muted">Resume PDF <input type="file" accept="application/pdf" onChange={upload} /></label>
+        <textarea id="yaml" value={yaml} onChange={(e) => setYaml(e.target.value)} />
+        <button id="save" type="submit">Save profile</button>
+        <label className="muted">Resume PDF <input id="resume" type="file" accept="application/pdf" onChange={upload} /></label>
         {note ? <p id="ok">{note}</p> : null}
-        {error ? <p className="error">{error}</p> : null}
+        {error ? <p id="err" className="error">{error}</p> : null}
       </form>
     </Shell>
   );
@@ -173,7 +186,7 @@ function Admin() {
   return (
     <Shell me={{ role: "admin" }}>
       <form className="row" onSubmit={create}>
-        <select value={track} onChange={(e) => setTrack(e.target.value)}>
+        <select id="track" value={track} onChange={(e) => setTrack(e.target.value)}>
           <option value="discovery">discovery</option>
           <option value="application">application</option>
           <option value="outreach">outreach</option>
@@ -181,7 +194,7 @@ function Admin() {
         </select>
         <button type="submit">Create invite</button>
       </form>
-      {fresh ? <p>Join URL (shown once): {fresh.join_url}</p> : null}
+      {fresh ? <p id="created">Join URL (shown once): {fresh.join_url}</p> : null}
       {error ? <p className="error">{error}</p> : null}
       <ul>
         {invites.map((inv) => (
@@ -216,9 +229,9 @@ function Join() {
     <Shell>
       <form className="stack" onSubmit={submit}>
         <h2>Join {id}</h2>
-        <input placeholder="bot name" value={name} onChange={(e) => setName(e.target.value)} />
+        <input id="name" placeholder="bot name" value={name} onChange={(e) => setName(e.target.value)} />
         <button type="submit">Redeem invite</button>
-        {key ? <p>API key, shown once: {key}</p> : null}
+        {key ? <p id="key">API key, shown once: {key}</p> : null}
         {error ? <p className="error">{error}</p> : null}
       </form>
     </Shell>
