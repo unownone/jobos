@@ -438,6 +438,7 @@ describe("BoardPage", () => {
     mockBoard([{ ...JOB, stopped: true }]);
     render(<BoardPage />);
     await waitFor(() => expect(byId("list")).toHaveTextContent("TicketCo"));
+    expect(byId("list")).toHaveTextContent("discovered · stopped");
     fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
     await waitFor(() => expect(byId("resumeBtn")).toBeEnabled());
     expect(byId("pauseBtn")).toBeDisabled();

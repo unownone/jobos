@@ -118,6 +118,11 @@ function whoText(me: Who): string {
   return `${name} · ${lane}`;
 }
 
+function statusLabel(job: Pick<Job, "status" | "stopped">): string {
+  if (!job.stopped) return job.status || "";
+  return job.status ? `${job.status} · stopped` : "stopped";
+}
+
 function isAdmin(me: Who | null): boolean {
   return Boolean(me && (me.can_hygiene || me.kind === "owner" || me.role === "admin"));
 }
@@ -699,7 +704,7 @@ export function BoardPage() {
                     subtitle={job.title || ""}
                     onClick={() => void openJob(job.id)}
                   >
-                    <RecordField label="Status" value={job.stopped ? "stopped" : job.status || ""} />
+                    <RecordField label="Status" value={statusLabel(job)} />
                     <RecordField label="Score" value={job.score == null ? "" : String(job.score)} />
                     <RecordField label="Pay" value={job.pay || "—"} />
                     <RecordField label="Posted" value={dayLabel(job.posted_at) || dayLabel(job.created_at)} />
@@ -725,8 +730,8 @@ export function BoardPage() {
                       <Td truncate={false} className="break-words" title={job.company}>{job.company}</Td>
                       <Td truncate={false} className="break-words" title={job.title}>{job.title}</Td>
                       <Td truncate={false}>
-                        <Badge variant="outline" className="max-w-full border-dashed border-current">
-                          {job.stopped ? "stopped" : job.status}
+                        <Badge variant="outline" className="h-auto max-w-full whitespace-normal border-dashed border-current">
+                          {statusLabel(job)}
                         </Badge>
                       </Td>
                       <Td truncate={false} className="max-[959px]:hidden @max-[36rem]:hidden">{job.score ?? ""}</Td>
