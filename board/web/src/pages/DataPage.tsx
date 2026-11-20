@@ -40,7 +40,7 @@ function isTab(value: string): value is Tab {
 }
 
 const PROSE = new Set(["Company", "Title", "Name", "Fact", "Reason", "Value", "Role", "Tags", "Note", "Field"]);
-const IDENTIFIERS = new Set(["ID", "Job", "Slug"]);
+const IDENTIFIERS = new Set(["ID", "Job", "Slug", "Pod", "Hosted"]);
 
 const JOB_WIDTH: Record<string, string> = {
   ID: "w-[28%]",

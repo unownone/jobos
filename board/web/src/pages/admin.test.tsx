@@ -125,6 +125,28 @@ describe("admin pages", () => {
     expect([...document.querySelectorAll("#table td")][2]?.className).toContain("break-words");
   });
 
+  it("wraps a hosted connector path", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada" });
+      if (path.startsWith("/api/jobs")) return Promise.resolve({ jobs: [], count: 0, total: 0 });
+      if (path.startsWith("/api/onboarding")) {
+        return Promise.resolve({
+          connectors_needed: [{ id: "gmail", required: true, hosted: "/api/mcp/hosted/google-workspace.json", reason: "Mail" }],
+          mcp_example: "gmail",
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<DataPage />);
+    fireEvent.click(document.querySelector("[data-tab='mcps']") as HTMLButtonElement);
+    await waitFor(() => {
+      expect(document.getElementById("table")).toHaveTextContent("/api/mcp/hosted/google-workspace.json");
+    });
+    const hosted = [...document.querySelectorAll("#table td")].find((cell) => cell.textContent === "/api/mcp/hosted/google-workspace.json");
+    expect(hosted?.className).toContain("break-all");
+    expect(hosted?.className).not.toContain("truncate");
+  });
+
   it("renders the data browser", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path.startsWith("/api/jobs")) return Promise.resolve({ jobs: [], count: 0, total: 0 });
