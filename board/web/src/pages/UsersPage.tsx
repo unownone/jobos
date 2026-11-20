@@ -119,7 +119,7 @@ export function UsersPage() {
                     <Td truncate={false} className="max-[959px]:hidden break-words" title={user.harness}>{softBreak(user.harness || "")}</Td>
                     <Td truncate={false} className="max-[959px]:hidden break-words" title={user.bed}>{softBreak(user.bed || "")}</Td>
                     <Td truncate={false} className="max-[959px]:hidden break-words" title={seen}>{softBreak(seen)}</Td>
-                    <Td truncate={false} className="max-[959px]:hidden break-all" title={user.current_task?.id}>{user.current_task?.id}</Td>
+                    <Td truncate={false} className="max-[959px]:hidden break-words" title={user.current_task?.id}>{softBreak(user.current_task?.id || "")}</Td>
                   </tr>
                 );
               })}

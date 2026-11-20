@@ -141,7 +141,9 @@ describe("admin pages", () => {
     expect(ada?.textContent).not.toContain("Last active:");
     const task = ada?.querySelectorAll("td")[8];
     expect(task?.textContent).toBe("board__audit-fixture-co-staff-software-engineer");
-    expect(task?.className).toContain("break-all");
+    expect(task?.className).toContain("break-words");
+    expect(task?.className).not.toContain("break-all");
+    expect(task?.querySelectorAll("wbr").length).toBeGreaterThan(0);
     expect(task?.className).not.toContain("truncate");
     const bea = [...document.querySelectorAll("#rows tr")].find((row) => row.textContent?.includes("Bea"));
     expect(bea?.textContent).toContain("discovery / owner");
