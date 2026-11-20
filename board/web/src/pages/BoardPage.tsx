@@ -522,7 +522,7 @@ export function BoardPage() {
         className={cn("flex min-h-0 min-w-0 flex-1 flex-col", stageScrolls ? "overflow-y-auto" : "overflow-hidden")}
       >
         <div ref={toolbarRef} data-board-toolbar className="shrink-0">
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+          <div className="flex flex-wrap items-end gap-2 border-b border-border px-3 py-2">
             <div className="hidden items-center gap-1 rounded-full border border-primary p-0.5 max-[959px]:inline-flex" role="tablist" aria-label="Board pane">
               <Button type="button" data-board-pane="jobs" variant={pane === "jobs" ? "default" : "ghost"} className="rounded-full" aria-pressed={pane === "jobs"} onClick={() => setPane("jobs")}>
                 Jobs
@@ -531,7 +531,10 @@ export function BoardPage() {
                 Live
               </Button>
             </div>
-            <Input id="q" value={q} placeholder="Search company / title / not" className="min-w-40 flex-1" onChange={(event) => { setOffset(0); setQ(event.target.value); }} />
+            <Field className="w-56 max-w-full shrink-0">
+              Search
+              <Input id="q" value={q} placeholder="Search company / title / not" onChange={(event) => { setOffset(0); setQ(event.target.value); }} />
+            </Field>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button id="statusBtn" type="button" variant="outline">
@@ -578,7 +581,7 @@ export function BoardPage() {
           id="moreFilters"
           ref={filtersRef}
           className={cn(
-            "shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2",
+            "shrink-0 flex-wrap items-end gap-2 border-b border-border px-3 py-2",
             filtersOpen ? "flex" : "hidden min-[960px]:flex",
           )}
         >
@@ -601,8 +604,14 @@ export function BoardPage() {
             { value: "true", label: "Pay stated" },
             { value: "false", label: "Pay missing" },
           ]} />
-          <Input id="locationFilter" value={location} placeholder="Location" aria-label="Location" className="w-44 shrink-0" onChange={(event) => { setOffset(0); setLocation(event.target.value); }} />
-          <Input id="sourceFilter" value={source} placeholder="Source" aria-label="Source" className="w-44 shrink-0" onChange={(event) => { setOffset(0); setSource(event.target.value); }} />
+          <Field className="w-44 max-w-full shrink-0">
+            Location
+            <Input id="locationFilter" value={location} placeholder="Location" onChange={(event) => { setOffset(0); setLocation(event.target.value); }} />
+          </Field>
+          <Field className="w-44 max-w-full shrink-0">
+            Source
+            <Input id="sourceFilter" value={source} placeholder="Source" onChange={(event) => { setOffset(0); setSource(event.target.value); }} />
+          </Field>
         </div>
         <div id="queueRail" hidden={!queueVisible} className="flex shrink-0 gap-2 px-3 py-1 text-sm text-muted-foreground">
           <span>Queue</span>

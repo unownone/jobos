@@ -256,8 +256,12 @@ describe("BoardPage", () => {
     expect(byId("main").contains(byId("list"))).toBe(true);
     for (const id of TICKET_IDS) expect(document.getElementById(id), id).toBeInTheDocument();
     expect(document.querySelector("label[for='f_rejection_by']")).toHaveTextContent("Rejected by");
-    expect(byId("locationFilter").className).toContain("w-44");
-    expect(byId("sourceFilter").className).toContain("w-44");
+    expect(byId("q").parentElement?.className).toContain("w-56");
+    expect(byId("q").parentElement).toHaveTextContent("Search");
+    expect(byId("locationFilter").parentElement?.className).toContain("w-44");
+    expect(byId("locationFilter").parentElement).toHaveTextContent("Location");
+    expect(byId("sourceFilter").parentElement?.className).toContain("w-44");
+    expect(byId("sourceFilter").parentElement).toHaveTextContent("Source");
     expect(byId("f_status").tagName).toBe("SELECT");
     expect(byId("f_status").getAttribute("data-slot")).toBe("select");
     expect(byId("f_rejection_by").tagName).toBe("SELECT");
