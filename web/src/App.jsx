@@ -23,16 +23,16 @@ function Login() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState("login");
   const [error, setError] = useState("");
 
   async function submit(event) {
     event.preventDefault();
     setError("");
+    const signup = event.nativeEvent.submitter?.id === "signupBtn";
     try {
-      const path = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
+      const path = signup ? "/api/auth/signup" : "/api/auth/login";
       await api(path, { method: "POST", body: JSON.stringify({ username, password }) });
-      navigate("/board");
+      navigate(signup ? "/onboarding" : "/board");
     } catch (err) {
       setError(err.message);
     }
@@ -41,15 +41,13 @@ function Login() {
   return (
     <Shell>
       <form className="stack" onSubmit={submit}>
-        <h2>{mode === "signup" ? "Create the hub" : "Log in"}</h2>
-        <input placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} />
-        <input placeholder="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <h2>Log in</h2>
+        <input id="username" placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+        <input id="password" placeholder="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         {error ? <p className="error">{error}</p> : null}
         <div className="row">
-          <button type="submit">{mode === "signup" ? "Sign up" : "Log in"}</button>
-          <button type="button" className="quiet" onClick={() => setMode(mode === "signup" ? "login" : "signup")}>
-            {mode === "signup" ? "I already have an account" : "First time here"}
-          </button>
+          <button id="loginBtn" type="submit">Log in</button>
+          <button id="signupBtn" type="submit">Create account</button>
         </div>
       </form>
     </Shell>
@@ -139,7 +137,7 @@ function Onboarding() {
         <textarea value={yaml} onChange={(e) => setYaml(e.target.value)} />
         <button type="submit">Save profile</button>
         <label className="muted">Resume PDF <input type="file" accept="application/pdf" onChange={upload} /></label>
-        {note ? <p>{note}</p> : null}
+        {note ? <p id="ok">{note}</p> : null}
         {error ? <p className="error">{error}</p> : null}
       </form>
     </Shell>
@@ -227,14 +225,24 @@ function Join() {
   );
 }
 
+function RequireAuth({ children }) {
+  const [state, setState] = useState("loading");
+  useEffect(() => {
+    api("/api/auth/me").then(() => setState("in")).catch(() => setState("out"));
+  }, []);
+  if (state === "loading") return <p>Checking session</p>;
+  if (state === "out") return <Navigate to="/login" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/board" replace />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/board" element={<Board />} />
-      <Route path="/onboarding" element={<Onboarding />} />
-      <Route path="/admin" element={<Admin />} />
+      <Route path="/board" element={<RequireAuth><Board /></RequireAuth>} />
+      <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
+      <Route path="/admin" element={<RequireAuth><Admin /></RequireAuth>} />
       <Route path="/join/:id" element={<Join />} />
     </Routes>
   );

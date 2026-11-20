@@ -124,6 +124,20 @@ jobs:
         working-directory: web
         run: npm ci && npm run build
 
+  images:
+    name: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -f server/Dockerfile -t jobos-api .
+
+      - name: Build SPA image
+        run: docker build -f web/Dockerfile -t jobos-web web
+
   e2e-browser:
     name: e2e-browser
     runs-on: ubuntu-latest
