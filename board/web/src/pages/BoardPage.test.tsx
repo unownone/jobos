@@ -439,6 +439,7 @@ describe("BoardPage", () => {
     render(<BoardPage />);
     await waitFor(() => expect(byId("list")).toHaveTextContent("TicketCo"));
     expect(byId("list")).toHaveTextContent("discovered · stopped");
+    expect(document.querySelector("#list [data-slot=badge]")?.className).toContain("break-words");
     fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
     await waitFor(() => expect(byId("resumeBtn")).toBeEnabled());
     expect(byId("pauseBtn")).toBeDisabled();

@@ -712,16 +712,16 @@ export function BoardPage() {
                   </RecordCard>
                 ))}
               </RecordDeck>
-              <Table className="max-[720px]:hidden min-[960px]:@max-[36rem]:[&_th]:px-1.5 min-[960px]:@max-[36rem]:[&_td]:px-1.5">
+              <Table className="max-[720px]:hidden min-[960px]:@max-[44rem]:[&_th]:px-1.5 min-[960px]:@max-[44rem]:[&_td]:px-1.5">
                 <thead className="sticky top-0 z-10 bg-card">
                   <tr>
-                    <Th className="w-[20%] min-[960px]:@max-[36rem]:w-[24%] max-[959px]:w-[38%]">Company</Th>
-                    <Th className="w-[26%] min-[960px]:@max-[36rem]:w-[24%] max-[959px]:w-[40%]">Title</Th>
-                    <Th className="w-[14%] min-[960px]:@max-[36rem]:w-[26%] max-[959px]:w-[22%]">Status</Th>
-                    <Th className="w-[8%] max-[959px]:hidden @max-[36rem]:hidden">Score</Th>
-                    <Th className="w-[8%] max-[959px]:hidden @max-[36rem]:hidden">Pay</Th>
-                    <Th className="w-[16%] min-[960px]:@max-[36rem]:w-[26%] max-[959px]:hidden">Posted</Th>
-                    <Th className="w-[8%] max-[959px]:hidden @max-[36rem]:hidden">Claim</Th>
+                    <Th className="w-[20%] min-[960px]:@max-[44rem]:w-[24%] max-[959px]:w-[38%]">Company</Th>
+                    <Th className="w-[26%] min-[960px]:@max-[44rem]:w-[24%] max-[959px]:w-[40%]">Title</Th>
+                    <Th className="w-[14%] min-[960px]:@max-[44rem]:w-[26%] max-[959px]:w-[22%]">Status</Th>
+                    <Th className="w-[8%] max-[959px]:hidden @max-[44rem]:hidden">Score</Th>
+                    <Th className="w-[8%] max-[959px]:hidden @max-[44rem]:hidden">Pay</Th>
+                    <Th className="w-[16%] min-[960px]:@max-[44rem]:w-[26%] max-[959px]:hidden">Posted</Th>
+                    <Th className="w-[8%] max-[959px]:hidden @max-[44rem]:hidden">Claim</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -730,14 +730,14 @@ export function BoardPage() {
                       <Td truncate={false} className="break-words" title={job.company}>{job.company}</Td>
                       <Td truncate={false} className="break-words" title={job.title}>{job.title}</Td>
                       <Td truncate={false}>
-                        <Badge variant="outline" className="h-auto max-w-full whitespace-normal border-dashed border-current">
+                        <Badge variant="outline" className="h-auto max-w-full min-w-0 flex-wrap whitespace-normal break-words border-dashed border-current px-1.5">
                           {statusLabel(job)}
                         </Badge>
                       </Td>
-                      <Td truncate={false} className="max-[959px]:hidden @max-[36rem]:hidden">{job.score ?? ""}</Td>
-                      <Td truncate={false} className="max-[959px]:hidden @max-[36rem]:hidden" title={job.pay || ""}>{job.pay || "—"}</Td>
+                      <Td truncate={false} className="max-[959px]:hidden @max-[44rem]:hidden">{job.score ?? ""}</Td>
+                      <Td truncate={false} className="max-[959px]:hidden @max-[44rem]:hidden" title={job.pay || ""}>{job.pay || "—"}</Td>
                       <Td truncate={false} className="max-[959px]:hidden whitespace-nowrap">{dayLabel(job.posted_at) || dayLabel(job.created_at)}</Td>
-                      <Td truncate={false} className="max-[959px]:hidden @max-[36rem]:hidden">{job.claim?.claimed_by || job.claim?.kind || ""}</Td>
+                      <Td truncate={false} className="max-[959px]:hidden @max-[44rem]:hidden">{job.claim?.claimed_by || job.claim?.kind || ""}</Td>
                     </tr>
                   ))}
                 </tbody>
