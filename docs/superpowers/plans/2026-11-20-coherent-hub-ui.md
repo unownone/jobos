@@ -794,4 +794,21 @@ Expected: web tests PASS. Python tests that only read static HTML and the served
 
 ## Live evaluation
 
-A local boot of Hub was started in parallel with this plan (no Docker on this machine; Postgres must come from `uv`/`pgserver` or a local server). Flow evidence belongs in `/opt/cursor/artifacts/audit/FLOWS.md`. If that file shows a route returning 4xx/5xx for a feature these pages call, fix the API in the same task as the page, with a pytest in `board/tests/` that fails before the fix.
+Hub is up at `http://127.0.0.1:8787` (no Docker; local Postgres). `/opt/cursor/artifacts/audit/FLOWS.md` records 37 flows, 0 failures: health, public pages, signup, candidate gate `409 candidate_required`, onboarding `PUT /api/candidate`, then home, board, admin, data, skills, memory, users, dashboard, jobs, meta, registry (29 skills), memory pods, presence, job create, and pause.
+
+Rendered at 1280×720 after login. `.hub-stage` is `overflow: hidden`. Wheel scroll does not move it (`scrollTop` stays 0).
+
+| Path | Stage scroll height vs 720px client | Content sticks out of the stage | What that means |
+| --- | --- | --- | --- |
+| `/home` | 720 | no | `.hub-home` is `overflow: auto` |
+| `/board` | 720 | no | list pane scrolls |
+| `/onboarding` | 862 | yes, bottom at 822 | Next button is clipped |
+| `/admin` | 1146 | yes, bottom at 1106 | Railway and Coolify links sit below the fold and cannot be reached |
+| `/admin/skills` | 1853 | yes, bottom at 1813 | 29 skill rows, 8 visible, wheel does nothing |
+| `/admin/memory` | 1043 | yes, bottom at 1003 | compose and table are clipped |
+| `/admin/data` | 720 | no | short empty state only |
+| `/admin/users` | 720 | no | short table only |
+
+Tasks 6 through 9 must put page content in `AppShell` `scroll="page"` so this measurement flips: after a wheel, `scrollTop` of the scrollport increases and a control that starts below 720px becomes visible. Task 7 keeps `scroll="panes"` and must keep `#pager` outside the list scrollport. Tables on admin pages need `overflow-x-auto` and `min-w-0` so a 9-column directory does not widen the stage. Close, switch, and menu controls use the 44px touch size (`2.75rem`), not `2.2rem`.
+
+No API change is required for these screens. The routes they call already returned 200.
