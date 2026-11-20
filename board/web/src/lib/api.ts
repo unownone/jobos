@@ -12,7 +12,7 @@ export async function api<T>(
   path: string,
   opts?: { method?: string; body?: unknown; raw?: BodyInit | ArrayBufferView | null; contentType?: string },
 ): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { Accept: "application/json" };
   const token = csrfToken();
   if (token) {
     headers["X-CSRF"] = token;

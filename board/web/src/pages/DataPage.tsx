@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
@@ -20,6 +21,7 @@ function isTab(value: string): value is Tab {
 export function DataPage() {
   const [tab, setTab] = useState<Tab>("jobs");
   const [who, setWho] = useState("Checking session…");
+  const [conn, setConn] = useState<ShellConn>("signing in");
   const [stats, setStats] = useState("");
   const [err, setErr] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
@@ -36,10 +38,16 @@ export function DataPage() {
     let cancelled = false;
     api<{ actor?: string; user?: { email?: string } }>("/api/auth/me")
       .then((me) => {
-        if (!cancelled) setWho(me.user?.email || me.actor || "signed in");
+        if (!cancelled) {
+          setWho(me.user?.email || me.actor || "signed in");
+          setConn("signed in");
+        }
       })
       .catch(() => {
-        if (!cancelled) setWho("Sign in required.");
+        if (!cancelled) {
+          setWho("Sign in required.");
+          setConn("sign in required");
+        }
       });
     return () => {
       cancelled = true;
@@ -180,7 +188,7 @@ export function DataPage() {
   }, [tab, q, status, stopped, tag, scope, kind, reloadKey]);
 
   return (
-    <AppShell title="jobOS data" subtitle="Jobs, people, candidate, registry, memory — filter, do not dump." scroll="page" path="/admin/data">
+    <AppShell title="jobOS data" subtitle="Jobs, people, candidate, registry, memory — filter, do not dump." scroll="page" path="/admin/data" who={who} conn={conn}>
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
         <p id="who" className="m-0 text-sm text-muted-foreground">
           {who}

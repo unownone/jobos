@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +30,7 @@ function scopeOf(podId: string): string {
 
 export function MemoryPage() {
   const [who, setWho] = useState("");
+  const [conn, setConn] = useState<ShellConn>("signing in");
   const [pods, setPods] = useState<Pod[]>([]);
   const [kinds, setKinds] = useState<Record<string, string[]>>({});
   const [policy, setPolicy] = useState("");
@@ -68,6 +70,7 @@ export function MemoryPage() {
         if (cancelled) return;
         const name = me.user?.display_name || me.actor || me.user_id || "signed in";
         setWho(`${name} · ${me.track || me.role || ""}`);
+        setConn("signed in");
         const podData = await api<{ pods?: Pod[]; kinds?: Record<string, string[]>; write_policy?: { store_when?: string; caps?: Record<string, number> } }>(
           "/api/memory/pods",
         );
@@ -86,7 +89,10 @@ export function MemoryPage() {
         setPolicy(`${policyText?.store_when || ""} Caps / 15m: ${JSON.stringify(policyText?.caps || {})}`);
         await loadItems();
       } catch (error) {
-        if (!cancelled) setErr(error instanceof Error ? error.message : "Could not load memory");
+        if (!cancelled) {
+          setErr(error instanceof Error ? error.message : "Could not load memory");
+          setConn((current) => (current === "signed in" ? current : "sign in required"));
+        }
       }
     }
     void boot();
@@ -197,9 +203,9 @@ export function MemoryPage() {
   }
 
   return (
-    <AppShell title="Memory pods" scroll="page" path="/admin/memory">
+    <AppShell title="Memory pods" scroll="page" path="/admin/memory" who={who} conn={conn}>
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
-        <p className="m-0 text-sm text-muted-foreground">{who}</p>
+        <p id="who" className="m-0 text-sm text-muted-foreground">{who}</p>
         <section className="grid gap-3 border border-border bg-card p-4 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             Pod

@@ -61,6 +61,7 @@ describe("admin pages", () => {
     render(<UsersPage />);
 
     expect(document.body).toHaveTextContent("Directory");
+    expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
     await waitFor(() => {
       expect(document.getElementById("rows")).toHaveTextContent("Ada");
     });
@@ -100,6 +101,8 @@ describe("admin pages", () => {
     render(<SkillsPage />);
 
     expect(document.querySelector("h1")).toHaveTextContent("Skill registry");
+    expect(document.querySelectorAll("#logout")).toHaveLength(0);
+    expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
     fireEvent.click(document.getElementById("seed") as HTMLButtonElement);
 
     await waitFor(() => {

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
-import { logout } from "@/components/shell/logout";
+import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +24,8 @@ type Created = {
 
 export function InvitesPage() {
   const [who, setWho] = useState("Checking session…");
+  const [headerWho, setHeaderWho] = useState("");
+  const [conn, setConn] = useState<ShellConn>("signing in");
   const [invites, setInvites] = useState<Invite[]>([]);
   const [soon, setSoon] = useState<string[]>([]);
   const [created, setCreated] = useState("");
@@ -43,7 +45,9 @@ export function InvitesPage() {
         const me = await api<{ user?: { email?: string }; actor?: string }>("/api/auth/me");
         if (cancelled) return;
         const name = me.user?.email || me.actor || "admin";
+        setHeaderWho(name);
         setWho(`Signed in as ${name} (human admin, not a track).`);
+        setConn("signed in");
         await api("/api/presence/heartbeat", { method: "POST", body: { status_hint: "logged_in" } });
         await loadInvites();
         const meta = await api<{ coming_soon_roles?: { id: string; summary?: string }[] }>("/api/meta");
@@ -54,7 +58,10 @@ export function InvitesPage() {
         ];
         setSoon(roles.map((row) => `${row.id} — ${row.summary || "coming soon"}`));
       } catch (error) {
-        if (!cancelled) setWho(error instanceof Error ? error.message : "Admin session required.");
+        if (!cancelled) {
+          setWho(error instanceof Error ? error.message : "Admin session required.");
+          setConn("sign in required");
+        }
       }
     }
     void boot();
@@ -96,16 +103,11 @@ export function InvitesPage() {
   }
 
   return (
-    <AppShell title="jobOS Harness — Invites" scroll="page" path="/admin">
+    <AppShell title="jobOS Harness — Invites" scroll="page" path="/admin" who={headerWho} conn={conn}>
       <main id="main" className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-5">
-        <div className="flex items-center justify-between gap-3">
-          <p id="who" className="m-0 text-sm text-muted-foreground">
-            {who}
-          </p>
-          <Button id="logout" type="button" variant="outline" onClick={() => void logout()}>
-            Log out
-          </Button>
-        </div>
+        <p id="who" className="m-0 text-sm text-muted-foreground">
+          {who}
+        </p>
         <section className="flex flex-col gap-3 border border-border bg-card p-4">
           <h2 className="m-0 font-display text-[1.6rem] leading-none font-extrabold [font-family:var(--font-display)]">
             Create track invite

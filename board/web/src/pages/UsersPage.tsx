@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
-import { logout } from "@/components/shell/logout";
-import { Button } from "@/components/ui/button";
+import { type ShellConn } from "@/components/shell/TopBar";
 import { api } from "@/lib/api";
 
 type DirectoryUser = {
@@ -22,6 +21,7 @@ type DirectoryUser = {
 
 export function UsersPage() {
   const [who, setWho] = useState("Checking session…");
+  const [conn, setConn] = useState<ShellConn>("signing in");
   const [users, setUsers] = useState<DirectoryUser[]>([]);
 
   useEffect(() => {
@@ -32,9 +32,14 @@ export function UsersPage() {
         const data = await api<{ users?: DirectoryUser[] }>("/api/users");
         if (cancelled) return;
         setUsers(data.users ?? []);
-        setWho(`${data.users?.length ?? 0} people in the directory`);
+        const count = data.users?.length ?? 0;
+        setWho(`${count} ${count === 1 ? "person" : "people"} in the directory`);
+        setConn("signed in");
       } catch (error) {
-        if (!cancelled) setWho(error instanceof Error ? error.message : "Admin or maintenance session required.");
+        if (!cancelled) {
+          setWho(error instanceof Error ? error.message : "Admin or maintenance session required.");
+          setConn("sign in required");
+        }
       }
     }
     void boot();
@@ -44,16 +49,11 @@ export function UsersPage() {
   }, []);
 
   return (
-    <AppShell title="Directory" subtitle="jobOS Harness" scroll="page" path="/admin/users">
+    <AppShell title="Directory" subtitle="jobOS Harness" scroll="page" path="/admin/users" who={who} conn={conn}>
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
-        <div className="flex items-center justify-between gap-3">
-          <p id="who" className="m-0 text-sm text-muted-foreground">
-            {who}
-          </p>
-          <Button id="logout" type="button" variant="outline" onClick={() => void logout()}>
-            Log out
-          </Button>
-        </div>
+        <p id="who" className="m-0 text-sm text-muted-foreground">
+          {who}
+        </p>
         <div className="min-w-0 overflow-x-auto border border-border bg-card">
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 bg-card">

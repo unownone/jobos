@@ -18,6 +18,7 @@ describe("api", () => {
     expect((init.headers as Record<string, string>)["X-CSRF"]).toBe("abc=123");
     expect(init.body).toBe(JSON.stringify({ title: "Staff" }));
     expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect((init.headers as Record<string, string>).Accept).toBe("application/json");
   });
 
   it("sends a resume as raw pdf bytes", async () => {

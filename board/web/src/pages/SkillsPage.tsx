@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
-import { logout } from "@/components/shell/logout";
+import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
@@ -26,6 +26,7 @@ type Recording = {
 
 export function SkillsPage() {
   const [who, setWho] = useState("Checking session…");
+  const [conn, setConn] = useState<ShellConn>("signing in");
   const [tag, setTag] = useState("");
   const [scope, setScope] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -57,10 +58,14 @@ export function SkillsPage() {
         const me = await api<{ display_name?: string; role?: string; track?: string; kind?: string }>("/api/auth/me");
         if (cancelled) return;
         setWho(`${me.display_name || me.role || "signed in"} · ${me.track || me.kind || ""}`);
+        setConn("signed in");
         await loadSkills();
         await loadRecordings();
       } catch (error) {
-        if (!cancelled) setWho(error instanceof Error ? error.message : "Sign in required.");
+        if (!cancelled) {
+          setWho(error instanceof Error ? error.message : "Sign in required.");
+          setConn("sign in required");
+        }
       }
     }
     void boot();
@@ -81,19 +86,14 @@ export function SkillsPage() {
   }
 
   return (
-    <AppShell title="Skill registry" scroll="page" path="/admin/skills">
+    <AppShell title="Skill registry" scroll="page" path="/admin/skills" who={who} conn={conn}>
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
         <p className="m-0 text-sm text-muted-foreground">
           GitHub starters seed shared skills. Local forks stay on the owning bot. Only maintainer consumes skill.record after proctor.
         </p>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p id="who" className="m-0 text-sm text-muted-foreground">
-            {who}
-          </p>
-          <Button id="logout" type="button" variant="outline" onClick={() => void logout()}>
-            Log out
-          </Button>
-        </div>
+        <p id="who" className="m-0 text-sm text-muted-foreground">
+          {who}
+        </p>
         <div className="flex flex-wrap items-center gap-2">
           <select id="tag" className={selectClass} aria-label="Tag" value={tag} onChange={(event) => setTag(event.target.value)}>
             <option value="">all tags</option>

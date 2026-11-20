@@ -31,6 +31,23 @@ function mockCandidate(put?: (body: unknown) => void) {
 }
 
 describe("OnboardingPage", () => {
+  it("fills the form from the JSON profile envelope", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ kind: "admin", actor: "ada", user: { email: "ada@example.test" } });
+      if (path === "/api/candidate") {
+        return Promise.resolve({ profile: { identity: { full_name: "Ada Lovelace", email: "ada@example.test" } } });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<OnboardingPage />);
+    await waitFor(() => {
+      expect(document.getElementById("full_name")).toHaveValue("Ada Lovelace");
+    });
+    expect(document.getElementById("email")).toHaveValue("ada@example.test");
+    expect(document.getElementById("who")).toHaveTextContent("Signed in as ada@example.test");
+    expect(document.getElementById("err")).toHaveTextContent("");
+  });
+
   it("blocks step 2 until name and email are present", async () => {
     mockCandidate();
     render(<OnboardingPage />);

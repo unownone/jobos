@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +59,8 @@ export function OnboardingPage() {
   const transition = usePageTransition();
   const [step, setStep] = useState<Step>("step1");
   const [who, setWho] = useState("Checking session…");
+  const [headerWho, setHeaderWho] = useState("");
+  const [conn, setConn] = useState<ShellConn>("signing in");
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [revLine, setRevLine] = useState("");
@@ -89,15 +92,22 @@ export function OnboardingPage() {
   useEffect(() => {
     let cancelled = false;
     async function boot() {
+      let signedIn = false;
       try {
         const me = await api<{ kind?: string; role?: string; actor?: string; user?: { email?: string } }>("/api/auth/me");
         if (cancelled) return;
         if (me.kind !== "admin" && me.role !== "admin") {
           setWho("Admin session required to onboard the candidate.");
+          setConn("sign in required");
           return;
         }
-        setWho(`Signed in as ${me.user?.email || me.actor || "admin"}. Fill a real profile.`);
-        const profile = await api<Profile>("/api/candidate");
+        signedIn = true;
+        const actor = me.user?.email || me.actor || "admin";
+        setHeaderWho(actor);
+        setWho(`Signed in as ${actor}. Fill a real profile.`);
+        setConn("signed in");
+        const loaded = await api<{ profile?: Profile }>("/api/candidate");
+        const profile = loaded.profile;
         if (cancelled || !profile) return;
         const identity = profile.identity ?? {};
         const target = profile.target ?? {};
@@ -125,7 +135,14 @@ export function OnboardingPage() {
         setDoNotClaim(joinList(proof.do_not_claim, "\n"));
         setWritingVoice(profile.materials?.writing_voice ?? "");
       } catch (error) {
-        if (!cancelled) setWho(error instanceof Error ? error.message : "Sign in required.");
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Sign in required.";
+        if (signedIn) {
+          setErr(message);
+          return;
+        }
+        setWho(message);
+        setConn("sign in required");
       }
     }
     void boot();
@@ -231,7 +248,7 @@ export function OnboardingPage() {
   }
 
   return (
-    <AppShell title="Candidate onboarding" scroll="page" path="/onboarding" subtitle="A real profile. Agents must not invent one.">
+    <AppShell title="Candidate onboarding" scroll="page" path="/onboarding" subtitle="A real profile. Agents must not invent one." who={headerWho} conn={conn}>
       <main id="main" className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5">
         <p id="who" className="m-0 text-sm text-muted-foreground">{who}</p>
         <ol className="m-0 flex list-none gap-3 p-0 text-sm">
