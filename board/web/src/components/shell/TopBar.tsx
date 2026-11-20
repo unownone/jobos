@@ -3,7 +3,9 @@ import { cn } from "@/lib/utils";
 
 import { logout } from "./logout";
 
-function connDotClass(conn: string): string {
+export type ShellConn = "signing in" | "signed in" | "sign in required";
+
+function connDotClass(conn: ShellConn): string {
   switch (conn) {
     case "signing in":
       return "bg-muted-foreground";
@@ -11,8 +13,10 @@ function connDotClass(conn: string): string {
       return "bg-primary";
     case "sign in required":
       return "bg-destructive";
-    default:
-      return "bg-muted-foreground";
+    default: {
+      const exhaustive: never = conn;
+      return exhaustive;
+    }
   }
 }
 
@@ -25,7 +29,7 @@ export function TopBar({
   title: string;
   subtitle?: string;
   who?: string;
-  conn?: string;
+  conn?: ShellConn;
 }) {
   return (
     <header className="flex shrink-0 items-center justify-between gap-3 border-b border-dashed border-primary bg-card px-4 py-2">

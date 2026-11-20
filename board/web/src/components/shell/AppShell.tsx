@@ -6,7 +6,7 @@ import { pageVariants, usePageTransition } from "@/lib/motion";
 
 import { Dock } from "./Dock";
 import { Rail } from "./Rail";
-import { TopBar } from "./TopBar";
+import { TopBar, type ShellConn } from "./TopBar";
 
 export type ShellScroll = "page" | "panes";
 
@@ -68,7 +68,7 @@ export function AppShell({
   subtitle?: string;
   scroll: ShellScroll;
   who?: string;
-  conn?: string;
+  conn?: ShellConn;
   path?: string;
   children: ReactNode;
 }) {
