@@ -12,4 +12,8 @@ describe("nextPath", () => {
   it("keeps an in-app path", () => {
     expect(nextPath("/admin/memory")).toBe("/admin/memory");
   });
+
+  it("sends the public start page to the board", () => {
+    expect(nextPath("/start")).toBe("/board");
+  });
 });
