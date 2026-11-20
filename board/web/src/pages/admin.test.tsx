@@ -121,6 +121,8 @@ describe("admin pages", () => {
     });
     expect(document.querySelector("#table th")?.textContent).toBe("ID");
     expect(document.querySelector("#table td")?.className).toContain("break-all");
+    expect([...document.querySelectorAll("#table th")].find((header) => header.textContent === "Title")?.className).toContain("w-[28%]");
+    expect([...document.querySelectorAll("#table td")][2]?.className).toContain("break-words");
   });
 
   it("renders the data browser", async () => {

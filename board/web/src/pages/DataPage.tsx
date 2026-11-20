@@ -38,6 +38,22 @@ function isTab(value: string): value is Tab {
   return (TABS as readonly string[]).includes(value);
 }
 
+const PROSE = new Set(["Company", "Title", "Name", "Fact", "Reason", "Value", "Role", "Tags", "Note", "Field"]);
+const IDENTIFIERS = new Set(["ID", "Job", "Slug"]);
+
+const JOB_WIDTH: Record<string, string> = {
+  ID: "w-[28%]",
+  Company: "w-[20%]",
+  Title: "w-[28%]",
+  Status: "w-[14%]",
+  Score: "w-[10%]",
+};
+
+function columnWidth(header: string, headers: string[]): string | undefined {
+  if (headers.join() === "ID,Company,Title,Status,Score") return JOB_WIDTH[header];
+  return undefined;
+}
+
 export function DataPage() {
   const reduce = useReducedMotion() === true;
   const play = usePanelPlay();
@@ -324,7 +340,7 @@ export function DataPage() {
               <thead>
                 <tr>
                   {headers.map((header, index) => (
-                    <Th key={header} className={index > 2 ? "max-[959px]:hidden" : undefined}>{header}</Th>
+                    <Th key={header} className={[columnWidth(header, headers), index > 2 ? "max-[959px]:hidden" : ""].filter(Boolean).join(" ") || undefined}>{header}</Th>
                   ))}
                 </tr>
               </thead>
@@ -332,12 +348,13 @@ export function DataPage() {
                 {rows.map((row, index) => (
                   <tr key={`${tab}-${index}`} className="border-t border-border">
                     {headers.map((header, index) => {
-                      const wrap = header === "ID";
+                      const identifier = IDENTIFIERS.has(header);
+                      const prose = PROSE.has(header);
                       return (
                         <Td
                           key={header}
-                          truncate={!wrap}
-                          className={[index > 2 ? "max-[959px]:hidden" : "", wrap ? "break-all" : ""].filter(Boolean).join(" ") || undefined}
+                          truncate={!identifier && !prose}
+                          className={[index > 2 ? "max-[959px]:hidden" : "", identifier ? "break-all" : "", prose ? "break-words" : ""].filter(Boolean).join(" ") || undefined}
                           title={row[header]}
                         >
                           {row[header]}
