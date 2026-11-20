@@ -57,6 +57,25 @@ Open `http://127.0.0.1:8787/` then `/login`. After signup, `/onboarding`. Board 
 
 Override the published port with `HUB_PORT=343` if 8787 is taken (`http://127.0.0.1:343` — also set `HUB_PUBLIC_HOST` / `HUB_PUBLIC_URL` to match).
 
+### Outside Postgres
+
+The bundled `postgres` service still starts with the default Compose files. Hub uses it when no secret URL is set.
+
+To use a Postgres that this stack does not create, set `DATABASE_URL` in secrets:
+
+- Coolify or Railway environment variables (store it as a secret)
+- repo-root `.env` (Compose interpolates it; the file is gitignored)
+- `board/.env`, when the host is not loopback. `127.0.0.1` and `localhost` in that file stay the bare-metal example and do not replace the bundled service
+
+From inside the Hub container, Postgres on the Docker host is `host.docker.internal`, not `127.0.0.1`. Put `sslmode` in the URL when the server requires TLS.
+
+```bash
+DATABASE_URL='postgresql://user:pass@db.example:5432/jobos?sslmode=require' \
+  docker compose up -d --build
+```
+
+`JOBOS_PG_USER`, `JOBOS_PG_PASSWORD`, `JOBOS_PG_HOST`, `JOBOS_PG_PORT`, and `JOBOS_PG_DB` configure the bundled service and the fallback URL when `DATABASE_URL` is unset. `JOBOS_PG_HOST=host.docker.internal` points that fallback at a host Postgres without assembling a URL. A Docker secret file mounted at `/run/secrets/database_url` is used when `DATABASE_URL` is unset.
+
 Stop: `docker compose -f docker-compose.plain.yml down` (keeps named volumes). Destroy data: `docker compose -f docker-compose.plain.yml down -v`.
 
 Browser e2e (Playwright against Compose Hub): `bash scripts/e2e_browser.sh`. Inventory: [`e2e/FLOWS.md`](../e2e/FLOWS.md).
@@ -142,7 +161,7 @@ The Hub container stores nothing durable on disk. PostgreSQL is the database.
 
 | Where | What |
 | --- | --- |
-| Postgres (internal Compose service) | Jobs, users, sessions, queue, messages, A2A, memory pods, candidate YAML, resume PDF, bootstrap token, token-burn metrics |
+| Postgres (bundled Compose service, or `DATABASE_URL` from secrets) | Jobs, users, sessions, queue, messages, A2A, memory pods, candidate YAML, resume PDF, bootstrap token, token-burn metrics |
 | `/tmp/jobos-packs/` in Hub | Skill/MCP zip snapshots (rebuilt on start) |
 | Named volume `pgdata` | Postgres files |
 | Named volume `blobs` | Resume PDFs and other blob files |

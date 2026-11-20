@@ -13,6 +13,11 @@
 #
 # First visit: /login (username + password) → /onboarding → then invites/agents.
 # Agents: curl $HUB_URL/llms.txt (not HTML).
+#
+# Outside Postgres (not started by this file): put the URL in secrets.
+#   DATABASE_URL in Coolify/Railway, repo-root .env, or a non-loopback
+#   DATABASE_URL in board/.env. Unset keeps the bundled `postgres` service.
+#   A database on the Docker host is host.docker.internal, not 127.0.0.1.
 
 name: jobos
 
@@ -21,13 +26,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: jobos
+      POSTGRES_USER: "${JOBOS_PG_USER:-jobos}"
       POSTGRES_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
-      POSTGRES_DB: jobos
+      POSTGRES_DB: "${JOBOS_PG_DB:-jobos}"
     volumes:
       - "pgdata:/var/lib/postgresql/data"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -51,13 +56,22 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - path: board/.env
+        required: false
     environment:
       JOBOS_NONINTERACTIVE: "1"
       BOARD_HOST: "0.0.0.0"
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
-      DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
+      # Empty when the secret is unset, so board/.env is not overwritten.
+      DATABASE_URL_FROM_SECRET: "${DATABASE_URL:-}"
+      JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
+      JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
+      JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
+      JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
+      JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
       AMQP_URL: "amqp://${JOBOS_AMQP_USER:-jobos}:${JOBOS_AMQP_PASSWORD:-jobos}@rabbitmq:5672/%2F"
       QUEUE_ADAPTER: "rabbitmq"
       BLOB_ROOT: "/var/lib/jobos/blobs"
@@ -68,6 +82,8 @@ services:
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
       - "blobs:/var/lib/jobos/blobs"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8787:8787"
     depends_on:

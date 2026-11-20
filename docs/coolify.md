@@ -25,6 +25,14 @@ Coolify prefixes those names with the resource UUID. The prefix is stable for th
 
 Do not put `JOBOS_PGDATA`, `JOBOS_BLOBS`, `JOBOS_AMQPDATA`, `$HOME`, or `~` on volume source lines. Env vars for passwords, `HUB_PUBLIC_URL`, and similar stay in `environment:` / Coolify’s Environment Variables tab.
 
+## Postgres you already run
+
+The Compose file still defines a bundled `postgres` service. Hub uses it when `DATABASE_URL` is unset.
+
+To use a database Coolify (or another host) already runs, set secret `DATABASE_URL` to that server. Hub reads the secret and does not replace it with the bundled URL. A non-loopback `DATABASE_URL` in `board/.env` works the same way. From inside the container, Postgres on the Docker host is `host.docker.internal`, not `127.0.0.1`. Add `sslmode` to the URL when the server requires TLS.
+
+`JOBOS_PG_PASSWORD` (and `JOBOS_PG_USER`, `JOBOS_PG_HOST`, `JOBOS_PG_PORT`, `JOBOS_PG_DB`) still apply only when `DATABASE_URL` is unset.
+
 `docker compose down` keeps named volumes. `docker compose down -v` (or deleting the Coolify resource) deletes them.
 
 ## Deploy on Coolify

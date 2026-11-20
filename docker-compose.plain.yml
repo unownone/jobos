@@ -6,6 +6,10 @@
 # Postgres/RabbitMQ have no published ports. See docs/coolify.md.
 #
 # First visit: /login (username + password) → /onboarding → invites/agents.
+#
+# Outside Postgres: set DATABASE_URL in secrets (repo-root .env, Coolify/Railway,
+# or a non-loopback URL in board/.env). Unset uses the bundled `postgres` service.
+# A database on the Docker host is host.docker.internal, not 127.0.0.1.
 
 name: jobos-plain
 
@@ -13,13 +17,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: jobos
+      POSTGRES_USER: ${JOBOS_PG_USER:-jobos}
       POSTGRES_PASSWORD: ${JOBOS_PG_PASSWORD:-jobos}
-      POSTGRES_DB: jobos
+      POSTGRES_DB: ${JOBOS_PG_DB:-jobos}
     volumes:
       - "pgdata:/var/lib/postgresql/data"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -45,13 +49,21 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${HUB_PORT:-8787}:8787"
+    env_file:
+      - path: board/.env
+        required: false
     environment:
       JOBOS_NONINTERACTIVE: "1"
       BOARD_HOST: "0.0.0.0"
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
-      DATABASE_URL: "postgresql://jobos:${JOBOS_PG_PASSWORD:-jobos}@postgres:5432/jobos"
+      DATABASE_URL_FROM_SECRET: "${DATABASE_URL:-}"
+      JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
+      JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
+      JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
+      JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
+      JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
       AMQP_URL: "amqp://${JOBOS_AMQP_USER:-jobos}:${JOBOS_AMQP_PASSWORD:-jobos}@rabbitmq:5672/%2F"
       QUEUE_ADAPTER: "rabbitmq"
       BLOB_ROOT: "/var/lib/jobos/blobs"
@@ -62,6 +74,8 @@ services:
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
       - "blobs:/var/lib/jobos/blobs"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

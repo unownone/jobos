@@ -158,6 +158,54 @@ def test_durable_data_uses_named_volumes() -> None:
     assert failures == []
 
 
+def test_hub_database_url_comes_from_secrets() -> None:
+    """Bundled Postgres stays in the file. Hub must not hardcode over a secret URL."""
+    failures: list[str] = []
+    for path, doc in _compose_docs():
+        services = doc.get("services") or {}
+        hub = services.get("hub")
+        if not isinstance(hub, dict):
+            failures.append(f"{_rel(path)}: hub service missing")
+            continue
+        environment = hub.get("environment") or {}
+        if not isinstance(environment, dict):
+            failures.append(f"{_rel(path)}: hub environment is not a mapping")
+            continue
+        secret = environment.get("DATABASE_URL_FROM_SECRET")
+        if secret != "${DATABASE_URL:-}":
+            failures.append(
+                f"{_rel(path)}: DATABASE_URL_FROM_SECRET must pass through the secret, got {secret!r}"
+            )
+        hardcoded = environment.get("DATABASE_URL")
+        if isinstance(hardcoded, str) and hardcoded.startswith("postgresql://"):
+            failures.append(f"{_rel(path)}: hub DATABASE_URL is hardcoded ({hardcoded!r})")
+        for key, default in (
+            ("JOBOS_PG_USER", "jobos"),
+            ("JOBOS_PG_PASSWORD", "jobos"),
+            ("JOBOS_PG_HOST", "postgres"),
+            ("JOBOS_PG_PORT", "5432"),
+            ("JOBOS_PG_DB", "jobos"),
+        ):
+            expected = f"${{{key}:-{default}}}"
+            if environment.get(key) != expected:
+                failures.append(f"{_rel(path)}: {key}={environment.get(key)!r}, want {expected}")
+        hosts = hub.get("extra_hosts") or []
+        if "host.docker.internal:host-gateway" not in hosts:
+            failures.append(f"{_rel(path)}: hub cannot reach a Postgres on the Docker host")
+        env_file = hub.get("env_file")
+        if not isinstance(env_file, list) or not env_file:
+            failures.append(f"{_rel(path)}: hub env_file must load board secrets")
+            continue
+        entry = env_file[0]
+        if not isinstance(entry, dict) or entry.get("required") is not False:
+            failures.append(f"{_rel(path)}: board env_file must be optional, got {entry!r}")
+        source = entry.get("path")
+        expected_path = ".env" if _rel(path).startswith("board/") else "board/.env"
+        if source != expected_path:
+            failures.append(f"{_rel(path)}: env_file path {source!r}, want {expected_path}")
+    assert failures == []
+
+
 def test_repo_relative_binds_are_coolify_safe() -> None:
     for path, doc in _compose_docs():
         for service, entry in _service_volumes(doc):
