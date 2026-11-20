@@ -17,7 +17,7 @@ Full operator API: [`docs/job-hub/human.md`](job-hub/human.md). Agents: [`docs/j
 | **Compose, Postgres always on** | Same API and SPA, Postgres is not a profile | `docker compose -f docker-compose.plain.yml up -d --build` |
 | **Docker Compose + Traefik** | Public host, ports 80/443/8787 | `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` |
 | **`docker build` / `docker run`** | One container, no Compose | See [Docker (no Compose)](#docker-no-compose) |
-| **uv / bare metal** | Cursor Cloud, no Docker | `bash scripts/hub_deploy.sh` |
+| **Go / bare metal** | Cursor Cloud, no Docker | `bash scripts/hub_deploy.sh` |
 | **Coolify** | Self-hosted PaaS, Compose from GitHub | [`docs/coolify.md`](coolify.md) — named volumes, no `${...}` in volume sources |
 | **Push to `main`** | This OCI host (Traefik + Hub already up) | [Deploy on push](deploy.md) |
 
@@ -127,7 +127,7 @@ Compose is required for a full install. The Hub image is stateless.
 
 ## Bare metal
 
-This path starts the Go API and serves `web/dist`. It still uses `uv` to mint the one-time bootstrap token. Needs Go, Node, and [`uv`](https://docs.astral.sh/uv/).
+This path starts the Go API and serves `web/dist`. It mints the one-time bootstrap token itself. Needs Go, Node, and OpenSSL.
 
 ```bash
 bash scripts/setup_uv.sh          # if uv is missing
