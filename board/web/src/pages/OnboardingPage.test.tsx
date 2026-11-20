@@ -134,6 +134,8 @@ describe("JoinPage", () => {
 
     const { unmount } = render(<JoinPage />);
     expect(document.querySelector("h1")).toHaveTextContent("Join");
+    expect(document.getElementById("payload")?.className).toContain("break-all");
+    expect(document.getElementById("key")?.className).toContain("break-all");
     await waitFor(() => {
       expect(document.getElementById("blurb")).toHaveTextContent("Candidate onboarding");
     });
