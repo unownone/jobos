@@ -46,7 +46,7 @@ func TestSignupOnboardJobQueueAndStream(t *testing.T) {
 	csrf := res.Header.Get("X-CSRF")
 	res.Body.Close()
 
-	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\ntitles:\n  - Engineer\n", csrf)
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	if res.StatusCode != 200 {
 		t.Fatalf("candidate %d %s", res.StatusCode, readBody(res))
 	}
@@ -207,7 +207,7 @@ func TestPackMCPAndMemoryCaps(t *testing.T) {
 	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"ada","password":"long-enough"}`, "")
 	csrf := res.Header.Get("X-CSRF")
 	res.Body.Close()
-	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\ntitles:\n  - Engineer\n", csrf)
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	if res.StatusCode != 200 {
 		t.Fatalf("candidate %s", readBody(res))
 	}
@@ -292,7 +292,7 @@ func TestBootstrapMemoryMoveAndDirectory(t *testing.T) {
 	}
 	again.Body.Close()
 
-	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\ntitles:\n  - Engineer\n", csrf)
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	if res.StatusCode != 200 {
 		t.Fatalf("candidate %s", readBody(res))
 	}
@@ -353,6 +353,11 @@ func TestAuthorizationBoundaries(t *testing.T) {
 	}
 	empty.Body.Close()
 	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\n", csrf)
+	if res.StatusCode != 422 {
+		t.Fatalf("name only %d %s", res.StatusCode, readBody(res))
+	}
+	res.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	if res.StatusCode != 200 {
 		t.Fatalf("candidate %s", readBody(res))
 	}
@@ -435,7 +440,7 @@ func TestA2AMessageSendLandsInInbox(t *testing.T) {
 	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"ada","password":"long-enough"}`, "")
 	csrf := res.Header.Get("X-CSRF")
 	res.Body.Close()
-	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\n", csrf)
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	if res.StatusCode != 200 {
 		t.Fatalf("candidate %d %s", res.StatusCode, readBody(res))
 	}

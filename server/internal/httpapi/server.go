@@ -415,7 +415,7 @@ func (s *Server) onboarded(c *gin.Context, accountID string) bool {
 		return len(raw) == 1 && raw[0] == '1'
 	}
 	obj, err := s.Blobs.Get(c.Request.Context(), accountID, candidateKey)
-	on := err == nil && realCandidate(string(obj.Content))
+	on := err == nil && profileMissing(string(obj.Content)) == ""
 	val := []byte("0")
 	if on {
 		val = []byte("1")
@@ -425,24 +425,7 @@ func (s *Server) onboarded(c *gin.Context, accountID string) bool {
 }
 
 func realCandidate(text string) bool {
-	name := ""
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(strings.ToLower(line), "name:") {
-			continue
-		}
-		name = strings.Trim(strings.TrimSpace(line[len("name:"):]), `"'`)
-		break
-	}
-	if name == "" {
-		return false
-	}
-	switch strings.ToLower(name) {
-	case "ada example", "your name":
-		return false
-	default:
-		return true
-	}
+	return profileMissing(text) == ""
 }
 
 func (s *Server) setSession(c *gin.Context, user store.User) {

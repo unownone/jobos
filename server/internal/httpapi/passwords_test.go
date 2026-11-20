@@ -64,7 +64,7 @@ func TestMetaIncludesRegistry(t *testing.T) {
 	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"ada","password":"long-enough"}`, "")
 	csrf := res.Header.Get("X-CSRF")
 	res.Body.Close()
-	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Jordan Lee\n", csrf)
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Jordan Lee\nemail: jordan@lee.test\ntitles:\n  - Engineer\nlocations:\n  - Remote\n", csrf)
 	res.Body.Close()
 	res, err := client.Get(ts.URL + "/api/meta")
 	if err != nil {

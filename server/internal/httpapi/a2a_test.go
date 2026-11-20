@@ -21,7 +21,7 @@ func TestA2AAnonymousAsksForAKeyAndSkillRoutesTheInbox(t *testing.T) {
 		t.Fatal("anonymous send before onboarding should ask for a profile")
 	}
 
-	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\n", csrf)
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	if res.StatusCode != 200 {
 		t.Fatalf("candidate %d %s", res.StatusCode, readBody(res))
 	}

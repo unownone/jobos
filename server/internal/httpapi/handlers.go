@@ -809,8 +809,8 @@ func (s *Server) putCandidate(c *gin.Context) {
 		fail(c, 422, "candidate yaml is required")
 		return
 	}
-	if !realCandidate(string(body)) {
-		fail(c, 422, "profile must name a real candidate")
+	if missing := profileMissing(string(body)); missing != "" {
+		fail(c, 422, "profile is incomplete: "+missing)
 		return
 	}
 	if err := s.Blobs.Put(c.Request.Context(), p.AccountID, candidateKey, body, "text/yaml", "candidate.yaml"); err != nil {

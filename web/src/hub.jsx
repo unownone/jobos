@@ -174,8 +174,8 @@ export function Onboarding({ me }) {
       setError("Full name and email are required");
       return;
     }
-    if (from === 2 && !values.titles.trim()) {
-      setError("A title is required");
+    if (from === 2 && (!values.titles.trim() || !values.locations.trim())) {
+      setError("A title and a location are required");
       return;
     }
     setError("");
@@ -185,6 +185,10 @@ export function Onboarding({ me }) {
   async function save(event) {
     event.preventDefault();
     setError("");
+    if (!values.full_name.trim() || !values.email.trim() || !values.titles.trim() || !values.locations.trim()) {
+      setError("Name, email, a title, and a location are required");
+      return;
+    }
     const nextValues = { ...values, revision: String(Number(values.revision || "0") + 1) };
     try {
       await api("/api/candidate", { method: "PUT", body: toYaml(nextValues), headers: { "Content-Type": "text/yaml" } });

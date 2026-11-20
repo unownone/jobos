@@ -21,7 +21,7 @@ func TestDisabledAgentKeyDoesNotStayCached(t *testing.T) {
 	}
 	csrf := res.Header.Get("X-CSRF")
 	res.Body.Close()
-	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\ntitles:\n  - Engineer\n", csrf)
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	if res.StatusCode != 200 {
 		t.Fatalf("candidate %d %s", res.StatusCode, readBody(res))
 	}
@@ -79,7 +79,7 @@ func TestHeartbeatRecallRefreshesAfterMemoryWrite(t *testing.T) {
 	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"ada","password":"long-enough"}`, "")
 	csrf := res.Header.Get("X-CSRF")
 	res.Body.Close()
-	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\ntitles:\n  - Engineer\n", csrf)
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	res.Body.Close()
 
 	beat := func() string {
