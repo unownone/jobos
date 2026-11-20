@@ -4,6 +4,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Field } from "@/components/ui/field";
 import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -214,7 +215,7 @@ export function MemoryPage() {
       <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
         <p id="who" className="m-0 text-sm text-muted-foreground">{who}</p>
         <section className="grid gap-3 border border-border bg-card p-4 md:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm">
+          <Field>
             Pod
             <NativeSelect
               id="write-pod"
@@ -227,8 +228,8 @@ export function MemoryPage() {
                 .filter((pod) => pod.writable !== false)
                 .map((pod) => ({ value: pod.id, label: pod.label }))}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
+          </Field>
+          <Field>
             Kind
             <NativeSelect
               id="write-kind"
@@ -236,19 +237,19 @@ export function MemoryPage() {
               onChange={setWriteKind}
               options={writeKinds.map((kind) => ({ value: kind, label: kind }))}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
+          </Field>
+          <Field>
             Company
             <Input id="write-company" value={company} onChange={(event) => setCompany(event.target.value)} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm md:col-span-2">
+          </Field>
+          <Field className="md:col-span-2">
             Title
             <Input id="write-title" value={title} onChange={(event) => setTitle(event.target.value)} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm md:col-span-2">
+          </Field>
+          <Field className="md:col-span-2">
             Fact
             <Textarea id="write-body" value={body} onChange={(event) => setBody(event.target.value)} />
-          </label>
+          </Field>
           <div className="flex flex-wrap gap-2 md:col-span-2">
             <Button id="add-item" type="button" onClick={() => void addItem()}>
               Add
@@ -266,7 +267,7 @@ export function MemoryPage() {
         </section>
         <section className="flex flex-col gap-3 border border-border bg-card p-4">
           <div className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-col gap-1 text-sm">
+            <Field>
               Pod
               <NativeSelect
                 id="pod"
@@ -278,15 +279,15 @@ export function MemoryPage() {
                   ...pods.map((pod) => ({ value: pod.id, label: pod.label })),
                 ]}
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
+            </Field>
+            <Field>
               Search
               <Input id="q" value={query} onChange={(event) => setQuery(event.target.value)} />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
+            </Field>
+            <Field>
               Kind
               <Input id="kind" value={filterKind} onChange={(event) => setFilterKind(event.target.value)} />
-            </label>
+            </Field>
             <Button id="load" type="button" variant="outline" onClick={() => void loadItems()}>
               Load
             </Button>
@@ -301,7 +302,7 @@ export function MemoryPage() {
             {err}
           </p>
           <div className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-col gap-1 text-sm">
+            <Field>
               Share pod
               <NativeSelect
                 id="share-pod"
@@ -312,8 +313,8 @@ export function MemoryPage() {
                   .filter((pod) => pod.writable !== false)
                   .map((pod) => ({ value: pod.id, label: pod.label }))}
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
+            </Field>
+            <Field>
               Share kind
               <NativeSelect
                 id="share-kind"
@@ -322,7 +323,7 @@ export function MemoryPage() {
                 onChange={setShareKind}
                 options={(kinds[scopeOf(sharePod)] ?? []).map((kind) => ({ value: kind, label: kind }))}
               />
-            </label>
+            </Field>
             <label className="flex min-h-11 items-center gap-2 text-sm">
               <Checkbox id="share-copy" checked={shareCopy} onChange={(event) => setShareCopy(event.target.checked)} />
               copy (leave original)

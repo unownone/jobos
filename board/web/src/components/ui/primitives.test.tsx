@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { Badge } from "./badge";
 import { Button } from "./button";
+import { Field } from "./field";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./card";
 import {
   Dialog,
@@ -47,6 +48,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
 const uiDir = dirname(fileURLToPath(import.meta.url));
 
 describe("hub primitives", () => {
+  it("stacks a field label above its control", () => {
+    render(<Field htmlFor="name">Name<input id="name" /></Field>);
+    const label = screen.getByText("Name").closest("label");
+    expect(label?.getAttribute("data-slot")).toBe("label");
+    expect(label?.className).toContain("flex-col");
+  });
+
   it("gives Button a 44px touch target", () => {
     render(<Button>Apply</Button>);
     expect(screen.getByRole("button").className).toContain("min-h-[2.75rem]");

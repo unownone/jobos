@@ -2,8 +2,8 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { assignHref, errorText, postJson } from "@/lib/auth-post";
 
 const display = "font-display tracking-[-0.03em] [font-family:var(--font-display)]";
@@ -61,8 +61,8 @@ export function SignupPage() {
         </CardHeader>
         <CardContent>
           <form id="form" className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)}>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">Email</Label>
+            <Field htmlFor="email">
+              Email
               <Input
                 id="email"
                 name="email"
@@ -72,9 +72,9 @@ export function SignupPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
+            </Field>
+            <Field htmlFor="password">
+              Password
               <Input
                 id="password"
                 name="password"
@@ -85,9 +85,9 @@ export function SignupPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="token">Bootstrap token</Label>
+            </Field>
+            <Field htmlFor="token">
+              Bootstrap token
               <Input
                 id="token"
                 name="token"
@@ -97,7 +97,7 @@ export function SignupPage() {
                 value={token}
                 onChange={(event) => setToken(event.target.value)}
               />
-            </div>
+            </Field>
             <Button type="submit">Create admin</Button>
             <div id="err" className="min-h-5 text-sm text-destructive" role="alert">
               {error}

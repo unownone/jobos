@@ -4,6 +4,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Field } from "@/components/ui/field";
 import { RecordCard, RecordDeck } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -127,7 +128,7 @@ export function InvitesPage() {
           </h2>
           <form id="form" className="flex flex-col gap-3" onSubmit={(event) => void onCreate(event)}>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex flex-col gap-1 text-sm">
+              <Field>
                 Track
                 <NativeSelect
                   id="track"
@@ -141,8 +142,8 @@ export function InvitesPage() {
                     { value: "maintenance", label: "maintenance" },
                   ]}
                 />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
+              </Field>
+              <Field>
                 Mode
                 <NativeSelect
                   id="mode"
@@ -155,17 +156,17 @@ export function InvitesPage() {
                     { value: "agents_only", label: "agents_only" },
                   ]}
                 />
-              </label>
+              </Field>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex flex-col gap-1 text-sm">
+              <Field>
                 Max redemptions
                 <Input id="max" name="max" type="number" min={1} max={64} defaultValue={8} />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
+              </Field>
+              <Field>
                 TTL hours
                 <Input id="ttl" name="ttl" type="number" min={1} max={720} defaultValue={72} />
-              </label>
+              </Field>
             </div>
             <label className="flex min-h-11 items-center gap-2 text-sm">
               <Checkbox id="multi" name="multi" />
@@ -187,9 +188,9 @@ export function InvitesPage() {
           </p>
           {prompt ? (
             <div>
-              <label className="mb-1 block text-sm" htmlFor="prompt">
+              <Field htmlFor="prompt">
                 Agent prompt (copy this with the join link)
-              </label>
+              </Field>
               <Textarea id="prompt" readOnly value={prompt} />
             </div>
           ) : (

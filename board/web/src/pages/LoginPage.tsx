@@ -2,8 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import { assignHref, errorText, postJson } from "@/lib/auth-post";
 import { nextPath } from "@/lib/next-path";
@@ -118,8 +118,8 @@ export function LoginPage() {
         </CardHeader>
         <CardContent>
           <form id="form" className="flex flex-col gap-4" onSubmit={onSubmit}>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="username">Username</Label>
+            <Field htmlFor="username">
+              Username
               <Input
                 id="username"
                 name="username"
@@ -129,9 +129,9 @@ export function LoginPage() {
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
+            </Field>
+            <Field htmlFor="password">
+              Password
               <Input
                 id="password"
                 name="password"
@@ -141,7 +141,7 @@ export function LoginPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
-            </div>
+            </Field>
             <div className="flex flex-wrap gap-2">
               <Button type="submit" className="min-w-[8rem] flex-1">
                 Log in

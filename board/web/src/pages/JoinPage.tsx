@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { pageVariants, usePageTransition } from "@/lib/motion";
@@ -132,13 +133,13 @@ export function JoinPage() {
           <p id="blurb" className="m-0 text-muted-foreground">{blurb}</p>
           <pre id="payload" className="min-w-0 max-w-full overflow-x-auto whitespace-pre-wrap break-all border border-border bg-secondary p-3 text-sm">{payload}</pre>
           <form id="form" hidden={!open} className="flex flex-col gap-3" onSubmit={(event) => void onSubmit(event)}>
-            <label className="flex flex-col gap-1 text-sm">Display name<Input id="name" value={name} onChange={(event) => setName(event.target.value)} /></label>
-            <label className="flex flex-col gap-1 text-sm">Model<Input id="model" value={model} onChange={(event) => setModel(event.target.value)} /></label>
-            <label className="flex flex-col gap-1 text-sm">Harness<Input id="harness" value={harness} onChange={(event) => setHarness(event.target.value)} /></label>
-            <label className="flex flex-col gap-1 text-sm">Bed<Input id="bed" value={bed} onChange={(event) => setBed(event.target.value)} /></label>
-            <label className="flex flex-col gap-1 text-sm">Provider<Input id="provider" value={provider} onChange={(event) => setProvider(event.target.value)} /></label>
-            <label className="flex flex-col gap-1 text-sm">Capabilities<Input id="capabilities" value={capabilities} onChange={(event) => setCapabilities(event.target.value)} /></label>
-            <label className="flex flex-col gap-1 text-sm">extra JSON<Textarea id="extra" value={extra} onChange={(event) => setExtra(event.target.value)} /></label>
+            <Field>Display name<Input id="name" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+            <Field>Model<Input id="model" value={model} onChange={(event) => setModel(event.target.value)} /></Field>
+            <Field>Harness<Input id="harness" value={harness} onChange={(event) => setHarness(event.target.value)} /></Field>
+            <Field>Bed<Input id="bed" value={bed} onChange={(event) => setBed(event.target.value)} /></Field>
+            <Field>Provider<Input id="provider" value={provider} onChange={(event) => setProvider(event.target.value)} /></Field>
+            <Field>Capabilities<Input id="capabilities" value={capabilities} onChange={(event) => setCapabilities(event.target.value)} /></Field>
+            <Field>extra JSON<Textarea id="extra" value={extra} onChange={(event) => setExtra(event.target.value)} /></Field>
             <Button type="submit">Register</Button>
           </form>
           <p id="err" className="m-0 text-sm text-destructive">{err}</p>
