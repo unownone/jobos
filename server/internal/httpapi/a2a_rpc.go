@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -100,6 +101,13 @@ func (s *Server) a2aCall(c *gin.Context, id any, method string, params map[strin
 		}
 		tasks := []any{}
 		for _, row := range rows {
+			if len(row.Payload) > 2 {
+				var stored any
+				if json.Unmarshal(row.Payload, &stored) == nil {
+					tasks = append(tasks, stored)
+					continue
+				}
+			}
 			tasks = append(tasks, gin.H{"id": row.ID, "status": gin.H{"state": row.State}})
 		}
 		return rpcResult(id, gin.H{"tasks": tasks})
@@ -113,40 +121,26 @@ func (s *Server) a2aCall(c *gin.Context, id any, method string, params map[strin
 }
 
 func (s *Server) a2aSend(c *gin.Context, id any, params map[string]any, p *principal, track string) gin.H {
-	account := ""
-	if p != nil {
-		account = p.AccountID
+	if p == nil {
+		return s.a2aAuthRequired(c, id)
 	}
-	if account == "" || !s.onboarded(c, account) {
+	if !s.onboarded(c, p.AccountID) {
 		return rpcError(id, -32090, "Onboard the candidate profile before A2A sends")
 	}
 	message, _ := params["message"].(map[string]any)
+	data := messageData(message)
 	text := messageText(message)
+	if text == "" {
+		if body, _ := data["body"].(string); strings.TrimSpace(body) != "" {
+			text = strings.TrimSpace(body)
+		}
+	}
 	if text == "" {
 		return rpcError(id, -32602, "message text is required")
 	}
-	data, _ := message["data"].(map[string]any)
-	if data == nil {
-		parts, _ := message["parts"].([]any)
-		for _, part := range parts {
-			obj, _ := part.(map[string]any)
-			if obj["kind"] == "data" {
-				data, _ = obj["data"].(map[string]any)
-			}
-		}
-	}
-	if data == nil {
-		data = map[string]any{}
-	}
-	toTrack := track
-	if raw, _ := data["to_track"].(string); raw != "" {
-		if canon := canonicalTrack(raw); canon != "" {
-			toTrack = canon
-		} else if raw == "admin" {
-			toTrack = "admin"
-		} else {
-			return rpcError(id, -32602, "to_track must be a Hub track or admin")
-		}
+	toTrack, errMsg := a2aTrack(data, params, track)
+	if errMsg != "" {
+		return rpcError(id, -32602, errMsg)
 	}
 	if toTrack == "" {
 		toTrack = p.Track
@@ -156,10 +150,7 @@ func (s *Server) a2aSend(c *gin.Context, id any, params map[string]any, p *princ
 	}
 	toUser, _ := data["to_user_id"].(string)
 	jobID, _ := data["job_id"].(string)
-	msgType, _ := data["type"].(string)
-	if msgType == "" {
-		msgType = "note"
-	}
+	msgType := a2aMessageType(data)
 	if toUser != "" {
 		toTrack = ""
 	}
@@ -177,13 +168,25 @@ func (s *Server) a2aSend(c *gin.Context, id any, params map[string]any, p *princ
 	if dest == "" {
 		dest = toTrack
 	}
-	result := gin.H{
-		"id": "", "contextId": message["contextId"],
-		"status":    gin.H{"state": "completed"},
-		"history":   []any{message, gin.H{"role": "agent", "parts": []any{gin.H{"kind": "text", "text": "Hub accepted " + msgType + " for " + dest + "."}}}},
-		"artifacts": []any{gin.H{"artifactId": msg.ID, "name": "hub-inbox"}},
+	contextID, _ := message["contextId"].(string)
+	if contextID == "" {
+		contextID, _ = message["context_id"].(string)
 	}
-	task := store.Task{ID: newID("task_"), AccountID: p.AccountID, Track: track, State: "completed", Payload: mustJSON(result), CreatedAt: now()}
+	reply := "Hub accepted " + msgType + " for " + dest + "."
+	result := gin.H{
+		"id": "", "contextId": contextID,
+		"status": gin.H{"state": "completed"},
+		"history": []any{
+			message,
+			gin.H{"role": "agent", "parts": []any{
+				gin.H{"kind": "text", "text": reply},
+				gin.H{"kind": "data", "data": gin.H{"hub_message_id": msg.ID, "type": msgType, "to_track": toTrack, "to_user_id": toUser, "job_id": jobID}},
+			}},
+		},
+		"artifacts": []any{gin.H{"artifactId": msg.ID, "name": "hub-inbox", "parts": []any{gin.H{"kind": "data", "data": gin.H{"message": msg}}}}},
+		"metadata":  gin.H{"protocol": "A2A", "hub": "job-apply-os"},
+	}
+	task := store.Task{ID: newID("task_"), AccountID: p.AccountID, Track: track, State: "completed", CreatedAt: now()}
 	result["id"] = task.ID
 	task.Payload = mustJSON(result)
 	_ = s.DB.SaveTask(c.Request.Context(), task)
@@ -191,15 +194,141 @@ func (s *Server) a2aSend(c *gin.Context, id any, params map[string]any, p *princ
 	return rpcResult(id, result)
 }
 
-func messageText(message map[string]any) string {
+func (s *Server) a2aAuthRequired(c *gin.Context, id any) gin.H {
+	admin, err := s.DB.FirstAdmin(c.Request.Context())
+	if err != nil || !s.onboarded(c, admin.AccountID) {
+		return rpcError(id, -32090, "Onboard the candidate profile before A2A sends")
+	}
+	task := store.Task{ID: newID("task_"), AccountID: admin.AccountID, State: "auth-required", CreatedAt: now()}
+	result := gin.H{
+		"id":     task.ID,
+		"status": gin.H{"state": "auth-required"},
+		"history": []any{gin.H{"role": "agent", "parts": []any{
+			gin.H{"kind": "text", "text": "Send Authorization: Bearer $HUB_KEY (owner or agent key)."},
+		}}},
+	}
+	task.Payload = mustJSON(result)
+	_ = s.DB.SaveTask(c.Request.Context(), task)
+	return rpcResult(id, result)
+}
+
+func messageData(message map[string]any) map[string]any {
+	out := map[string]any{}
+	if meta, _ := message["metadata"].(map[string]any); meta != nil {
+		for k, v := range meta {
+			out[k] = v
+		}
+	}
+	if data, _ := message["data"].(map[string]any); data != nil {
+		for k, v := range data {
+			out[k] = v
+		}
+	}
 	parts, _ := message["parts"].([]any)
 	for _, part := range parts {
 		obj, _ := part.(map[string]any)
-		if obj["kind"] == "text" {
-			if text, _ := obj["text"].(string); text != "" {
-				return text
-			}
+		if partKind(obj) != "data" {
+			continue
+		}
+		data, _ := obj["data"].(map[string]any)
+		for k, v := range data {
+			out[k] = v
 		}
 	}
+	return out
+}
+
+func messageText(message map[string]any) string {
+	if message == nil {
+		return ""
+	}
+	var chunks []string
+	parts, _ := message["parts"].([]any)
+	for _, part := range parts {
+		obj, _ := part.(map[string]any)
+		if partKind(obj) != "text" && partKind(obj) != "text/plain" {
+			continue
+		}
+		if text, _ := obj["text"].(string); strings.TrimSpace(text) != "" {
+			chunks = append(chunks, strings.TrimSpace(text))
+		}
+	}
+	if len(chunks) > 0 {
+		return strings.Join(chunks, "\n")
+	}
+	if text, _ := message["text"].(string); strings.TrimSpace(text) != "" {
+		return strings.TrimSpace(text)
+	}
+	if text, _ := message["body"].(string); strings.TrimSpace(text) != "" {
+		return strings.TrimSpace(text)
+	}
 	return ""
+}
+
+func partKind(part map[string]any) string {
+	if part == nil {
+		return ""
+	}
+	if kind, _ := part["kind"].(string); kind != "" {
+		return strings.ToLower(strings.TrimSpace(kind))
+	}
+	kind, _ := part["type"].(string)
+	return strings.ToLower(strings.TrimSpace(kind))
+}
+
+func a2aTrack(data map[string]any, params map[string]any, fallback string) (string, string) {
+	raw, _ := data["to_track"].(string)
+	if raw == "" {
+		raw, _ = data["track"].(string)
+	}
+	if strings.TrimSpace(raw) != "" {
+		if canon := canonicalTrack(raw); canon != "" {
+			return canon, ""
+		}
+		if strings.EqualFold(strings.TrimSpace(raw), "admin") {
+			return "admin", ""
+		}
+		return "", "to_track must be a Hub track or admin"
+	}
+	skill, _ := data["skill_id"].(string)
+	if skill == "" {
+		skill, _ = data["skill"].(string)
+	}
+	if skill == "" {
+		skill, _ = params["skill"].(string)
+	}
+	return skillTrack(skill, fallback), ""
+}
+
+func skillTrack(skill, fallback string) string {
+	switch strings.ToLower(strings.TrimSpace(skill)) {
+	case "", "hub.handoff":
+		return fallback
+	case "hub.discovery", "discovery":
+		return "discovery"
+	case "hub.application", "hub.apply", "application", "apply":
+		return "application"
+	case "hub.outreach", "outreach":
+		return "outreach"
+	case "hub.maintenance", "maintenance", "maintainer":
+		return "maintenance"
+	default:
+		if canon := canonicalTrack(skill); canon != "" {
+			return canon
+		}
+		return fallback
+	}
+}
+
+func a2aMessageType(data map[string]any) string {
+	raw, _ := data["type"].(string)
+	if raw == "" {
+		raw, _ = data["kind"].(string)
+	}
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "note", "block", "handoff", "question":
+		return strings.ToLower(strings.TrimSpace(raw))
+	default:
+		return "note"
+	}
 }
