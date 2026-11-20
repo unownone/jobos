@@ -2,7 +2,7 @@
 # Deploy Job Hub on this host from GitHub main (or a pinned SHA).
 # Intended for the live clone at $JOBOS_REPO (default: $HOME/jobos-live),
 # not the agent's working tree. Durable data is named Docker volumes
-# (pgdata, blobs, rabbitmq). Coolify forbids ${...} in volume sources and
+# (pgdata, blobs). Coolify forbids ${...} in volume sources and
 # would wipe ~/ binds on each helper checkout. See docs/coolify.md.
 set -euo pipefail
 
@@ -37,7 +37,7 @@ Env (optional file: $HOME/.jobos/deploy.env):
   JOBOS_PG_PASSWORD    Postgres password (default: jobos). Not published; Hub-only.
                        Used when DATABASE_URL is unset (bundled service).
   DATABASE_URL         Outside Postgres. Secret / repo-root .env. Wins over the bundled URL.
-                       Durable data is named volumes pgdata, blobs, rabbitmq.
+                       Durable data is named volumes pgdata and blobs.
 EOF
 }
 
@@ -62,7 +62,7 @@ jobos_load_github_ssh
 
 REPO="${JOBOS_REPO:-${HOME}/jobos-live}"
 COMPOSE_FILE="${JOBOS_COMPOSE_FILE:-docker-compose.yml}"
-HEALTH_URL="${JOBOS_HEALTH_URL:-http://127.0.0.1:8787/health}"
+HEALTH_URL="${JOBOS_HEALTH_URL:-http://127.0.0.1:8080/health}"
 STATE_DIR="${JOBOS_STATE_DIR:-${HOME}/.jobos}"
 mkdir -p "$STATE_DIR"
 

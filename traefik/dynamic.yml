@@ -22,4 +22,4 @@ http:
     hub:
       loadBalancer:
         servers:
-          - url: http://hub:8787
+          - url: http://web:80

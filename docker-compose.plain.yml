@@ -1,15 +1,9 @@
-# jobOS Hub only (no Traefik). From repo root:
+# jobOS Hub: Go API + React SPA, with Postgres always on.
 #   docker compose -f docker-compose.plain.yml up -d --build
-# Hub listens on http://127.0.0.1:8787
+# SPA http://127.0.0.1:8080  API http://127.0.0.1:8081
 #
-# Durable state: named volumes pgdata and blobs (Coolify-safe).
-# The work queue is the Postgres queue_items table. See docs/runtime.md.
-#
-# First visit: /login (username + password) → /onboarding → invites/agents.
-#
-# Outside Postgres: set secret DATABASE_URL (Coolify/Railway, repo-root .env,
-# or the shell). Unset uses the bundled `postgres` service.
-# A database on the Docker host is host.docker.internal, not 127.0.0.1.
+# Durable state: named volumes pgdata and blobs.
+# Queue leases are queue_items. RabbitMQ is not in this file.
 
 name: jobos-plain
 
@@ -29,31 +23,24 @@ services:
       retries: 20
     restart: unless-stopped
 
-  hub:
+  api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: server/Dockerfile
     ports:
-      - "${HUB_PORT:-8787}:8787"
+      - "8081:8080"
     environment:
-      JOBOS_NONINTERACTIVE: "1"
-      BOARD_HOST: "0.0.0.0"
-      BOARD_PORT: "8787"
-      BOARD_DB: "/tmp/board.db"
-      HUB_PACKS_DIR: "/tmp/jobos-packs"
+      HUB_ADDR: ":8080"
+      HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
+      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8080}"
       DATABASE_URL: "${DATABASE_URL:-}"
       JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
       JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
       JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
       JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
-      QUEUE_ADAPTER: "memory"
-      BLOB_ROOT: "/var/lib/jobos/blobs"
-      BLOB_ADAPTER: "filesystem"
-      HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-127.0.0.1:8787}"
-      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8787}"
-      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
-      OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
+      BLOB_DRIVER: filesystem
+      BLOB_ROOT: /var/lib/jobos/blobs
     volumes:
       - "blobs:/var/lib/jobos/blobs"
     extra_hosts:
@@ -62,10 +49,20 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+    ports:
+      - "${HUB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

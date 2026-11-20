@@ -6,7 +6,7 @@ COPY server/ ./
 RUN CGO_ENABLED=0 go build -o /hub ./cmd/hub
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
 COPY --from=build /hub /usr/local/bin/hub
 COPY AGENTS.md llms.txt agents.txt /opt/jobos/
 COPY docs /opt/jobos/docs

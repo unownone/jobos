@@ -45,7 +45,8 @@ The live coordination plane is **jobOS Hub**: the Go API and the React SPA. Main
 1. **Install the Hub** — [`docs/install.md`](docs/install.md) / [`INSTALL.md`](INSTALL.md).
    - Default Compose (SPA on **8080**, API on **8081**): `docker compose up -d --build`
    - With Postgres, Redis, and MinIO: `docker compose --profile data --profile cache --profile blobs up -d --build`
-   - The Python board on **8787** is `docker compose -f docker-compose.plain.yml up -d --build`
+   - Same stack with Postgres always on: `docker compose -f docker-compose.plain.yml up -d --build`
+   - Traefik on 80/443: `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh`
    - `docker run` and uv/bare metal are in the same guide.
    - **This GitHub repo’s OCI host** deploys on push to `main` — that is one machine, not every clone. Details: [`docs/deploy.md`](docs/deploy.md). Feature walkthrough of that host: [`docs/demo/README.md`](docs/demo/README.md).
 2. **Create the admin** at the printed `/admin/signup` URL (one-time).
@@ -250,8 +251,8 @@ scripts/rebuild_skill_index.py  skills/lists/INDEX.md from YAML
 scripts/setup_deep_research.sh  Clone dzhng/open-deep-research
 scripts/run_deep_research.py    Non-interactive research API wrapper
 docker-compose.yml        Go API + React SPA. SPA :8080, API :8081
-docker-compose.plain.yml  Python board on :8787
-docker-compose.traefik.yml Traefik on 80/443 in front of the Python board
+docker-compose.plain.yml  Go API + React SPA, Postgres always on
+docker-compose.traefik.yml Traefik on 80/443 in front of the SPA
 docs/coolify.md           Coolify: named volumes, no ${...} in volume sources
 ```
 

@@ -2,7 +2,7 @@
 
 jobOS Hub is the live coordination plane for the job harness. The current Compose file runs two containers: a Go API and a React SPA. Postgres, Redis, and MinIO are optional profiles. RabbitMQ is not in that file. See [`docs/runtime.md`](runtime.md). Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
 
-Sections below that name port 8787 or the FastAPI image describe the Python `board/` process, which is still in the tree.
+`scripts/hub_deploy.sh` and `board/docker-compose.yml` still start the Python board. Compose files at the repo root start the Go API and the React SPA. Traefik also answers on port 8787 and sends that traffic to the SPA.
 
 **Onboarding is the first thing you do after the process is up.** Until a truthful candidate profile exists, jobs, invites, queues, messages, and A2A sends return `409 candidate_required`. Do not copy `profiles/candidate.example.yaml` into production.
 
@@ -14,7 +14,8 @@ Full operator API: [`docs/job-hub/human.md`](job-hub/human.md). Agents: [`docs/j
 | --- | --- | --- |
 | **Docker Compose** | Laptop or VM. SPA on 8080, API on 8081 | `docker compose up -d --build` |
 | **Compose + data profiles** | Postgres, Redis, and MinIO on the same network | `docker compose --profile data --profile cache --profile blobs up -d --build` |
-| **Python board** | The FastAPI process still in `board/`, port 8787 | `docker compose -f docker-compose.plain.yml up -d --build` |
+| **Compose, Postgres always on** | Same API and SPA, Postgres is not a profile | `docker compose -f docker-compose.plain.yml up -d --build` |
+| **Docker Compose + Traefik** | Public host, ports 80/443/8787 | `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` |
 | **`docker build` / `docker run`** | One container, no Compose | See [Docker (no Compose)](#docker-no-compose) |
 | **uv / bare metal** | Cursor Cloud, no Docker | `bash scripts/hub_deploy.sh` |
 | **Coolify** | Self-hosted PaaS, Compose from GitHub | [`docs/coolify.md`](coolify.md) — named volumes, no `${...}` in volume sources |
@@ -75,7 +76,7 @@ Browser e2e (Playwright against Compose Hub): `bash scripts/e2e_browser.sh`. Inv
 
 ## Docker Compose + Traefik (public host)
 
-Ports **80** and **443** plus **8787**. Landing is `/`. Board is `/board`. File-based Traefik config (no Docker socket): `traefik/traefik.yml`, `traefik/dynamic.yml`.
+Ports **80**, **443**, and **8787** all reach the SPA. The SPA proxies the API. Board is `/board`. File-based Traefik config (no Docker socket): `traefik/traefik.yml`, `traefik/dynamic.yml`.
 
 ```bash
 # hostname, IPv4, or IP:port. :443 → https:// on invite URLs.
@@ -126,7 +127,7 @@ Compose is required for a full install. The Hub image is stateless.
 
 ## Bare metal (uv)
 
-Needs Python 3.11+ and [`uv`](https://docs.astral.sh/uv/).
+This path still starts the Python board. Needs Python 3.11+ and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
 bash scripts/setup_uv.sh          # if uv is missing
@@ -138,11 +139,11 @@ Listens on `0.0.0.0:8787`. Secrets: gitignored `board/.env` and `board/tokens.lo
 
 ## Reverse proxy / TLS
 
-Plain Compose already publishes 8787. For a hostname:
+Plain Compose publishes the SPA on 8080. For a hostname:
 
-- **Caddy** (example): `hunt.example.com { reverse_proxy 127.0.0.1:8787 }`
-- **nginx**: `proxy_pass http://127.0.0.1:8787;` plus WebSocket-unrelated HTTP/1.1
-- **Cloudflare Tunnel / Tailscale**: point at 8787; set `HUB_PUBLIC_URL` to the public origin so invite links work
+- **Caddy** (example): `hunt.example.com { reverse_proxy 127.0.0.1:8080 }`
+- **nginx**: `proxy_pass http://127.0.0.1:8080;` and forward `Upgrade` for `/ws`
+- **Cloudflare Tunnel / Tailscale**: point at 8080; set `HUB_PUBLIC_URL` to the public origin so invite links work
 - **Traefik template**: repo-root `docker-compose.traefik.yml`
 
 Always set `HUB_PUBLIC_URL` (or `HUB_PUBLIC_HOST`) to the origin browsers and agents actually use. Never put `jh_boot_` / `jh_agt_` / `BOARD_TOKEN_*` in that URL.
@@ -207,7 +208,7 @@ See [`docs/job-hub/a2a.md`](job-hub/a2a.md).
 | Coolify: `Invalid volume source: contains forbidden character '${'` | Volume sources must be named volumes, not `${VAR:-...}` binds. See [`docs/coolify.md`](coolify.md). |
 | Coolify redeploy emptied Postgres | Bind mounts under `~` or `/artifacts` reset each deploy. Use named volumes. |
 | Docker healthcheck failing | `docker compose logs api`. `/health` must answer on port 8080 inside the API container. |
-| Traefik 404 | Confirm `traefik/dynamic.yml` service URL is `http://hub:8787` and the `hub` service is healthy. |
+| Traefik 404 | Confirm `traefik/dynamic.yml` service URL is `http://web:80` and the `web` service is healthy. |
 
 ## Deploy on push (this host)
 
