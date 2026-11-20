@@ -739,7 +739,7 @@ export function BoardPage() {
                     <h2 className="m-0 truncate font-display text-lg leading-tight font-extrabold [font-family:var(--font-display)]" title={selected.company}>
                       {selected.company || "Job"}
                     </h2>
-                    <p className="m-0 truncate font-mono text-xs text-muted-foreground" title={selected.id}>
+                    <p className="m-0 break-all font-mono text-xs text-muted-foreground" title={selected.id}>
                       {selected.id}
                     </p>
                   </div>

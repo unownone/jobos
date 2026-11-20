@@ -220,6 +220,7 @@ describe("BoardPage", () => {
     expect(byId("side").className).toContain("min-w-0");
     expect(byId("side").querySelector("h2")?.textContent).toBe("TicketCo");
     expect(byId("side").querySelector("h2")?.className).toContain("truncate");
+    expect(byId("side").querySelector("p")?.className).toContain("break-all");
     expect(byId("side").querySelector("p")?.textContent).toBe(JOB.id);
     expect(byId("list").querySelector("table")?.className).toContain("table-fixed");
     expect(byId("list").querySelector("table")?.className).toContain("max-[720px]:hidden");
