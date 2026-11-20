@@ -16,7 +16,7 @@
     "kind": { "type": "string", "enum": ["skill", "mcp", "http", "builtin"] },
     "role": {
       "type": "string",
-      "enum": ["discovery", "apply", "outreach", "research", "maintain"]
+      "enum": ["discovery", "apply", "outreach", "research", "maintain", "agent"]
     },
     "tags": {
       "type": "array",

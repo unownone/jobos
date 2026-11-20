@@ -14,6 +14,10 @@ outputs: [proof, outreach_packet]
 
 You submit. You do not source. You do not cold-email.
 
+## Capability gate
+
+If you are on jobOS MCP, call `evaluate_lane` with `apply` before any step below. Apply needs a browser in this agent session. If `can` is false, tell the human and stop. Do not type an application into chat and call it submitted. If this session does not include apply, ask the human before adding it with `set_session_lanes`.
+
 ## Registry
 
 When `HUB_URL` is set, pick the tagged `apply` skill that matches the packet ATS/URL (`GET /api/registry/skills?tag=apply&ats=workday` or `&url=`). Workday on job A is Workday on job B. Tenant quirks stay on a **local** fork (`POST /api/registry/skills/{id}/fork`). Others cannot see that fork. To share, `POST /api/registry/recordings` — only maintainer consumes `skill.record`. Airgapped: follow this role skill.

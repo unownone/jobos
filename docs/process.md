@@ -4,6 +4,19 @@ This is the contract. Skills implement slices of it. If a skill and this documen
 
 jobOS is the job harness. Agents curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt` (not HTML) for identity and next steps. **Always use registry skills/MCPs** when Hub is up. If you use something outside, record it and add a memory fact. `review` and `resume` roles are coming soon — stubs only, not part of this contract’s owners. **Deployed agents** (advanced browser handling, cheaper hosted workers) are also coming soon — not shipped, not a claimable track.
 
+## Preferred path
+
+One agent, connected with MCP. The human is the admin: they observe, steer, and pick lanes. The agent is not locked to a single track.
+
+1. Admin logs in and opens `/connect`.
+2. They add `{origin}/mcp` to their AI. The AI starts OAuth. The admin approves. Refresh keeps the connection up.
+3. The human says get started, find jobs, apply jobs, or outreach jobs.
+4. The agent asks which lanes this session should run and stores them on the agent session. jobOS does not pick the lanes.
+5. The agent reports whether it has a browser and an email connection, then evaluates the lane. Find and apply stop without a browser. Outreach stops without email.
+6. The agent starts a loop and keeps asking for the next step until the loop is done or blocked.
+
+Details: [`docs/job-hub/agent-flow.md`](job-hub/agent-flow.md). The older invite and role API still works. New sessions should use MCP.
+
 ## 0. Preconditions
 
 - Hub: finish `/onboarding` so the tenant's `GET /api/candidate/status` has `onboarded: true`. Airgap export: `GET /api/export/ledger`. Never treat git `ledger/` as the live list when Hub is up.

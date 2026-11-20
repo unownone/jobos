@@ -43,6 +43,10 @@ _PUBLIC_EXACT = frozenset(
         "/llms.txt",
         "/agents.txt",
         "/static/hub.css",
+        "/mcp",
+        "/oauth/register",
+        "/oauth/authorize",
+        "/oauth/token",
     }
 )
 

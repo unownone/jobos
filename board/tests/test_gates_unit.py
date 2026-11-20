@@ -17,3 +17,8 @@ def test_jobs_and_invites_stay_gated() -> None:
     assert path_is_open("/api/jobs") is False
     assert path_is_open("/api/invites") is False
     assert path_is_open("/api/auth/bootstrap") is True
+    assert path_is_open("/mcp") is True
+    assert path_is_open("/connect") is True
+    assert path_is_open("/oauth/authorize") is True
+    assert path_is_open("/api/agent/status") is True
+    assert path_is_open("/api/agent/steers") is True

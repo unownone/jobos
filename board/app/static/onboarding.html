@@ -15,6 +15,7 @@
   <nav class="hub-rail" aria-label="Hub">
     <a class="hub-brand" href="/home"><img src="/brand/mascot.png" width="36" height="36" alt="jobOS" /></a>
     <a class="hub-nav-item" data-icon="home" data-nav="/home" href="/home">Home</a>
+    <a class="hub-nav-item" data-icon="agents" data-nav="/connect" href="/connect">Agents</a>
     <a class="hub-nav-item" data-icon="board" data-nav="/board" href="/board">Board</a>
     <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
     <a class="hub-nav-item" data-icon="invites" data-nav="/admin" href="/admin">Invites</a>
@@ -335,11 +336,11 @@
         err.textContent = (body.detail && (body.detail.message || body.detail)) || res.statusText;
         return;
       }
-      resumeOk.textContent = "Resume stored. Opening the board…";
-      location.href = "/board";
+      resumeOk.textContent = "Resume stored. Opening agent setup…";
+      location.href = "/connect";
     });
     document.getElementById("skipResume").addEventListener("click", () => {
-      location.href = "/board";
+      location.href = "/connect";
     });
     me();
   </script>
@@ -347,11 +348,13 @@
   </div>
   <nav class="hub-dock" aria-label="Primary">
     <a class="hub-nav-item" data-icon="home" data-nav="/home" href="/home">Home</a>
+    <a class="hub-nav-item" data-icon="agents" data-nav="/connect" href="/connect">Agents</a>
     <a class="hub-nav-item" data-icon="board" data-nav="/board" href="/board">Board</a>
-    <a class="hub-nav-item" data-icon="directory" data-nav="/admin/users" href="/admin/users">Directory</a>
     <button class="hub-nav-item" type="button" data-icon="more" data-hub-more>More</button>
   </nav>
   <div class="hub-more" id="hubMore">
+    <a href="/connect">Agents</a>
+    <a href="/admin/users">Directory</a>
     <a href="/admin">Invites</a>
     <a href="/admin/data">Data</a>
     <a href="/admin/skills">Skills</a>

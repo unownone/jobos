@@ -16,6 +16,7 @@ PAGES = [
     "users.html",
     "skills.html",
     "memory.html",
+    "connect.html",
 ]
 
 
@@ -41,7 +42,7 @@ def test_hub_css_blocks_are_balanced() -> None:
 
 
 def test_authenticated_pages_have_mobile_dock() -> None:
-    for name in ("index.html", "home.html", "admin.html", "data.html", "users.html", "skills.html", "memory.html", "onboarding.html"):
+    for name in ("index.html", "home.html", "admin.html", "data.html", "users.html", "skills.html", "memory.html", "onboarding.html", "connect.html"):
         text = (STATIC / name).read_text(encoding="utf-8")
         assert "hub-dock" in text, name
         assert "hub-rail" in text, name
@@ -53,7 +54,7 @@ def test_onboarding_prefills_saved_profile_and_stays_in_hub() -> None:
     assert "function fillForm" in text
     assert "function loadProfile" in text
     assert 'Accept: "application/json"' in text
-    assert 'location.href = "/board"' in text
+    assert 'location.href = "/connect"' in text
     assert 'location.href = "/"' not in text
     assert 'location.href = "/admin"' not in text
 
@@ -77,3 +78,4 @@ def test_login_treats_public_next_as_board() -> None:
     text = (STATIC / "login.html").read_text(encoding="utf-8")
     assert "function nextPath" in text
     assert 'requested === "/"' in text
+    assert 'return "/connect"' in text

@@ -37,6 +37,11 @@ _ALLOW_EXACT = frozenset(
         "/api/candidate/status",
         "/api/candidate/template",
         "/api/registry/catalog",
+        "/mcp",
+        "/connect",
+        "/oauth/register",
+        "/oauth/authorize",
+        "/oauth/token",
     }
 )
 
@@ -46,6 +51,7 @@ _ALLOW_PREFIXES = (
     "/.well-known/",
     "/a2a",
     "/api/join/",
+    "/api/agent",
     "/join/",
 )
 
