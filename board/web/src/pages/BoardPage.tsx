@@ -213,9 +213,12 @@ export function BoardPage() {
   }
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [presenceNote, setPresenceNote] = useState("Workers appear here when they take Hub actions.");
+  const [presenceFailed, setPresenceFailed] = useState(false);
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [memoryNote, setMemoryNote] = useState("Heartbeat recalls worker + track + common facts each round.");
+  const [memoryFailed, setMemoryFailed] = useState(false);
   const [queueStats, setQueueStats] = useState("");
+  const [queueFailed, setQueueFailed] = useState(false);
   const [q, setQ] = useState("");
   const [stopped, setStopped] = useState("");
   const [lane, setLane] = useState("");
@@ -375,22 +378,40 @@ export function BoardPage() {
         if (cancelled) return;
         const items = beat.memory?.items ?? [];
         setMemories(items);
+        setMemoryFailed(false);
         setMemoryNote(items.length ? "" : beat.memory?.hint || "No stored facts yet. Write only durable lessons.");
+      } catch (error) {
+        if (cancelled) return;
+        setMemories([]);
+        setMemoryFailed(true);
+        setMemoryNote(error instanceof Error ? error.message : "Could not recall memory");
+      }
+      try {
         const directory = await api<{ users?: PresenceUser[] }>("/api/presence");
         if (cancelled) return;
         const users = directory.users ?? [];
         setPresence(users);
+        setPresenceFailed(false);
         setPresenceNote(users.length ? "" : "No workers yet. They appear when they call the Hub.");
-        if (isAdmin(caps)) {
-          const queue = await api<{ items?: { kind?: string; status?: string }[] }>("/api/queue?limit=20");
-          if (cancelled) return;
-          const queued = queue.items ?? [];
-          setQueueStats(queued.slice(0, 8).map((item) => `${item.kind}:${item.status}`).join(" · ") || "empty");
-        }
-      } catch {
+      } catch (error) {
         if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Could not load presence";
+        const denied = message.includes("can read presence");
         setPresence([]);
-        setPresenceNote("Directory is admin, maintenance, or track-owner only.");
+        setPresenceFailed(!denied);
+        setPresenceNote(denied ? "Directory is admin, maintenance, or track-owner only." : message);
+      }
+      if (!isAdmin(caps)) return;
+      try {
+        const queue = await api<{ items?: { kind?: string; status?: string }[] }>("/api/queue?limit=20");
+        if (cancelled) return;
+        const queued = queue.items ?? [];
+        setQueueFailed(false);
+        setQueueStats(queued.slice(0, 8).map((item) => `${item.kind}:${item.status}`).join(" · ") || "empty");
+      } catch (error) {
+        if (cancelled) return;
+        setQueueFailed(true);
+        setQueueStats(error instanceof Error ? error.message : "Could not load the queue");
       }
     }
     void pulse();
@@ -653,7 +674,7 @@ export function BoardPage() {
         {!selected && sideErr ? (
           <p id="sideErr" className="shrink-0 px-3 py-2 text-sm text-destructive">{sideErr}</p>
         ) : null}
-        <div id="queueRail" hidden={!queueVisible} className="flex shrink-0 gap-2 px-3 py-1 text-sm text-muted-foreground">
+        <div id="queueRail" hidden={!queueVisible} className={cn("flex shrink-0 gap-2 px-3 py-1 text-sm", queueFailed ? "text-destructive" : "text-muted-foreground")}>
           <span>Queue</span>
           <span id="queueStats">{queueStats}</span>
         </div>
@@ -671,7 +692,7 @@ export function BoardPage() {
             )}
           >
             <h2 className="mt-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Presence</h2>
-            <p id="presenceEmpty" hidden={presence.length > 0} className="text-sm text-muted-foreground">{presenceNote}</p>
+            <p id="presenceEmpty" hidden={presence.length > 0} className={cn("text-sm", presenceFailed ? "text-destructive" : "text-muted-foreground")}>{presenceNote}</p>
             <div id="presenceList" className="flex flex-col gap-2">
               {presence.map((user) => {
                 const name = user.display_name || user.user_id || "";
@@ -690,7 +711,7 @@ export function BoardPage() {
               })}
             </div>
             <h2 className="font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Memory</h2>
-            <p id="memoryEmpty" hidden={memories.length > 0} className="text-sm text-muted-foreground">{memoryNote}</p>
+            <p id="memoryEmpty" hidden={memories.length > 0} className={cn("text-sm", memoryFailed ? "text-destructive" : "text-muted-foreground")}>{memoryNote}</p>
             <div id="memoryList" className="mt-2 flex flex-col gap-2">
               {memories.map((item) => (
                 <RecordCard

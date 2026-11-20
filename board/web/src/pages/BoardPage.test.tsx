@@ -563,6 +563,70 @@ describe("BoardPage", () => {
     expect(byId("list")).not.toHaveTextContent("No jobs on this page.");
   });
 
+  it("keeps the directory when only the queue fails", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve(ADMIN);
+      if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered"], apply_kinds: [] });
+      if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload([]));
+      if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: [] } });
+      if (path === "/api/presence") return Promise.resolve({ users: [{ user_id: "ada", display_name: "Ada", status: "idle", kind: "human" }] });
+      if (path.startsWith("/api/queue")) return Promise.reject(new Error("queue unavailable"));
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("queueStats")).toHaveTextContent("queue unavailable"));
+    expect(byId("queueRail").className).toContain("text-destructive");
+    expect(byId("presenceList")).toHaveTextContent("Ada");
+    expect(byId("presenceEmpty")).not.toHaveTextContent("Directory is admin");
+  });
+
+  it("shows a failed directory in the stop color", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve(ADMIN);
+      if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered"], apply_kinds: [] });
+      if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload([]));
+      if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: [] } });
+      if (path === "/api/presence") return Promise.reject(new Error("presence unavailable"));
+      if (path.startsWith("/api/queue")) return Promise.resolve({ items: [] });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("presenceEmpty")).toHaveTextContent("presence unavailable"));
+    expect(byId("presenceEmpty").className).toContain("text-destructive");
+    expect(byId("presenceEmpty")).not.toHaveTextContent("Directory is admin");
+  });
+
+  it("keeps a denied directory in the usual ink", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve(ADMIN);
+      if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered"], apply_kinds: [] });
+      if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload([]));
+      if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: [] } });
+      if (path === "/api/presence") return Promise.reject(new Error("admin, maintenance, or a track owner can read presence"));
+      if (path.startsWith("/api/queue")) return Promise.resolve({ items: [] });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("presenceEmpty")).toHaveTextContent("Directory is admin, maintenance, or track-owner only."));
+    expect(byId("presenceEmpty").className).not.toContain("text-destructive");
+  });
+
+  it("shows a failed heartbeat on the memory line", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve(ADMIN);
+      if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered"], apply_kinds: [] });
+      if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload([]));
+      if (path === "/api/presence/heartbeat") return Promise.reject(new Error("heartbeat unavailable"));
+      if (path === "/api/presence") return Promise.resolve({ users: [{ user_id: "ada", display_name: "Ada", status: "idle", kind: "human" }] });
+      if (path.startsWith("/api/queue")) return Promise.resolve({ items: [] });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("memoryEmpty")).toHaveTextContent("heartbeat unavailable"));
+    expect(byId("memoryEmpty").className).toContain("text-destructive");
+    expect(byId("presenceList")).toHaveTextContent("Ada");
+  });
+
   it("does not load the queue for a lane worker", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/whoami") return Promise.resolve({ actor: "scout", role: "discovery" });
