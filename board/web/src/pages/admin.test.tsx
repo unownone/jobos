@@ -95,8 +95,36 @@ describe("admin pages", () => {
     expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
     await waitFor(() => {
       expect(document.getElementById("rows")).toHaveTextContent("Ada");
-    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Last active")?.className).toContain("w-[18%]");
     });
+    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Last active")?.className).toContain("w-[18%]");
+  });
+
+  it("names a directory lane without an empty track", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/users") {
+        return Promise.resolve({
+          users: [
+            { user_id: "u1", display_name: "Ada", role: "admin", last_active: "Last active: just now" },
+            { user_id: "u2", display_name: "Bea", track: "discovery", role: "owner", last_seen: "2h ago" },
+          ],
+        });
+      }
+      if (path === "/api/presence/heartbeat") return Promise.resolve({});
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<UsersPage />);
+    await waitFor(() => {
+      expect(document.getElementById("rows")).toHaveTextContent("Ada");
+    });
+    const ada = [...document.querySelectorAll("#rows tr")].find((row) => row.textContent?.includes("Ada"));
+    expect(ada?.textContent).toContain("admin");
+    expect(ada?.textContent).not.toContain("/ admin");
+    expect(ada?.textContent).toContain("just now");
+    expect(ada?.textContent).not.toContain("Last active:");
+    const bea = [...document.querySelectorAll("#rows tr")].find((row) => row.textContent?.includes("Bea"));
+    expect(bea?.textContent).toContain("discovery / owner");
+    expect(bea?.textContent).toContain("2h ago");
     expect(apiMock).toHaveBeenCalledWith("/api/presence/heartbeat", {
       method: "POST",
       body: { status_hint: "logged_in" },

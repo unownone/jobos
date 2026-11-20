@@ -6,6 +6,20 @@ import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card
 import { Table, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
 
+function lane(track?: string, role?: string): string {
+  const left = track?.trim() ?? "";
+  const right = role?.trim() ?? "";
+  if (left && right) return `${left} / ${right}`;
+  return left || right;
+}
+
+function seenLabel(value?: string): string {
+  const text = value?.trim() ?? "";
+  const prefix = "Last active:";
+  if (text.toLowerCase().startsWith(prefix.toLowerCase())) return text.slice(prefix.length).trim();
+  return text;
+}
+
 type DirectoryUser = {
   user_id?: string;
   display_name?: string;
@@ -59,8 +73,8 @@ export function UsersPage() {
         <RecordDeck>
           {users.map((user) => {
             const name = user.display_name || user.user_id || "";
-            const track = `${user.track || ""} / ${user.role || ""}`;
-            const seen = user.last_active || user.last_seen || "";
+            const track = lane(user.track, user.role);
+            const seen = seenLabel(user.last_active || user.last_seen);
             return (
               <RecordCard key={user.user_id || user.display_name} title={name} subtitle={user.kind || ""}>
                 <RecordField label="Track" value={track} />
@@ -92,8 +106,8 @@ export function UsersPage() {
             <tbody id="rows">
               {users.map((user) => {
                 const name = user.display_name || user.user_id || "";
-                const track = `${user.track || ""} / ${user.role || ""}`;
-                const seen = user.last_active || user.last_seen || "";
+                const track = lane(user.track, user.role);
+                const seen = seenLabel(user.last_active || user.last_seen);
                 return (
                   <tr key={user.user_id || user.display_name} className="border-t border-border">
                     <Td title={name}>{name}</Td>
