@@ -212,6 +212,25 @@ type Skill struct {
 	UpdatedAt string          `json:"updated_at"`
 }
 
+type MCP struct {
+	AccountID  string          `json:"account_id"`
+	ID         string          `json:"id"`
+	Slug       string          `json:"slug"`
+	Name       string          `json:"name"`
+	Kind       string          `json:"kind"`
+	Status     string          `json:"status"`
+	Capability json.RawMessage `json:"capability"`
+	Roles      json.RawMessage `json:"roles"`
+	Platforms  json.RawMessage `json:"platforms"`
+	Source     string          `json:"source,omitempty"`
+	Install    string          `json:"install,omitempty"`
+	Auth       string          `json:"auth,omitempty"`
+	Notes      string          `json:"notes,omitempty"`
+	Origin     string          `json:"origin"`
+	CreatedAt  string          `json:"created_at"`
+	UpdatedAt  string          `json:"updated_at"`
+}
+
 type Recording struct {
 	ID          string `json:"id"`
 	AccountID   string `json:"account_id"`
@@ -324,6 +343,10 @@ type Store interface {
 	SaveSkill(ctx context.Context, s Skill) error
 	Skill(ctx context.Context, id string) (Skill, error)
 	ListSkills(ctx context.Context, accountID, scope, status, tag string) ([]Skill, error)
+
+	SaveMCP(ctx context.Context, item MCP) error
+	MCP(ctx context.Context, accountID, idOrSlug string) (MCP, error)
+	ListMCPs(ctx context.Context, accountID string) ([]MCP, error)
 
 	SaveRecording(ctx context.Context, r Recording) error
 	Recording(ctx context.Context, id string) (Recording, error)

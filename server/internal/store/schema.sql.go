@@ -175,6 +175,25 @@ CREATE TABLE IF NOT EXISTS skills (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mcps (
+    account_id TEXT NOT NULL,
+    id TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'mcp',
+    status TEXT NOT NULL DEFAULT 'adopted',
+    capability_json TEXT NOT NULL DEFAULT '[]',
+    roles_json TEXT NOT NULL DEFAULT '[]',
+    platforms_json TEXT NOT NULL DEFAULT '[]',
+    source TEXT NOT NULL DEFAULT '',
+    install TEXT NOT NULL DEFAULT '',
+    auth TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    origin TEXT NOT NULL DEFAULT 'github',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (account_id, id)
+);
 CREATE TABLE IF NOT EXISTS skill_recordings (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL,

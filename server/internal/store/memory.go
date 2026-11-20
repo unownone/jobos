@@ -25,6 +25,7 @@ type Memory struct {
 	memory     map[string]MemoryItem
 	messages   map[string]Message
 	skills     map[string]Skill
+	mcps       map[string]MCP
 	records    map[string]Recording
 	presence   map[string]Presence
 	burns      []Burn
@@ -51,6 +52,7 @@ func NewMemory() *Memory {
 		memory:     map[string]MemoryItem{},
 		messages:   map[string]Message{},
 		skills:     map[string]Skill{},
+		mcps:       map[string]MCP{},
 		records:    map[string]Recording{},
 		presence:   map[string]Presence{},
 		peers:      map[string]Peer{},
@@ -642,6 +644,39 @@ func (m *Memory) ListSkills(_ context.Context, accountID, scope, status, tag str
 			continue
 		}
 		out = append(out, s)
+	}
+	return out, nil
+}
+
+func (m *Memory) SaveMCP(_ context.Context, item MCP) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.mcps[item.AccountID+"\x00"+item.ID] = item
+	return nil
+}
+
+func (m *Memory) MCP(_ context.Context, accountID, idOrSlug string) (MCP, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, item := range m.mcps {
+		if item.AccountID != accountID && item.AccountID != "shared" {
+			continue
+		}
+		if item.ID == idOrSlug || item.Slug == idOrSlug {
+			return item, nil
+		}
+	}
+	return MCP{}, ErrNotFound
+}
+
+func (m *Memory) ListMCPs(_ context.Context, accountID string) ([]MCP, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []MCP
+	for _, item := range m.mcps {
+		if item.AccountID == accountID || item.AccountID == "shared" {
+			out = append(out, item)
+		}
 	}
 	return out, nil
 }

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -1158,6 +1160,15 @@ func (s *Server) createMemory(c *gin.Context) {
 		fail(c, 422, "kind and body are required")
 		return
 	}
+	if err := memoryAllowed(pod, body.Kind, body.Body); err != "" {
+		fail(c, 422, err)
+		return
+	}
+	existing, _ := s.DB.ListMemory(c.Request.Context(), p.AccountID, pod)
+	if memoryOverCap(existing, pod) {
+		fail(c, 429, "memory write cap reached for this pod")
+		return
+	}
 	item := store.MemoryItem{ID: newID("mem_"), AccountID: p.AccountID, Pod: pod, Kind: body.Kind, Body: body.Body, ContentHash: hash(body.Body), SolidifyStatus: "none", CreatedBy: p.UserID, CreatedAt: now(), UpdatedAt: now()}
 	if err := s.DB.SaveMemory(c.Request.Context(), item); err != nil {
 		fail(c, 500, err.Error())
@@ -1372,6 +1383,64 @@ func (s *Server) createSkill(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"skill": body})
 }
 
+func (s *Server) forkSkill(c *gin.Context) {
+	p := principalFrom(c)
+	src, err := s.DB.Skill(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		fail(c, 404, "skill not found")
+		return
+	}
+	fork := src
+	fork.ID = newID("skl_")
+	fork.AccountID = p.AccountID
+	fork.Scope = "local"
+	fork.OwnerID = p.UserID
+	fork.Status = "draft"
+	fork.Origin = "mutation"
+	fork.Version = src.Version + 1
+	fork.CreatedAt, fork.UpdatedAt = now(), now()
+	if err := s.DB.SaveSkill(c.Request.Context(), fork); err != nil {
+		fail(c, 500, err.Error())
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"skill": fork})
+}
+
+func (s *Server) listMCPs(c *gin.Context) {
+	p := principalFrom(c)
+	rows, err := s.DB.ListMCPs(c.Request.Context(), p.AccountID)
+	if err != nil {
+		fail(c, 500, err.Error())
+		return
+	}
+	status := c.Query("status")
+	kind := c.Query("kind")
+	var out []store.MCP
+	for _, item := range rows {
+		if status != "" && item.Status != status {
+			continue
+		}
+		if kind != "" && item.Kind != kind {
+			continue
+		}
+		out = append(out, item)
+	}
+	if out == nil {
+		out = []store.MCP{}
+	}
+	c.JSON(http.StatusOK, gin.H{"mcps": out, "count": len(out)})
+}
+
+func (s *Server) getMCP(c *gin.Context) {
+	p := principalFrom(c)
+	item, err := s.DB.MCP(c.Request.Context(), p.AccountID, c.Param("id"))
+	if err != nil {
+		fail(c, 404, "mcp not found")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"mcp": item})
+}
+
 func (s *Server) createRecording(c *gin.Context) {
 	p := principalFrom(c)
 	var body struct {
@@ -1456,6 +1525,66 @@ func (s *Server) seedSkills(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"seeded": n})
 }
 
+func memoryAllowed(pod, kind, body string) string {
+	podKind := pod
+	switch {
+	case strings.HasPrefix(pod, "worker:"):
+		podKind = "worker"
+	case strings.HasPrefix(pod, "track:"):
+		podKind = "track"
+	}
+	allowed := map[string]map[string]bool{
+		"worker": {"working_note": true, "reminder": true, "fact": true},
+		"track": {
+			"portal_quirk": true, "blocker": true, "tool_failure": true, "company_note": true,
+			"process_note": true, "person_hint": true, "search_coverage": true,
+		},
+		"common": {
+			"process_note": true, "tool_failure": true, "catalog_note": true,
+			"candidate_constraint": true, "hub_note": true,
+		},
+	}
+	if !allowed[podKind][kind] {
+		return "kind is not allowed in this pod"
+	}
+	if len(body) > 800 {
+		return "body is too long"
+	}
+	min := 40
+	if kind == "working_note" || kind == "reminder" {
+		min = 24
+	}
+	if len(strings.TrimSpace(body)) < min {
+		return "body is too short"
+	}
+	lower := strings.ToLower(body)
+	for _, prefix := range []string{"jh_agt_", "jh_own_", "jh_inv_", "jh_boot_"} {
+		if strings.Contains(lower, prefix) {
+			return "memory must not contain secrets"
+		}
+	}
+	return ""
+}
+
+func memoryOverCap(items []store.MemoryItem, pod string) bool {
+	capN := 6
+	switch {
+	case strings.HasPrefix(pod, "track:"):
+		capN = 3
+	case pod == "common":
+		capN = 2
+	}
+	cutoff := time.Now().UTC().Add(-15 * time.Minute)
+	n := 0
+	for _, item := range items {
+		stamp, err := time.Parse(time.RFC3339, item.CreatedAt)
+		if err == nil && stamp.After(cutoff) {
+			n++
+		}
+	}
+	return n >= capN
+}
+
 func (s *Server) Seed(ctx context.Context) int {
 	type row struct{ slug, name, role, tag, body string }
 	rows := []row{
@@ -1473,6 +1602,51 @@ func (s *Server) Seed(ctx context.Context) int {
 		}
 		sk := store.Skill{ID: id, AccountID: "shared", Slug: row.slug, Name: row.name, Kind: "skill", Role: row.role, Tags: mustJSON([]string{row.tag}), Scope: "shared", Status: "approved", Body: row.body, Origin: "github", Version: 1, CreatedAt: now(), UpdatedAt: now()}
 		if err := s.DB.SaveSkill(ctx, sk); err == nil {
+			n++
+		}
+	}
+	n += s.seedMCPs(ctx)
+	return n
+}
+
+func (s *Server) seedMCPs(ctx context.Context) int {
+	type spec struct{ slug, kind, source string }
+	var specs []spec
+	if s.Cfg.RepoRoot != "" {
+		raw, err := os.ReadFile(filepath.Join(s.Cfg.RepoRoot, "mcp", "mcp.example.json"))
+		if err == nil {
+			var doc struct {
+				Servers map[string]struct {
+					Type string `json:"type"`
+					URL  string `json:"url"`
+				} `json:"mcpServers"`
+			}
+			if json.Unmarshal(raw, &doc) == nil {
+				for slug, cfg := range doc.Servers {
+					kind := "mcp"
+					if cfg.Type != "" {
+						kind = cfg.Type
+					}
+					specs = append(specs, spec{slug: slug, kind: kind, source: cfg.URL})
+				}
+			}
+		}
+	}
+	if len(specs) == 0 {
+		specs = []spec{{slug: "gmail", kind: "http", source: "https://gmailmcp.googleapis.com/mcp/v1"}, {slug: "indeed", kind: "http", source: "https://mcp.indeed.com/claude/mcp"}}
+	}
+	n := 0
+	for _, spec := range specs {
+		id := "mcp_" + spec.slug
+		if _, err := s.DB.MCP(ctx, "shared", id); err == nil {
+			continue
+		}
+		item := store.MCP{
+			AccountID: "shared", ID: id, Slug: spec.slug, Name: spec.slug, Kind: spec.kind, Status: "adopted",
+			Capability: []byte("[]"), Roles: []byte("[]"), Platforms: []byte("[]"), Source: spec.source,
+			Origin: "github", CreatedAt: now(), UpdatedAt: now(),
+		}
+		if err := s.DB.SaveMCP(ctx, item); err == nil {
 			n++
 		}
 	}

@@ -1,12 +1,15 @@
 package httpapi
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +26,7 @@ import (
 func testServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	srv := New(config.Config{}, store.NewMemory(), blob.NewMemory(), cache.NewMemory(), realtime.New())
-	if n := srv.Seed(context.Background()); n != 5 {
+	if n := srv.Seed(context.Background()); n < 5 {
 		t.Fatalf("seeded %d", n)
 	}
 	return httptest.NewServer(srv.Router())
@@ -176,6 +179,67 @@ func send(t *testing.T, client *http.Client, method, url, ctype, body, csrf stri
 		t.Fatal(err)
 	}
 	return res
+}
+
+func TestPackMCPAndMemoryCaps(t *testing.T) {
+	srv := New(config.Config{}, store.NewMemory(), blob.NewMemory(), cache.NewMemory(), realtime.New())
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.Cfg.RepoRoot = root
+	if n := srv.Seed(context.Background()); n < 5 {
+		t.Fatalf("seeded %d", n)
+	}
+	ts := httptest.NewServer(srv.Router())
+	defer ts.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"ada","password":"long-enough"}`, "")
+	csrf := res.Header.Get("X-CSRF")
+	res.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\ntitles:\n  - Engineer\n", csrf)
+	if res.StatusCode != 200 {
+		t.Fatalf("candidate %s", readBody(res))
+	}
+	res.Body.Close()
+
+	res = send(t, client, http.MethodGet, ts.URL+"/api/packs/current/skills.zip", "", "", csrf)
+	raw, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("zip %d %s", res.StatusCode, raw)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil || len(zr.File) == 0 {
+		t.Fatalf("zip open %v files=%d", err, len(zr.File))
+	}
+
+	res, err = client.Get(ts.URL + "/api/registry/mcps")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var listed struct {
+		Count int `json:"count"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&listed); err != nil || listed.Count < 1 {
+		t.Fatalf("mcps %d %v", res.StatusCode, err)
+	}
+	res.Body.Close()
+
+	note := `{"pod":"worker","kind":"working_note","body":"Greenhouse times out after the second page."}`
+	for i := 0; i < 6; i++ {
+		res = postJSON(t, client, ts.URL+"/api/memory/items", note, csrf)
+		if res.StatusCode != 201 {
+			t.Fatalf("memory %d %s", res.StatusCode, readBody(res))
+		}
+		res.Body.Close()
+	}
+	res = postJSON(t, client, ts.URL+"/api/memory/items", note, csrf)
+	if res.StatusCode != 429 {
+		t.Fatalf("cap status %d %s", res.StatusCode, readBody(res))
+	}
+	res.Body.Close()
 }
 
 func readBody(res *http.Response) string {

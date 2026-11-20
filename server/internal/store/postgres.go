@@ -811,6 +811,54 @@ func (p *Postgres) ListSkills(ctx context.Context, accountID, scope, status, tag
 	return out, rows.Err()
 }
 
+func (p *Postgres) SaveMCP(ctx context.Context, item MCP) error {
+	_, err := p.pool.Exec(ctx, `
+		INSERT INTO mcps (account_id, id, slug, name, kind, status, capability_json, roles_json, platforms_json, source, install, auth, notes, origin, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+		ON CONFLICT (account_id, id) DO UPDATE SET
+			name=EXCLUDED.name, kind=EXCLUDED.kind, status=EXCLUDED.status, capability_json=EXCLUDED.capability_json,
+			roles_json=EXCLUDED.roles_json, platforms_json=EXCLUDED.platforms_json, source=EXCLUDED.source,
+			install=EXCLUDED.install, auth=EXCLUDED.auth, notes=EXCLUDED.notes, updated_at=EXCLUDED.updated_at`,
+		item.AccountID, item.ID, item.Slug, item.Name, item.Kind, item.Status, rawOr(item.Capability, "[]"), rawOr(item.Roles, "[]"),
+		rawOr(item.Platforms, "[]"), item.Source, item.Install, item.Auth, item.Notes, item.Origin, item.CreatedAt, item.UpdatedAt)
+	return err
+}
+
+func scanMCP(row pgx.Row) (MCP, error) {
+	var item MCP
+	var capability, roles, platforms string
+	err := row.Scan(&item.AccountID, &item.ID, &item.Slug, &item.Name, &item.Kind, &item.Status, &capability, &roles, &platforms, &item.Source, &item.Install, &item.Auth, &item.Notes, &item.Origin, &item.CreatedAt, &item.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return MCP{}, ErrNotFound
+	}
+	item.Capability, item.Roles, item.Platforms = []byte(capability), []byte(roles), []byte(platforms)
+	return item, err
+}
+
+const mcpSelect = `SELECT account_id, id, slug, name, kind, status, capability_json, roles_json, platforms_json, source, install, auth, notes, origin, created_at, updated_at FROM mcps`
+
+func (p *Postgres) MCP(ctx context.Context, accountID, idOrSlug string) (MCP, error) {
+	item, err := scanMCP(p.pool.QueryRow(ctx, mcpSelect+` WHERE (account_id=$1 OR account_id='shared') AND (id=$2 OR slug=$2) LIMIT 1`, accountID, idOrSlug))
+	return item, err
+}
+
+func (p *Postgres) ListMCPs(ctx context.Context, accountID string) ([]MCP, error) {
+	rows, err := p.pool.Query(ctx, mcpSelect+` WHERE account_id=$1 OR account_id='shared'`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MCP
+	for rows.Next() {
+		item, err := scanMCP(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
 func (p *Postgres) SaveRecording(ctx context.Context, r Recording) error {
 	_, err := p.pool.Exec(ctx, `
 		INSERT INTO skill_recordings (id, account_id, skill_id, submitter_user_id, origin, body, status, proctor_note, created_at)
