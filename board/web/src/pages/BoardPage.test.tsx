@@ -125,7 +125,7 @@ function listPayload(jobs: unknown[], matched = jobs.length === 0 ? 0 : 2) {
   };
 }
 
-function mockBoard(jobs: unknown[] = [JOB], presence: unknown[] = []) {
+function mockBoard(jobs: unknown[] = [JOB], presence: unknown[] = [], memories: unknown[] = []) {
   apiMock.mockImplementation((path: string, opts?: { method?: string; body?: unknown }) => {
     if (path === "/api/whoami") return Promise.resolve(ADMIN);
     if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered", "rejected"], apply_kinds: ["ats"] });
@@ -135,7 +135,7 @@ function mockBoard(jobs: unknown[] = [JOB], presence: unknown[] = []) {
     if (path === "/api/jobs/1/pause" || path === "/api/jobs/1/stop" || path === "/api/jobs/1/resume") return Promise.resolve({});
     if (path === "/api/jobs/1") return Promise.resolve({ job: jobs[0] ?? JOB });
     if (path.startsWith("/api/events")) return Promise.resolve({ events: [] });
-    if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: [] } });
+    if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: memories } });
     if (path === "/api/presence") return Promise.resolve({ users: presence });
     if (path.startsWith("/api/queue")) return Promise.resolve({ items: [{ kind: "apply", status: "ready" }] });
     return Promise.reject(new Error(`unexpected ${path} ${opts?.method ?? "GET"}`));
@@ -209,6 +209,14 @@ describe("BoardPage", () => {
     await waitFor(() => expect(byId("f_company")).toHaveValue("TicketCo"));
   });
 
+  it("shows a stored fact as a card", async () => {
+    mockBoard([JOB], [], [{ pod_scope: "track", kind: "fact", title: "Portal", body: "Use the public board." }]);
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("memoryList")).toHaveTextContent("Portal"));
+    expect(byId("memoryList").querySelector("[data-slot='card']")).toBeTruthy();
+    expect(byId("memoryList")).toHaveTextContent("Use the public board.");
+  });
+
   it("opens a ticket from the list and saves the allowed fields", async () => {
     mockBoard();
     render(<BoardPage />);
@@ -239,6 +247,7 @@ describe("BoardPage", () => {
     expect(byId("side").querySelector("p")?.textContent).toBe(JOB.id);
     expect(byId("list").querySelector("table")?.className).toContain("table-fixed");
     expect(byId("list").querySelector("table")?.className).toContain("max-[720px]:hidden");
+    expect(byId("list").querySelector("th")?.className).toContain("font-medium");
     expect(byId("list").querySelector("[data-slot='record-deck']")?.textContent).toContain("TicketCo");
     expect([...byId("list").querySelectorAll("th")].find((header) => header.textContent === "Score")?.className).toContain("max-[959px]:hidden");
     expect([...byId("list").querySelectorAll("th")].find((header) => header.textContent === "Posted")?.className).toContain("w-[16%]");

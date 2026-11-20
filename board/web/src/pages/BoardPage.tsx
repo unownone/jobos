@@ -6,7 +6,7 @@ import type { ShellConn } from "@/components/shell/TopBar";
 import { Badge } from "@/components/ui/badge";
 import { Field } from "@/components/ui/field";
 import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
-import { Table } from "@/components/ui/table";
+import { Table, Td, Th } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -616,53 +616,41 @@ export function BoardPage() {
             animate={pane === "presence" ? panel.animate : { opacity: 1 }}
             transition={transition}
             className={cn(
-              "w-56 shrink-0 overflow-y-auto border-r border-border p-3 max-[959px]:w-full max-[959px]:border-r-0",
+              "w-56 min-w-0 max-w-56 shrink-0 overflow-y-auto border-r border-border p-3 max-[959px]:w-full max-[959px]:max-w-none max-[959px]:border-r-0",
               stageScrolls ? "min-h-[8rem]" : "min-h-0",
               pane === "jobs" && "max-[959px]:hidden",
             )}
           >
             <h2 className="mt-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Presence</h2>
             <p id="presenceEmpty" hidden={presence.length > 0} className="text-sm text-muted-foreground">{presenceNote}</p>
-            <div id="presenceList" className="flex flex-col gap-1">
+            <div id="presenceList" className="flex flex-col gap-2">
               {presence.map((user) => {
                 const name = user.display_name || user.user_id || "";
                 const lane = [user.status, user.kind, user.track || user.role].filter(Boolean).join(" · ");
                 const jobId = user.current_task?.job_id || "";
-                const body = (
-                  <>
-                    <div className="font-medium break-words">{name}</div>
-                    <div className="break-words text-muted-foreground">{lane}</div>
-                    {jobId ? <div className="break-all text-muted-foreground">{jobId}</div> : null}
-                  </>
-                );
-                if (!jobId) {
-                  return (
-                    <div key={user.user_id || name} className="py-1 text-sm">
-                      {body}
-                    </div>
-                  );
-                }
                 return (
-                  <button
+                  <RecordCard
                     key={user.user_id || name}
-                    type="button"
-                    className="min-h-11 py-1 text-left text-sm"
-                    onClick={() => void openJob(jobId)}
+                    title={name || "Worker"}
+                    subtitle={lane}
+                    onClick={jobId ? () => void openJob(jobId) : undefined}
                   >
-                    {body}
-                  </button>
+                    {jobId ? <RecordField label="Job" value={jobId} /> : null}
+                  </RecordCard>
                 );
               })}
             </div>
             <h2 className="font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Memory</h2>
             <p id="memoryEmpty" hidden={memories.length > 0} className="text-sm text-muted-foreground">{memoryNote}</p>
-            <div id="memoryList">
+            <div id="memoryList" className="mt-2 flex flex-col gap-2">
               {memories.map((item) => (
-                <div key={`${item.pod_scope ?? ""}-${item.title ?? ""}`} className="py-1 text-sm">
-                  <div className="text-muted-foreground">{item.pod_scope} · {item.kind}</div>
-                  <div className="font-medium">{item.title}</div>
-                  <div className="break-words text-muted-foreground">{item.body}</div>
-                </div>
+                <RecordCard
+                  key={`${item.pod_scope ?? ""}-${item.title ?? ""}`}
+                  title={item.title || "Memory"}
+                  subtitle={item.body || ""}
+                >
+                  <RecordField label="Pod" value={[item.pod_scope, item.kind].filter(Boolean).join(" · ")} />
+                </RecordCard>
               ))}
             </div>
           </motion.aside>
@@ -673,7 +661,7 @@ export function BoardPage() {
             animate={pane === "jobs" ? panel.animate : { opacity: 1 }}
             transition={transition}
             className={cn(
-              "min-w-0 flex-1 overflow-y-auto",
+              "min-w-0 flex-1 overflow-y-auto @container",
               stageScrolls ? "min-h-[8rem]" : "min-h-0",
               pane === "presence" && "max-[959px]:hidden",
             )}
@@ -700,32 +688,32 @@ export function BoardPage() {
                   </RecordCard>
                 ))}
               </RecordDeck>
-              <Table className="max-[720px]:hidden">
+              <Table className="max-[720px]:hidden min-[960px]:@max-[36rem]:[&_th]:px-1.5 min-[960px]:@max-[36rem]:[&_td]:px-1.5">
                 <thead className="sticky top-0 z-10 bg-card">
                   <tr>
-                    <th className="w-[20%] px-3 py-2 max-[959px]:w-[38%]">Company</th>
-                    <th className="w-[26%] px-3 py-2 max-[959px]:w-[40%]">Title</th>
-                    <th className="w-[14%] px-3 py-2 max-[959px]:w-[22%]">Status</th>
-                    <th className="w-[8%] px-3 py-2 max-[959px]:hidden">Score</th>
-                    <th className="w-[8%] px-3 py-2 max-[959px]:hidden">Pay</th>
-                    <th className="w-[16%] px-3 py-2 max-[959px]:hidden">Posted</th>
-                    <th className="w-[8%] px-3 py-2 max-[959px]:hidden">Claim</th>
+                    <Th className="w-[20%] min-[960px]:@max-[36rem]:w-[24%] max-[959px]:w-[38%]">Company</Th>
+                    <Th className="w-[26%] min-[960px]:@max-[36rem]:w-[24%] max-[959px]:w-[40%]">Title</Th>
+                    <Th className="w-[14%] min-[960px]:@max-[36rem]:w-[26%] max-[959px]:w-[22%]">Status</Th>
+                    <Th className="w-[8%] max-[959px]:hidden @max-[36rem]:hidden">Score</Th>
+                    <Th className="w-[8%] max-[959px]:hidden @max-[36rem]:hidden">Pay</Th>
+                    <Th className="w-[16%] min-[960px]:@max-[36rem]:w-[26%] max-[959px]:hidden">Posted</Th>
+                    <Th className="w-[8%] max-[959px]:hidden @max-[36rem]:hidden">Claim</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {jobs.map((job) => (
                     <tr key={job.id} data-id={job.id} className="cursor-pointer border-t border-border" onClick={() => void openJob(job.id)}>
-                      <td className="truncate px-3 py-2" title={job.company}>{job.company}</td>
-                      <td className="break-words px-3 py-2" title={job.title}>{job.title}</td>
-                      <td className="px-3 py-2">
-                        <Badge variant="outline" className="max-w-full truncate border-dashed border-current">
+                      <Td truncate={false} className="break-words" title={job.company}>{job.company}</Td>
+                      <Td truncate={false} className="break-words" title={job.title}>{job.title}</Td>
+                      <Td truncate={false}>
+                        <Badge variant="outline" className="max-w-full border-dashed border-current">
                           {job.stopped ? "stopped" : job.status}
                         </Badge>
-                      </td>
-                      <td className="px-3 py-2 max-[959px]:hidden">{job.score ?? ""}</td>
-                      <td className="truncate px-3 py-2 max-[959px]:hidden" title={job.pay || ""}>{job.pay || "—"}</td>
-                      <td className="truncate px-3 py-2 max-[959px]:hidden">{dayLabel(job.posted_at) || dayLabel(job.created_at)}</td>
-                      <td className="truncate px-3 py-2 max-[959px]:hidden">{job.claim?.claimed_by || job.claim?.kind || ""}</td>
+                      </Td>
+                      <Td truncate={false} className="max-[959px]:hidden @max-[36rem]:hidden">{job.score ?? ""}</Td>
+                      <Td truncate={false} className="max-[959px]:hidden @max-[36rem]:hidden" title={job.pay || ""}>{job.pay || "—"}</Td>
+                      <Td truncate={false} className="max-[959px]:hidden whitespace-nowrap">{dayLabel(job.posted_at) || dayLabel(job.created_at)}</Td>
+                      <Td truncate={false} className="max-[959px]:hidden @max-[36rem]:hidden">{job.claim?.claimed_by || job.claim?.kind || ""}</Td>
                     </tr>
                   ))}
                 </tbody>
