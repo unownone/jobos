@@ -205,9 +205,23 @@ describe("HomePage", () => {
     expect(byId("kpiOldestDays")).toHaveTextContent("—");
     expect(byId("agentWorking")).toHaveTextContent("0");
     expect(byId("oldestBody")).toHaveTextContent("Pipeline is empty");
+    expect(byId("oldestBody").querySelector("p")?.className).not.toContain("text-destructive");
     expect(byId("oldestBody")).not.toHaveTextContent("TicketCo");
     const legend = [...byId("funnelLegend").querySelectorAll("li")].map((item) => item.textContent?.replace(/\s+/g, " ").trim());
     expect(legend).toEqual(["Found 0", "Applied 0", "Outreached 0"]);
+  });
+
+  it("shows a failed dashboard in the stop color", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve({ display_name: "Ada", kind: "admin" });
+      if (path === "/api/dashboard") return Promise.reject(new Error("dashboard unavailable"));
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<HomePage />);
+    await waitFor(() => expect(byId("oldestBody")).toHaveTextContent("dashboard unavailable"));
+    expect(byId("oldestBody").querySelector("p")?.className).toContain("text-destructive");
+    expect(byId("whoLabel")).toHaveTextContent("Ada · admin");
+    expect(byId("connLabel")).toHaveTextContent("signed in");
   });
 
   it("says found rows are not open when none can age", async () => {

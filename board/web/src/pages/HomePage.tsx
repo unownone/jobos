@@ -167,9 +167,11 @@ export function HomePage() {
     let cancelled = false;
 
     async function load() {
+      let signedIn = false;
       try {
         const me = await api<Whoami>("/api/whoami");
         if (cancelled) return;
+        signedIn = true;
         setWho(formatWho(me));
         setConn("signed in");
         const data = await api<Dashboard>("/api/dashboard");
@@ -179,7 +181,7 @@ export function HomePage() {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : "Could not load the dashboard";
         if (message.includes("unauthorized")) return;
-        setConn("sign in required");
+        if (!signedIn) setConn("sign in required");
         setLoadError(message);
       }
     }
@@ -291,7 +293,7 @@ export function HomePage() {
           <Card className="border-l-[3px] border-l-primary p-4">
             <div id="oldestBody">
               {loadError ? (
-                <p className="m-0 text-muted-foreground">{loadError}</p>
+                <p className="m-0 text-destructive">{loadError}</p>
               ) : !dashboard ? (
                 <p className="m-0 text-muted-foreground">Loading pipeline…</p>
               ) : !dashboard.oldest_in_pipeline ? (

@@ -261,6 +261,7 @@ describe("BoardPage", () => {
     expect(byId("whoLabel")).toHaveTextContent("Ada · owner");
     expect(byId("connLabel")).toHaveTextContent("signed in");
     expect(byId("stats")).toHaveTextContent("1 shown · 2 match · 4 total · admin");
+    expect(byId("stats").className).not.toContain("text-destructive");
     expect(byId("pageLabel")).toHaveTextContent("Page 1 of 1");
     const jobsCall = apiMock.mock.calls.find((call) => String(call[0]).startsWith("/api/jobs?"));
     expect(String(jobsCall?.[0])).toBe("/api/jobs?limit=25&offset=0");
@@ -544,6 +545,21 @@ describe("BoardPage", () => {
         body: { status_hint: "working", task_id: "1", task_kind: "job", job_id: "1" },
       });
     });
+  });
+
+  it("shows a failed job list in the stop color", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve(ADMIN);
+      if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered"], apply_kinds: [] });
+      if (path.startsWith("/api/jobs?")) return Promise.reject(new Error("job list unavailable"));
+      if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: [] } });
+      if (path === "/api/presence") return Promise.resolve({ users: [] });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("stats")).toHaveTextContent("job list unavailable"));
+    expect(byId("stats").className).toContain("text-destructive");
+    expect(byId("list")).toHaveTextContent("No jobs on this page.");
   });
 
   it("does not load the queue for a lane worker", async () => {

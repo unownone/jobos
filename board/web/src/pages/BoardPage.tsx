@@ -198,6 +198,7 @@ export function BoardPage() {
   const [meta, setMeta] = useState<ListMeta>(EMPTY_META);
   const [loaded, setLoaded] = useState(false);
   const [statsText, setStatsText] = useState("0 shown · 0 total · not connected");
+  const [statsFailed, setStatsFailed] = useState(false);
   const [offset, setOffset] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [selected, setSelected] = useState<Job | null>(null);
@@ -298,7 +299,10 @@ export function BoardPage() {
         const message = error instanceof Error ? error.message : "";
         if (message.includes("unauthorized")) return;
         setConn("sign in required");
-        if (message) setStatsText(message);
+        if (message) {
+          setStatsText(message);
+          setStatsFailed(true);
+        }
       }
     }
     void boot();
@@ -342,12 +346,14 @@ export function BoardPage() {
       setJobs(data.jobs ?? []);
       setMeta({ count, total, matched, limit, offset: nextOffset, role: data.role ?? "" });
       setStatsText(`${count} shown · ${matched} match · ${total} total · ${data.role ?? ""}`);
+      setStatsFailed(false);
       setLoaded(true);
     }
     void loadJobs().catch((error: unknown) => {
       if (cancelled) return;
       setLoaded(true);
       setStatsText(error instanceof Error ? error.message : "Could not load jobs");
+      setStatsFailed(true);
     });
     return () => {
       cancelled = true;
@@ -605,7 +611,7 @@ export function BoardPage() {
             >
               Filters
             </Button>
-            <span id="stats" className="text-sm text-muted-foreground">{statsText}</span>
+            <span id="stats" className={cn("text-sm", statsFailed ? "text-destructive" : "text-muted-foreground")}>{statsText}</span>
           </div>
         </div>
         <div
