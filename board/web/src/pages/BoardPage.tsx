@@ -203,6 +203,7 @@ export function BoardPage() {
   const [pageSize, setPageSize] = useState(25);
   const [selected, setSelected] = useState<Job | null>(null);
   const [events, setEvents] = useState<JobEvent[]>([]);
+  const [eventsError, setEventsError] = useState("");
   const [packets, setPackets] = useState<Packets>(EMPTY_PACKETS);
   const [sourceText, setSourceText] = useState("");
   const [sideErr, setSideErr] = useState("");
@@ -427,6 +428,7 @@ export function BoardPage() {
   function closeTicket() {
     setSelected(null);
     setEvents([]);
+    setEventsError("");
     note("");
   }
 
@@ -444,14 +446,14 @@ export function BoardPage() {
   async function openJob(id: string) {
     note("");
     const detail = await api<{ job: Job }>(`/api/jobs/${encodeURIComponent(id)}`);
-    let nextEvents: JobEvent[] = [];
     try {
       const payload = await api<{ events?: JobEvent[] }>(`/api/events?job_id=${encodeURIComponent(id)}&limit=30`);
-      nextEvents = payload.events ?? [];
-    } catch {
-      nextEvents = [];
+      setEvents(payload.events ?? []);
+      setEventsError("");
+    } catch (error) {
+      setEvents([]);
+      setEventsError(error instanceof Error ? error.message : "Could not load events");
     }
-    setEvents(nextEvents);
     showJob(detail.job);
   }
 
@@ -881,7 +883,9 @@ export function BoardPage() {
                 </div>
                 <div>
                   <h2 className="font-display text-[1.2rem] leading-none font-extrabold [font-family:var(--font-display)]">Events</h2>
-                  {events.length === 0 ? <p className="text-sm text-muted-foreground">No events</p> : events.map((event) => (
+                  {eventsError ? (
+                    <p id="eventsErr" className="text-sm text-destructive">{eventsError}</p>
+                  ) : events.length === 0 ? <p className="text-sm text-muted-foreground">No events</p> : events.map((event) => (
                     <p key={`${event.ts ?? ""}-${event.action ?? ""}`} className="text-sm">
                       {event.ts} · {event.actor_role} · {event.action}
                       {event.from_status ? ` · ${event.from_status} → ${event.to_status || ""}` : ""}

@@ -547,6 +547,27 @@ describe("BoardPage", () => {
     });
   });
 
+  it("shows a failed event list instead of an empty one", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve(ADMIN);
+      if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered"], apply_kinds: [] });
+      if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload([JOB]));
+      if (path === "/api/jobs/1") return Promise.resolve({ job: JOB });
+      if (path.startsWith("/api/events")) return Promise.reject(new Error("events unavailable"));
+      if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: [] } });
+      if (path === "/api/presence") return Promise.resolve({ users: [] });
+      if (path.startsWith("/api/queue")) return Promise.resolve({ items: [] });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("list")).toHaveTextContent("TicketCo"));
+    fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
+    await waitFor(() => expect(byId("eventsErr")).toHaveTextContent("events unavailable"));
+    expect(byId("eventsErr").className).toContain("text-destructive");
+    expect(byId("f_company")).toHaveValue("TicketCo");
+    expect(byId("side")).not.toHaveTextContent("No events");
+  });
+
   it("shows a failed job list in the stop color", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/whoami") return Promise.resolve(ADMIN);
