@@ -126,19 +126,35 @@ function listPayload(jobs: unknown[], matched = jobs.length === 0 ? 0 : 2) {
 }
 
 function mockBoard(
-  jobs: unknown[] = [JOB],
+  jobs: Array<typeof JOB> = [JOB],
   presence: unknown[] = [],
   memories: unknown[] = [],
   who: Record<string, unknown> = ADMIN,
 ) {
+  const rows = jobs.map((job) => ({ ...job }));
   apiMock.mockImplementation((path: string, opts?: { method?: string; body?: unknown }) => {
+    const row = rows.find((job) => job.id === "1") ?? rows[0];
     if (path === "/api/whoami") return Promise.resolve(who);
-    if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered", "rejected"], apply_kinds: ["ats"] });
-    if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload(jobs));
+    if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered", "rejected", "closed_withdrawn"], apply_kinds: ["ats"] });
+    if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload(rows));
     if (path === "/api/jobs/1" && opts?.method === "PATCH") return Promise.resolve({});
     if (path === "/api/jobs/1" && opts?.method === "DELETE") return Promise.resolve({});
-    if (path === "/api/jobs/1/pause" || path === "/api/jobs/1/stop" || path === "/api/jobs/1/resume") return Promise.resolve({});
-    if (path === "/api/jobs/1") return Promise.resolve({ job: jobs[0] ?? JOB });
+    if (path === "/api/jobs/1/pause") {
+      if (row) row.stopped = true;
+      return Promise.resolve({ job: row });
+    }
+    if (path === "/api/jobs/1/stop") {
+      if (row) {
+        row.stopped = true;
+        row.status = "closed_withdrawn";
+      }
+      return Promise.resolve({ job: row });
+    }
+    if (path === "/api/jobs/1/resume") {
+      if (row) row.stopped = false;
+      return Promise.resolve({ job: row });
+    }
+    if (path === "/api/jobs/1") return Promise.resolve({ job: row ?? JOB });
     if (path.startsWith("/api/events")) return Promise.resolve({ events: [] });
     if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: memories } });
     if (path === "/api/presence") return Promise.resolve({ users: presence });
@@ -398,21 +414,14 @@ describe("BoardPage", () => {
     expect(document.querySelector("aside#side")).not.toBeInTheDocument();
   });
 
-  it("posts pause, stop, and delete with the live prompts", async () => {
+  it("stops and deletes from the open ticket, then leaves pause frozen", async () => {
     mockBoard();
     render(<BoardPage />);
     await waitFor(() => expect(byId("list")).toHaveTextContent("TicketCo"));
     fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
     await waitFor(() => expect(byId("pauseBtn")).toBeEnabled());
 
-    const prompt = vi.spyOn(window, "prompt").mockReturnValue("hold");
-    fireEvent.click(byId("pauseBtn"));
-    await waitFor(() => {
-      expect(apiMock).toHaveBeenCalledWith("/api/jobs/1/pause", { method: "POST", body: { reason: "hold" } });
-    });
-    expect(prompt).toHaveBeenCalledWith("Pause reason (required). Status stays; lanes cannot patch until Resume.");
-
-    prompt.mockReturnValue("");
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue("");
     fireEvent.click(byId("stopBtn"));
     expect(prompt).toHaveBeenCalledWith("Stop reason (required). Sets closed_withdrawn and freezes the row.");
     expect(apiMock.mock.calls.some((call) => call[0] === "/api/jobs/1/stop")).toBe(false);
@@ -422,6 +431,16 @@ describe("BoardPage", () => {
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/api/jobs/1/stop", { method: "POST", body: { reason: "done" } });
     });
+    await waitFor(() => {
+      expect(byId("pauseBtn")).toBeDisabled();
+      expect(byId("f_status")).toHaveValue("closed_withdrawn");
+      expect(byId("sideErr")).toHaveTextContent("Stopped.");
+    });
+    expect(byId("list")).toHaveTextContent("closed_withdrawn · stopped");
+
+    prompt.mockReturnValue("hold");
+    fireEvent.click(byId("pauseBtn"));
+    expect(apiMock.mock.calls.some((call) => call[0] === "/api/jobs/1/pause")).toBe(false);
 
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     fireEvent.click(byId("delBtn"));
@@ -448,6 +467,33 @@ describe("BoardPage", () => {
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/api/jobs/1/resume", { method: "POST" });
     });
+    await waitFor(() => {
+      expect(byId("pauseBtn")).toBeEnabled();
+      expect(byId("resumeBtn")).toBeDisabled();
+      expect(byId("sideErr")).toHaveTextContent("Resumed.");
+    });
+    expect(byId("list")).not.toHaveTextContent("· stopped");
+  });
+
+  it("freezes the open ticket after pause", async () => {
+    mockBoard();
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("list")).toHaveTextContent("TicketCo"));
+    fireEvent.click(document.querySelector("#list tbody tr") as HTMLElement);
+    await waitFor(() => expect(byId("pauseBtn")).toBeEnabled());
+    vi.spyOn(window, "prompt").mockReturnValue("hold");
+    fireEvent.click(byId("pauseBtn"));
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith("/api/jobs/1/pause", { method: "POST", body: { reason: "hold" } });
+    });
+    await waitFor(() => {
+      expect(byId("pauseBtn")).toBeDisabled();
+      expect(byId("stopBtn")).toBeDisabled();
+      expect(byId("resumeBtn")).toBeEnabled();
+      expect(byId("sideErr")).toHaveTextContent("Paused.");
+    });
+    expect(byId("list")).toHaveTextContent("discovered · stopped");
+    expect(byId("f_status")).toHaveValue("discovered");
   });
 
   it("heartbeats logged in, then working on the open job, and loads the queue for an admin", async () => {

@@ -466,13 +466,20 @@ export function BoardPage() {
     }
   }
 
+  async function settleLane(id: string, message: string) {
+    await openJob(id);
+    setSideErr(message);
+    setReloadKey((key) => key + 1);
+  }
+
   async function pauseJob() {
     if (!selected) return;
+    const id = selected.id;
     const reason = window.prompt("Pause reason (required). Status stays; lanes cannot patch until Resume.");
     if (!reason) return;
     try {
-      await api(`/api/jobs/${encodeURIComponent(selected.id)}/pause`, { method: "POST", body: { reason } });
-      setReloadKey((key) => key + 1);
+      await api(`/api/jobs/${encodeURIComponent(id)}/pause`, { method: "POST", body: { reason } });
+      await settleLane(id, "Paused.");
     } catch (error) {
       setSideErr(error instanceof Error ? error.message : "Could not pause");
     }
@@ -480,11 +487,12 @@ export function BoardPage() {
 
   async function stopJob() {
     if (!selected) return;
+    const id = selected.id;
     const reason = window.prompt("Stop reason (required). Sets closed_withdrawn and freezes the row.");
     if (!reason) return;
     try {
-      await api(`/api/jobs/${encodeURIComponent(selected.id)}/stop`, { method: "POST", body: { reason } });
-      setReloadKey((key) => key + 1);
+      await api(`/api/jobs/${encodeURIComponent(id)}/stop`, { method: "POST", body: { reason } });
+      await settleLane(id, "Stopped.");
     } catch (error) {
       setSideErr(error instanceof Error ? error.message : "Could not stop");
     }
@@ -492,9 +500,10 @@ export function BoardPage() {
 
   async function resumeJob() {
     if (!selected) return;
+    const id = selected.id;
     try {
-      await api(`/api/jobs/${encodeURIComponent(selected.id)}/resume`, { method: "POST" });
-      setReloadKey((key) => key + 1);
+      await api(`/api/jobs/${encodeURIComponent(id)}/resume`, { method: "POST" });
+      await settleLane(id, "Resumed.");
     } catch (error) {
       setSideErr(error instanceof Error ? error.message : "Could not resume");
     }
