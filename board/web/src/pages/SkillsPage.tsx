@@ -151,11 +151,11 @@ export function SkillsPage() {
           <Table>
             <thead>
               <tr>
-                <Th>Slug</Th>
-                <Th>Role</Th>
-                <Th className="max-[959px]:hidden">Tags</Th>
-                <Th className="max-[959px]:hidden">Scope</Th>
-                <Th className="max-[959px]:hidden">Status</Th>
+                <Th className="w-[26%] max-[959px]:w-1/2">Slug</Th>
+                <Th className="w-[20%] max-[959px]:w-1/2">Role</Th>
+                <Th className="w-[30%] max-[959px]:hidden">Tags</Th>
+                <Th className="w-[12%] max-[959px]:hidden">Scope</Th>
+                <Th className="w-[12%] max-[959px]:hidden">Status</Th>
               </tr>
             </thead>
             <tbody id="skills">

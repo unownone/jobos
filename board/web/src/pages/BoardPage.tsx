@@ -671,20 +671,20 @@ export function BoardPage() {
               <Table className="max-[720px]:hidden">
                 <thead className="sticky top-0 z-10 bg-card">
                   <tr>
-                    <th className="w-[22%] px-3 py-2 max-[959px]:w-[38%]">Company</th>
-                    <th className="w-[24%] px-3 py-2 max-[959px]:w-[40%]">Title</th>
+                    <th className="w-[20%] px-3 py-2 max-[959px]:w-[38%]">Company</th>
+                    <th className="w-[26%] px-3 py-2 max-[959px]:w-[40%]">Title</th>
                     <th className="w-[14%] px-3 py-2 max-[959px]:w-[22%]">Status</th>
                     <th className="w-[8%] px-3 py-2 max-[959px]:hidden">Score</th>
-                    <th className="w-[10%] px-3 py-2 max-[959px]:hidden">Pay</th>
-                    <th className="w-[12%] px-3 py-2 max-[959px]:hidden">Posted</th>
-                    <th className="w-[10%] px-3 py-2 max-[959px]:hidden">Claim</th>
+                    <th className="w-[8%] px-3 py-2 max-[959px]:hidden">Pay</th>
+                    <th className="w-[16%] px-3 py-2 max-[959px]:hidden">Posted</th>
+                    <th className="w-[8%] px-3 py-2 max-[959px]:hidden">Claim</th>
                   </tr>
                 </thead>
                 <tbody>
                   {jobs.map((job) => (
                     <tr key={job.id} data-id={job.id} className="cursor-pointer border-t border-border" onClick={() => void openJob(job.id)}>
                       <td className="truncate px-3 py-2" title={job.company}>{job.company}</td>
-                      <td className="truncate px-3 py-2" title={job.title}>{job.title}</td>
+                      <td className="break-words px-3 py-2" title={job.title}>{job.title}</td>
                       <td className="px-3 py-2">
                         <Badge variant="outline" className="max-w-full truncate border-dashed border-current">
                           {job.stopped ? "stopped" : job.status}

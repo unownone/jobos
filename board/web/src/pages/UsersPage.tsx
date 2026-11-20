@@ -78,14 +78,14 @@ export function UsersPage() {
           <Table>
             <thead className="sticky top-0 bg-card">
               <tr>
-                <Th>Name</Th>
-                <Th>Kind</Th>
-                <Th className="max-[959px]:hidden">Track</Th>
-                <Th>Status</Th>
-                <Th className="max-[959px]:hidden">Model</Th>
-                <Th className="max-[959px]:hidden">Harness</Th>
-                <Th className="max-[959px]:hidden">Bed</Th>
-                <Th className="max-[959px]:hidden">Last active</Th>
+                <Th className="w-[16%] max-[959px]:w-[46%]">Name</Th>
+                <Th className="w-[9%] max-[959px]:w-[27%]">Kind</Th>
+                <Th className="w-[14%] max-[959px]:hidden">Track</Th>
+                <Th className="w-[9%] max-[959px]:w-[27%]">Status</Th>
+                <Th className="w-[11%] max-[959px]:hidden">Model</Th>
+                <Th className="w-[9%] max-[959px]:hidden">Harness</Th>
+                <Th className="w-[8%] max-[959px]:hidden">Bed</Th>
+                <Th className="w-[18%] max-[959px]:hidden">Last active</Th>
                 <Th className="max-[959px]:hidden">Task</Th>
               </tr>
             </thead>

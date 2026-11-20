@@ -95,6 +95,7 @@ describe("admin pages", () => {
     expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
     await waitFor(() => {
       expect(document.getElementById("rows")).toHaveTextContent("Ada");
+    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Last active")?.className).toContain("w-[18%]");
     });
     expect(apiMock).toHaveBeenCalledWith("/api/presence/heartbeat", {
       method: "POST",
@@ -119,6 +120,7 @@ describe("admin pages", () => {
       expect(document.querySelector("[data-slot='record-deck'] p")?.textContent).toBe("Acme");
     });
     expect(document.querySelector("#table th")?.textContent).toBe("ID");
+    expect(document.querySelector("#table td")?.className).toContain("break-all");
   });
 
   it("renders the data browser", async () => {

@@ -331,11 +331,19 @@ export function DataPage() {
               <tbody>
                 {rows.map((row, index) => (
                   <tr key={`${tab}-${index}`} className="border-t border-border">
-                    {headers.map((header, index) => (
-                      <Td key={header} className={index > 2 ? "max-[959px]:hidden" : undefined} title={row[header]}>
-                        {row[header]}
-                      </Td>
-                    ))}
+                    {headers.map((header, index) => {
+                      const wrap = header === "ID";
+                      return (
+                        <Td
+                          key={header}
+                          truncate={!wrap}
+                          className={[index > 2 ? "max-[959px]:hidden" : "", wrap ? "break-all" : ""].filter(Boolean).join(" ") || undefined}
+                          title={row[header]}
+                        >
+                          {row[header]}
+                        </Td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
