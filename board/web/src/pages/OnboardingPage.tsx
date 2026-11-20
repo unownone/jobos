@@ -287,28 +287,32 @@ export function OnboardingPage() {
                 {id === "step1" ? (
                   <>
                     <h2 className="m-0 font-display text-[1.6rem] leading-none font-extrabold [font-family:var(--font-display)]">Identity</h2>
-                    <Field>Full name<Input id="full_name" value={fullName} autoComplete="name" onChange={(event) => setFullName(event.target.value)} /></Field>
-                    <Field>Preferred name<Input id="preferred_name" value={preferredName} onChange={(event) => setPreferredName(event.target.value)} /></Field>
-                    <Field>Email<Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
-                    <Field>Phone<Input id="phone" value={phone} onChange={(event) => setPhone(event.target.value)} /></Field>
-                    <Field>Location<Input id="location" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
-                    <Field>Timezone<Input id="timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} /></Field>
-                    <Field>Work authorization<Input id="work_authorization" value={workAuthorization} onChange={(event) => setWorkAuthorization(event.target.value)} /></Field>
-                    <Field>LinkedIn<Input id="linkedin_url" value={linkedin} onChange={(event) => setLinkedin(event.target.value)} /></Field>
-                    <Field>GitHub<Input id="github_url" value={github} onChange={(event) => setGithub(event.target.value)} /></Field>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field>Full name<Input id="full_name" value={fullName} autoComplete="name" onChange={(event) => setFullName(event.target.value)} /></Field>
+                      <Field>Preferred name<Input id="preferred_name" value={preferredName} onChange={(event) => setPreferredName(event.target.value)} /></Field>
+                      <Field>Email<Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
+                      <Field>Phone<Input id="phone" value={phone} onChange={(event) => setPhone(event.target.value)} /></Field>
+                      <Field>Location<Input id="location" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
+                      <Field>Timezone<Input id="timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} /></Field>
+                      <Field>Work authorization<Input id="work_authorization" value={workAuthorization} onChange={(event) => setWorkAuthorization(event.target.value)} /></Field>
+                      <Field>LinkedIn<Input id="linkedin_url" value={linkedin} onChange={(event) => setLinkedin(event.target.value)} /></Field>
+                      <Field className="sm:col-span-2">GitHub<Input id="github_url" value={github} onChange={(event) => setGithub(event.target.value)} /></Field>
+                    </div>
                     <Button id="to2" type="button" onClick={toTargets}>Next — targets</Button>
                   </>
                 ) : null}
                 {id === "step2" ? (
                   <>
                     <h2 className="m-0 font-display text-[1.6rem] leading-none font-extrabold [font-family:var(--font-display)]">Targets</h2>
-                    <Field>Titles<Input id="titles" value={titles} onChange={(event) => setTitles(event.target.value)} /></Field>
-                    <Field>Locations<Input id="locations_t" value={locations} onChange={(event) => setLocations(event.target.value)} /></Field>
-                    <Field>Seniority<Input id="seniority" value={seniority} onChange={(event) => setSeniority(event.target.value)} /></Field>
-                    <Field>Domains<Input id="domains" value={domains} onChange={(event) => setDomains(event.target.value)} /></Field>
-                    <Field>Remote<Input id="remote" value={remote} onChange={(event) => setRemote(event.target.value)} /></Field>
-                    <Field>Must-haves<Textarea id="must_haves" value={mustHaves} onChange={(event) => setMustHaves(event.target.value)} /></Field>
-                    <Field>Deal-breakers<Textarea id="deal_breakers" value={dealBreakers} onChange={(event) => setDealBreakers(event.target.value)} /></Field>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field>Titles<Input id="titles" value={titles} onChange={(event) => setTitles(event.target.value)} /></Field>
+                      <Field>Locations<Input id="locations_t" value={locations} onChange={(event) => setLocations(event.target.value)} /></Field>
+                      <Field>Seniority<Input id="seniority" value={seniority} onChange={(event) => setSeniority(event.target.value)} /></Field>
+                      <Field>Domains<Input id="domains" value={domains} onChange={(event) => setDomains(event.target.value)} /></Field>
+                      <Field>Remote<Input id="remote" value={remote} onChange={(event) => setRemote(event.target.value)} /></Field>
+                      <Field className="sm:col-span-2">Must-haves<Textarea id="must_haves" value={mustHaves} onChange={(event) => setMustHaves(event.target.value)} /></Field>
+                      <Field className="sm:col-span-2">Deal-breakers<Textarea id="deal_breakers" value={dealBreakers} onChange={(event) => setDealBreakers(event.target.value)} /></Field>
+                    </div>
                     <div className="flex gap-2">
                       <Button id="back1" type="button" variant="outline" onClick={() => setStep("step1")}>Back</Button>
                       <Button id="to3" type="button" onClick={toProof}>Next — proof</Button>
@@ -318,12 +322,14 @@ export function OnboardingPage() {
                 {id === "step3" ? (
                   <>
                     <h2 className="m-0 font-display text-[1.6rem] leading-none font-extrabold [font-family:var(--font-display)]">Proof</h2>
-                    <Field>Headline<Input id="headline" value={headline} onChange={(event) => setHeadline(event.target.value)} /></Field>
-                    <Field>Years<Input id="years" type="number" min={0} value={years} onChange={(event) => setYears(event.target.value)} /></Field>
-                    <Field>Stack<Input id="stack" value={stack} onChange={(event) => setStack(event.target.value)} /></Field>
-                    <Field>Highlights<Textarea id="highlights" value={highlights} onChange={(event) => setHighlights(event.target.value)} /></Field>
-                    <Field>Do not claim<Textarea id="do_not_claim" value={doNotClaim} onChange={(event) => setDoNotClaim(event.target.value)} /></Field>
-                    <Field>Writing voice<Input id="writing_voice" value={writingVoice} onChange={(event) => setWritingVoice(event.target.value)} /></Field>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field>Headline<Input id="headline" value={headline} onChange={(event) => setHeadline(event.target.value)} /></Field>
+                      <Field>Years<Input id="years" type="number" min={0} value={years} onChange={(event) => setYears(event.target.value)} /></Field>
+                      <Field>Stack<Input id="stack" value={stack} onChange={(event) => setStack(event.target.value)} /></Field>
+                      <Field>Writing voice<Input id="writing_voice" value={writingVoice} onChange={(event) => setWritingVoice(event.target.value)} /></Field>
+                      <Field className="sm:col-span-2">Highlights<Textarea id="highlights" value={highlights} onChange={(event) => setHighlights(event.target.value)} /></Field>
+                      <Field className="sm:col-span-2">Do not claim<Textarea id="do_not_claim" value={doNotClaim} onChange={(event) => setDoNotClaim(event.target.value)} /></Field>
+                    </div>
                     <div className="flex gap-2">
                       <Button id="back2" type="button" variant="outline" onClick={() => setStep("step2")}>Back</Button>
                       <Button id="save" type="button" onClick={() => void save()}>Save profile</Button>

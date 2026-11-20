@@ -38,6 +38,8 @@ describe("OnboardingPage", () => {
     fireEvent.click(document.querySelector("#s2 button") as HTMLButtonElement);
     expect(document.getElementById("step2")).not.toHaveAttribute("hidden");
     expect(document.getElementById("titles")).toBeInTheDocument();
+    expect(document.getElementById("full_name")?.parentElement?.parentElement?.className).toContain("sm:grid-cols-2");
+    expect(document.getElementById("must_haves")?.parentElement?.className).toContain("sm:col-span-2");
     expect(document.querySelector("#s2 button")).toHaveAttribute("aria-current", "step");
   });
 
