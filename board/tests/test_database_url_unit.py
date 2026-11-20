@@ -35,6 +35,13 @@ def test_explicit_loopback_url_is_kept() -> None:
     assert resolve_database_url({"DATABASE_URL": url}) == url
 
 
+def test_password_keeps_a_trailing_apostrophe() -> None:
+    assert (
+        resolve_database_url({"JOBOS_PG_PASSWORD": "secret'"})
+        == "postgresql://jobos:secret%27@postgres:5432/jobos"
+    )
+
+
 def test_parts_build_outside_host_and_encode_password() -> None:
     assert (
         resolve_database_url(

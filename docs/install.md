@@ -163,7 +163,12 @@ The Hub container stores nothing durable on disk. PostgreSQL is the database.
 | Named volume `blobs` | Resume PDFs and other blob files |
 | Named volume `rabbitmq` | RabbitMQ durable queue state |
 
-Backup the `pgdata` volume while Postgres is stopped, or `pg_dump` from the Hub network. Airgap export for git: admin `GET /api/export/ledger`.
+Backup the database Hub is actually using.
+
+- Bundled Compose service: stop Postgres and copy the `pgdata` volume, or `pg_dump` from the Hub network.
+- `DATABASE_URL` points at a database this stack does not create: back up that database. `pgdata` is the unused bundled instance.
+
+Airgap export for git: admin `GET /api/export/ledger`.
 
 Postgres is **not** published on the host. Do not add a `ports:` mapping for it.
 

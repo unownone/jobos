@@ -205,6 +205,20 @@ def test_hub_database_url_comes_from_secrets() -> None:
     assert failures == []
 
 
+def test_env_example_does_not_publish_a_loopback_database_url() -> None:
+    """Copying board/.env.example must not override the bundled Compose Postgres."""
+    example = REPO / "board" / ".env.example"
+    active: list[str] = []
+    for raw in example.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key.strip() == "DATABASE_URL" and value.strip():
+            active.append(value.strip())
+    assert active == []
+
+
 def test_repo_relative_binds_are_coolify_safe() -> None:
     for path, doc in _compose_docs():
         for service, entry in _service_volumes(doc):

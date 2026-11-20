@@ -43,13 +43,15 @@ def _read_secret_file(secret_file: Path | None) -> str:
     path = _DEFAULT_SECRET_FILE if secret_file is None else secret_file
     if not path.is_file():
         return ""
-    return path.read_text(encoding="utf-8").strip().strip('"').strip("'")
+    return path.read_text(encoding="utf-8").strip()
 
 
 def _or_default(env: Mapping[str, str], key: str, default: str) -> str:
-    value = _clean(env.get(key))
-    return value or default
+    value = env.get(key)
+    if value is None or value == "":
+        return default
+    return value
 
 
 def _clean(value: str | None) -> str:
-    return (value or "").strip().strip('"').strip("'")
+    return (value or "").strip()
