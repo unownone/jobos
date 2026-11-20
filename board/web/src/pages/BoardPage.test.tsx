@@ -585,6 +585,24 @@ describe("BoardPage", () => {
     expect(byId("side")).not.toHaveTextContent("No events");
   });
 
+  it("keeps the session when the status catalog fails", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/whoami") return Promise.resolve(ADMIN);
+      if (path === "/api/meta") return Promise.reject(new Error("meta unavailable"));
+      if (path.startsWith("/api/jobs?")) return Promise.resolve(listPayload([JOB]));
+      if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: [] } });
+      if (path === "/api/presence") return Promise.resolve({ users: [] });
+      if (path.startsWith("/api/queue")) return Promise.resolve({ items: [] });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("catalogErr")).toHaveTextContent("meta unavailable"));
+    expect(byId("catalogErr").className).toContain("text-destructive");
+    expect(byId("connLabel")).toHaveTextContent("signed in");
+    expect(byId("whoLabel")).toHaveTextContent("Ada · owner");
+    expect(byId("list")).toHaveTextContent("TicketCo");
+  });
+
   it("shows a failed job list in the stop color", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/whoami") return Promise.resolve(ADMIN);

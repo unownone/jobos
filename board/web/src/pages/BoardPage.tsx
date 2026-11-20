@@ -199,6 +199,7 @@ export function BoardPage() {
   const [loaded, setLoaded] = useState(false);
   const [statsText, setStatsText] = useState("0 shown · 0 total · not connected");
   const [statsFailed, setStatsFailed] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
   const [offset, setOffset] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [selected, setSelected] = useState<Job | null>(null);
@@ -296,10 +297,6 @@ export function BoardPage() {
         setCaps(me);
         setWho(whoText(me));
         setConn("signed in");
-        const catalog = await api<{ statuses?: string[]; apply_kinds?: string[] }>("/api/meta");
-        if (cancelled) return;
-        setStatuses(catalog.statuses ?? []);
-        setApplyKinds(catalog.apply_kinds ?? []);
       } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : "";
@@ -309,6 +306,19 @@ export function BoardPage() {
           setStatsText(message);
           setStatsFailed(true);
         }
+        return;
+      }
+      try {
+        const catalog = await api<{ statuses?: string[]; apply_kinds?: string[] }>("/api/meta");
+        if (cancelled) return;
+        setStatuses(catalog.statuses ?? []);
+        setApplyKinds(catalog.apply_kinds ?? []);
+        setCatalogError("");
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Could not load statuses";
+        if (message.includes("unauthorized")) return;
+        setCatalogError(message);
       }
     }
     void boot();
@@ -644,6 +654,7 @@ export function BoardPage() {
             </Button>
             <span id="stats" className={cn("text-sm", statsFailed ? "text-destructive" : "text-muted-foreground")}>{statsText}</span>
           </div>
+          {catalogError ? <p id="catalogErr" className="m-0 border-b border-border px-3 py-1 text-sm text-destructive">{catalogError}</p> : null}
         </div>
         <div
           id="moreFilters"
