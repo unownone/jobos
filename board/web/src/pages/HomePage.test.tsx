@@ -155,8 +155,10 @@ describe("HomePage", () => {
     const legend = [...byId("funnelLegend").querySelectorAll("li")].map((item) => item.textContent?.replace(/\s+/g, " ").trim());
     expect(legend).toEqual(["Found 3", "Applied 1", "Outreached 0"]);
     expect((funnel?.querySelector("[data-funnel='Found']") as HTMLElement | null)?.style.width).toBe("100%");
+    expect((funnel?.querySelector("[data-funnel='Found']") as HTMLElement | null)?.style.backgroundColor).toBe("var(--primary)");
     expect((funnel?.querySelector("[data-funnel='Applied']") as HTMLElement | null)?.style.width).toBe("33%");
     expect((funnel?.querySelector("[data-funnel='Outreached']") as HTMLElement | null)?.style.width).toBe("0%");
+    expect(byId("oldestBody").querySelector("a")).toHaveAttribute("href", "/board?job=j");
 
     expect(homeSource).not.toMatch(/chart\.js|chartjs|Chart/i);
     expect(homeSource).toContain('from "@/components/shell/AppShell"');

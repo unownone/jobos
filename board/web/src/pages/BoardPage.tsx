@@ -227,6 +227,14 @@ export function BoardPage() {
     return () => media.removeEventListener("change", apply);
   }, []);
 
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("job")?.trim() ?? "";
+    if (!id) return;
+    void openJob(id).catch((error: unknown) => {
+      setSideErr(error instanceof Error ? error.message : "Could not open job");
+    });
+  }, []);
+
   useLayoutEffect(() => {
     const measure = () => {
       const stage = stageRef.current;

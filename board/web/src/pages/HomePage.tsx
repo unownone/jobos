@@ -45,9 +45,9 @@ type Whoami = {
 type OldestJob = NonNullable<Dashboard["oldest_in_pipeline"]>;
 
 const FUNNEL_STAGES = [
-  { key: "found", label: "Found", color: "#e0992d" },
-  { key: "applied", label: "Applied", color: "#3f9d7a" },
-  { key: "outreached", label: "Outreached", color: "#f3bc5a" },
+  { key: "found", label: "Found", color: "var(--primary)" },
+  { key: "applied", label: "Applied", color: "var(--good)" },
+  { key: "outreached", label: "Outreached", color: "var(--accent-foreground)" },
 ] as const;
 
 function text(value: string | null | undefined): string {
@@ -143,7 +143,7 @@ function OldestBody({ job }: { job: OldestJob }) {
         {job.location ? <span>{job.location}</span> : null}
       </p>
       <p className="mt-3 mb-0">
-        <a href="/board" className="inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline">
+        <a href={`/board?job=${encodeURIComponent(job.id)}`} className="inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline">
           {job.id}
         </a>
       </p>

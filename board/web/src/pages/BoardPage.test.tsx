@@ -186,6 +186,14 @@ describe("BoardPage", () => {
     expect(document.querySelector("[data-testid='hub-scroll']")?.className).not.toContain("overflow-y-auto");
   });
 
+  it("opens the job named in the URL", async () => {
+    window.history.replaceState({}, "", "/board?job=1");
+    mockBoard();
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("f_company")).toHaveValue("TicketCo"));
+    expect(apiMock).toHaveBeenCalledWith("/api/jobs/1");
+  });
+
   it("opens a ticket from the list and saves the allowed fields", async () => {
     mockBoard();
     render(<BoardPage />);
