@@ -2,8 +2,8 @@
 #   docker compose -f docker-compose.plain.yml up -d --build
 # Hub listens on http://127.0.0.1:8787
 #
-# Durable state: named volumes pgdata, rabbitmq, blobs (Coolify-safe).
-# Postgres/RabbitMQ have no published ports. See docs/coolify.md.
+# Durable state: named volumes pgdata and blobs (Coolify-safe).
+# The work queue is the Postgres queue_items table. See docs/runtime.md.
 #
 # First visit: /login (username + password) → /onboarding → invites/agents.
 #
@@ -29,20 +29,6 @@ services:
       retries: 20
     restart: unless-stopped
 
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
-      RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
-    volumes:
-      - "rabbitmq:/var/lib/rabbitmq"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-    restart: unless-stopped
-
   hub:
     build:
       context: .
@@ -61,8 +47,7 @@ services:
       JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
       JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
       JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
-      AMQP_URL: "amqp://${JOBOS_AMQP_USER:-jobos}:${JOBOS_AMQP_PASSWORD:-jobos}@rabbitmq:5672/%2F"
-      QUEUE_ADAPTER: "rabbitmq"
+      QUEUE_ADAPTER: "memory"
       BLOB_ROOT: "/var/lib/jobos/blobs"
       BLOB_ADAPTER: "filesystem"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-127.0.0.1:8787}"
@@ -76,8 +61,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
       interval: 10s
@@ -87,5 +70,4 @@ services:
 
 volumes:
   pgdata:
-  rabbitmq:
   blobs:

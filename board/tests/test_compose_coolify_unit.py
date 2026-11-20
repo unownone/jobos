@@ -43,7 +43,6 @@ COOLIFY_FORBIDDEN = (
 NAMED_VOLUME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 DURABLE_TARGETS = {
     "/var/lib/postgresql/data",
-    "/var/lib/rabbitmq",
     "/var/lib/jobos/blobs",
 }
 ROOT_COMPOSE = {
@@ -125,8 +124,23 @@ def test_volume_sources_pass_coolify_validate_shell_safe_path() -> None:
     assert failures == []
 
 
+def test_no_rabbitmq_service() -> None:
+    for path, doc in _compose_docs():
+        services = doc.get("services") or {}
+        assert "rabbitmq" not in services, _rel(path)
+
+
+def test_go_compose_is_two_containers() -> None:
+    doc = yaml.safe_load((REPO / "docker-compose.yml").read_text(encoding="utf-8"))
+    services = doc["services"]
+    assert "api" in services and "web" in services
+    assert services["postgres"].get("profiles") == ["data"]
+    assert services["redis"].get("profiles") == ["cache"]
+    assert services["minio"].get("profiles") == ["blobs"]
+
+
 def test_durable_data_uses_named_volumes() -> None:
-    """Postgres, RabbitMQ, and blobs must survive Coolify's per-deploy checkout."""
+    """Postgres and blobs must survive Coolify's per-deploy checkout."""
     failures: list[str] = []
     for path, doc in _compose_docs():
         declared = set((doc.get("volumes") or {}).keys()) if isinstance(doc.get("volumes"), dict) else set()
@@ -149,10 +163,13 @@ def test_durable_data_uses_named_volumes() -> None:
                 failures.append(
                     f"{_rel(path)}: named volume {source!r} missing from top-level volumes:"
                 )
-        if _rel(path) in ROOT_COMPOSE:
+        if _rel(path) in {"docker-compose.plain.yml", "docker-compose.traefik.yml"}:
             missing = DURABLE_TARGETS - seen_targets
             if missing:
                 failures.append(f"{_rel(path)}: missing durable mounts {sorted(missing)}")
+        if _rel(path) == "docker-compose.yml":
+            if "/var/lib/postgresql/data" not in seen_targets:
+                failures.append(f"{_rel(path)}: postgres data volume missing")
         elif "/var/lib/postgresql/data" not in seen_targets:
             failures.append(f"{_rel(path)}: postgres data volume missing")
     assert failures == []
@@ -163,9 +180,14 @@ def test_hub_database_url_comes_from_secrets() -> None:
     failures: list[str] = []
     for path, doc in _compose_docs():
         services = doc.get("services") or {}
-        hub = services.get("hub")
+        hub = services.get("hub") or services.get("api")
         if not isinstance(hub, dict):
             failures.append(f"{_rel(path)}: hub service missing")
+            continue
+        if _rel(path) == "docker-compose.yml":
+            secret = (hub.get("environment") or {}).get("DATABASE_URL")
+            if secret != "${DATABASE_URL:-}":
+                failures.append(f"{_rel(path)}: DATABASE_URL must pass through the secret, got {secret!r}")
             continue
         environment = hub.get("environment") or {}
         if not isinstance(environment, dict):

@@ -25,20 +25,6 @@ services:
       retries: 20
     restart: unless-stopped
 
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: jobos
-      RABBITMQ_DEFAULT_PASS: jobos
-    volumes:
-      - "e2e-rabbitmq:/var/lib/rabbitmq"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-    restart: unless-stopped
-
   hub:
     build:
       context: .
@@ -50,8 +36,7 @@ services:
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
       DATABASE_URL: "postgresql://jobos:jobos@postgres:5432/jobos"
-      AMQP_URL: "amqp://jobos:jobos@rabbitmq:5672/%2F"
-      QUEUE_ADAPTER: "rabbitmq"
+      QUEUE_ADAPTER: "memory"
       BLOB_ROOT: "/var/lib/jobos/blobs"
       BLOB_ADAPTER: "filesystem"
       HUB_PUBLIC_HOST: "127.0.0.1:18787"
@@ -66,8 +51,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
@@ -77,5 +60,4 @@ services:
 
 volumes:
   e2e-pgdata:
-  e2e-rabbitmq:
   e2e-blobs:

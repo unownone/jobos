@@ -34,6 +34,10 @@ agent-transcripts/
 # Vendored MCP runtimes used to live here; they bloated the PR.
 # Source trees stay out of git. Cache clones go in agent-tools/.
 
+# Web SPA
+web/node_modules/
+web/dist/
+
 # OS / editor
 .DS_Store
 .idea/

@@ -1,0 +1,19 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": "http://127.0.0.1:8080",
+      "/ws": { target: "ws://127.0.0.1:8080", ws: true },
+      "/health": "http://127.0.0.1:8080",
+      "/ready": "http://127.0.0.1:8080",
+      "/llms.txt": "http://127.0.0.1:8080",
+      "/agents.txt": "http://127.0.0.1:8080",
+      "/a2a": "http://127.0.0.1:8080",
+      "/.well-known": "http://127.0.0.1:8080",
+    },
+  },
+});
