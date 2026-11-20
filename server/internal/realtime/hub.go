@@ -6,45 +6,53 @@ import (
 	"sync"
 )
 
+type subscription struct {
+	account string
+	ch      chan []byte
+}
+
 type Hub struct {
 	mu   sync.Mutex
 	next int
-	subs map[int]chan []byte
+	subs map[int]subscription
 }
 
 func New() *Hub {
-	return &Hub{subs: map[int]chan []byte{}}
+	return &Hub{subs: map[int]subscription{}}
 }
 
-func (h *Hub) Subscribe() (int, <-chan []byte) {
+func (h *Hub) Subscribe(account string) (int, <-chan []byte) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.next++
 	id := h.next
 	ch := make(chan []byte, 16)
-	h.subs[id] = ch
+	h.subs[id] = subscription{account: account, ch: ch}
 	return id, ch
 }
 
 func (h *Hub) Unsubscribe(id int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if ch, ok := h.subs[id]; ok {
+	if sub, ok := h.subs[id]; ok {
 		delete(h.subs, id)
-		close(ch)
+		close(sub.ch)
 	}
 }
 
-func (h *Hub) Publish(event string, payload any) {
+func (h *Hub) Publish(account, event string, payload any) {
 	body, err := json.Marshal(map[string]any{"event": event, "data": payload})
 	if err != nil {
 		return
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for _, ch := range h.subs {
+	for _, sub := range h.subs {
+		if sub.account != account {
+			continue
+		}
 		select {
-		case ch <- body:
+		case sub.ch <- body:
 		default:
 		}
 	}

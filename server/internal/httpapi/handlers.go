@@ -147,7 +147,7 @@ func (s *Server) createJob(c *gin.Context) {
 	_, _ = s.DB.AddEvent(c.Request.Context(), store.Event{AccountID: p.AccountID, TS: now(), JobID: j.ID, ActorRole: p.Role, Actor: p.Actor, Action: "create", ToStatus: j.Status})
 	s.syncQueue(c, p, j)
 	s.invalidateJobs(c, p.AccountID)
-	s.RT.Publish("job", gin.H{"action": "create", "id": j.ID})
+	s.RT.Publish(p.AccountID, "job", gin.H{"action": "create", "id": j.ID})
 	c.JSON(http.StatusCreated, gin.H{"job": j, "role": p.Role})
 }
 
@@ -288,7 +288,7 @@ func (s *Server) patchJob(c *gin.Context) {
 	_, _ = s.DB.AddEvent(c.Request.Context(), store.Event{AccountID: p.AccountID, TS: now(), JobID: j.ID, ActorRole: p.Role, Actor: p.Actor, Action: "patch", FromStatus: from, ToStatus: next.Status, Fields: mustJSON(body)})
 	s.syncQueue(c, p, next)
 	s.invalidateJobs(c, p.AccountID)
-	s.RT.Publish("job", gin.H{"action": "patch", "id": next.ID, "status": next.Status})
+	s.RT.Publish(p.AccountID, "job", gin.H{"action": "patch", "id": next.ID, "status": next.Status})
 	c.JSON(http.StatusOK, gin.H{"job": next, "role": p.Role})
 }
 
@@ -296,7 +296,7 @@ func (s *Server) syncQueue(c *gin.Context, p principal, j store.Job) {
 	if j.Stopped {
 		return
 	}
-	if j.Status == "apply_ready" {
+	if j.Status == "apply_ready" && packetComplete(j.ApplyPacket) {
 		s.upsertQueue(c, p, "apply.ready", j.ID)
 	}
 	kind := strings.ToLower(j.ApplyKind)
@@ -315,7 +315,7 @@ func (s *Server) upsertQueue(c *gin.Context, p principal, kind, jobID string) {
 		Payload: mustJSON(gin.H{"job_id": jobID}), Status: "open", DedupeKey: key, CreatedAt: now(),
 	}
 	_ = s.DB.SaveQueue(c.Request.Context(), item)
-	s.RT.Publish("queue", gin.H{"action": "push", "id": item.ID, "kind": kind})
+	s.RT.Publish(p.AccountID, "queue", gin.H{"action": "push", "id": item.ID, "kind": kind})
 }
 
 func (s *Server) deleteJob(c *gin.Context) {
@@ -329,7 +329,7 @@ func (s *Server) deleteJob(c *gin.Context) {
 		return
 	}
 	s.invalidateJobs(c, p.AccountID)
-	s.RT.Publish("job", gin.H{"action": "delete", "id": c.Param("id")})
+	s.RT.Publish(p.AccountID, "job", gin.H{"action": "delete", "id": c.Param("id")})
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
@@ -755,6 +755,10 @@ func (s *Server) disableAgent(c *gin.Context) {
 		fail(c, 403, "cannot disable admin")
 		return
 	}
+	if p.Role != "admin" && p.Track != user.Track {
+		fail(c, 403, "owners can disable users on their own track")
+		return
+	}
 	user.DisabledAt = now()
 	_ = s.DB.SaveUser(c.Request.Context(), user)
 	_ = s.DB.RevokeUserKeys(c.Request.Context(), user.ID, now())
@@ -799,8 +803,7 @@ func (s *Server) putCandidate(c *gin.Context) {
 		fail(c, 422, "candidate yaml is required")
 		return
 	}
-	text := string(body)
-	if strings.Contains(text, "Ada Example") || !strings.Contains(text, "name:") {
+	if !realCandidate(string(body)) {
 		fail(c, 422, "profile must name a real candidate")
 		return
 	}
@@ -813,8 +816,8 @@ func (s *Server) putCandidate(c *gin.Context) {
 
 func (s *Server) getResume(c *gin.Context) {
 	p := principalFrom(c)
-	if p.Role == "discovery" {
-		fail(c, 403, "discovery cannot download the resume PDF")
+	if p.Role != "apply" && p.Role != "outreach" && p.Role != "admin" {
+		fail(c, 403, "only apply, outreach, or admin can download the resume PDF")
 		return
 	}
 	obj, err := s.Blobs.Get(c.Request.Context(), p.AccountID, resumeKey)
@@ -857,6 +860,14 @@ func (s *Server) queuePush(c *gin.Context) {
 		fail(c, 422, "unknown queue kind")
 		return
 	}
+	if systemQueueKind(body.Kind) && p.Role != "admin" {
+		fail(c, 403, "apply.ready and outreach.ready are system-enqueued on job status")
+		return
+	}
+	if !contains(produceKinds(p.Role), body.Kind) {
+		fail(c, 403, "this track cannot push "+body.Kind)
+		return
+	}
 	key := body.Kind + ":" + body.JobID
 	if body.JobID == "" {
 		key = body.Kind + ":" + random(4)
@@ -870,7 +881,7 @@ func (s *Server) queuePush(c *gin.Context) {
 		fail(c, 500, err.Error())
 		return
 	}
-	s.RT.Publish("queue", gin.H{"action": "push", "id": item.ID, "kind": item.Kind})
+	s.RT.Publish(p.AccountID, "queue", gin.H{"action": "push", "id": item.ID, "kind": item.Kind})
 	c.JSON(http.StatusCreated, gin.H{"item": item})
 }
 
@@ -935,7 +946,7 @@ func (s *Server) queueClaim(c *gin.Context) {
 	if claimed == nil {
 		claimed = []store.QueueItem{}
 	}
-	s.RT.Publish("queue", gin.H{"action": "claim", "count": len(claimed)})
+	s.RT.Publish(p.AccountID, "queue", gin.H{"action": "claim", "count": len(claimed)})
 	c.JSON(http.StatusOK, gin.H{"items": claimed})
 }
 
@@ -948,6 +959,9 @@ func (s *Server) queueNack(c *gin.Context) {
 	item, err := s.DB.QueueByID(c.Request.Context(), p.AccountID, c.Param("id"))
 	if err != nil {
 		fail(c, 404, "queue item not found")
+		return
+	}
+	if !s.queueClaimOwned(c, p, item) {
 		return
 	}
 	var body struct {
@@ -971,6 +985,38 @@ func (s *Server) queueNack(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"item": item, "note": body.Note})
 }
 
+func packetComplete(raw json.RawMessage) bool {
+	var packet map[string]any
+	if len(raw) == 0 || json.Unmarshal(raw, &packet) != nil {
+		return false
+	}
+	if url, _ := packet["url"].(string); strings.TrimSpace(url) != "" {
+		return true
+	}
+	steps, _ := packet["steps"].([]any)
+	return len(steps) > 0
+}
+
+func (s *Server) queueClaimOwned(c *gin.Context, p principal, item store.QueueItem) bool {
+	if item.Status != "claimed" {
+		fail(c, 409, "queue item is not claimed")
+		return false
+	}
+	who := p.UserID
+	if who == "" {
+		who = p.Actor
+	}
+	if item.ClaimedBy != who && p.Role != "admin" {
+		fail(c, 403, "only the claimant can change this queue item")
+		return false
+	}
+	if p.Role != "admin" && item.LeaseUntil != "" && item.LeaseUntil < now() {
+		fail(c, 409, "lease expired")
+		return false
+	}
+	return true
+}
+
 func (s *Server) finishQueue(c *gin.Context, status string) {
 	p := principalFrom(c)
 	item, err := s.DB.QueueByID(c.Request.Context(), p.AccountID, c.Param("id"))
@@ -978,10 +1024,13 @@ func (s *Server) finishQueue(c *gin.Context, status string) {
 		fail(c, 404, "queue item not found")
 		return
 	}
+	if !s.queueClaimOwned(c, p, item) {
+		return
+	}
 	item.Status = status
 	item.LeaseUntil = ""
 	_ = s.DB.SaveQueue(c.Request.Context(), item)
-	s.RT.Publish("queue", gin.H{"action": status, "id": item.ID})
+	s.RT.Publish(p.AccountID, "queue", gin.H{"action": status, "id": item.ID})
 	c.JSON(http.StatusOK, gin.H{"item": item})
 }
 
@@ -1061,6 +1110,10 @@ func (s *Server) createPerson(c *gin.Context) {
 
 func (s *Server) getPerson(c *gin.Context) {
 	p := principalFrom(c)
+	if p.Role != "outreach" && p.Role != "admin" {
+		fail(c, 403, "only outreach or admin can read people")
+		return
+	}
 	person, err := s.DB.Person(c.Request.Context(), p.AccountID, c.Param("id"))
 	if err != nil {
 		fail(c, 404, "person not found")
@@ -1071,6 +1124,10 @@ func (s *Server) getPerson(c *gin.Context) {
 
 func (s *Server) patchPerson(c *gin.Context) {
 	p := principalFrom(c)
+	if p.Role != "outreach" && p.Role != "admin" {
+		fail(c, 403, "only outreach or admin can write people")
+		return
+	}
 	person, err := s.DB.Person(c.Request.Context(), p.AccountID, c.Param("id"))
 	if err != nil {
 		fail(c, 404, "person not found")
@@ -1258,7 +1315,7 @@ func (s *Server) createMemory(c *gin.Context) {
 func (s *Server) patchMemory(c *gin.Context) {
 	p := principalFrom(c)
 	item, err := s.DB.Memory(c.Request.Context(), p.AccountID, c.Param("id"))
-	if err != nil {
+	if err != nil || !canReadPod(p, item.Pod) {
 		fail(c, 404, "memory item not found")
 		return
 	}
@@ -1282,6 +1339,11 @@ func (s *Server) patchMemory(c *gin.Context) {
 
 func (s *Server) deleteMemory(c *gin.Context) {
 	p := principalFrom(c)
+	item, err := s.DB.Memory(c.Request.Context(), p.AccountID, c.Param("id"))
+	if err != nil || !canReadPod(p, item.Pod) {
+		fail(c, 404, "memory item not found")
+		return
+	}
 	if err := s.DB.DeleteMemory(c.Request.Context(), p.AccountID, c.Param("id")); err != nil {
 		fail(c, 404, "memory item not found")
 		return
@@ -1341,7 +1403,7 @@ func (s *Server) moveMemory(c *gin.Context) {
 func (s *Server) solidifyMemory(c *gin.Context) {
 	p := principalFrom(c)
 	item, err := s.DB.Memory(c.Request.Context(), p.AccountID, c.Param("id"))
-	if err != nil {
+	if err != nil || !canReadPod(p, item.Pod) {
 		fail(c, 404, "memory item not found")
 		return
 	}
@@ -1378,7 +1440,7 @@ func (s *Server) createMessage(c *gin.Context) {
 		fail(c, 500, err.Error())
 		return
 	}
-	s.RT.Publish("message", gin.H{"id": msg.ID, "type": msg.Type})
+	s.RT.Publish(p.AccountID, "message", gin.H{"id": msg.ID, "type": msg.Type})
 	c.JSON(http.StatusCreated, gin.H{"message": msg})
 }
 
@@ -1390,16 +1452,32 @@ func (s *Server) listMessages(c *gin.Context) {
 		fail(c, 500, err.Error())
 		return
 	}
-	if rows == nil {
-		rows = []store.Message{}
+	var visible []store.Message
+	for _, msg := range rows {
+		if canSeeMessage(p, msg) {
+			visible = append(visible, msg)
+		}
 	}
-	c.JSON(http.StatusOK, gin.H{"messages": rows})
+	if visible == nil {
+		visible = []store.Message{}
+	}
+	c.JSON(http.StatusOK, gin.H{"messages": visible})
+}
+
+func canSeeMessage(p principal, msg store.Message) bool {
+	if p.Role == "admin" {
+		return true
+	}
+	if p.UserID != "" && msg.ToUserID == p.UserID {
+		return true
+	}
+	return p.Track != "" && msg.ToTrack == p.Track
 }
 
 func (s *Server) readMessage(c *gin.Context) {
 	p := principalFrom(c)
 	msg, err := s.DB.Message(c.Request.Context(), p.AccountID, c.Param("id"))
-	if err != nil {
+	if err != nil || !canSeeMessage(p, msg) {
 		fail(c, 404, "message not found")
 		return
 	}
@@ -1424,7 +1502,7 @@ func (s *Server) heartbeat(c *gin.Context) {
 	}
 	pr := store.Presence{AccountID: p.AccountID, UserID: p.UserID, Status: body.Status, TaskID: body.TaskID, LastBeat: now(), UserAgent: c.GetHeader("User-Agent")}
 	_ = s.DB.SavePresence(c.Request.Context(), pr)
-	s.RT.Publish("presence", pr)
+	s.RT.Publish(p.AccountID, "presence", pr)
 	c.JSON(http.StatusOK, gin.H{"presence": pr})
 }
 
@@ -1493,15 +1571,32 @@ func (s *Server) listSkills(c *gin.Context) {
 		fail(c, 500, err.Error())
 		return
 	}
-	if skills == nil {
-		skills = []store.Skill{}
+	var visible []store.Skill
+	for _, sk := range skills {
+		if canSeeSkill(p, sk) {
+			visible = append(visible, sk)
+		}
 	}
-	c.JSON(http.StatusOK, gin.H{"skills": skills})
+	if visible == nil {
+		visible = []store.Skill{}
+	}
+	c.JSON(http.StatusOK, gin.H{"skills": visible})
+}
+
+func canSeeSkill(p principal, sk store.Skill) bool {
+	if p.Role == "admin" || p.Role == "maintenance" {
+		return true
+	}
+	if sk.Scope == "shared" {
+		return sk.Status == "approved"
+	}
+	return sk.OwnerID == p.UserID
 }
 
 func (s *Server) getSkill(c *gin.Context) {
+	p := principalFrom(c)
 	sk, err := s.DB.Skill(c.Request.Context(), c.Param("id"))
-	if err != nil {
+	if err != nil || !canSeeSkill(p, sk) {
 		fail(c, 404, "skill not found")
 		return
 	}
@@ -1539,6 +1634,10 @@ func (s *Server) patchSkill(c *gin.Context) {
 		sk.Body = body.Body
 	}
 	if body.Status != "" {
+		if body.Status == "approved" && p.Role != "admin" && p.Role != "maintenance" {
+			fail(c, 403, "shared skills are published through proctor")
+			return
+		}
 		sk.Status = body.Status
 	}
 	if len(body.Tags) > 0 {
@@ -1565,12 +1664,8 @@ func (s *Server) createSkill(c *gin.Context) {
 	}
 	body.ID = newID("skl_")
 	body.AccountID = p.AccountID
-	if body.Scope == "" {
-		body.Scope = "local"
-	}
-	if body.Status == "" {
-		body.Status = "draft"
-	}
+	body.Scope = "local"
+	body.Status = "draft"
 	if body.Kind == "" {
 		body.Kind = "skill"
 	}
@@ -1591,7 +1686,7 @@ func (s *Server) createSkill(c *gin.Context) {
 func (s *Server) forkSkill(c *gin.Context) {
 	p := principalFrom(c)
 	src, err := s.DB.Skill(c.Request.Context(), c.Param("id"))
-	if err != nil {
+	if err != nil || !canSeeSkill(p, src) {
 		fail(c, 404, "skill not found")
 		return
 	}

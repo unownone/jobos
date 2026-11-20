@@ -320,6 +320,94 @@ func TestBootstrapMemoryMoveAndDirectory(t *testing.T) {
 	res.Body.Close()
 }
 
+func TestAuthorizationBoundaries(t *testing.T) {
+	ts := testServer(t)
+	defer ts.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"ada","password":"long-enough"}`, "")
+	csrf := res.Header.Get("X-CSRF")
+	res.Body.Close()
+	empty := putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name:\n", csrf)
+	if empty.StatusCode != 422 {
+		t.Fatalf("blank name %d %s", empty.StatusCode, readBody(empty))
+	}
+	empty.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\n", csrf)
+	if res.StatusCode != 200 {
+		t.Fatalf("candidate %s", readBody(res))
+	}
+	res.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate/resume", "application/pdf", "%PDF-1.4 resume", csrf)
+	res.Body.Close()
+
+	created := postJSON(t, client, ts.URL+"/api/registry/skills", `{"name":"Private trick","body":"Do the thing.","scope":"shared","status":"approved"}`, csrf)
+	raw := readBody(created)
+	if created.StatusCode != 201 || !strings.Contains(raw, `"scope":"local"`) || !strings.Contains(raw, `"status":"draft"`) {
+		t.Fatalf("skill create %d %s", created.StatusCode, raw)
+	}
+	var skill struct {
+		Skill struct {
+			ID string `json:"id"`
+		} `json:"skill"`
+	}
+	if err := json.Unmarshal([]byte(raw), &skill); err != nil || skill.Skill.ID == "" {
+		t.Fatal(raw)
+	}
+
+	discovery := mintTrack(t, client, ts.URL, csrf, "discovery")
+	agent := &http.Client{}
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/registry/skills/"+skill.Skill.ID, nil)
+	req.Header.Set("Authorization", "Bearer "+discovery)
+	res, err := agent.Do(req)
+	if err != nil || res.StatusCode != 404 {
+		t.Fatalf("local skill visible %d %v", res.StatusCode, err)
+	}
+	res.Body.Close()
+	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/api/candidate/resume", nil)
+	req.Header.Set("Authorization", "Bearer "+discovery)
+	res, _ = agent.Do(req)
+	if res.StatusCode != 403 {
+		t.Fatalf("resume %d %s", res.StatusCode, readBody(res))
+	}
+	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/api/queue/push", strings.NewReader(`{"kind":"apply.ready","job_id":"x"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+discovery)
+	res, _ = agent.Do(req)
+	if res.StatusCode != 403 {
+		t.Fatalf("push %d %s", res.StatusCode, readBody(res))
+	}
+
+	res = postJSON(t, client, ts.URL+"/api/messages", `{"to_track":"application","body":"packet is ready"}`, csrf)
+	if res.StatusCode != 201 {
+		t.Fatalf("message %d %s", res.StatusCode, readBody(res))
+	}
+	res.Body.Close()
+	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/api/messages", nil)
+	req.Header.Set("Authorization", "Bearer "+discovery)
+	res, _ = agent.Do(req)
+	body := readBody(res)
+	if res.StatusCode != 200 || strings.Contains(body, "packet is ready") {
+		t.Fatalf("inbox leak %d %s", res.StatusCode, body)
+	}
+}
+
+func mintTrack(t *testing.T, client *http.Client, base, csrf, track string) string {
+	t.Helper()
+	res := postJSON(t, client, base+"/api/agents", `{"display_name":"`+track+`","track":"`+track+`"}`, csrf)
+	body := readBody(res)
+	if res.StatusCode != 200 {
+		t.Fatalf("agent %d %s", res.StatusCode, body)
+	}
+	var payload struct {
+		APIKey string `json:"api_key"`
+	}
+	if err := json.Unmarshal([]byte(body), &payload); err != nil || payload.APIKey == "" {
+		t.Fatalf("key %s", body)
+	}
+	return payload.APIKey
+}
+
 func readBody(res *http.Response) string {
 	defer res.Body.Close()
 	b, _ := io.ReadAll(res.Body)

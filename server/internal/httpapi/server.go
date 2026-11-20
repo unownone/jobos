@@ -355,11 +355,28 @@ func (s *Server) onboarded(c *gin.Context, accountID string) bool {
 	if err != nil {
 		return false
 	}
-	text := string(obj.Content)
-	if strings.Contains(text, "Ada Example") || !strings.Contains(text, "name:") {
+	return realCandidate(string(obj.Content))
+}
+
+func realCandidate(text string) bool {
+	name := ""
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(strings.ToLower(line), "name:") {
+			continue
+		}
+		name = strings.Trim(strings.TrimSpace(line[len("name:"):]), `"'`)
+		break
+	}
+	if name == "" {
 		return false
 	}
-	return true
+	switch strings.ToLower(name) {
+	case "ada example", "your name":
+		return false
+	default:
+		return true
+	}
 }
 
 func (s *Server) setSession(c *gin.Context, user store.User) {
@@ -657,9 +674,9 @@ func (s *Server) socket(c *gin.Context) {
 		return
 	}
 	defer conn.Close()
-	id, ch := s.RT.Subscribe()
-	defer s.RT.Unsubscribe(id)
 	p := principalFrom(c)
+	id, ch := s.RT.Subscribe(p.AccountID)
+	defer s.RT.Unsubscribe(id)
 	_ = conn.WriteJSON(gin.H{"event": "hello", "data": gin.H{"account_id": p.AccountID, "user_id": p.UserID}})
 	done := make(chan struct{})
 	go func() {
@@ -682,7 +699,7 @@ func (s *Server) socket(c *gin.Context) {
 				_ = s.DB.SavePresence(c.Request.Context(), store.Presence{
 					AccountID: p.AccountID, UserID: p.UserID, Status: status, TaskID: frame.TaskID, LastBeat: now(),
 				})
-				s.RT.Publish("presence", gin.H{"user_id": p.UserID, "status": status})
+				s.RT.Publish(p.AccountID, "presence", gin.H{"user_id": p.UserID, "status": status})
 			}
 		}
 	}()
@@ -705,7 +722,8 @@ func (s *Server) stream(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
-	id, ch := s.RT.Subscribe()
+	p := principalFrom(c)
+	id, ch := s.RT.Subscribe(p.AccountID)
 	defer s.RT.Unsubscribe(id)
 	_, _ = c.Writer.Write([]byte(": connected\n\n"))
 	c.Writer.Flush()

@@ -34,6 +34,25 @@ var kindTrack = map[string]string{
 	"maintenance.pack_rebuild": "maintenance", "skill.record": "maintenance",
 }
 
+func produceKinds(role string) []string {
+	switch role {
+	case "discovery":
+		return []string{"catalog.refresh", "discovery.search", "discovery.enrich", "discovery.packet", "skill.record"}
+	case "apply", "outreach":
+		return []string{"skill.record"}
+	case "maintenance":
+		return []string{"catalog.refresh", "maintenance.hygiene", "maintenance.pack_rebuild", "skill.record"}
+	case "admin":
+		return append([]string{}, queueKinds...)
+	default:
+		return nil
+	}
+}
+
+func systemQueueKind(kind string) bool {
+	return kind == "apply.ready" || kind == "outreach.ready"
+}
+
 func consumeKinds(role string) []string {
 	switch role {
 	case "discovery":
