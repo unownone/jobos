@@ -871,7 +871,7 @@ function TicketFrame({
   }
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <SheetContent id="side" side="bottom" className="flex h-[92dvh] max-h-[92dvh] flex-col gap-0 overflow-hidden px-4 pt-14 pb-4">
+      <SheetContent id="side" side="bottom" className="flex h-[92dvh] max-h-[92dvh] flex-col gap-0 overflow-hidden rounded-t-[var(--radius-sheet)] px-4 pt-14 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <SheetTitle className="sr-only">Job ticket</SheetTitle>
         <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea>
         {footer}

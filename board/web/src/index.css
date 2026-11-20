@@ -102,6 +102,7 @@
   --input: rgba(224, 153, 45, 0.5);
   --ring: #e0992d;
   --radius: 2px;
+  --radius-sheet: 12px;
   --font-display: "Big Shoulders Display", "Arial Narrow", sans-serif;
   --font-sans: "Red Hat Text", "Segoe UI", sans-serif;
   --font-mono: "Red Hat Mono", ui-monospace, monospace;

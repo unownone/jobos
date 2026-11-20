@@ -41,6 +41,14 @@ export function panelVariants(reduce: boolean, play: boolean) {
   return { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } };
 }
 
+/** A sheet mounts when it opens, so it may start from opacity 0. Reduced motion fades only. */
+export function sheetVariants(reduce: boolean) {
+  if (reduce) {
+    return { initial: { opacity: 0 }, animate: { opacity: 1 } };
+  }
+  return { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 } };
+}
+
 export function usePanelPlay() {
   const [play, setPlay] = useState(false);
   useEffect(() => setPlay(true), []);

@@ -1,7 +1,9 @@
 import * as SheetPrimitive from "@radix-ui/react-dialog";
+import { motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 
+import { sheetVariants, usePageTransition } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 const sheetSides = {
@@ -43,19 +45,29 @@ function SheetContent({
   side = "right",
   ...props
 }: ComponentProps<typeof SheetPrimitive.Content> & { side?: SheetSide }) {
+  const reduce = useReducedMotion() === true;
+  const variants = sheetVariants(reduce);
+  const transition = usePageTransition();
   return (
     <SheetPrimitive.Portal>
       <SheetPrimitive.Overlay data-slot="sheet-overlay" className="fixed inset-0 z-50 bg-background/80" />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-popover p-6 text-popover-foreground shadow-lg border border-border",
+          "fixed z-50 flex flex-col gap-4 overflow-hidden bg-popover p-6 text-popover-foreground shadow-lg border border-border",
           sheetSides[side],
           className,
         )}
         {...props}
       >
-        {children}
+        <motion.div
+          className="flex min-h-0 flex-1 flex-col"
+          initial={variants.initial}
+          animate={variants.animate}
+          transition={transition}
+        >
+          {children}
+        </motion.div>
         <SheetClose className="absolute top-3 right-3 inline-flex items-center justify-center rounded-md opacity-70 transition-colors hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-w-[2.75rem]">
           <X className="size-4" />
           <span className="sr-only">Close</span>
