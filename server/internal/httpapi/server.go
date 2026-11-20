@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -185,7 +186,53 @@ func (s *Server) Router() *gin.Engine {
 	authed.POST("/api/a2a/peers/:id/send", s.sendPeer)
 	authed.GET("/api/stream", s.stream)
 	authed.GET("/ws", s.socket)
+	s.serveSPA(r)
 	return r
+}
+
+func (s *Server) serveSPA(r *gin.Engine) {
+	root := strings.TrimSpace(s.Cfg.WebRoot)
+	if root == "" {
+		return
+	}
+	r.NoRoute(func(c *gin.Context) {
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		path := c.Request.URL.Path
+		if strings.HasPrefix(path, "/api/") || path == "/api" || strings.HasPrefix(path, "/a2a") || strings.HasPrefix(path, "/ws") || strings.HasPrefix(path, "/.well-known/") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		file, ok := spaFile(root, path)
+		if !ok {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.File(file)
+	})
+}
+
+func spaFile(root, urlPath string) (string, bool) {
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return "", false
+	}
+	rel := strings.TrimPrefix(filepath.Clean("/"+urlPath), "/")
+	full := filepath.Join(rootAbs, rel)
+	fullAbs, err := filepath.Abs(full)
+	if err != nil || (fullAbs != rootAbs && !strings.HasPrefix(fullAbs, rootAbs+string(os.PathSeparator))) {
+		return "", false
+	}
+	if info, err := os.Stat(fullAbs); err == nil && !info.IsDir() {
+		return fullAbs, true
+	}
+	index := filepath.Join(rootAbs, "index.html")
+	if _, err := os.Stat(index); err != nil {
+		return "", false
+	}
+	return index, true
 }
 
 func (s *Server) requireAuth(c *gin.Context) {

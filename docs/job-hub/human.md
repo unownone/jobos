@@ -37,7 +37,7 @@ Full hosting: [`docs/install.md`](../install.md). **After signup, open `/onboard
 
 `HUB_PUBLIC_HOST=12.234.244.34:343` becomes `http://12.234.244.34:343` on invite URLs. `:443` becomes `https://`. A full `HUB_PUBLIC_URL` still wins.
 
-`scripts/hub_deploy.sh` still starts the Python board. The Compose file above is the Go API and the React SPA.
+`scripts/hub_deploy.sh` starts the Go API and serves the React SPA on `BOARD_HOST`/`BOARD_PORT` (default `0.0.0.0:8787`). Compose runs those as two containers.
 
 What the script does:
 
@@ -45,11 +45,11 @@ What the script does:
 2. Mints compat role tokens (`scripts/board_gen_tokens.py`) if empty.
 3. Mints a one-time `jh_boot_*` bootstrap token if there is no admin user (`scripts/hub_ensure_bootstrap.py`).
 4. Builds the onboarding pack (`scripts/hub_build_pack.py`).
-5. Starts `board/start.sh` (Gunicorn + Uvicorn workers on `BOARD_HOST`/`BOARD_PORT`, default `0.0.0.0:8787`).
+5. Builds `web/dist` when it is missing, then starts `go run ./cmd/hub`.
 
 Stdout prints `Admin signup: $public_origin/admin/signup#bootstrap=…` once for a **fresh** deploy. After that, anyone may create an account at `/login` (username + password). `/admin/signup` still consumes the one-time bootstrap token if no admin exists yet.
 
-Dry run (no gunicorn): `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
+Dry run (does not start the API): `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
 
 `GET /health` is public and includes `admin_bootstrapped` (boolean). It does not leak tokens.
 

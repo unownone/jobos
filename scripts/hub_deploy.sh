@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Deploy Job Hub (the board FastAPI process). No second service.
-# Cursor Cloud: binds 0.0.0.0:8787; Docker is optional and not required.
+# Deploy Job Hub as the Go API. It serves the built React SPA when web/dist exists.
+# Default listen address is 0.0.0.0:8787. Docker is optional and not required.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -22,9 +22,13 @@ fi
 
 export BOARD_HOST="${BOARD_HOST:-0.0.0.0}"
 export BOARD_PORT="${BOARD_PORT:-8787}"
+export HUB_ADDR="${HUB_ADDR:-${BOARD_HOST}:${BOARD_PORT}}"
+export HUB_REPO_ROOT="${HUB_REPO_ROOT:-$REPO}"
+export HUB_WEB_ROOT="${HUB_WEB_ROOT:-$REPO/web/dist}"
+export HUB_PLUGINS="${HUB_PLUGINS:-off}"
 
 echo "Job Hub deploy"
-echo "  bind: ${BOARD_HOST}:${BOARD_PORT}"
+echo "  bind: ${HUB_ADDR}"
 echo "  gitignored secrets: ${BOARD}/.env ${BOARD}/tokens.local.json"
 echo "  postgres: ${DATABASE_URL:-set DATABASE_URL}"
 if [[ -n "${HUB_PUBLIC_URL:-}" ]]; then
@@ -39,8 +43,22 @@ fi
 "$BOARD_PKG/.venv/bin/python" "$REPO/scripts/hub_build_pack.py" --dir "$BOARD" --repo "$REPO"
 
 if [[ "${HUB_DEPLOY_DRY_RUN:-}" == "1" ]]; then
-  echo "HUB_DEPLOY_DRY_RUN=1 — not starting gunicorn"
+  echo "HUB_DEPLOY_DRY_RUN=1 — not starting the Go API"
   exit 0
 fi
 
-exec bash "$BOARD_PKG/start.sh"
+if [[ ! -f "${HUB_WEB_ROOT}/index.html" ]]; then
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "hub_deploy: npm is required to build ${HUB_WEB_ROOT}" >&2
+    exit 1
+  fi
+  npm install --prefix "$REPO/web"
+  npm run build --prefix "$REPO/web"
+fi
+if ! command -v go >/dev/null 2>&1; then
+  echo "hub_deploy: go is required to start the API" >&2
+  exit 1
+fi
+
+cd "$REPO/server"
+exec go run ./cmd/hub

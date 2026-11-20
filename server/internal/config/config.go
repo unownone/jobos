@@ -11,6 +11,7 @@ type Config struct {
 	Addr        string
 	PublicURL   string
 	RepoRoot    string
+	WebRoot     string
 	DatabaseURL string
 
 	RedisURL string
@@ -33,6 +34,7 @@ func Load() Config {
 		Addr:           env("HUB_ADDR", ":8080"),
 		PublicURL:      strings.TrimRight(os.Getenv("HUB_PUBLIC_URL"), "/"),
 		RepoRoot:       os.Getenv("HUB_REPO_ROOT"),
+		WebRoot:        strings.TrimSpace(os.Getenv("HUB_WEB_ROOT")),
 		DatabaseURL:    strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		RedisURL:       strings.TrimSpace(os.Getenv("REDIS_URL")),
 		BlobDriver:     strings.ToLower(env("BLOB_DRIVER", "memory")),

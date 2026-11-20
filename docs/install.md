@@ -2,7 +2,7 @@
 
 jobOS Hub is the live coordination plane for the job harness. The current Compose file runs two containers: a Go API and a React SPA. Postgres, Redis, and MinIO are optional profiles. RabbitMQ is not in that file. See [`docs/runtime.md`](runtime.md). Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
 
-`scripts/hub_deploy.sh` still starts the Python board. `board/docker-compose.yml` and the repo-root Compose files start the Go API and the React SPA. Traefik also answers on port 8787 and sends that traffic to the SPA.
+`scripts/hub_deploy.sh` starts the Go API and serves the built React SPA on port 8787. `board/docker-compose.yml` and the repo-root Compose files run the API and the SPA as separate containers. Traefik also answers on port 8787 and sends that traffic to the SPA.
 
 **Onboarding is the first thing you do after the process is up.** Until a truthful candidate profile exists, jobs, invites, queues, messages, and A2A sends return `409 candidate_required`. Do not copy `profiles/candidate.example.yaml` into production.
 
@@ -98,11 +98,11 @@ Coolify has no universal one-click URL. Create a **Docker Compose** resource poi
 4. Confirm Persistent Storage lists named volumes `pgdata` and `blobs` (Coolify prefixes them). Do not convert them to `${...}` or `~` binds.
 5. After first boot, open `/login`, then `/onboarding`. Healthcheck is `GET /health` on port 8080 inside the API container.
 
-The Railway button still builds the root Python `Dockerfile`. Local and Coolify Compose build `server/Dockerfile` and `web/Dockerfile`.
+The Railway button builds the root `Dockerfile`, which is the Go API serving the SPA from the same container. Local and Coolify Compose build `server/Dockerfile` and `web/Dockerfile` as two containers.
 
 ## Railway
 
-Use the README **Deploy on Railway** button (`railway.json` + `Dockerfile`). Railway injects `PORT`; Gunicorn binds that port (see `board/gunicorn.conf.py`). Override worker count with `WEB_CONCURRENCY`.
+Use the README **Deploy on Railway** button (`railway.json` + `Dockerfile`). Railway injects `PORT`. The process binds that port. Compose remains the two-container layout.
 
 Set after the first domain exists:
 
@@ -125,9 +125,9 @@ docker build -t jobos-hub .
 
 Compose is required for a full install. The Hub image is stateless.
 
-## Bare metal (uv)
+## Bare metal
 
-This path still starts the Python board. Needs Python 3.11+ and [`uv`](https://docs.astral.sh/uv/).
+This path starts the Go API and serves `web/dist`. It still uses `uv` to mint the one-time bootstrap token. Needs Go, Node, and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
 bash scripts/setup_uv.sh          # if uv is missing
@@ -135,7 +135,7 @@ export HUB_PUBLIC_HOST=127.0.0.1:8787
 bash scripts/hub_deploy.sh
 ```
 
-Listens on `0.0.0.0:8787`. Secrets: gitignored `board/.env` and `board/tokens.local.json`. Set `DATABASE_URL` to PostgreSQL. Dry run: `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
+Listens on `0.0.0.0:8787` and serves the SPA from that same port. Secrets: gitignored `board/.env` and `board/tokens.local.json`. Set `DATABASE_URL` to PostgreSQL. Dry run: `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
 
 ## Reverse proxy / TLS
 
