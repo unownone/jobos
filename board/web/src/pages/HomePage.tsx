@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 
 import { AppShell } from "@/components/shell/AppShell";
+import type { ShellConn } from "@/components/shell/TopBar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
+import { pageVariants, usePageTransition } from "@/lib/motion";
 
 const display =
   "font-display tracking-[-0.03em] [font-family:var(--font-display)]";
@@ -39,14 +42,12 @@ type Whoami = {
   user?: { display_name?: string | null } | null;
 };
 
-type Conn = "signing in" | "signed in" | "sign in required";
-
 type OldestJob = NonNullable<Dashboard["oldest_in_pipeline"]>;
 
 const FUNNEL_STAGES = [
-  { key: "found", label: "Found" },
-  { key: "applied", label: "Applied" },
-  { key: "outreached", label: "Outreached" },
+  { key: "found", label: "Found", color: "#e0992d" },
+  { key: "applied", label: "Applied", color: "#3f9d7a" },
+  { key: "outreached", label: "Outreached", color: "#f3bc5a" },
 ] as const;
 
 function text(value: string | null | undefined): string {
@@ -88,6 +89,11 @@ function barWidth(count: number, max: number): string {
   return `${Math.round((count / max) * 100)}%`;
 }
 
+function agentWidth(dashboard: Dashboard | undefined): string {
+  if (!dashboard || dashboard.agents.total <= 0) return "0%";
+  return `${Math.round((dashboard.agents.working / dashboard.agents.total) * 100)}%`;
+}
+
 function dayLabel(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso.slice(0, 10);
@@ -109,8 +115,8 @@ function Kpi({
 }) {
   return (
     <Card className="p-4">
-      <p className="m-0 text-sm text-muted-foreground">{label}</p>
-      <p id={valueId} className={`${valueClass} mt-2`}>
+      <p className="m-0 text-xs font-bold tracking-[0.08em] text-muted-foreground uppercase">{label}</p>
+      <p id={valueId} className={`${valueClass} mt-2 text-accent-foreground`}>
         {value}
       </p>
       <p id={hintId} className="mt-2 mb-0 text-sm text-muted-foreground">
@@ -137,7 +143,7 @@ function OldestBody({ job }: { job: OldestJob }) {
         {job.location ? <span>{job.location}</span> : null}
       </p>
       <p className="mt-3 mb-0">
-        <a href="/board" className="text-primary underline-offset-4 hover:underline">
+        <a href="/board" className="inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline">
           {job.id}
         </a>
       </p>
@@ -146,8 +152,11 @@ function OldestBody({ job }: { job: OldestJob }) {
 }
 
 export function HomePage() {
+  const reduceMotion = useReducedMotion() === true;
+  const variants = pageVariants(reduceMotion);
+  const transition = usePageTransition();
   const [who, setWho] = useState<string | undefined>(undefined);
-  const [conn, setConn] = useState<Conn>("signing in");
+  const [conn, setConn] = useState<ShellConn>("signing in");
   const [dashboard, setDashboard] = useState<Dashboard | undefined>(undefined);
   const [loadError, setLoadError] = useState("");
 
@@ -189,7 +198,14 @@ export function HomePage() {
       who={who}
       conn={conn}
     >
-      <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5">
+      <motion.main
+        id="main"
+        className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5"
+        initial={variants.initial}
+        animate={variants.animate}
+        exit={variants.exit}
+        transition={transition}
+      >
         <div className="grid gap-3 md:grid-cols-3">
           <Kpi
             label="Found today"
@@ -224,8 +240,8 @@ export function HomePage() {
                     <div className="relative min-h-14">
                       <div
                         data-funnel={stage.label}
-                        className="absolute inset-y-0 left-0 bg-primary/25"
-                        style={{ width }}
+                        className="absolute inset-y-0 left-0"
+                        style={{ width, backgroundColor: stage.color, opacity: 0.35 }}
                       />
                       <div className="relative flex items-baseline justify-between gap-3 px-4 py-3">
                         <span className="font-medium">{stage.label}</span>
@@ -240,7 +256,8 @@ export function HomePage() {
             </div>
             <ul id="funnelLegend" aria-live="polite" className="m-0 mt-3 flex list-none flex-wrap gap-x-5 gap-y-1 p-0 text-sm text-muted-foreground">
               {FUNNEL_STAGES.map((stage) => (
-                <li key={stage.key}>
+                <li key={stage.key} className="flex items-center gap-2">
+                  <i aria-hidden="true" className="inline-block size-2.5 shrink-0" style={{ backgroundColor: stage.color }} />
                   {stage.label} <b className="text-foreground">{countText(dashboard?.funnel[stage.key])}</b>
                 </li>
               ))}
@@ -250,7 +267,7 @@ export function HomePage() {
           <section>
             <h2 className={sectionTitle}>Agents</h2>
             <Card className="p-4">
-              <p id="agentWorking" className={valueClass}>
+              <p id="agentWorking" className={`${valueClass} text-accent-foreground`}>
                 {countText(dashboard?.agents.working)}
               </p>
               <p className="mt-2 mb-0 text-sm text-muted-foreground">working now</p>
@@ -259,13 +276,16 @@ export function HomePage() {
                   of {dashboard.agents.total} {dashboard.agents.total === 1 ? "agent" : "agents"} · {dashboard.agents.live} live
                 </p>
               ) : null}
+              <div className="mt-4 h-2 bg-secondary" aria-hidden="true">
+                <div className="h-full bg-primary" style={{ width: agentWidth(dashboard) }} />
+              </div>
             </Card>
           </section>
         </div>
 
         <section>
           <h2 className={sectionTitle}>Oldest open job</h2>
-          <Card className="p-4">
+          <Card className="border-l-[3px] border-l-primary p-4">
             <div id="oldestBody">
               {loadError ? (
                 <p className="m-0 text-muted-foreground">{loadError}</p>
@@ -279,7 +299,7 @@ export function HomePage() {
             </div>
           </Card>
         </section>
-      </main>
+      </motion.main>
     </AppShell>
   );
 }

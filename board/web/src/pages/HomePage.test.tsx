@@ -2,6 +2,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/lib/api";
+import { pageVariants } from "@/lib/motion";
 
 import { HomePage } from "./HomePage";
 import homeSource from "./HomePage.tsx?raw";
@@ -71,8 +72,8 @@ function byId(id: string): HTMLElement {
 beforeEach(() => {
   window.history.replaceState({}, "", "/home");
   apiMock.mockReset();
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: false,
+  const matchMedia = (query: string) => ({
+    matches: query.includes("prefers-reduced-motion"),
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},
@@ -80,7 +81,13 @@ beforeEach(() => {
     removeListener: () => {},
     dispatchEvent: () => false,
     onchange: null,
-  }));
+  });
+  vi.stubGlobal("matchMedia", matchMedia);
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: matchMedia,
+  });
 });
 
 afterEach(() => {
@@ -154,8 +161,20 @@ describe("HomePage", () => {
     expect(homeSource).not.toMatch(/chart\.js|chartjs|Chart/i);
     expect(homeSource).toContain('from "@/components/shell/AppShell"');
     expect(homeSource).toContain('from "@/lib/api"');
+    expect(homeSource).toContain('from "@/lib/motion"');
+    expect(homeSource).toContain("pageVariants(");
     expect(homeSource).toContain('from "@/components/ui/card"');
     expect(homeSource).toContain('scroll="page"');
+    expect(homeSource).toContain('path="/home"');
+    expect(pageVariants(true)).toEqual({
+      initial: false,
+      animate: { opacity: 1 },
+      exit: { opacity: 0 },
+    });
+    const motionStyles = [...document.querySelectorAll<HTMLElement>("[style]")]
+      .map((node) => node.getAttribute("style") ?? "")
+      .join("\n");
+    expect(motionStyles).not.toMatch(/translateY|translate3d/i);
   });
 
   it("uses an em dash when the pipeline is empty and falls back to actor and role", async () => {
