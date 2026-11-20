@@ -102,6 +102,25 @@ describe("admin pages", () => {
     });
   });
 
+  it("names a job card by company", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada" });
+      if (path.startsWith("/api/jobs")) {
+        return Promise.resolve({
+          jobs: [{ id: "board__acme", company: "Acme", title: "Engineer", status: "discovered", score: 4 }],
+          count: 1,
+          total: 1,
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<DataPage />);
+    await waitFor(() => {
+      expect(document.querySelector("[data-slot='record-deck'] p")?.textContent).toBe("Acme");
+    });
+    expect(document.querySelector("#table th")?.textContent).toBe("ID");
+  });
+
   it("renders the data browser", async () => {
     apiMock.mockImplementation((path: string) => {
       if (path.startsWith("/api/jobs")) return Promise.resolve({ jobs: [], count: 0, total: 0 });

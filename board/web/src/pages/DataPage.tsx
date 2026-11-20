@@ -16,6 +16,24 @@ type Tab = (typeof TABS)[number];
 
 type Row = Record<string, string>;
 
+function cardFace(row: Record<string, string>, headers: string[]): { title: string; subtitle?: string; fields: string[] } {
+  if (row.Company) {
+    return {
+      title: row.Company,
+      subtitle: row.Title || "",
+      fields: headers.filter((header) => header !== "Company" && header !== "Title"),
+    };
+  }
+  if (row.Name) {
+    return {
+      title: row.Name,
+      subtitle: row.Title || "",
+      fields: headers.filter((header) => header !== "Name" && header !== "Title"),
+    };
+  }
+  return { title: row[headers[0]] || "Row", fields: headers.slice(1) };
+}
+
 function isTab(value: string): value is Tab {
   return (TABS as readonly string[]).includes(value);
 }
@@ -290,13 +308,16 @@ export function DataPage() {
           ) : (
             <>
             <RecordDeck>
-              {rows.map((row, index) => (
-                <RecordCard key={`${tab}-${index}`} title={row[headers[0]] || "Row"}>
-                  {headers.slice(1).map((header) => (
-                    <RecordField key={header} label={header} value={row[header] || ""} />
-                  ))}
-                </RecordCard>
-              ))}
+              {rows.map((row, index) => {
+                const face = cardFace(row, headers);
+                return (
+                  <RecordCard key={`${tab}-${index}`} title={face.title} subtitle={face.subtitle}>
+                    {face.fields.map((header) => (
+                      <RecordField key={header} label={header} value={row[header] || ""} />
+                    ))}
+                  </RecordCard>
+                );
+              })}
             </RecordDeck>
             <div className="overflow-x-auto border border-border bg-card max-[720px]:hidden">
             <Table>
