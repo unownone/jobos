@@ -219,6 +219,9 @@ describe("BoardPage", () => {
     expect(byId("f_status").getAttribute("data-slot")).toBe("select");
     expect(byId("f_rejection_by").tagName).toBe("SELECT");
     expect(byId("side").querySelector("[data-slot='scroll-area']")).toBeTruthy();
+    expect(byId("side").querySelector("[data-slot='scroll-area']")?.contains(byId("f_status"))).toBe(true);
+    expect(byId("side").querySelector("[data-slot='scroll-area']")?.contains(byId("saveBtn"))).toBe(false);
+    expect(byId("side").contains(byId("saveBtn"))).toBe(true);
     expect(document.querySelectorAll("#f_company")).toHaveLength(1);
 
     fireEvent.change(byId("f_title"), { target: { value: "Staff Engineer" } });

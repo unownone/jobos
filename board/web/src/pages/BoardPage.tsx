@@ -660,9 +660,25 @@ export function BoardPage() {
               </table>
             )}
           </section>
-          <TicketFrame narrow={narrow} open={selected !== null} onClose={closeTicket}>
+          <TicketFrame
+            narrow={narrow}
+            open={selected !== null}
+            onClose={closeTicket}
+            footer={selected ? (
+              <div className="shrink-0 border-t border-border bg-card p-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button id="saveBtn" type="button" disabled={!caps?.can_patch} onClick={() => void saveJob()}>Save patch</Button>
+                  <Button id="pauseBtn" type="button" variant="outline" disabled={!caps?.can_stop || Boolean(selected.stopped)} onClick={() => void pauseJob()}>Pause</Button>
+                  <Button id="stopBtn" type="button" variant="outline" disabled={!caps?.can_stop || Boolean(selected.stopped)} onClick={() => void stopJob()}>Stop</Button>
+                  <Button id="resumeBtn" type="button" variant="secondary" disabled={!caps?.can_stop || !selected.stopped} onClick={() => void resumeJob()}>Resume</Button>
+                  <Button id="delBtn" type="button" variant="destructive" disabled={!caps?.can_delete} onClick={() => void deleteJob()}>Delete</Button>
+                </div>
+                <p id="sideErr" className="mt-2 text-sm">{sideErr}</p>
+              </div>
+            ) : null}
+          >
             {selected ? (
-              <div className="flex flex-col gap-2 p-3">
+              <div className="flex flex-col gap-1 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="m-0 min-w-0 flex-1 break-all font-display text-lg leading-tight font-extrabold [font-family:var(--font-display)]">
                     #{selected.id} · {selected.company}
@@ -676,13 +692,11 @@ export function BoardPage() {
                     Claimed: {selected.claim.kind} by {selected.claim.claimed_by || ""} until {selected.claim.lease_until || ""}
                   </p>
                 ) : null}
-                <label className="text-sm" htmlFor="f_company">Company</label>
+                <label className="text-xs leading-none" htmlFor="f_company">Company</label>
                 <Input id="f_company" value={selected.company ?? ""} onChange={(event) => updateJob({ company: event.target.value })} />
-                <label className="text-sm" htmlFor="f_title">Title</label>
+                <label className="text-xs leading-none" htmlFor="f_title">Title</label>
                 <Input id="f_title" value={selected.title ?? ""} onChange={(event) => updateJob({ title: event.target.value })} />
-                <label className="text-sm" htmlFor="f_source">Source</label>
-                <Input id="f_source" value={sourceText} onChange={(event) => setSourceText(event.target.value)} />
-                <label className="text-sm" htmlFor="f_status">Status</label>
+                <label className="text-xs leading-none" htmlFor="f_status">Status</label>
                 <NativeSelect
                   id="f_status"
                   label="Status"
@@ -690,23 +704,25 @@ export function BoardPage() {
                   options={statusOptions.map((status) => ({ value: status, label: status }))}
                   onChange={(value) => updateJob({ status: value })}
                 />
-                <label className="text-sm" htmlFor="f_score">Score</label>
+                <label className="text-xs leading-none" htmlFor="f_source">Source</label>
+                <Input id="f_source" value={sourceText} onChange={(event) => setSourceText(event.target.value)} />
+                <label className="text-xs leading-none" htmlFor="f_score">Score</label>
                 <Input id="f_score" type="number" min={1} max={5} step={1} value={selected.score == null ? "" : String(selected.score)} onChange={(event) => updateJob({ score: event.target.value === "" ? null : Number(event.target.value) })} />
-                <label className="text-sm" htmlFor="f_location">Location</label>
+                <label className="text-xs leading-none" htmlFor="f_location">Location</label>
                 <Input id="f_location" value={selected.location ?? ""} onChange={(event) => updateJob({ location: event.target.value })} />
-                <label className="text-sm" htmlFor="f_apply_url">Apply URL</label>
+                <label className="text-xs leading-none" htmlFor="f_apply_url">Apply URL</label>
                 <Input id="f_apply_url" value={selected.apply_url ?? ""} onChange={(event) => updateJob({ apply_url: event.target.value })} />
-                <label className="text-sm" htmlFor="f_posted_at">Posted</label>
+                <label className="text-xs leading-none" htmlFor="f_posted_at">Posted</label>
                 <Input id="f_posted_at" value={selected.posted_at ?? ""} placeholder="2026-09-01T00:00:00Z" onChange={(event) => updateJob({ posted_at: event.target.value })} />
-                <label className="text-sm" htmlFor="f_pay">Pay</label>
+                <label className="text-xs leading-none" htmlFor="f_pay">Pay</label>
                 <Input id="f_pay" value={selected.pay ?? ""} placeholder="as the posting states it" onChange={(event) => updateJob({ pay: event.target.value })} />
-                <label className="text-sm" htmlFor="f_description">Job description</label>
+                <label className="text-xs leading-none" htmlFor="f_description">Job description</label>
                 <Textarea id="f_description" value={selected.description ?? ""} onChange={(event) => updateJob({ description: event.target.value })} />
-                <label className="text-sm" htmlFor="f_expectations">Expectations</label>
+                <label className="text-xs leading-none" htmlFor="f_expectations">Expectations</label>
                 <Textarea id="f_expectations" value={selected.expectations ?? ""} onChange={(event) => updateJob({ expectations: event.target.value })} />
-                <label className="text-sm" htmlFor="f_notes">Notes</label>
+                <label className="text-xs leading-none" htmlFor="f_notes">Notes</label>
                 <Textarea id="f_notes" value={selected.notes ?? ""} onChange={(event) => updateJob({ notes: event.target.value })} />
-                <label className="text-sm" htmlFor="f_rejection_by">Rejected by</label>
+                <label className="text-xs leading-none" htmlFor="f_rejection_by">Rejected by</label>
                 <NativeSelect
                   id="f_rejection_by"
                   label="Rejected by"
@@ -718,26 +734,18 @@ export function BoardPage() {
                   ]}
                   onChange={(value) => updateJob({ rejection: { ...selected.rejection, by: value === "none" ? "" : value } })}
                 />
-                <label className="text-sm" htmlFor="f_company_remarks">Company remarks</label>
+                <label className="text-xs leading-none" htmlFor="f_company_remarks">Company remarks</label>
                 <Textarea id="f_company_remarks" value={selected.rejection?.company_remarks ?? ""} onChange={(event) => updateJob({ rejection: { ...selected.rejection, company_remarks: event.target.value } })} />
-                <label className="text-sm" htmlFor="f_user_remarks">User remarks</label>
+                <label className="text-xs leading-none" htmlFor="f_user_remarks">User remarks</label>
                 <Textarea id="f_user_remarks" value={selected.rejection?.user_remarks ?? ""} onChange={(event) => updateJob({ rejection: { ...selected.rejection, user_remarks: event.target.value } })} />
-                <label className="text-sm" htmlFor="f_owners">Owners JSON</label>
+                <label className="text-xs leading-none" htmlFor="f_owners">Owners JSON</label>
                 <Textarea id="f_owners" value={packets.owners} onChange={(event) => setPackets((current) => ({ ...current, owners: event.target.value }))} />
-                <label className="text-sm" htmlFor="f_apply_packet">Apply packet JSON</label>
+                <label className="text-xs leading-none" htmlFor="f_apply_packet">Apply packet JSON</label>
                 <Textarea id="f_apply_packet" value={packets.apply_packet} onChange={(event) => setPackets((current) => ({ ...current, apply_packet: event.target.value }))} />
-                <label className="text-sm" htmlFor="f_outreach_packet">Outreach packet JSON</label>
+                <label className="text-xs leading-none" htmlFor="f_outreach_packet">Outreach packet JSON</label>
                 <Textarea id="f_outreach_packet" value={packets.outreach_packet} onChange={(event) => setPackets((current) => ({ ...current, outreach_packet: event.target.value }))} />
-                <label className="text-sm" htmlFor="f_proof">Proof JSON</label>
+                <label className="text-xs leading-none" htmlFor="f_proof">Proof JSON</label>
                 <Textarea id="f_proof" value={packets.proof} onChange={(event) => setPackets((current) => ({ ...current, proof: event.target.value }))} />
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button id="saveBtn" type="button" disabled={!caps?.can_patch} onClick={() => void saveJob()}>Save patch</Button>
-                  <Button id="pauseBtn" type="button" variant="outline" disabled={!caps?.can_stop || Boolean(selected.stopped)} onClick={() => void pauseJob()}>Pause</Button>
-                  <Button id="stopBtn" type="button" variant="outline" disabled={!caps?.can_stop || Boolean(selected.stopped)} onClick={() => void stopJob()}>Stop</Button>
-                  <Button id="resumeBtn" type="button" variant="secondary" disabled={!caps?.can_stop || !selected.stopped} onClick={() => void resumeJob()}>Resume</Button>
-                  <Button id="delBtn" type="button" variant="destructive" disabled={!caps?.can_delete} onClick={() => void deleteJob()}>Delete</Button>
-                </div>
-                <p id="sideErr" className="text-sm">{sideErr}</p>
                 <div>
                   <h2 className="font-display text-[1.2rem] leading-none font-extrabold [font-family:var(--font-display)]">Events</h2>
                   {events.length === 0 ? <p className="text-sm text-muted-foreground">No events</p> : events.map((event) => (
@@ -791,25 +799,29 @@ function TicketFrame({
   narrow,
   open,
   onClose,
+  footer,
   children,
 }: {
   narrow: boolean;
   open: boolean;
   onClose: () => void;
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   if (!narrow) {
     return (
       <aside id="side" hidden={!open} className="flex min-h-0 w-80 min-w-0 max-w-80 shrink-0 flex-col overflow-hidden border-l border-border">
         {open ? <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea> : children}
+        {open ? footer : null}
       </aside>
     );
   }
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <SheetContent id="side" side="bottom" className="flex max-h-[92dvh] flex-col overflow-y-auto">
+      <SheetContent id="side" side="bottom" className="flex max-h-[92dvh] flex-col overflow-hidden">
         <SheetTitle className="sr-only">Job ticket</SheetTitle>
         <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea>
+        {footer}
       </SheetContent>
     </Sheet>
   );
