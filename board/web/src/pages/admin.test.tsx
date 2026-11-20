@@ -136,7 +136,8 @@ describe("admin pages", () => {
 
     expect(document.querySelector("h1")).toHaveTextContent("jobOS data");
     expect(document.getElementById("tabs")).toBeInTheDocument();
-    expect(document.getElementById("q")).toBeInTheDocument();
+    expect(document.getElementById("q")?.closest("label")?.className).toContain("w-56");
+    expect(document.getElementById("q")?.closest("label")).toHaveTextContent("Search");
     expect(document.getElementById("status")).toBeInTheDocument();
     expect(document.getElementById("stopped")?.tagName).toBe("SELECT");
     expect(document.getElementById("stopped")).toHaveAttribute("data-slot", "select");

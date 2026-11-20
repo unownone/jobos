@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -253,11 +254,17 @@ export function DataPage() {
             </Button>
           ))}
         </div>
-        <div id="filters" className="flex flex-wrap items-center gap-2">
+        <div id="filters" className="flex flex-wrap items-end gap-2">
           {tab === "jobs" ? (
             <>
-              <Input id="q" value={q} placeholder="Search company / title" onChange={(event) => setQ(event.target.value)} />
-              <Input id="status" value={status} placeholder="status (apply_ready…)" onChange={(event) => setStatus(event.target.value)} />
+              <Field className="w-56 max-w-full shrink-0">
+                Search
+                <Input id="q" value={q} placeholder="Search company / title" onChange={(event) => setQ(event.target.value)} />
+              </Field>
+              <Field className="w-56 max-w-full shrink-0">
+                Status
+                <Input id="status" value={status} placeholder="status (apply_ready…)" onChange={(event) => setStatus(event.target.value)} />
+              </Field>
               <NativeSelect
                 id="stopped"
                 label="Stopped"
@@ -273,10 +280,16 @@ export function DataPage() {
             </>
           ) : null}
           {tab === "people" || tab === "memory" ? (
-            <Input id="q" value={q} placeholder={tab === "people" ? "Search name / company" : "Search facts"} onChange={(event) => setQ(event.target.value)} />
+            <Field className="w-56 max-w-full shrink-0">
+              Search
+              <Input id="q" value={q} placeholder={tab === "people" ? "Search name / company" : "Search facts"} onChange={(event) => setQ(event.target.value)} />
+            </Field>
           ) : null}
           {tab === "memory" ? (
-            <Input id="kind" value={kind} placeholder="kind" onChange={(event) => setKind(event.target.value)} />
+            <Field className="w-56 max-w-full shrink-0">
+              Kind
+              <Input id="kind" value={kind} placeholder="kind" onChange={(event) => setKind(event.target.value)} />
+            </Field>
           ) : null}
           {tab === "skills" ? (
             <>
