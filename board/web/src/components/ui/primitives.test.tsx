@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Field } from "./field";
+import { RecordCard, RecordField } from "./record-card";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./card";
 import {
   Dialog,
@@ -53,6 +54,18 @@ describe("hub primitives", () => {
     const label = screen.getByText("Name").closest("label");
     expect(label?.getAttribute("data-slot")).toBe("label");
     expect(label?.className).toContain("flex-col");
+  });
+
+  it("wraps a card value instead of clipping it", () => {
+    render(
+      <RecordCard title="Audit Fixture Co" subtitle="Staff Software Engineer">
+        <RecordField label="ID" value="board__audit-fixture-co-staff-software-engineer" />
+      </RecordCard>,
+    );
+    const value = screen.getByText("board__audit-fixture-co-staff-software-engineer");
+    expect(value.className).toContain("break-all");
+    expect(value.className).not.toContain("truncate");
+    expect(screen.getByText("Audit Fixture Co").className).not.toContain("truncate");
   });
 
   it("gives Button a 44px touch target", () => {

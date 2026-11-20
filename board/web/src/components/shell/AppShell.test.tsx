@@ -20,6 +20,9 @@ describe("AppShell", () => {
     expect(hub.textContent).not.toMatch(/Log out/);
     expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute("href", "/admin/users");
+    const mark = screen.getByRole("link", { name: "jobOS" });
+    expect(mark.className).toContain("size-11");
+    expect(mark.querySelector("span")?.className).toContain("size-[2.35rem]");
     expect(screen.getByText("helps find jobs").className).toContain("min-[960px]:truncate");
   });
 

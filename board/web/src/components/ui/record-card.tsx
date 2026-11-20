@@ -27,11 +27,11 @@ function RecordCard({
 }) {
   const body = (
     <Card className="p-3">
-      <p className="m-0 truncate font-medium" title={title}>
+      <p className="m-0 break-words font-medium" title={title}>
         {title}
       </p>
       {subtitle ? (
-        <p className="m-0 mt-1 truncate text-sm text-muted-foreground" title={subtitle}>
+        <p className="m-0 mt-1 break-words text-sm text-muted-foreground" title={subtitle}>
           {subtitle}
         </p>
       ) : null}
@@ -51,7 +51,7 @@ function RecordField({ label, value }: { label: string; value: string }) {
   return (
     <>
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="m-0 min-w-0 truncate" title={value}>
+      <dd className="m-0 min-w-0 break-all" title={value}>
         {value}
       </dd>
     </>
