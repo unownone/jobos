@@ -115,14 +115,27 @@
 
   function fillSessions(grants) {
     const current = steerSession.value;
+    const live = [""];
     const options = ["<option value=\"\">All sessions</option>"];
     grants.forEach((grant) => {
       if (!grant.session) return;
+      live.push(grant.session.id);
       options.push("<option value=\"" + esc(grant.session.id) + "\">" + esc(grant.client_name) + "</option>");
     });
+    const stale = current && live.indexOf(current) === -1;
+    if (stale) {
+      options.push("<option value=\"" + esc(current) + "\">Session ended</option>");
+    }
     steerSession.innerHTML = options.join("");
-    steerSession.value = current;
+    steerSession.value = stale || live.indexOf(current) !== -1 ? current : "";
+    steerSession.dataset.ended = stale ? current : "";
+    steerSession.dataset.stale = stale ? "1" : "";
   }
+
+  steerSession.addEventListener("change", () => {
+    const ended = steerSession.dataset.ended || "";
+    steerSession.dataset.stale = ended && steerSession.value === ended ? "1" : "";
+  });
 
   document.getElementById("copyUrl").addEventListener("click", async () => {
     const url = urlEl.dataset.url || urlEl.textContent;
@@ -137,6 +150,10 @@
   document.getElementById("steerForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     steerState.textContent = "";
+    if (steerSession.dataset.stale === "1") {
+      steerState.textContent = "That session ended. Pick another session, or All sessions.";
+      return;
+    }
     const body = document.getElementById("steerBody").value.trim();
     const sessionId = steerSession.value || null;
     const res = await fetch("/api/agent/steers", {

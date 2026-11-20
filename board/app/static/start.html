@@ -29,7 +29,8 @@
   <main id="main" class="wrap doc">
     <h1>Get started</h1>
     <p>
-      Log in, add <code>/mcp</code> to your AI, and approve the login it opens.
+      Log in, open <a href="/connect">/connect</a>, and add the full MCP URL shown there
+      (<code>https://your-hub/mcp</code>) to your AI. Approve the login it opens.
       Then tell it to get started, find jobs, apply jobs, or outreach jobs.
       The agent asks which lanes this session should run. Find and apply need a browser. Outreach needs email.
       You watch from Agents and leave a steer when you want to redirect it.
@@ -45,7 +46,7 @@
       <li>A running Hub (<a href="https://github.com/unownone/jobos/blob/main/docs/install.md">docs/install.md</a>).</li>
       <li>A truthful candidate profile. Do not invent one. Do not copy <code>candidate.example.yaml</code> into production.</li>
       <li>At least one resume PDF in the tenant BlobStore (recommended at onboarding).</li>
-      <li>A claimed role. Discovery never Easy Applies.</li>
+      <li>An admin login. The agent asks which lanes this session should run. Discovery never Easy Applies.</li>
     </ul>
 
     <h2>Sequence</h2>
@@ -75,16 +76,17 @@
       </li>
       <li>
         <div>
-          <strong>Read the contract, pick a role</strong>
-          <a href="https://github.com/unownone/jobos/blob/main/docs/process.md">docs/process.md</a>
-          and <a href="https://github.com/unownone/jobos/blob/main/docs/roles.md">docs/roles.md</a>.
-          Owners today: discovery, apply, outreach, and seldom maintainer.
-          Review and resume are coming soon — stubs only, not invite tracks.
+          <strong>Connect your AI</strong>
+          Open <a href="/connect">/connect</a> and copy the MCP URL. Add that URL to the AI and approve OAuth.
+          Then tell it to get started, find jobs, apply jobs, or outreach jobs. It asks which lanes this session should run.
         </div>
       </li>
       <li>
         <div>
-          <strong>Mint invites and let agents join</strong>
+          <strong>Older lane-bot path</strong>
+          Invite keys and a claimed role still work for bots that call the HTTP API.
+          <a href="https://github.com/unownone/jobos/blob/main/docs/process.md">docs/process.md</a>
+          and <a href="https://github.com/unownone/jobos/blob/main/docs/roles.md">docs/roles.md</a>.
           Operator docs:
           <a href="https://github.com/unownone/jobos/blob/main/docs/job-hub/human.md">docs/job-hub/human.md</a>.
           Agents:

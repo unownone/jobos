@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from typing import Any
@@ -256,9 +257,13 @@ def tool_catalog() -> list[dict[str, Any]]:
     ]
 
 
-def _slug_id(company: str, title: str) -> str:
-    slug = SLUG_RE.sub("-", f"{company}-{title}".lower()).strip("-")[:72]
-    return f"board__{slug or 'job'}"
+def _slug_id(company: str, title: str, *, apply_url: str = "", location: str = "") -> str:
+    slug = SLUG_RE.sub("-", f"{company}-{title}".lower()).strip("-")[:48] or "job"
+    marker = (apply_url or location or "").strip().lower()
+    if not marker:
+        return f"board__{slug}"
+    digest = hashlib.sha256(marker.encode("utf-8")).hexdigest()[:8]
+    return f"board__{slug}-{digest}"
 
 
 def _principal(grant: dict[str, Any], session: dict[str, Any]) -> Principal:
@@ -536,8 +541,15 @@ class McpEngine:
             if not ID_RE.match(job_id):
                 raise ValueError("id must match {source}__{stable_id}")
         else:
-            job_id = _slug_id(payload["company"], payload["title"])
-        if self.db.get_job(self.tenant, job_id):
+            job_id = _slug_id(
+                payload["company"],
+                payload["title"],
+                apply_url=str(payload.get("apply_url") or ""),
+                location=str(payload.get("location") or ""),
+            )
+        existing = self.db.get_job(self.tenant, job_id)
+        if existing:
+            self._sync_job(existing, role)
             raise ValueError(f"job id already exists: {job_id}")
         dup = self.db.find_duplicate(
             self.tenant,
@@ -562,10 +574,14 @@ class McpEngine:
             note="created via mcp",
             fields={"company": stored["company"], "title": stored["title"]},
         )
-        queue = getattr(self.request.app.state, "queue", None)
-        if queue is not None:
-            queue.sync_system_items(self.tenant, stored, actor_role=role, actor=self.principal.actor)
+        self._sync_job(stored, role)
         return {"job": _summary(stored), "instruction": "Do not apply from find. Call next_loop when this source is done."}
+
+    def _sync_job(self, job: dict[str, Any], role: str) -> None:
+        queue = getattr(self.request.app.state, "queue", None)
+        if queue is None:
+            return
+        queue.sync_system_items(self.tenant, job, actor_role=role, actor=self.principal.actor)
 
     def tool_update_job(self, args: dict[str, Any]) -> dict[str, Any]:
         self._candidate_ready()
@@ -671,7 +687,11 @@ class McpEngine:
 
     def tool_stop_loop(self, args: dict[str, Any]) -> dict[str, Any]:
         loop_id = str(args.get("loop_id") or "").strip()
-        loop = self.flow.get_loop(self.grant["account_id"], loop_id)
+        if loop_id:
+            loop = self.flow.get_loop(self.grant["account_id"], loop_id)
+        else:
+            loop = self.flow.active_loop(self.grant["account_id"], self.session["id"], None)
+            loop_id = str(loop["id"]) if loop else ""
         if loop is None or loop["session_id"] != self.session["id"]:
             raise ValueError("loop not found")
         saved = self.flow.save_loop(

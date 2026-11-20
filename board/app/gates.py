@@ -51,7 +51,7 @@ _ALLOW_PREFIXES = (
     "/.well-known/",
     "/a2a",
     "/api/join/",
-    "/api/agent",
+    "/api/agent/",
     "/join/",
 )
 

@@ -10,6 +10,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -94,6 +95,13 @@ CREATE TABLE IF NOT EXISTS mcp_grants (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mcp_grants_account ON mcp_grants(account_id, created_at);
+
+CREATE TABLE IF NOT EXISTS mcp_spent_refreshes (
+    grant_id TEXT NOT NULL,
+    refresh_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (grant_id, refresh_hash)
+);
 
 CREATE TABLE IF NOT EXISTS agent_sessions (
     id TEXT PRIMARY KEY,
@@ -323,11 +331,16 @@ def redirect_uri_allowed(uri: str) -> bool:
     return False
 
 
+_PKCE_VERIFIER = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
+
+
+def pkce_verifier_ok(verifier: str) -> bool:
+    """RFC 7636: 43–128 unreserved ASCII characters."""
+    return bool(_PKCE_VERIFIER.fullmatch(verifier or ""))
+
+
 def pkce_s256(verifier: str) -> str:
-    try:
-        raw = verifier.encode("ascii")
-    except UnicodeEncodeError:
-        raw = b""
+    raw = verifier.encode("ascii")
     digest = hashlib.sha256(raw).digest()
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
@@ -465,49 +478,76 @@ class AgentFlow:
             raise ValueError("invalid_grant")
         if row["expires_at"] < utc_now():
             raise ValueError("invalid_grant")
-        if not code_verifier or pkce_s256(code_verifier) != row["code_challenge"]:
+        if not pkce_verifier_ok(code_verifier) or pkce_s256(code_verifier) != row["code_challenge"]:
             raise ValueError("invalid_grant")
-        self.db.conn.execute(
-            "UPDATE mcp_auth_codes SET used_at = ? WHERE code_hash = ?",
+        claimed = self.db.conn.execute(
+            "UPDATE mcp_auth_codes SET used_at = ? WHERE code_hash = ? AND used_at IS NULL",
             (utc_now(), row["code_hash"]),
         )
+        if claimed.rowcount != 1:
+            self.db.conn.rollback()
+            raise ValueError("invalid_grant")
         client = self.get_client(client_id)
         name = client["client_name"] if client else "AI client"
-        return self._mint_grant(
-            account_id=row["account_id"],
-            user_id=row["user_id"],
-            client_id=client_id,
-            client_name=name,
-            scope=row["scope"] or SCOPE,
-            session_id=None,
-        )
+        try:
+            issued = self._mint_grant(
+                account_id=row["account_id"],
+                user_id=row["user_id"],
+                client_id=client_id,
+                client_name=name,
+                scope=row["scope"] or SCOPE,
+                session_id=None,
+                commit=False,
+            )
+        except Exception:
+            self.db.conn.rollback()
+            raise
+        self.db.conn.commit()
+        return issued
 
     def refresh(self, *, refresh_token: str, client_id: str) -> dict[str, Any]:
         digest = sha256_hex(refresh_token)
-        row = _row(
-            self.db.conn.execute(
-                "SELECT * FROM mcp_grants WHERE client_id = ? AND revoked_at IS NULL AND (refresh_hash = ? OR previous_refresh_hash = ?)",
-                (client_id, digest, digest),
-            ).fetchone()
-        )
-        if row is None:
-            raise ValueError("invalid_grant")
-        if row["refresh_expires_at"] < utc_now():
-            raise ValueError("invalid_grant")
-        if row.get("previous_refresh_hash") and hmac.compare_digest(digest, row["previous_refresh_hash"]):
-            self.revoke_grant(row["account_id"], row["id"])
+        row = self._grant_for_refresh(client_id, digest)
+        if row is None or row["refresh_expires_at"] < utc_now():
             raise ValueError("invalid_grant")
         if not hmac.compare_digest(digest, row["refresh_hash"]):
+            self.revoke_grant(row["account_id"], row["id"])
             raise ValueError("invalid_grant")
-        return self._mint_grant(
-            account_id=row["account_id"],
-            user_id=row["user_id"],
-            client_id=row["client_id"],
-            client_name=row["client_name"],
-            scope=row["scope"],
-            session_id=row.get("session_id"),
-            replace_id=row["id"],
-            previous_refresh_hash=row["refresh_hash"],
+        try:
+            return self._mint_grant(
+                account_id=row["account_id"],
+                user_id=row["user_id"],
+                client_id=row["client_id"],
+                client_name=row["client_name"],
+                scope=row["scope"],
+                session_id=row.get("session_id"),
+                replace_id=row["id"],
+                previous_refresh_hash=row["refresh_hash"],
+                expected_refresh_hash=digest,
+            )
+        except ValueError as exc:
+            if str(exc) != "refresh_conflict":
+                raise
+            again = self._grant_for_refresh(client_id, digest)
+            if again is not None and not hmac.compare_digest(digest, again["refresh_hash"]):
+                self.revoke_grant(again["account_id"], again["id"])
+            raise ValueError("invalid_grant") from exc
+
+    def _grant_for_refresh(self, client_id: str, digest: str) -> dict[str, Any] | None:
+        return _row(
+            self.db.conn.execute(
+                """
+                SELECT g.* FROM mcp_grants g
+                WHERE g.client_id = ? AND g.revoked_at IS NULL AND (
+                    g.refresh_hash = ? OR g.previous_refresh_hash = ?
+                    OR EXISTS (
+                        SELECT 1 FROM mcp_spent_refreshes s
+                        WHERE s.grant_id = g.id AND s.refresh_hash = ?
+                    )
+                )
+                """,
+                (client_id, digest, digest, digest),
+            ).fetchone()
         )
 
     def _mint_grant(
@@ -521,6 +561,8 @@ class AgentFlow:
         session_id: str | None,
         replace_id: str | None = None,
         previous_refresh_hash: str | None = None,
+        expected_refresh_hash: str | None = None,
+        commit: bool = True,
     ) -> dict[str, Any]:
         access = ACCESS_PREFIX + secrets.token_urlsafe(32)
         refresh = REFRESH_PREFIX + secrets.token_urlsafe(32)
@@ -529,12 +571,12 @@ class AgentFlow:
         refresh_exp = _iso_after(REFRESH_TTL)
         grant_id = replace_id or new_id("mgr_")
         if replace_id:
-            self.db.conn.execute(
+            rotated = self.db.conn.execute(
                 """
                 UPDATE mcp_grants
                 SET access_hash = ?, refresh_hash = ?, previous_refresh_hash = ?,
                     access_expires_at = ?, refresh_expires_at = ?, last_used_at = ?
-                WHERE id = ? AND account_id = ?
+                WHERE id = ? AND account_id = ? AND revoked_at IS NULL AND refresh_hash = ?
                 """,
                 (
                     sha256_hex(access),
@@ -545,8 +587,21 @@ class AgentFlow:
                     now,
                     replace_id,
                     account_id,
+                    expected_refresh_hash or previous_refresh_hash,
                 ),
             )
+            if rotated.rowcount != 1:
+                self.db.conn.rollback()
+                raise ValueError("refresh_conflict")
+            if previous_refresh_hash:
+                self.db.conn.execute(
+                    """
+                    INSERT INTO mcp_spent_refreshes (grant_id, refresh_hash, created_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT (grant_id, refresh_hash) DO NOTHING
+                    """,
+                    (replace_id, previous_refresh_hash, now),
+                )
         else:
             self.db.conn.execute(
                 """
@@ -572,7 +627,8 @@ class AgentFlow:
                     now,
                 ),
             )
-        self.db.conn.commit()
+        if commit:
+            self.db.conn.commit()
         return {
             "access_token": access,
             "token_type": "Bearer",
@@ -605,12 +661,20 @@ class AgentFlow:
         return row, ""
 
     def ensure_session(self, grant: dict[str, Any], *, label: str | None = None) -> dict[str, Any]:
+        fresh = self._load_grant(str(grant["id"]))
+        if fresh and fresh.get("session_id"):
+            grant["session_id"] = fresh["session_id"]
         current = self.session_for_grant(grant)
         if current and current["status"] == "active":
             self.touch_session(current["id"])
             current["last_seen_at"] = utc_now()
             return current
         now = utc_now()
+        if grant.get("session_id"):
+            self.db.conn.execute(
+                "UPDATE mcp_grants SET session_id = NULL WHERE id = ? AND session_id = ?",
+                (grant["id"], grant["session_id"]),
+            )
         session_id = new_id("ags_")
         name = (label or grant.get("client_name") or "agent").strip()[:120]
         self.db.conn.execute(
@@ -622,13 +686,34 @@ class AgentFlow:
             """,
             (session_id, grant["account_id"], grant["id"], name, _dump(empty_capabilities()), now, now, now),
         )
-        self.db.conn.execute(
-            "UPDATE mcp_grants SET session_id = ? WHERE id = ?",
+        linked = self.db.conn.execute(
+            """
+            UPDATE mcp_grants SET session_id = ?
+            WHERE id = ? AND revoked_at IS NULL AND session_id IS NULL
+            """,
             (session_id, grant["id"]),
         )
+        if linked.rowcount != 1:
+            self.db.conn.rollback()
+            won = self._load_grant(str(grant["id"]))
+            if won and won.get("session_id"):
+                grant["session_id"] = won["session_id"]
+                existing = self.session_for_grant(grant)
+                if existing and existing["status"] == "active":
+                    self.touch_session(existing["id"])
+                    return existing
+            raise ValueError("session was not linked")
         self.db.conn.commit()
         grant["session_id"] = session_id
-        return self.get_session(grant["account_id"], session_id)
+        stored = self.get_session(grant["account_id"], session_id)
+        if stored is None:
+            raise ValueError("session was not linked")
+        return stored
+
+    def _load_grant(self, grant_id: str) -> dict[str, Any] | None:
+        return _row(
+            self.db.conn.execute("SELECT * FROM mcp_grants WHERE id = ?", (grant_id,)).fetchone()
+        )
 
     def touch_session(self, session_id: str) -> None:
         now = utc_now()

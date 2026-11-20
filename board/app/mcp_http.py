@@ -56,12 +56,8 @@ class SteerIn(BaseModel):
 
 
 def external_origin(request: Request) -> str:
+    """Public origin from settings. Request Host and forwarded headers are not trusted."""
     settings = request.app.state.settings
-    forwarded_host = (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
-    forwarded_proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip()
-    if forwarded_host:
-        proto = forwarded_proto or "https"
-        return f"{proto}://{forwarded_host}".rstrip("/")
     configured = (getattr(settings, "public_url", "") or "").strip().rstrip("/")
     if configured:
         return configured
@@ -206,7 +202,13 @@ def _consent_page(request: Request, principal: Principal, client: dict[str, Any]
   </script>
 </body>
 </html>"""
-    return HTMLResponse(body)
+    return HTMLResponse(
+        body,
+        headers={
+            "X-Frame-Options": "DENY",
+            "Content-Security-Policy": "frame-ancestors 'none'",
+        },
+    )
 
 
 def _read_token_form(request: Request, raw: bytes) -> dict[str, str]:
@@ -355,12 +357,23 @@ def create_mcp_router(principal_dep: Any) -> APIRouter:
             payload = await request.json()
         except json.JSONDecodeError:
             return JSONResponse(status_code=400, content={"jsonrpc": "2.0", "error": {"code": -32700, "message": "parse error"}})
+        grant, reason = flow.grant_for_access(token)
+        if grant is None:
+            return JSONResponse(
+                status_code=401,
+                content={"error": reason or "invalid_token"},
+                headers={"WWW-Authenticate": _www_authenticate(origin), "Cache-Control": "no-store"},
+            )
         messages = payload if isinstance(payload, list) else [payload]
-        initializing = any(isinstance(item, dict) and item.get("method") == "initialize" for item in messages)
-        if header_session and grant.get("session_id") and header_session != grant.get("session_id") and not initializing:
+        needs_session = [
+            item
+            for item in messages
+            if isinstance(item, dict) and item.get("method") != "initialize"
+        ]
+        if needs_session and (not header_session or (grant.get("session_id") and header_session != grant.get("session_id"))):
             return JSONResponse(status_code=404, content={"error": "session not found"})
         session = flow.ensure_session(grant)
-        if header_session and header_session != session["id"] and not initializing:
+        if needs_session and header_session != session["id"]:
             return JSONResponse(status_code=404, content={"error": "session not found"})
         engine = McpEngine(request, flow, grant, session)
         replies: list[dict[str, Any]] = []
@@ -397,9 +410,12 @@ def create_mcp_router(principal_dep: Any) -> APIRouter:
                 content={"error": reason or "invalid_token"},
                 headers={"WWW-Authenticate": _www_authenticate(origin)},
             )
-        session_id = (request.headers.get("mcp-session-id") or grant.get("session_id") or "").strip()
-        if session_id:
-            flow.end_session(grant["account_id"], session_id)
+        linked = (grant.get("session_id") or "").strip()
+        supplied = (request.headers.get("mcp-session-id") or "").strip()
+        if supplied and supplied != linked:
+            return JSONResponse(status_code=404, content={"error": "session not found"})
+        if linked:
+            flow.end_session(grant["account_id"], linked)
         return Response(status_code=204)
 
     @router.get("/connect", response_model=None)

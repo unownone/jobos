@@ -26,7 +26,7 @@ Outline: `docs/catalogs/skill-outline.md`.
 
 ## Startup sequence
 
-1. Read `profiles/candidate.yaml` and the resume PDF paths.
+1. Read `profiles/candidate.yaml`, or `GET /api/candidate/public` on the Hub. If neither gives a profile, stop for the human to finish `/onboarding`. Fetch the resume with `GET /api/candidate/resume` when the packet needs the PDF.
 2. Take jobs with `status: apply_ready` (or `shortlisted` if the user approved).
 3. Claim `owners.apply` and set `applying` before opening a portal.
 4. Follow `apply_packet` in the YAML. If the packet is incomplete, bounce to discovery (`apply_blocked: packet incomplete`) instead of guessing a URL.

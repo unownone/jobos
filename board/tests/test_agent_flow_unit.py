@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.agent_flow import evaluate_lane, plan_loop, redirect_uri_allowed
+from app.agent_flow import evaluate_lane, pkce_verifier_ok, plan_loop, redirect_uri_allowed
 from app.mcp_http import _with_query
 
 
@@ -66,6 +66,14 @@ def test_apply_loop_names_one_ready_job() -> None:
     assert step["continue"] is True
     blocked = plan_loop({"lane": "apply"}, [])
     assert blocked["status"] == "blocked"
+
+
+def test_pkce_verifier_rejects_values_outside_the_rfc_grammar() -> None:
+    assert pkce_verifier_ok("a" * 64) is True
+    assert pkce_verifier_ok("a" * 42) is False
+    assert pkce_verifier_ok("a" * 129) is False
+    assert pkce_verifier_ok("a" * 43 + " ") is False
+    assert pkce_verifier_ok("é" * 64) is False
 
 
 def test_oauth_callback_keeps_registered_query_parameters() -> None:

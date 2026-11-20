@@ -16,7 +16,7 @@ You get a conversation. You do not apply. You do not text.
 
 ## Capability gate
 
-If you are on jobOS MCP, call `evaluate_lane` with `outreach` before any step below. Outreach needs a connected mailbox. A browser is optional. If `can` is false, tell the human and stop. Attach the resume PDF on email. If this session does not include outreach, ask the human before adding it with `set_session_lanes`.
+If you are on jobOS MCP, call `evaluate_lane` with `outreach` before any step below. Outreach needs a connected mailbox. A browser is optional. If `can` is false because `reason` is `lane_not_in_session`, ask the human whether to add outreach. If they decline, stop. If they agree, call `set_session_lanes` with the full lane set, then `evaluate_lane` again and continue only when `can` is true. For any other `can: false`, tell the human and stop. Attach the resume PDF on email.
 
 ## Registry
 

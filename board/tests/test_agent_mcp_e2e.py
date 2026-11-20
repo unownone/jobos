@@ -555,3 +555,105 @@ def test_oauth_redirect_keeps_the_registered_query(tmp_path: Path) -> None:
     assert query["desk"] == ["1"]
     assert query["state"] == ["s1"]
     assert query["code"][0]
+
+
+def test_old_refresh_token_revokes_the_grant_after_two_rotations(tmp_path: Path) -> None:
+    client = TestClient(create_app(_settings(tmp_path)))
+    _bootstrap(client)
+    registered = client.post(
+        "/oauth/register",
+        json={"client_name": "Test AI", "redirect_uris": [REDIRECT], "token_endpoint_auth_method": "none"},
+    )
+    client_id = registered.json()["client_id"]
+    verifier, challenge = _pkce()
+    approved = client.post(
+        "/oauth/authorize",
+        headers=_csrf(client),
+        json={
+            "client_id": client_id,
+            "redirect_uri": REDIRECT,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "state": "s1",
+            "decision": "approve",
+        },
+    )
+    code = parse_qs(urlparse(approved.json()["redirect"]).query)["code"][0]
+    issued = client.post(
+        "/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": client_id,
+            "code": code,
+            "redirect_uri": REDIRECT,
+            "code_verifier": verifier,
+        },
+    )
+    assert issued.status_code == 200, issued.text
+    first = issued.json()["refresh_token"]
+    second = client.post(
+        "/oauth/token",
+        data={"grant_type": "refresh_token", "client_id": client_id, "refresh_token": first},
+    )
+    assert second.status_code == 200, second.text
+    third = client.post(
+        "/oauth/token",
+        data={
+            "grant_type": "refresh_token",
+            "client_id": client_id,
+            "refresh_token": second.json()["refresh_token"],
+        },
+    )
+    assert third.status_code == 200, third.text
+    reused = client.post(
+        "/oauth/token",
+        data={"grant_type": "refresh_token", "client_id": client_id, "refresh_token": first},
+    )
+    assert reused.status_code == 400
+    dead = client.post(
+        "/mcp",
+        headers={"Authorization": f"Bearer {third.json()['access_token']}"},
+        json={"jsonrpc": "2.0", "id": 1, "method": "ping"},
+    )
+    assert dead.status_code == 401
+
+
+def test_delete_cannot_end_a_different_session(tmp_path: Path) -> None:
+    client = TestClient(create_app(_settings(tmp_path)))
+    _bootstrap(client)
+    access = _connect(client)
+    session_id = _open_session(client, access)
+    denied = client.delete(
+        "/mcp",
+        headers={"Authorization": f"Bearer {access}", "Mcp-Session-Id": "ags_other"},
+    )
+    assert denied.status_code == 404
+    alive = client.post(
+        "/mcp",
+        headers={"Authorization": f"Bearer {access}", "Mcp-Session-Id": session_id},
+        json={"jsonrpc": "2.0", "id": 2, "method": "ping"},
+    )
+    assert alive.status_code == 200, alive.text
+
+
+def test_consent_page_refuses_framing(tmp_path: Path) -> None:
+    client = TestClient(create_app(_settings(tmp_path)))
+    _bootstrap(client)
+    registered = client.post(
+        "/oauth/register",
+        json={"client_name": "Test AI", "redirect_uris": [REDIRECT], "token_endpoint_auth_method": "none"},
+    )
+    _verifier, challenge = _pkce()
+    page = client.get(
+        "/oauth/authorize",
+        params={
+            "client_id": registered.json()["client_id"],
+            "redirect_uri": REDIRECT,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "state": "s1",
+        },
+    )
+    assert page.status_code == 200
+    assert page.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors" in page.headers["content-security-policy"]
