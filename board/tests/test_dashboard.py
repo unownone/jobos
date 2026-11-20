@@ -185,9 +185,11 @@ def test_dashboard_funnel_today_and_oldest(client: TestClient) -> None:
     page = client.get("/home", headers=h("admin"))
     assert page.status_code == 200
     assert "Hunt funnel" in page.text
-    assert "/static/vendor/chart.umd.js" in page.text
     assert 'id="funnelLegend"' in page.text
-    assert "chart-donut" in page.text
+    assert 'data-funnel="Found"' in page.text
+    assert 'data-funnel="Applied"' in page.text
+    assert 'data-funnel="Outreached"' in page.text
+    assert "/static/vendor/chart.umd.js" not in page.text
 
 
 def test_summarize_dashboard_empty_board(tmp_path: Path) -> None:
