@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { sessionLine, type SessionLine } from "@/lib/session";
+import { softBreak } from "@/lib/soft-break";
 import { panelVariants, usePageTransition, usePanelPlay } from "@/lib/motion";
 
 const TABS = ["jobs", "people", "candidate", "skills", "mcps", "memory"] as const;
@@ -370,10 +371,10 @@ export function DataPage() {
                         <Td
                           key={header}
                           truncate={!identifier && !prose}
-                          className={[index > 2 ? "max-[959px]:hidden" : "", identifier ? "break-all" : "", prose ? "break-words" : ""].filter(Boolean).join(" ") || undefined}
+                          className={[index > 2 ? "max-[959px]:hidden" : "", identifier || prose ? "break-words" : ""].filter(Boolean).join(" ") || undefined}
                           title={row[header]}
                         >
-                          {row[header]}
+                          {identifier ? softBreak(row[header] || "") : row[header]}
                         </Td>
                       );
                     })}

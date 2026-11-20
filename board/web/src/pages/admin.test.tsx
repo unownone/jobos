@@ -179,7 +179,10 @@ describe("admin pages", () => {
       expect(document.querySelector("[data-slot='record-deck'] p")?.textContent).toBe("Acme");
     });
     expect(document.querySelector("#table th")?.textContent).toBe("ID");
-    expect(document.querySelector("#table td")?.className).toContain("break-all");
+    const idCell = document.querySelector("#table td");
+    expect(idCell?.className).toContain("break-words");
+    expect(idCell?.className).not.toContain("break-all");
+    expect(idCell?.querySelectorAll("wbr").length).toBeGreaterThan(0);
     expect([...document.querySelectorAll("#table th")].find((header) => header.textContent === "Title")?.className).toContain("w-[28%]");
     expect([...document.querySelectorAll("#table td")][2]?.className).toContain("break-words");
     expect([...document.querySelectorAll("#table td")][3]?.textContent).toBe("discovered · stopped");
@@ -204,7 +207,9 @@ describe("admin pages", () => {
       expect(document.getElementById("table")).toHaveTextContent("/api/mcp/hosted/google-workspace.json");
     });
     const hosted = [...document.querySelectorAll("#table td")].find((cell) => cell.textContent === "/api/mcp/hosted/google-workspace.json");
-    expect(hosted?.className).toContain("break-all");
+    expect(hosted?.className).toContain("break-words");
+    expect(hosted?.className).not.toContain("break-all");
+    expect(hosted?.querySelectorAll("wbr").length).toBeGreaterThan(0);
     expect(hosted?.className).not.toContain("truncate");
   });
 
