@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { NativeSelect } from "@/components/ui/select";
@@ -94,32 +95,40 @@ export function SkillsPage() {
         <p id="who" className="m-0 text-sm text-muted-foreground">
           {who}
         </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <NativeSelect
-            id="tag"
-            label="Tag"
-            value={tag}
-            className="w-auto shrink-0"
-            onChange={setTag}
-            options={[
-              { value: "", label: "all tags" },
-              { value: "source", label: "source" },
-              { value: "apply", label: "apply" },
-              { value: "outreach", label: "outreach" },
-            ]}
-          />
-          <NativeSelect
-            id="scope"
-            label="Scope"
-            value={scope}
-            className="w-auto shrink-0"
-            onChange={setScope}
-            options={[
-              { value: "", label: "shared + mine" },
-              { value: "shared", label: "shared" },
-              { value: "local", label: "local" },
-            ]}
-          />
+        <div className="flex flex-wrap items-end gap-2">
+          <Field className="w-44 max-w-full shrink-0">
+            Tag
+            <NativeSelect
+              id="tag"
+              value={tag}
+              onChange={(next) => {
+                setTag(next);
+                void loadSkills(next, scope);
+              }}
+              options={[
+                { value: "", label: "all tags" },
+                { value: "source", label: "source" },
+                { value: "apply", label: "apply" },
+                { value: "outreach", label: "outreach" },
+              ]}
+            />
+          </Field>
+          <Field className="w-44 max-w-full shrink-0">
+            Scope
+            <NativeSelect
+              id="scope"
+              value={scope}
+              onChange={(next) => {
+                setScope(next);
+                void loadSkills(tag, next);
+              }}
+              options={[
+                { value: "", label: "shared + mine" },
+                { value: "shared", label: "shared" },
+                { value: "local", label: "local" },
+              ]}
+            />
+          </Field>
           <Button
             id="reload"
             type="button"
@@ -161,11 +170,11 @@ export function SkillsPage() {
             <tbody id="skills">
               {skills.map((skill) => (
                 <tr key={skill.slug} className="border-t border-border">
-                  <Td title={skill.slug}>{skill.slug}</Td>
-                  <Td title={skill.role}>{skill.role}</Td>
-                  <Td className="max-[959px]:hidden" title={(skill.tags ?? []).join(", ")}>{(skill.tags ?? []).join(", ")}</Td>
-                  <Td className="max-[959px]:hidden" title={skill.scope}>{skill.scope}</Td>
-                  <Td className="max-[959px]:hidden" title={skill.status}>{skill.status}</Td>
+                  <Td truncate={false} className="break-all" title={skill.slug}>{skill.slug}</Td>
+                  <Td truncate={false} className="break-words" title={skill.role}>{skill.role}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden break-words" title={(skill.tags ?? []).join(", ")}>{(skill.tags ?? []).join(", ")}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden" title={skill.scope}>{skill.scope}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden" title={skill.status}>{skill.status}</Td>
                 </tr>
               ))}
             </tbody>

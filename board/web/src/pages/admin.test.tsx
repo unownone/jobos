@@ -182,6 +182,13 @@ describe("admin pages", () => {
     render(<SkillsPage />);
 
     expect(document.querySelector("h1")).toHaveTextContent("Skill registry");
+    expect(document.getElementById("tag")?.parentElement).toHaveTextContent("Tag");
+    expect(document.getElementById("tag")?.hasAttribute("aria-label")).toBe(false);
+    expect(document.getElementById("scope")?.parentElement).toHaveTextContent("Scope");
+    fireEvent.change(document.getElementById("tag") as HTMLSelectElement, { target: { value: "source" } });
+    await waitFor(() => {
+      expect(apiMock.mock.calls.some((call) => String(call[0]).includes("tag=source"))).toBe(true);
+    });
     expect(document.getElementById("skills")?.closest("table")?.className).toContain("table-fixed");
     expect(document.querySelectorAll("#logout")).toHaveLength(0);
     expect(document.querySelectorAll("#logoutBtn")).toHaveLength(1);
