@@ -3,6 +3,7 @@ package httpapi
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -80,10 +82,12 @@ func (s *Server) Router() *gin.Engine {
 	r.GET("/.well-known/agent.json", s.agentCard(""))
 	r.GET("/a2a/agent-card.json", s.agentCard(""))
 	r.GET("/a2a/:track/agent-card.json", func(c *gin.Context) { s.agentCard(c.Param("track"))(c) })
+	r.GET("/a2a/:track/.well-known/agent-card.json", func(c *gin.Context) { s.agentCard(c.Param("track"))(c) })
 	r.GET("/api/candidate/public", s.candidatePublic)
 	r.GET("/api/candidate/status", s.candidateStatus)
 	r.GET("/api/candidate/template", s.candidateTemplate)
 	r.GET("/api/registry/catalog", s.catalog)
+	r.POST("/api/auth/bootstrap", s.bootstrap)
 	r.POST("/api/auth/signup", s.signup)
 	r.POST("/api/auth/login", s.login)
 	r.GET("/api/join/:id", s.joinPreview)
@@ -140,16 +144,21 @@ func (s *Server) Router() *gin.Engine {
 	authed.PATCH("/api/memory/items/:id", s.patchMemory)
 	authed.DELETE("/api/memory/items/:id", s.deleteMemory)
 	authed.POST("/api/memory/items/:id/solidify", s.solidifyMemory)
+	authed.POST("/api/memory/items/:id/move", s.moveMemory)
 	authed.POST("/api/messages", s.createMessage)
 	authed.GET("/api/messages", s.listMessages)
 	authed.POST("/api/messages/:id/read", s.readMessage)
 	authed.POST("/api/presence/heartbeat", s.heartbeat)
 	authed.GET("/api/presence", s.listPresence)
+	authed.GET("/api/presence/:id", s.getPresence)
+	authed.GET("/api/users", s.listUsers)
 	authed.GET("/api/registry/skills", s.listSkills)
 	authed.GET("/api/registry/skills/:id", s.getSkill)
+	authed.PATCH("/api/registry/skills/:id", s.patchSkill)
 	authed.POST("/api/registry/skills", s.createSkill)
 	authed.POST("/api/registry/recordings", s.createRecording)
 	authed.GET("/api/registry/recordings", s.listRecordings)
+	authed.GET("/api/registry/recordings/:id", s.getRecording)
 	authed.POST("/api/registry/recordings/:id/proctor", s.proctorRecording)
 	authed.POST("/api/registry/recordings/:id/promote", s.promoteRecording)
 	authed.POST("/api/registry/recordings/:id/decline", s.declineRecording)
@@ -170,6 +179,7 @@ func (s *Server) Router() *gin.Engine {
 	authed.POST("/api/metrics/token_burn", s.addBurn)
 	authed.GET("/api/metrics/token_burn", s.listBurns)
 	authed.GET("/api/metrics/summary", s.burnSummary)
+	authed.GET("/api/a2a/directory", s.a2aDirectory)
 	authed.GET("/api/a2a/peers", s.listPeers)
 	authed.POST("/api/a2a/peers", s.createPeer)
 	authed.POST("/api/a2a/peers/:id/send", s.sendPeer)
@@ -456,6 +466,79 @@ func (s *Server) agentCard(track string) gin.HandlerFunc {
 
 func (s *Server) a2aInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"protocol": "a2a", "jsonrpc": "/a2a", "version": "0.3.0"})
+}
+
+func (s *Server) bootstrap(c *gin.Context) {
+	if s.Cfg.BootstrapToken == "" {
+		fail(c, 404, "bootstrap is not configured")
+		return
+	}
+	var body struct {
+		Token     string `json:"token"`
+		Bootstrap string `json:"bootstrap"`
+		Email     string `json:"email"`
+		Password  string `json:"password"`
+	}
+	if err := c.BindJSON(&body); err != nil {
+		return
+	}
+	token := strings.TrimSpace(body.Token)
+	if token == "" {
+		token = strings.TrimSpace(body.Bootstrap)
+	}
+	if auth := c.GetHeader("Authorization"); strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+		token = strings.TrimSpace(auth[7:])
+	}
+	for _, header := range []string{"X-Hub-Key", "X-Bootstrap-Token"} {
+		if value := strings.TrimSpace(c.GetHeader(header)); value != "" {
+			token = value
+		}
+	}
+	used, _ := s.DB.GetKV(c.Request.Context(), "bootstrap.used")
+	if used == "1" {
+		fail(c, 403, "signup closed; log in")
+		return
+	}
+	expected := s.Cfg.BootstrapToken
+	if !strings.HasPrefix(token, "jh_boot_") && strings.HasPrefix(expected, "jh_boot_") {
+		token = "jh_boot_" + token
+	}
+	if subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
+		fail(c, 403, "invalid or used bootstrap token")
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(body.Email))
+	if !strings.Contains(email, "@") || len(body.Password) < 8 {
+		fail(c, 422, "email and password are required")
+		return
+	}
+	username := strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '_' || r == '-' {
+			return r
+		}
+		return -1
+	}, strings.Split(email, "@")[0])
+	if len(username) < 3 {
+		username = "admin" + newID("")[:8]
+	}
+	if _, _, err := s.DB.AccountByUsername(c.Request.Context(), username); err == nil {
+		username = username + newID("")[:6]
+	}
+	pw, err := hashPassword(body.Password)
+	if err != nil {
+		fail(c, 500, "could not hash password")
+		return
+	}
+	acc := store.Account{ID: newID("acc_"), Username: username, PasswordHash: pw, CreatedAt: now()}
+	user := store.User{ID: newID("usr_"), AccountID: acc.ID, Kind: "admin", Email: email, DisplayName: "admin", PasswordHash: pw, Metadata: []byte("{}"), CreatedAt: now()}
+	if err := s.DB.CreateAccount(c.Request.Context(), acc, user); err != nil {
+		fail(c, 500, err.Error())
+		return
+	}
+	_ = s.DB.PutKV(c.Request.Context(), "bootstrap.used", "1", now())
+	s.setSession(c, user)
+	_, _ = s.DB.AddEvent(c.Request.Context(), store.Event{AccountID: acc.ID, TS: now(), ActorRole: "admin", Actor: email, Action: "bootstrap"})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "admin_bootstrapped": true, "user": publicUser(user)})
 }
 
 func (s *Server) signup(c *gin.Context) {

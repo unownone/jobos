@@ -166,18 +166,23 @@ type Person struct {
 }
 
 type MemoryItem struct {
-	ID             string `json:"id"`
-	AccountID      string `json:"account_id"`
-	Pod            string `json:"pod"`
-	Kind           string `json:"kind"`
-	Body           string `json:"body"`
-	ContentHash    string `json:"content_hash"`
-	Importance     string `json:"importance,omitempty"`
-	ExpiresAt      string `json:"expires_at,omitempty"`
-	SolidifyStatus string `json:"solidify_status"`
-	CreatedBy      string `json:"created_by,omitempty"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
+	ID             string          `json:"id"`
+	AccountID      string          `json:"account_id"`
+	Pod            string          `json:"pod"`
+	Kind           string          `json:"kind"`
+	Title          string          `json:"title,omitempty"`
+	Body           string          `json:"body"`
+	JobID          string          `json:"job_id,omitempty"`
+	Company        string          `json:"company,omitempty"`
+	ContentHash    string          `json:"content_hash"`
+	Importance     string          `json:"importance,omitempty"`
+	ExpiresAt      string          `json:"expires_at,omitempty"`
+	Pinned         bool            `json:"pinned"`
+	Tags           json.RawMessage `json:"tags,omitempty"`
+	SolidifyStatus string          `json:"solidify_status"`
+	CreatedBy      string          `json:"created_by,omitempty"`
+	CreatedAt      string          `json:"created_at"`
+	UpdatedAt      string          `json:"updated_at"`
 }
 
 type Message struct {

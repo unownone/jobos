@@ -24,7 +24,8 @@ type Config struct {
 	S3SecretKey    string
 	S3UsePathStyle bool
 
-	CompatTokens map[string]string
+	CompatTokens   map[string]string
+	BootstrapToken string
 }
 
 func Load() Config {
@@ -43,6 +44,7 @@ func Load() Config {
 		S3SecretKey:    os.Getenv("S3_SECRET_KEY"),
 		S3UsePathStyle: env("S3_USE_PATH_STYLE", "true") != "false",
 		CompatTokens:   map[string]string{},
+		BootstrapToken: strings.TrimSpace(os.Getenv("HUB_BOOTSTRAP_TOKEN")),
 	}
 	if cfg.Addr != "" && !strings.Contains(cfg.Addr, ":") {
 		cfg.Addr = ":" + cfg.Addr

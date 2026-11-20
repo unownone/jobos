@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -233,17 +234,88 @@ func TestPackMCPAndMemoryCaps(t *testing.T) {
 	}
 	res.Body.Close()
 
-	note := `{"pod":"worker","kind":"working_note","body":"Greenhouse times out after the second page."}`
 	for i := 0; i < 6; i++ {
+		note := fmt.Sprintf(`{"pod":"worker","kind":"working_note","title":"Greenhouse timeout %d","body":"Greenhouse times out after the second page on attempt %d."}`, i, i)
 		res = postJSON(t, client, ts.URL+"/api/memory/items", note, csrf)
 		if res.StatusCode != 201 {
 			t.Fatalf("memory %d %s", res.StatusCode, readBody(res))
 		}
 		res.Body.Close()
 	}
-	res = postJSON(t, client, ts.URL+"/api/memory/items", note, csrf)
+	res = postJSON(t, client, ts.URL+"/api/memory/items", `{"pod":"worker","kind":"working_note","title":"Greenhouse timeout extra","body":"Greenhouse times out after the second page on the extra attempt."}`, csrf)
 	if res.StatusCode != 429 {
 		t.Fatalf("cap status %d %s", res.StatusCode, readBody(res))
+	}
+	res.Body.Close()
+}
+
+func TestBootstrapMemoryMoveAndDirectory(t *testing.T) {
+	srv := New(config.Config{BootstrapToken: "jh_boot_testtoken"}, store.NewMemory(), blob.NewMemory(), cache.NewMemory(), realtime.New())
+	ts := httptest.NewServer(srv.Router())
+	defer ts.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+
+	bad := postJSON(t, client, ts.URL+"/api/auth/bootstrap", `{"email":"ada@example.com","password":"long-enough","token":"nope"}`, "")
+	if bad.StatusCode != 403 {
+		t.Fatalf("bad token %d %s", bad.StatusCode, readBody(bad))
+	}
+	bad.Body.Close()
+
+	res := postJSON(t, client, ts.URL+"/api/auth/bootstrap", `{"email":"ada@example.com","password":"long-enough","token":"testtoken"}`, "")
+	if res.StatusCode != 200 || !strings.Contains(readBody(res), `"admin_bootstrapped":true`) {
+		t.Fatalf("bootstrap %d", res.StatusCode)
+	}
+	csrf := res.Header.Get("X-CSRF")
+	again := postJSON(t, client, ts.URL+"/api/auth/bootstrap", `{"email":"ada@example.com","password":"long-enough","token":"jh_boot_testtoken"}`, "")
+	if again.StatusCode != 403 {
+		t.Fatalf("second bootstrap %d %s", again.StatusCode, readBody(again))
+	}
+	again.Body.Close()
+
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", "name: Ada Lovelace\ntitles:\n  - Engineer\n", csrf)
+	if res.StatusCode != 200 {
+		t.Fatalf("candidate %s", readBody(res))
+	}
+	res.Body.Close()
+	note := `{"pod":"worker","kind":"working_note","title":"Greenhouse timeout","body":"Greenhouse times out after the second page.","company":"Greenhouse"}`
+	res = postJSON(t, client, ts.URL+"/api/memory/items", note, csrf)
+	body := readBody(res)
+	if res.StatusCode != 201 || !strings.Contains(body, `"expires_at"`) {
+		t.Fatalf("memory %d %s", res.StatusCode, body)
+	}
+	var stored struct {
+		Item struct {
+			ID string `json:"id"`
+		} `json:"item"`
+	}
+	if err := json.Unmarshal([]byte(body), &stored); err != nil || stored.Item.ID == "" {
+		t.Fatal(body)
+	}
+	res, err := client.Get(ts.URL + "/api/memory/recall?q=greenhouse&compact=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	recalled := readBody(res)
+	if res.StatusCode != 200 || !strings.Contains(recalled, "Greenhouse") {
+		t.Fatalf("recall %d %s", res.StatusCode, recalled)
+	}
+	res = postJSON(t, client, ts.URL+"/api/memory/items/"+stored.Item.ID+"/move", `{"pod":"common","kind":"process_note","keep_original":true}`, csrf)
+	moved := readBody(res)
+	if res.StatusCode != 200 || !strings.Contains(moved, `"pod":"common"`) || !strings.Contains(moved, `"copied":true`) {
+		t.Fatalf("move %d %s", res.StatusCode, moved)
+	}
+	res, err = client.Get(ts.URL + "/api/a2a/directory")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := readBody(res)
+	if res.StatusCode != 200 || !strings.Contains(dir, "hub-discovery") {
+		t.Fatalf("directory %d %s", res.StatusCode, dir)
+	}
+	res, err = client.Get(ts.URL + "/api/users")
+	if err != nil || res.StatusCode != 200 {
+		t.Fatalf("users %d", res.StatusCode)
 	}
 	res.Body.Close()
 }

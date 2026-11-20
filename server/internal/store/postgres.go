@@ -36,8 +36,21 @@ func Open(ctx context.Context, databaseURL string) (Store, error) {
 }
 
 func (p *Postgres) migrate(ctx context.Context) error {
-	_, err := p.pool.Exec(ctx, schemaSQL)
-	return err
+	if _, err := p.pool.Exec(ctx, schemaSQL); err != nil {
+		return err
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS job_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS company TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE`,
+		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS tags_json TEXT NOT NULL DEFAULT '[]'`,
+	} {
+		if _, err := p.pool.Exec(ctx, stmt); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (p *Postgres) Name() string { return "postgres" }
@@ -653,24 +666,36 @@ func (p *Postgres) ListPeople(ctx context.Context, accountID, company, jobID str
 }
 
 func (p *Postgres) SaveMemory(ctx context.Context, item MemoryItem) error {
+	tags := item.Tags
+	if len(tags) == 0 {
+		tags = []byte("[]")
+	}
 	_, err := p.pool.Exec(ctx, `
-		INSERT INTO memory_items (id, account_id, pod, kind, body, content_hash, importance, expires_at, solidify_status, created_by, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-		ON CONFLICT (id) DO UPDATE SET body=EXCLUDED.body, kind=EXCLUDED.kind, pod=EXCLUDED.pod, solidify_status=EXCLUDED.solidify_status, updated_at=EXCLUDED.updated_at`,
-		item.ID, item.AccountID, item.Pod, item.Kind, item.Body, item.ContentHash, item.Importance, item.ExpiresAt, item.SolidifyStatus, item.CreatedBy, item.CreatedAt, item.UpdatedAt)
+		INSERT INTO memory_items (id, account_id, pod, kind, title, body, job_id, company, content_hash, importance, expires_at, pinned, tags_json, solidify_status, created_by, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		ON CONFLICT (id) DO UPDATE SET
+			pod=EXCLUDED.pod, kind=EXCLUDED.kind, title=EXCLUDED.title, body=EXCLUDED.body, job_id=EXCLUDED.job_id,
+			company=EXCLUDED.company, content_hash=EXCLUDED.content_hash, importance=EXCLUDED.importance,
+			expires_at=EXCLUDED.expires_at, pinned=EXCLUDED.pinned, tags_json=EXCLUDED.tags_json,
+			solidify_status=EXCLUDED.solidify_status, updated_at=EXCLUDED.updated_at`,
+		item.ID, item.AccountID, item.Pod, item.Kind, item.Title, item.Body, item.JobID, item.Company, item.ContentHash, item.Importance, item.ExpiresAt, item.Pinned, string(tags), item.SolidifyStatus, item.CreatedBy, item.CreatedAt, item.UpdatedAt)
 	return err
 }
 
 func scanMemory(row pgx.Row) (MemoryItem, error) {
 	var item MemoryItem
-	err := row.Scan(&item.ID, &item.AccountID, &item.Pod, &item.Kind, &item.Body, &item.ContentHash, &item.Importance, &item.ExpiresAt, &item.SolidifyStatus, &item.CreatedBy, &item.CreatedAt, &item.UpdatedAt)
+	var tags string
+	err := row.Scan(&item.ID, &item.AccountID, &item.Pod, &item.Kind, &item.Title, &item.Body, &item.JobID, &item.Company, &item.ContentHash, &item.Importance, &item.ExpiresAt, &item.Pinned, &tags, &item.SolidifyStatus, &item.CreatedBy, &item.CreatedAt, &item.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return MemoryItem{}, ErrNotFound
+	}
+	if tags != "" {
+		item.Tags = []byte(tags)
 	}
 	return item, err
 }
 
-const memorySelect = `SELECT id, account_id, pod, kind, body, content_hash, importance, expires_at, solidify_status, created_by, created_at, updated_at FROM memory_items`
+const memorySelect = `SELECT id, account_id, pod, kind, title, body, job_id, company, content_hash, importance, expires_at, pinned, tags_json, solidify_status, created_by, created_at, updated_at FROM memory_items`
 
 func (p *Postgres) Memory(ctx context.Context, accountID, id string) (MemoryItem, error) {
 	return scanMemory(p.pool.QueryRow(ctx, memorySelect+` WHERE account_id=$1 AND id=$2`, accountID, id))

@@ -515,11 +515,11 @@ func canonicalTrack(v string) string {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "discovery":
 		return "discovery"
-	case "application", "apply":
+	case "application", "apply", "applicator":
 		return "application"
 	case "outreach":
 		return "outreach"
-	case "maintenance", "maintainer":
+	case "maintenance", "maintainer", "mainainer":
 		return "maintenance"
 	default:
 		return ""
@@ -1098,83 +1098,161 @@ func (s *Server) patchPerson(c *gin.Context) {
 }
 
 func (s *Server) memoryPods(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"pods": []string{"worker", "track", "common"}})
+	p := principalFrom(c)
+	pods := []string{"worker:" + p.UserID, "common"}
+	if p.Track != "" {
+		pods = append([]string{"worker:" + p.UserID, "track:" + p.Track}, "common")
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"pods": pods,
+		"write_policy": gin.H{
+			"window_s": 15 * 60,
+			"caps":     gin.H{"worker": 6, "track": 3, "common": 2},
+		},
+		"kinds": memoryKinds,
+	})
 }
 
 func (s *Server) memoryRecall(c *gin.Context) {
 	p := principalFrom(c)
-	items, err := s.DB.ListMemory(c.Request.Context(), p.AccountID, "")
-	if err != nil {
-		fail(c, 500, err.Error())
-		return
+	items := s.visibleMemory(c, p, "")
+	limit := queryLimit(c, 12, 24)
+	compact := c.Query("compact") == "1" || c.Query("compact") == "true"
+	kept := filterMemory(items, c.Query("q"), c.Query("job_id"), c.Query("company"), "", limit, compact)
+	c.JSON(http.StatusOK, gin.H{"items": kept, "count": len(kept)})
+}
+
+func (s *Server) listMemory(c *gin.Context) {
+	p := principalFrom(c)
+	pod, msg := "", ""
+	if raw := c.Query("pod"); raw != "" {
+		pod, msg = resolveWritePod(p, raw)
+		if msg != "" && p.Role != "admin" && p.Role != "maintenance" {
+			fail(c, 403, msg)
+			return
+		}
+		if msg != "" {
+			pod = raw
+		}
 	}
+	items := s.visibleMemory(c, p, pod)
+	limit := queryLimit(c, 12, 100)
+	kept := filterMemory(items, c.Query("q"), c.Query("job_id"), c.Query("company"), c.Query("kind"), limit, false)
+	c.JSON(http.StatusOK, gin.H{"items": kept, "count": len(kept)})
+}
+
+func (s *Server) visibleMemory(c *gin.Context, p principal, pod string) []store.MemoryItem {
+	items, err := s.DB.ListMemory(c.Request.Context(), p.AccountID, pod)
+	if err != nil {
+		return nil
+	}
+	var out []store.MemoryItem
+	nowAt := time.Now().UTC()
+	for _, item := range items {
+		if !canReadPod(p, item.Pod) || memoryExpired(item, nowAt) {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func filterMemory(items []store.MemoryItem, q, jobID, company, kind string, limit int, compact bool) []store.MemoryItem {
 	var kept []store.MemoryItem
 	for _, item := range items {
-		if item.Pod == "common" || strings.HasPrefix(item.Pod, "track:") || strings.HasPrefix(item.Pod, "worker:"+p.UserID) {
-			kept = append(kept, item)
+		if !memoryMatches(item, q, jobID, company, kind) {
+			continue
+		}
+		if compact {
+			item.Body = compactBody(item.Body)
+		}
+		kept = append(kept, item)
+		if len(kept) >= limit {
+			break
 		}
 	}
 	if kept == nil {
 		kept = []store.MemoryItem{}
 	}
-	c.JSON(http.StatusOK, gin.H{"items": kept})
+	return kept
 }
 
-func (s *Server) listMemory(c *gin.Context) {
-	p := principalFrom(c)
-	items, err := s.DB.ListMemory(c.Request.Context(), p.AccountID, c.Query("pod"))
-	if err != nil {
-		fail(c, 500, err.Error())
-		return
+func queryLimit(c *gin.Context, fallback, max int) int {
+	n, err := strconv.Atoi(c.Query("limit"))
+	if err != nil || n < 1 {
+		return fallback
 	}
-	if items == nil {
-		items = []store.MemoryItem{}
+	if n > max {
+		return max
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	return n
 }
 
 func (s *Server) createMemory(c *gin.Context) {
 	p := principalFrom(c)
 	var body struct {
-		Pod  string `json:"pod"`
-		Kind string `json:"kind"`
-		Body string `json:"body"`
+		Pod        string `json:"pod"`
+		Kind       string `json:"kind"`
+		Title      string `json:"title"`
+		Body       string `json:"body"`
+		JobID      string `json:"job_id"`
+		Company    string `json:"company"`
+		Importance int    `json:"importance"`
+		Pinned     bool   `json:"pinned"`
 	}
 	if err := c.BindJSON(&body); err != nil {
 		return
 	}
-	pod := body.Pod
-	switch pod {
-	case "worker":
-		pod = "worker:" + p.UserID
-	case "track":
-		pod = "track:" + p.Track
-	case "common":
-	default:
-		if pod == "" {
-			fail(c, 422, "pod must be worker, track, or common")
-			return
+	pod, msg := resolveWritePod(p, body.Pod)
+	if msg != "" {
+		status := 422
+		if strings.Contains(msg, "cannot") {
+			status = 403
 		}
+		fail(c, status, msg)
+		return
 	}
-	if body.Body == "" || body.Kind == "" {
+	if body.Kind == "" || body.Body == "" {
 		fail(c, 422, "kind and body are required")
 		return
 	}
-	if err := memoryAllowed(pod, body.Kind, body.Body); err != "" {
-		fail(c, 422, err)
+	body.Kind = strings.ToLower(strings.TrimSpace(body.Kind))
+	body.Title = strings.Join(strings.Fields(body.Title), " ")
+	if errText := validateMemory(pod, body.Kind, body.Title, body.Body); errText != "" {
+		fail(c, 422, errText)
+		return
+	}
+	importance := body.Importance
+	if importance == 0 {
+		importance = 2
+	}
+	if importance < 1 || importance > 3 {
+		fail(c, 422, "importance must be 1, 2, or 3")
 		return
 	}
 	existing, _ := s.DB.ListMemory(c.Request.Context(), p.AccountID, pod)
+	digest := hash(strings.ToLower(body.Kind + "\n" + body.Title + "\n" + body.Body + "\n" + body.Company + "\n" + body.JobID))
+	for _, item := range existing {
+		if item.ContentHash == digest {
+			c.JSON(http.StatusOK, gin.H{"item": item, "status": "exists"})
+			return
+		}
+	}
 	if memoryOverCap(existing, pod) {
 		fail(c, 429, "memory write cap reached for this pod")
 		return
 	}
-	item := store.MemoryItem{ID: newID("mem_"), AccountID: p.AccountID, Pod: pod, Kind: body.Kind, Body: body.Body, ContentHash: hash(body.Body), SolidifyStatus: "none", CreatedBy: p.UserID, CreatedAt: now(), UpdatedAt: now()}
+	item := store.MemoryItem{
+		ID: newID("mem_"), AccountID: p.AccountID, Pod: pod, Kind: body.Kind, Title: body.Title, Body: strings.TrimSpace(body.Body),
+		JobID: body.JobID, Company: body.Company, ContentHash: digest, Importance: strconv.Itoa(importance),
+		ExpiresAt: defaultExpiry(pod, body.Kind, strconv.Itoa(importance)), Pinned: body.Pinned, Tags: []byte("[]"),
+		SolidifyStatus: "none", CreatedBy: p.UserID, CreatedAt: now(), UpdatedAt: now(),
+	}
 	if err := s.DB.SaveMemory(c.Request.Context(), item); err != nil {
 		fail(c, 500, err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"item": item})
+	c.JSON(http.StatusCreated, gin.H{"item": item, "status": "stored"})
 }
 
 func (s *Server) patchMemory(c *gin.Context) {
@@ -1209,6 +1287,55 @@ func (s *Server) deleteMemory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (s *Server) moveMemory(c *gin.Context) {
+	p := principalFrom(c)
+	item, err := s.DB.Memory(c.Request.Context(), p.AccountID, c.Param("id"))
+	if err != nil || !canReadPod(p, item.Pod) {
+		fail(c, 404, "memory item not found")
+		return
+	}
+	var body struct {
+		Pod          string `json:"pod"`
+		Kind         string `json:"kind"`
+		KeepOriginal bool   `json:"keep_original"`
+	}
+	if err := c.BindJSON(&body); err != nil {
+		return
+	}
+	pod, msg := resolveWritePod(p, body.Pod)
+	if msg != "" {
+		fail(c, 422, msg)
+		return
+	}
+	kind := item.Kind
+	if body.Kind != "" {
+		kind = strings.ToLower(body.Kind)
+	}
+	if errText := validateMemory(pod, kind, item.Title, item.Body); errText != "" {
+		fail(c, 422, errText)
+		return
+	}
+	moved := item
+	moved.Pod = pod
+	moved.Kind = kind
+	moved.UpdatedAt = now()
+	moved.ExpiresAt = defaultExpiry(pod, kind, item.Importance)
+	if body.KeepOriginal {
+		moved.ID = newID("mem_")
+		moved.CreatedAt = now()
+	}
+	if err := s.DB.SaveMemory(c.Request.Context(), moved); err != nil {
+		fail(c, 500, err.Error())
+		return
+	}
+	action := "memory_move"
+	if body.KeepOriginal {
+		action = "memory_copy"
+	}
+	_, _ = s.DB.AddEvent(c.Request.Context(), store.Event{AccountID: p.AccountID, TS: now(), ActorRole: p.Role, Actor: p.Actor, Action: action, Note: pod})
+	c.JSON(http.StatusOK, gin.H{"item": moved, "copied": body.KeepOriginal})
 }
 
 func (s *Server) solidifyMemory(c *gin.Context) {
@@ -1314,6 +1441,39 @@ func (s *Server) listPresence(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"presence": rows})
 }
 
+func (s *Server) getPresence(c *gin.Context) {
+	p := principalFrom(c)
+	rows, err := s.DB.ListPresence(c.Request.Context(), p.AccountID)
+	if err != nil {
+		fail(c, 500, err.Error())
+		return
+	}
+	for _, row := range rows {
+		if row.UserID == c.Param("id") {
+			c.JSON(http.StatusOK, gin.H{"presence": row})
+			return
+		}
+	}
+	fail(c, 404, "presence not found")
+}
+
+func (s *Server) listUsers(c *gin.Context) {
+	p := principalFrom(c)
+	rows, err := s.DB.ListUsers(c.Request.Context(), p.AccountID, c.Query("kind"), c.Query("track"))
+	if err != nil {
+		fail(c, 500, err.Error())
+		return
+	}
+	var out []gin.H
+	for _, user := range rows {
+		out = append(out, publicUser(user))
+	}
+	if out == nil {
+		out = []gin.H{}
+	}
+	c.JSON(http.StatusOK, gin.H{"users": out, "count": len(out)})
+}
+
 func (s *Server) catalog(c *gin.Context) {
 	skills, err := s.DB.ListSkills(c.Request.Context(), "shared", "shared", "approved", c.Query("tag"))
 	if err != nil {
@@ -1343,6 +1503,51 @@ func (s *Server) getSkill(c *gin.Context) {
 	sk, err := s.DB.Skill(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		fail(c, 404, "skill not found")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"skill": sk})
+}
+
+func (s *Server) patchSkill(c *gin.Context) {
+	p := principalFrom(c)
+	sk, err := s.DB.Skill(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		fail(c, 404, "skill not found")
+		return
+	}
+	if sk.Scope == "shared" && p.Role != "admin" && p.Role != "maintenance" {
+		fail(c, 403, "shared skills are maintainer-owned")
+		return
+	}
+	if sk.Scope == "local" && sk.OwnerID != "" && sk.OwnerID != p.UserID && p.Role != "admin" {
+		fail(c, 403, "not your skill")
+		return
+	}
+	var body struct {
+		Name   string          `json:"name"`
+		Body   string          `json:"body"`
+		Status string          `json:"status"`
+		Tags   json.RawMessage `json:"tags"`
+	}
+	if err := c.BindJSON(&body); err != nil {
+		return
+	}
+	if body.Name != "" {
+		sk.Name = body.Name
+	}
+	if body.Body != "" {
+		sk.Body = body.Body
+	}
+	if body.Status != "" {
+		sk.Status = body.Status
+	}
+	if len(body.Tags) > 0 {
+		sk.Tags = body.Tags
+	}
+	sk.Version++
+	sk.UpdatedAt = now()
+	if err := s.DB.SaveSkill(c.Request.Context(), sk); err != nil {
+		fail(c, 500, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"skill": sk})
@@ -1473,6 +1678,22 @@ func (s *Server) listRecordings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"recordings": rows})
 }
 
+func (s *Server) getRecording(c *gin.Context) {
+	p := principalFrom(c)
+	rows, err := s.DB.ListRecordings(c.Request.Context(), p.AccountID, "")
+	if err != nil {
+		fail(c, 500, err.Error())
+		return
+	}
+	for _, row := range rows {
+		if row.ID == c.Param("id") {
+			c.JSON(http.StatusOK, gin.H{"recording": row})
+			return
+		}
+	}
+	fail(c, 404, "recording not found")
+}
+
 func (s *Server) proctorRecording(c *gin.Context) {
 	s.setRecording(c, "")
 }
@@ -1523,66 +1744,6 @@ func (s *Server) seedSkills(c *gin.Context) {
 	}
 	n := s.Seed(c.Request.Context())
 	c.JSON(http.StatusOK, gin.H{"seeded": n})
-}
-
-func memoryAllowed(pod, kind, body string) string {
-	podKind := pod
-	switch {
-	case strings.HasPrefix(pod, "worker:"):
-		podKind = "worker"
-	case strings.HasPrefix(pod, "track:"):
-		podKind = "track"
-	}
-	allowed := map[string]map[string]bool{
-		"worker": {"working_note": true, "reminder": true, "fact": true},
-		"track": {
-			"portal_quirk": true, "blocker": true, "tool_failure": true, "company_note": true,
-			"process_note": true, "person_hint": true, "search_coverage": true,
-		},
-		"common": {
-			"process_note": true, "tool_failure": true, "catalog_note": true,
-			"candidate_constraint": true, "hub_note": true,
-		},
-	}
-	if !allowed[podKind][kind] {
-		return "kind is not allowed in this pod"
-	}
-	if len(body) > 800 {
-		return "body is too long"
-	}
-	min := 40
-	if kind == "working_note" || kind == "reminder" {
-		min = 24
-	}
-	if len(strings.TrimSpace(body)) < min {
-		return "body is too short"
-	}
-	lower := strings.ToLower(body)
-	for _, prefix := range []string{"jh_agt_", "jh_own_", "jh_inv_", "jh_boot_"} {
-		if strings.Contains(lower, prefix) {
-			return "memory must not contain secrets"
-		}
-	}
-	return ""
-}
-
-func memoryOverCap(items []store.MemoryItem, pod string) bool {
-	capN := 6
-	switch {
-	case strings.HasPrefix(pod, "track:"):
-		capN = 3
-	case pod == "common":
-		capN = 2
-	}
-	cutoff := time.Now().UTC().Add(-15 * time.Minute)
-	n := 0
-	for _, item := range items {
-		stamp, err := time.Parse(time.RFC3339, item.CreatedAt)
-		if err == nil && stamp.After(cutoff) {
-			n++
-		}
-	}
-	return n >= capN
 }
 
 func (s *Server) Seed(ctx context.Context) int {
@@ -1714,6 +1875,29 @@ func (s *Server) burnSummary(c *gin.Context) {
 		cost += b.CostUSD
 	}
 	c.JSON(http.StatusOK, gin.H{"count": len(rows), "prompt_tokens": prompt, "completion_tokens": completion, "cost_usd": cost})
+}
+
+func (s *Server) a2aDirectory(c *gin.Context) {
+	p := principalFrom(c)
+	base := s.publicURL(c)
+	local := []gin.H{{
+		"id": "hub", "name": "Job Hub", "card_url": base + "/.well-known/agent-card.json", "agent_url": base + "/a2a",
+	}}
+	for _, track := range hubTracks {
+		local = append(local, gin.H{
+			"id": "hub-" + track, "name": "Job Hub / " + track, "track": track,
+			"card_url": base + "/a2a/" + track + "/agent-card.json", "agent_url": base + "/a2a/" + track,
+		})
+	}
+	peers, err := s.DB.ListPeers(c.Request.Context(), p.AccountID)
+	if err != nil {
+		fail(c, 500, err.Error())
+		return
+	}
+	if peers == nil {
+		peers = []store.Peer{}
+	}
+	c.JSON(http.StatusOK, gin.H{"local": local, "peers": peers, "protocolVersion": "0.3.0"})
 }
 
 func (s *Server) listPeers(c *gin.Context) {

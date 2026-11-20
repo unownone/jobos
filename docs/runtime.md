@@ -44,4 +44,4 @@ Onboarding files come from `HUB_REPO_ROOT`. `GET /api/onboarding` lists the trac
 
 `GET /api/registry/mcps` lists connectors seeded from `mcp/mcp.example.json` when the repo root is set. `POST /api/registry/skills/:id/fork` copies a skill into the caller's local scope.
 
-Memory writes are capped inside a 15 minute window: 6 on a worker pod, 3 on a track pod, 2 on common. Bodies are length-checked and rejected when they contain a hub key.
+Memory writes are capped inside a 15 minute window: 6 on a worker pod, 3 on a track pod, 2 on common. Titles and bodies are length-checked, dumps and hub keys are rejected, and worker notes expire after 7 days unless pinned. `GET /api/memory/recall?q=` matches title, body, and company. `POST /api/memory/items/:id/move` copies or moves a note between pods. `POST /api/auth/bootstrap` consumes `HUB_BOOTSTRAP_TOKEN` once and opens an admin session. `GET /api/a2a/directory` lists the local agent cards plus saved peers.
