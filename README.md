@@ -263,7 +263,7 @@ docs/coolify.md           Coolify: named volumes, no ${...} in volume sources
 uv run scripts/rebuild_index.py
 uv run scripts/rebuild_skill_index.py
 
-# live Hub (maintainer): generates gitignored tokens on first start
+# live Hub (maintainer): Go API and React SPA, gitignored tokens on first start
 bash board/start.sh
 # or: docker compose up -d --build
 ```

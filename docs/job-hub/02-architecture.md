@@ -412,4 +412,4 @@ This workspace has **no** live `profiles/candidate.yaml`. Hub `/api/candidate/pu
 | INDEX Active operators | `GET /api/presence` |
 | `owners.apply` on YAML | still on job; plus `claimed_by` on queue |
 | `scripts/board_gen_tokens.py` | keep for compat; bootstrap is new |
-| `board/start.sh` | called by `hub_deploy.sh` |
+| `board/start.sh` | asks for the public host, then runs `scripts/hub_deploy.sh` (Go API) |
