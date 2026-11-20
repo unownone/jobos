@@ -29,15 +29,15 @@ bash scripts/hub_deploy.sh
 Or Docker:
 
 ```bash
-# plain Hub on :8787
-docker compose -f docker-compose.plain.yml up -d --build
-# or Traefik on :80 / :443
-HUB_PUBLIC_HOST=12.234.244.34 bash scripts/hub_docker.sh
+docker compose up -d --build
+# SPA http://127.0.0.1:8080  API http://127.0.0.1:8081
 ```
 
 Full hosting: [`docs/install.md`](../install.md). **After signup, open `/onboarding` before minting invites.**
 
 `HUB_PUBLIC_HOST=12.234.244.34:343` becomes `http://12.234.244.34:343` on invite URLs. `:443` becomes `https://`. A full `HUB_PUBLIC_URL` still wins.
+
+`scripts/hub_deploy.sh` still starts the Python board. The Compose file above is the Go API and the React SPA.
 
 What the script does:
 
@@ -87,7 +87,7 @@ Process aliases the Hub accepts on input: `apply` → `application`, `maintainer
 In the UI: `/admin/invites` (same admin HTML). Or:
 
 ```bash
-export HUB_URL="${HUB_URL:-http://127.0.0.1:8787}"
+export HUB_URL="${HUB_URL:-http://127.0.0.1:8080}"
 # Cookie session from the browser is easier. From curl, use an admin Bearer after you have one,
 # or stay on the Invites page so you never put the key in a committed file.
 

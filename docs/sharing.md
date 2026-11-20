@@ -1,6 +1,6 @@
 # Sharing
 
-Canonical state is **jobOS Hub**: Postgres + BlobStore + RabbitMQ, namespaced by account id. Git is the source repo for skills and docs, not the live job list.
+Canonical state is **jobOS Hub**: Postgres when configured, plus the blob driver, namespaced by account id. Queue leases are `queue_items` rows. Git is the source repo for skills and docs, not the live job list.
 
 Sign up at `/login` (username + password). No dashboard token. Each account only sees its own jobs, files, skills, memory, and queue traffic.
 
@@ -13,13 +13,11 @@ Live hunts need leases, heartbeats, and isolation. YAML-in-git cannot namespace 
 ## Canonical store
 
 ```
-Postgres (per account_id)
+Postgres (per account_id), or the in-memory store when DATABASE_URL is empty
   jobs, events, people, users, sessions, queue_items,
   skills, mcps, memory_items, messages, presence
-Filesystem BlobStore (volumized)
-  {BLOB_ROOT}/{account_id}/candidate.yaml, resume, …
-RabbitMQ
-  exchange jobos.work, routing {account_id}.{kind}
+Blob driver (memory, filesystem volume, or S3)
+  candidate.yaml, resume, …
 ```
 
 `GET /api/export/ledger` writes a YAML tarball when you need files. That snapshot is not dual-write.
@@ -34,7 +32,7 @@ RabbitMQ
 
 ## Optional live hunt board (maintainer-owned)
 
-Maintainer runs [`board/`](../board/README.md). Compose: Postgres + RabbitMQ + Hub + blob volume. First visit: `/` then `/login`.
+Maintainer runs the Go API and the React SPA ([`docs/runtime.md`](runtime.md)). First visit: `/login`.
 
 ## Secrets
 

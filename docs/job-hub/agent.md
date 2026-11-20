@@ -24,7 +24,7 @@ Aliases the server maps: `apply` → `application`, `maintainer` → `maintenanc
 Auth after join:
 
 ```bash
-export HUB_URL="${HUB_URL:-http://127.0.0.1:8787}"
+export HUB_URL="${HUB_URL:-http://127.0.0.1:8080}"
 export HUB_KEY="jh_agt_…"   # or jh_own_… shown once at join; never commit
 # Either header works:
 #   Authorization: Bearer $HUB_KEY

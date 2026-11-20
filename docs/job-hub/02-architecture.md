@@ -1,6 +1,6 @@
 # Job Hub target architecture
 
-Grows **`board/`** (FastAPI + PostgreSQL + admin UI) into the Hub. Consumers do not clone the hunt repo. Role playbooks are authored in git and served as a pack. Tagged skills live in the Hub **registry**. Git is the starter copy; Postgres is the live copy. See [multi-tenant.md](multi-tenant.md).
+The Hub is a Go API and a React SPA. Consumers do not clone the hunt repo. Role playbooks are authored in git and served as a pack. Tagged skills live in the Hub **registry**. Git is the starter copy; Postgres is the live copy when `DATABASE_URL` is set. See [multi-tenant.md](multi-tenant.md) and [`docs/runtime.md`](../runtime.md).
 
 Related: [grilling](01-grilling.md), [PR plan](03-pr-plan.md), current overlay [board/README.md](../../board/README.md).
 
@@ -20,11 +20,10 @@ flowchart TB
   end
 
   subgraph hub [Job Hub — only non-AI component]
-    api[FastAPI same origin]
-    ui[Board + Admin + Onboarding + Presence + Invites]
+    api[Go Gin API]
+    ui[React SPA]
     db[(PostgreSQL jobs events queue users skills memory — tenant scoped)]
-    blobs[Filesystem BlobStore volume]
-    mq[RabbitMQ jobos.work]
+    blobs[Blob driver: memory, filesystem, or S3]
     pack[Skill/MCP/docs pack]
     a2a[A2A JSON-RPC + Agent Cards]
     secrets[gitignored .env + encrypted connectors]
@@ -43,7 +42,6 @@ flowchart TB
   m --> api
   api --> db
   api --> blobs
-  api --> mq
   api --> pack
   api --> a2a
   api --> secrets
@@ -58,13 +56,14 @@ flowchart TB
 
 | Component | v1 choice |
 | --- | --- |
-| HTTP | Gunicorn + Uvicorn workers, FastAPI `board/app/main.py` |
-| DB | PostgreSQL (`DATABASE_URL`). Git `ledger/` is export-only. |
-| Queue | RabbitMQ topic `jobos.work` + Hub claim table; routing `{account_id}.{kind}` |
-| Files | BlobStore filesystem volume (`BLOB_ROOT`); Memory Adapter in tests |
-| Pack | Files under `board/data/packs/<sha>/` |
-| UI | Extend `board/app/static/index.html` (or split `admin.html` if the file gets large) |
-| Deploy | `scripts/hub_deploy.sh`; Docker Compose plain (`docker-compose.plain.yml`) or Traefik (`docker-compose.yml`). See [`docs/install.md`](../install.md). |
+| HTTP | Go + Gin (`server/`). SSE `GET /api/stream` and WebSocket `GET /ws`. |
+| DB | PostgreSQL (`DATABASE_URL`). Empty URL uses the in-memory store. Git `ledger/` is export-only. |
+| Queue | Postgres `queue_items` (claim, lease, ack, nack). No RabbitMQ. |
+| Files | Blob driver: memory, filesystem (`BLOB_ROOT`), or any S3-compatible API. MinIO is the Compose test store. |
+| Cache | Optional Redis (`REDIS_URL`). Job lists are cached for 15s. |
+| Pack | Files shipped in the API image at `HUB_REPO_ROOT` and served by `GET /api/onboarding`. |
+| UI | React SPA in `web/`. No server render. |
+| Deploy | `docker compose up -d --build`. See [`docs/runtime.md`](../runtime.md). |
 
 ## Identity and tracks
 
