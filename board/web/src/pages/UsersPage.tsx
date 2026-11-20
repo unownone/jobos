@@ -20,6 +20,19 @@ function seenLabel(value?: string): string {
   return text;
 }
 
+function softBreak(value: string) {
+  return value.split(/([ \-_/])/).map((part, index) =>
+    part === " " || part === "-" || part === "_" || part === "/" ? (
+      <span key={index}>
+        {part}
+        <wbr />
+      </span>
+    ) : (
+      <span key={index}>{part}</span>
+    ),
+  );
+}
+
 type DirectoryUser = {
   user_id?: string;
   display_name?: string;
@@ -92,15 +105,15 @@ export function UsersPage() {
           <Table>
             <thead className="sticky top-0 bg-card">
               <tr>
-                <Th className="w-[14%] max-[959px]:w-[46%]">Name</Th>
+                <Th className="w-[12%] max-[959px]:w-[46%]">Name</Th>
                 <Th className="w-[8%] max-[959px]:w-[27%]">Kind</Th>
-                <Th className="w-[12%] max-[959px]:hidden">Track</Th>
+                <Th className="w-[16%] max-[959px]:hidden">Track</Th>
                 <Th className="w-[8%] max-[959px]:w-[27%]">Status</Th>
-                <Th className="w-[10%] max-[959px]:hidden">Model</Th>
-                <Th className="w-[8%] max-[959px]:hidden">Harness</Th>
-                <Th className="w-[8%] max-[959px]:hidden">Bed</Th>
-                <Th className="w-[14%] max-[959px]:hidden">Last active</Th>
-                <Th className="w-[18%] max-[959px]:hidden">Task</Th>
+                <Th className="w-[14%] max-[959px]:hidden">Model</Th>
+                <Th className="w-[10%] max-[959px]:hidden">Harness</Th>
+                <Th className="w-[10%] max-[959px]:hidden">Bed</Th>
+                <Th className="w-[8%] max-[959px]:hidden">Last active</Th>
+                <Th className="w-[14%] max-[959px]:hidden">Task</Th>
               </tr>
             </thead>
             <tbody id="rows">
@@ -110,14 +123,14 @@ export function UsersPage() {
                 const seen = seenLabel(user.last_active || user.last_seen);
                 return (
                   <tr key={user.user_id || user.display_name} className="border-t border-border">
-                    <Td title={name}>{name}</Td>
-                    <Td title={user.kind}>{user.kind}</Td>
-                    <Td className="max-[959px]:hidden" title={track}>{track}</Td>
-                    <Td title={user.status}>{user.status}</Td>
-                    <Td className="max-[959px]:hidden" title={user.model}>{user.model}</Td>
-                    <Td className="max-[959px]:hidden" title={user.harness}>{user.harness}</Td>
-                    <Td className="max-[959px]:hidden" title={user.bed}>{user.bed}</Td>
-                    <Td className="max-[959px]:hidden" title={seen}>{seen}</Td>
+                    <Td truncate={false} className="break-words" title={name}>{softBreak(name)}</Td>
+                    <Td truncate={false} className="break-words" title={user.kind}>{softBreak(user.kind || "")}</Td>
+                    <Td truncate={false} className="max-[959px]:hidden break-words" title={track}>{softBreak(track)}</Td>
+                    <Td truncate={false} className="break-words" title={user.status}>{softBreak(user.status || "")}</Td>
+                    <Td truncate={false} className="max-[959px]:hidden break-words" title={user.model}>{softBreak(user.model || "")}</Td>
+                    <Td truncate={false} className="max-[959px]:hidden break-words" title={user.harness}>{softBreak(user.harness || "")}</Td>
+                    <Td truncate={false} className="max-[959px]:hidden break-words" title={user.bed}>{softBreak(user.bed || "")}</Td>
+                    <Td truncate={false} className="max-[959px]:hidden break-words" title={seen}>{softBreak(seen)}</Td>
                     <Td truncate={false} className="max-[959px]:hidden break-all" title={user.current_task?.id}>{user.current_task?.id}</Td>
                   </tr>
                 );

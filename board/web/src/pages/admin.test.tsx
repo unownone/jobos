@@ -96,8 +96,9 @@ describe("admin pages", () => {
     await waitFor(() => {
       expect(document.getElementById("rows")).toHaveTextContent("Ada");
     });
-    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Last active")?.className).toContain("w-[14%]");
-    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Task")?.className).toContain("w-[18%]");
+    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Last active")?.className).toContain("w-[8%]");
+    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Task")?.className).toContain("w-[14%]");
+    expect([...document.querySelectorAll("th")].find((header) => header.textContent === "Model")?.className).toContain("w-[14%]");
   });
 
   it("names a directory lane without an empty track", async () => {
@@ -112,7 +113,16 @@ describe("admin pages", () => {
               last_active: "Last active: just now",
               current_task: { id: "board__audit-fixture-co-staff-software-engineer" },
             },
-            { user_id: "u2", display_name: "Bea", track: "discovery", role: "owner", last_seen: "2h ago" },
+            {
+              user_id: "u2",
+              display_name: "Bea",
+              track: "discovery",
+              role: "owner",
+              model: "claude-sonnet-5-5-xhigh",
+              harness: "cursor-cloud",
+              bed: "board-worker-east",
+              last_seen: "2h ago",
+            },
           ],
         });
       }
@@ -136,6 +146,16 @@ describe("admin pages", () => {
     const bea = [...document.querySelectorAll("#rows tr")].find((row) => row.textContent?.includes("Bea"));
     expect(bea?.textContent).toContain("discovery / owner");
     expect(bea?.textContent).toContain("2h ago");
+    const beaCells = bea?.querySelectorAll("td") ?? [];
+    expect(beaCells[2]?.textContent).toBe("discovery / owner");
+    expect(beaCells[2]?.className).toContain("break-words");
+    expect(beaCells[2]?.className).not.toContain("truncate");
+    expect(beaCells[4]?.textContent).toBe("claude-sonnet-5-5-xhigh");
+    expect(beaCells[4]?.className).toContain("break-words");
+    expect(beaCells[4]?.className).not.toContain("truncate");
+    expect(beaCells[4]?.querySelectorAll("wbr").length).toBeGreaterThan(0);
+    expect(beaCells[5]?.textContent).toBe("cursor-cloud");
+    expect(beaCells[6]?.textContent).toBe("board-worker-east");
     expect(apiMock).toHaveBeenCalledWith("/api/presence/heartbeat", {
       method: "POST",
       body: { status_hint: "logged_in" },
