@@ -35,6 +35,21 @@ describe("api", () => {
     expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/pdf");
   });
 
+  it("reads the message from a structured error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: { code: "memory_invalid", message: "title must be 8–120 characters" } }), {
+          status: 422,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    await expect(api("/api/memory/items", { method: "POST", body: { title: "short" } })).rejects.toThrow(
+      "title must be 8–120 characters",
+    );
+  });
+
   it("redirects 401 to the board when next would be root", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 401 })));
     window.history.pushState({}, "", "/");

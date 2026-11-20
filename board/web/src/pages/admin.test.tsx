@@ -423,6 +423,7 @@ describe("admin pages", () => {
     await waitFor(() => {
       expect(document.getElementById("compose-status")).toHaveTextContent("Stored");
     });
+    expect(document.getElementById("compose-status")?.className).not.toContain("text-destructive");
     await waitFor(() => {
       expect(document.querySelector("[data-solidify='mem1']")).toBeInTheDocument();
     });
@@ -469,6 +470,32 @@ describe("admin pages", () => {
         body: expect.objectContaining({ pod: "track:discovery", kind: "portal_quirk" }),
       }));
     });
+  });
+
+  it("shows a rejected memory fact as an error", async () => {
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada", role: "admin" });
+      if (path === "/api/memory/pods") {
+        return Promise.resolve({
+          pods: [{ id: "worker:ada", label: "your worker (private)", writable: true }],
+          kinds: { worker: ["fact"] },
+        });
+      }
+      if (path.startsWith("/api/memory/items?")) return Promise.resolve({ items: [] });
+      if (path === "/api/memory/items" && opts?.method === "POST") {
+        return Promise.reject(new Error("title must be 8–120 characters"));
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    render(<MemoryPage />);
+    await waitFor(() => expect(document.getElementById("add-item")).toBeTruthy());
+    fireEvent.change(document.getElementById("write-title") as HTMLInputElement, { target: { value: "short" } });
+    fireEvent.click(document.getElementById("add-item") as HTMLButtonElement);
+    await waitFor(() => {
+      expect(document.getElementById("compose-status")).toHaveTextContent("title must be 8–120 characters");
+    });
+    expect(document.getElementById("compose-status")?.className).toContain("text-destructive");
+    expect(document.getElementById("compose-status")?.textContent).not.toContain("memory_invalid");
   });
 
   it("edits, shares, and deletes a memory row", async () => {

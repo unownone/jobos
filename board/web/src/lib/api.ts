@@ -1,5 +1,14 @@
 import { nextPath } from "./next-path";
 
+function errorMessage(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "message" in detail) {
+    const message = detail.message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return JSON.stringify(detail);
+}
+
 export function csrfToken(): string {
   const match = document.cookie.match(/(?:^|;\s*)hub_csrf=([^;]*)/);
   if (!match) {
@@ -55,9 +64,7 @@ export async function api<T>(
     } catch {
       detail = await res.text();
     }
-    const message =
-      typeof detail === "string" ? detail : JSON.stringify(detail);
-    throw new Error(message);
+    throw new Error(errorMessage(detail));
   }
 
   if (res.status === 204 || res.headers.get("content-length") === "0") {

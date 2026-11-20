@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type Pod = { id: string; label: string; writable?: boolean };
 function policyLine(policy: { store_when?: string; caps?: Record<string, number> } | undefined): string {
@@ -51,6 +52,7 @@ export function MemoryPage() {
   const [policy, setPolicy] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [status, setStatus] = useState("");
+  const [failed, setFailed] = useState(false);
   const [err, setErr] = useState("");
   const [writePod, setWritePod] = useState("");
   const [writeKind, setWriteKind] = useState("");
@@ -67,6 +69,11 @@ export function MemoryPage() {
   const [sharingId, setSharingId] = useState<string | null>(null);
 
   const writeKinds = kinds[scopeOf(writePod)] ?? [];
+
+  function report(message: string, isError = false) {
+    setStatus(message);
+    setFailed(isError);
+  }
 
   async function loadItems(pod = filterPod, q = query, kind = filterKind) {
     const params = new URLSearchParams();
@@ -116,7 +123,7 @@ export function MemoryPage() {
   }, []);
 
   async function addItem() {
-    setStatus("");
+    report("");
     try {
       const data = await api<{ status?: string }>("/api/memory/items", {
         method: "POST",
@@ -132,9 +139,9 @@ export function MemoryPage() {
       setBody("");
       setCompany("");
       await loadItems();
-      setStatus(data.status === "exists" ? "Already stored." : "Stored.");
+      report(data.status === "exists" ? "Already stored." : "Stored.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not store");
+      report(error instanceof Error ? error.message : "Could not store", true);
     }
   }
 
@@ -155,7 +162,7 @@ export function MemoryPage() {
     setBody(item.body ?? "");
     if (item.pod) setWritePod(item.pod);
     if (item.kind) setWriteKind(item.kind);
-    setStatus("Editing.");
+    report("Editing.");
     setErr("");
   }
 
@@ -164,12 +171,12 @@ export function MemoryPage() {
     setTitle("");
     setBody("");
     setCompany("");
-    setStatus("");
+    report("");
   }
 
   async function saveItem() {
     if (!editingId) return;
-    setStatus("");
+    report("");
     try {
       await api(`/api/memory/items/${encodeURIComponent(editingId)}`, {
         method: "PATCH",
@@ -180,9 +187,9 @@ export function MemoryPage() {
       setBody("");
       setCompany("");
       await loadItems();
-      setStatus("Updated.");
+      report("Updated.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not save");
+      report(error instanceof Error ? error.message : "Could not save", true);
     }
   }
 
@@ -194,7 +201,7 @@ export function MemoryPage() {
       if (editingId === id) cancelEdit();
       if (sharingId === id) setSharingId(null);
       await loadItems();
-      setStatus("Deleted.");
+      report("Deleted.");
     } catch (error) {
       setErr(error instanceof Error ? error.message : "Could not delete");
     }
@@ -210,7 +217,7 @@ export function MemoryPage() {
       });
       setSharingId(null);
       await loadItems();
-      setStatus(shareCopy ? "Copied." : "Moved.");
+      report(shareCopy ? "Copied." : "Moved.");
     } catch (error) {
       setErr(error instanceof Error ? error.message : "Could not share");
     }
@@ -267,7 +274,7 @@ export function MemoryPage() {
               Cancel
             </Button>
           </div>
-          <p id="compose-status" className="m-0 text-sm md:col-span-2">
+          <p id="compose-status" className={cn("m-0 text-sm md:col-span-2", failed && "text-destructive")}>
             {status}
           </p>
         </section>
