@@ -1,0 +1,152 @@
+import { fireEvent, render, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { api } from "@/lib/api";
+
+import { DataPage } from "./DataPage";
+import { InvitesPage } from "./InvitesPage";
+import { MemoryPage } from "./MemoryPage";
+import { SkillsPage } from "./SkillsPage";
+import { UsersPage } from "./UsersPage";
+
+vi.mock("@/lib/api", () => ({
+  api: vi.fn(),
+}));
+
+const apiMock = vi.mocked(api);
+
+beforeEach(() => {
+  apiMock.mockReset();
+});
+
+describe("admin pages", () => {
+  it("renders the invite track control and shows the join link", async () => {
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ user: { email: "ada@example.test" }, actor: "ada" });
+      if (path === "/api/invites" && opts?.method === "POST") {
+        return Promise.resolve({ join_url: "https://hub.example/join/inv1?s=secret", agent_prompt: "curl the hub" });
+      }
+      if (path === "/api/invites") return Promise.resolve({ invites: [{ id: "inv1", track: "discovery", mode: "owner_then_agents", revoked: false }] });
+      if (path === "/api/meta") return Promise.resolve({ coming_soon_roles: [{ id: "review", summary: "feedback" }] });
+      if (path === "/api/presence/heartbeat") return Promise.resolve({});
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<InvitesPage />);
+
+    expect(document.body).toHaveTextContent("jobOS Harness");
+    expect(document.getElementById("track")).toBeInTheDocument();
+    expect(document.querySelector("[data-testid='hub-scroll']")?.className).toContain("overflow-y-auto");
+
+    fireEvent.submit(document.getElementById("form") as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(document.getElementById("created")).toHaveTextContent("/join/");
+    });
+    expect(document.getElementById("url")).toHaveTextContent("/join/inv1");
+    await waitFor(() => {
+      expect(document.getElementById("rows")).toHaveTextContent("discovery");
+    });
+  });
+
+  it("lists directory rows", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/users") {
+        return Promise.resolve({ users: [{ user_id: "u1", display_name: "Ada", kind: "admin", status: "offline" }] });
+      }
+      if (path === "/api/presence/heartbeat") return Promise.resolve({});
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<UsersPage />);
+
+    expect(document.body).toHaveTextContent("Directory");
+    await waitFor(() => {
+      expect(document.getElementById("rows")).toHaveTextContent("Ada");
+    });
+    expect(apiMock).toHaveBeenCalledWith("/api/presence/heartbeat", {
+      method: "POST",
+      body: { status_hint: "logged_in" },
+    });
+  });
+
+  it("renders the data browser", async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith("/api/jobs")) return Promise.resolve({ jobs: [], count: 0, total: 0 });
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada" });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<DataPage />);
+
+    expect(document.querySelector("h1")).toHaveTextContent("jobOS data");
+    expect(document.getElementById("tabs")).toBeInTheDocument();
+    expect(document.getElementById("q")).toBeInTheDocument();
+    expect(document.getElementById("status")).toBeInTheDocument();
+    expect(document.getElementById("stopped")).toBeInTheDocument();
+    expect(document.getElementById("go")).toBeInTheDocument();
+    expect(document.getElementById("table")).toBeInTheDocument();
+  });
+
+  it("seeds the skill registry", async () => {
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ display_name: "Ada", kind: "admin" });
+      if (path.startsWith("/api/registry/skills")) return Promise.resolve({ skills: [{ slug: "hunt", role: "discovery", tags: ["source"], scope: "shared", status: "active" }] });
+      if (path === "/api/registry/recordings") return Promise.resolve({ recordings: [] });
+      if (path === "/api/registry/seed" && opts?.method === "POST") return Promise.resolve({ counts: { skills: 2 } });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<SkillsPage />);
+
+    expect(document.querySelector("h1")).toHaveTextContent("Skill registry");
+    fireEvent.click(document.getElementById("seed") as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(document.getElementById("msg")).toHaveTextContent("Seeded");
+    });
+  });
+
+  it("stores a memory fact and solidifies it", async () => {
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ actor: "ada", role: "admin" });
+      if (path === "/api/memory/pods") {
+        return Promise.resolve({
+          pods: [{ id: "track:discovery", label: "discovery", writable: true }],
+          kinds: { track: ["portal"] },
+          write_policy: { store_when: "When it will matter next round.", caps: { track: 4 } },
+        });
+      }
+      if (path === "/api/memory/items" && opts?.method === "POST") return Promise.resolve({ status: "stored", id: "mem1" });
+      if (path.startsWith("/api/memory/items?")) {
+        return Promise.resolve({
+          items: [{ id: "mem1", pod: "track:discovery", kind: "portal", title: "Lever", body: "Use the public board.", pod_scope: "track", solidify_status: "none" }],
+        });
+      }
+      if (path === "/api/memory/items/mem1/solidify") return Promise.resolve({});
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+
+    render(<MemoryPage />);
+
+    expect(document.querySelector("h1")).toHaveTextContent("Memory pods");
+    expect(document.getElementById("add-item")).toBeInTheDocument();
+
+    fireEvent.change(document.getElementById("write-title") as HTMLInputElement, { target: { value: "Lever" } });
+    fireEvent.change(document.getElementById("write-body") as HTMLTextAreaElement, { target: { value: "Use the public board." } });
+    fireEvent.click(document.getElementById("add-item") as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(document.getElementById("compose-status")).toHaveTextContent("Stored");
+    });
+    await waitFor(() => {
+      expect(document.querySelector("[data-solidify='mem1']")).toBeInTheDocument();
+    });
+
+    fireEvent.click(document.querySelector("[data-solidify='mem1']") as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith("/api/memory/items/mem1/solidify", { method: "POST" });
+    });
+  });
+});
