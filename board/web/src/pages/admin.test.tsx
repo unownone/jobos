@@ -136,7 +136,7 @@ describe("admin pages", () => {
       if (path === "/api/auth/me") return Promise.resolve({ actor: "ada" });
       if (path.startsWith("/api/jobs")) {
         return Promise.resolve({
-          jobs: [{ id: "board__acme", company: "Acme", title: "Engineer", status: "discovered", score: 4 }],
+          jobs: [{ id: "board__acme", company: "Acme", title: "Engineer", status: "discovered", stopped: true, score: 4 }],
           count: 1,
           total: 1,
         });
@@ -151,6 +151,8 @@ describe("admin pages", () => {
     expect(document.querySelector("#table td")?.className).toContain("break-all");
     expect([...document.querySelectorAll("#table th")].find((header) => header.textContent === "Title")?.className).toContain("w-[28%]");
     expect([...document.querySelectorAll("#table td")][2]?.className).toContain("break-words");
+    expect([...document.querySelectorAll("#table td")][3]?.textContent).toBe("discovered · stopped");
+    expect([...document.querySelectorAll("#table td")][3]?.className).toContain("break-words");
   });
 
   it("wraps a hosted connector path", async () => {

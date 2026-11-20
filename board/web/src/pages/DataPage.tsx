@@ -39,7 +39,7 @@ function isTab(value: string): value is Tab {
   return (TABS as readonly string[]).includes(value);
 }
 
-const PROSE = new Set(["Company", "Title", "Name", "Fact", "Reason", "Value", "Role", "Tags", "Note", "Field"]);
+const PROSE = new Set(["Company", "Title", "Name", "Fact", "Reason", "Value", "Role", "Tags", "Note", "Field", "Status"]);
 const IDENTIFIERS = new Set(["ID", "Job", "Slug", "Pod", "Hosted"]);
 
 const JOB_WIDTH: Record<string, string> = {
@@ -110,7 +110,7 @@ export function DataPage() {
           if (q.trim()) params.set("q", q.trim());
           if (status.trim()) params.set("status", status.trim());
           if (stopped) params.set("stopped", stopped);
-          const data = await api<{ jobs?: { id: string; company: string; title: string; status: string; score?: number | null }[]; count?: number; total?: number }>(
+          const data = await api<{ jobs?: { id: string; company: string; title: string; status: string; stopped?: boolean; score?: number | null }[]; count?: number; total?: number }>(
             `/api/jobs?${params.toString()}`,
           );
           if (cancelled) return;
@@ -121,7 +121,7 @@ export function DataPage() {
               ID: job.id,
               Company: job.company,
               Title: job.title,
-              Status: job.status,
+              Status: job.stopped ? (job.status ? `${job.status} · stopped` : "stopped") : job.status,
               Score: job.score == null ? "" : String(job.score),
             })),
           );
