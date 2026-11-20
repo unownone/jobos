@@ -13,6 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 
 type Pod = { id: string; label: string; writable?: boolean };
+function policyLine(policy: { store_when?: string; caps?: Record<string, number> } | undefined): string {
+  const when = policy?.store_when?.trim() ?? "";
+  const caps = Object.entries(policy?.caps ?? {});
+  const capText = caps.length === 0 ? "No 15-minute caps." : `15-minute caps: ${caps.map(([name, count]) => `${name} ${count}`).join(", ")}.`;
+  return [when, capText].filter(Boolean).join(" ");
+}
+
 type Item = {
   id: string;
   pod?: string;
@@ -93,8 +100,7 @@ export function MemoryPage() {
         setSharePod(first);
         setWriteKind((current) => current || firstKind);
         setShareKind((current) => current || firstKind);
-        const policyText = podData.write_policy;
-        setPolicy(`${policyText?.store_when || ""} Caps / 15m: ${JSON.stringify(policyText?.caps || {})}`);
+        setPolicy(policyLine(podData.write_policy));
         await loadItems();
       } catch (error) {
         if (!cancelled) {
@@ -333,6 +339,7 @@ export function MemoryPage() {
             </Button>
             <span hidden data-edit="" data-solidify="" data-delete="" />
           </div>
+          {items.length === 0 ? <p className="m-0 text-sm text-muted-foreground">No facts in this view.</p> : null}
           <RecordDeck>
             {items.map((item) => {
               const canSolidify = item.pod_scope !== "worker" && (item.solidify_status || "none") === "none";
@@ -382,10 +389,10 @@ export function MemoryPage() {
                   const canSolidify = item.pod_scope !== "worker" && (item.solidify_status || "none") === "none";
                   return (
                     <tr key={item.id} className="border-t border-border">
-                      <Td className="max-[959px]:hidden" title={item.pod}>{item.pod}</Td>
-                      <Td className="max-[959px]:hidden" title={item.kind}>{item.kind}</Td>
-                      <Td title={item.title}>{item.title}</Td>
-                      <Td title={item.body}>{item.body}</Td>
+                      <Td truncate={false} className="max-[959px]:hidden break-all" title={item.pod}>{item.pod}</Td>
+                      <Td truncate={false} className="max-[959px]:hidden break-words" title={item.kind}>{item.kind}</Td>
+                      <Td truncate={false} className="break-words" title={item.title}>{item.title}</Td>
+                      <Td truncate={false} className="break-words" title={item.body}>{item.body}</Td>
                       <Td truncate={false}>
                         <div className="flex flex-wrap gap-2">
                           <Button type="button" variant="outline" data-edit={item.id} onClick={() => startEdit(item)}>

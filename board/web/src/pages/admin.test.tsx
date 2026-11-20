@@ -239,6 +239,10 @@ describe("admin pages", () => {
     render(<MemoryPage />);
 
     expect(document.querySelector("h1")).toHaveTextContent("Memory pods");
+    await waitFor(() => {
+      expect(document.getElementById("policy")).toHaveTextContent("15-minute caps: track 4");
+    });
+    expect(document.getElementById("policy")?.textContent).not.toContain("{");
     expect(document.getElementById("add-item")).toBeInTheDocument();
     expect(document.getElementById("write-title")?.parentElement?.parentElement).toBe(
       document.getElementById("write-company")?.parentElement?.parentElement,
@@ -255,6 +259,8 @@ describe("admin pages", () => {
     await waitFor(() => {
       expect(document.querySelector("[data-solidify='mem1']")).toBeInTheDocument();
     });
+    const podCell = [...document.querySelectorAll("#rows td")].find((cell) => cell.textContent === "track:discovery");
+    expect(podCell?.className).toContain("break-all");
 
     fireEvent.click(document.querySelector("[data-solidify='mem1']") as HTMLButtonElement);
 
