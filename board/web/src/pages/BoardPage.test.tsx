@@ -165,6 +165,7 @@ describe("BoardPage", () => {
     expect(document.body).toHaveTextContent("jobOS Harness");
     expect(document.body).toHaveTextContent("helps find jobs");
     expect(document.getElementById("statusBtn")).toHaveTextContent("All statuses");
+    expect(document.getElementById("moreFilters")?.className).toContain("min-[960px]:flex");
     for (const id of ["pager", "moreFilters", "list", "q", "logoutBtn", "whoLabel", "connLabel", "side", "main"]) {
       expect(document.getElementById(id), id).toBeInTheDocument();
     }
@@ -213,6 +214,7 @@ describe("BoardPage", () => {
     expect(byId("side").querySelector("h2")?.className).toContain("truncate");
     expect(byId("side").querySelector("p")?.textContent).toBe(JOB.id);
     expect(byId("list").querySelector("table")?.className).toContain("table-fixed");
+    expect([...byId("list").querySelectorAll("th")].find((header) => header.textContent === "Score")?.className).toContain("max-[959px]:hidden");
     expect(byId("list").contains(byId("pager"))).toBe(false);
     expect(byId("main").contains(byId("pager"))).toBe(false);
     expect(byId("main").contains(byId("list"))).toBe(true);

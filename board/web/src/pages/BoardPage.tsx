@@ -211,6 +211,7 @@ export function BoardPage() {
   const [pay, setPay] = useState("");
   const [location, setLocation] = useState("");
   const [source, setSource] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const openId = selected?.id ?? "";
   const queueVisible = isAdmin(caps);
@@ -253,7 +254,7 @@ export function BoardPage() {
       observer?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [queueVisible]);
+  }, [queueVisible, filtersOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -549,10 +550,27 @@ export function BoardPage() {
             <Button id="refresh" type="button" variant="outline" onClick={() => setReloadKey((key) => key + 1)}>
               Refresh
             </Button>
+            <Button
+              type="button"
+              variant={filtersOpen ? "default" : "outline"}
+              className="min-[960px]:hidden"
+              aria-expanded={filtersOpen}
+              aria-controls="moreFilters"
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              Filters
+            </Button>
             <span id="stats" className="text-sm text-muted-foreground">{statsText}</span>
           </div>
         </div>
-        <div id="moreFilters" ref={filtersRef} className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+        <div
+          id="moreFilters"
+          ref={filtersRef}
+          className={cn(
+            "shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2",
+            filtersOpen ? "flex" : "hidden min-[960px]:flex",
+          )}
+        >
           <Choice id="laneFilter" label="Lane" value={lane} placeholder="Lane: any" onChange={(value) => { setOffset(0); setLane(value); }} options={[
             { value: "discovery", label: "Lane: discovery" },
             { value: "apply", label: "Lane: apply" },
@@ -626,13 +644,13 @@ export function BoardPage() {
               <Table>
                 <thead className="sticky top-0 z-10 bg-card">
                   <tr>
-                    <th className="w-[22%] px-3 py-2">Company</th>
-                    <th className="w-[24%] px-3 py-2">Title</th>
-                    <th className="w-[14%] px-3 py-2">Status</th>
-                    <th className="w-[8%] px-3 py-2">Score</th>
-                    <th className="w-[10%] px-3 py-2">Pay</th>
-                    <th className="w-[12%] px-3 py-2">Posted</th>
-                    <th className="w-[10%] px-3 py-2">Claim</th>
+                    <th className="w-[22%] px-3 py-2 max-[959px]:w-[38%]">Company</th>
+                    <th className="w-[24%] px-3 py-2 max-[959px]:w-[40%]">Title</th>
+                    <th className="w-[14%] px-3 py-2 max-[959px]:w-[22%]">Status</th>
+                    <th className="w-[8%] px-3 py-2 max-[959px]:hidden">Score</th>
+                    <th className="w-[10%] px-3 py-2 max-[959px]:hidden">Pay</th>
+                    <th className="w-[12%] px-3 py-2 max-[959px]:hidden">Posted</th>
+                    <th className="w-[10%] px-3 py-2 max-[959px]:hidden">Claim</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -645,10 +663,10 @@ export function BoardPage() {
                           {job.stopped ? "stopped" : job.status}
                         </Badge>
                       </td>
-                      <td className="px-3 py-2">{job.score ?? ""}</td>
-                      <td className="truncate px-3 py-2" title={job.pay || ""}>{job.pay || "—"}</td>
-                      <td className="truncate px-3 py-2">{dayLabel(job.posted_at) || dayLabel(job.created_at)}</td>
-                      <td className="truncate px-3 py-2">{job.claim?.claimed_by || job.claim?.kind || ""}</td>
+                      <td className="px-3 py-2 max-[959px]:hidden">{job.score ?? ""}</td>
+                      <td className="truncate px-3 py-2 max-[959px]:hidden" title={job.pay || ""}>{job.pay || "—"}</td>
+                      <td className="truncate px-3 py-2 max-[959px]:hidden">{dayLabel(job.posted_at) || dayLabel(job.created_at)}</td>
+                      <td className="truncate px-3 py-2 max-[959px]:hidden">{job.claim?.claimed_by || job.claim?.kind || ""}</td>
                     </tr>
                   ))}
                 </tbody>
