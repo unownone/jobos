@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AppShell } from "@/components/shell/AppShell";
 import type { ShellConn } from "@/components/shell/TopBar";
 import { Badge } from "@/components/ui/badge";
+import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
 import { Table } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
@@ -649,7 +650,24 @@ export function BoardPage() {
             ) : jobs.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No jobs on this page.</p>
             ) : (
-              <Table>
+              <>
+              <RecordDeck>
+                {jobs.map((job) => (
+                  <RecordCard
+                    key={job.id}
+                    title={job.company || "Job"}
+                    subtitle={job.title || ""}
+                    onClick={() => void openJob(job.id)}
+                  >
+                    <RecordField label="Status" value={job.stopped ? "stopped" : job.status || ""} />
+                    <RecordField label="Score" value={job.score == null ? "" : String(job.score)} />
+                    <RecordField label="Pay" value={job.pay || "—"} />
+                    <RecordField label="Posted" value={dayLabel(job.posted_at) || dayLabel(job.created_at)} />
+                    <RecordField label="Claim" value={job.claim?.claimed_by || job.claim?.kind || ""} />
+                  </RecordCard>
+                ))}
+              </RecordDeck>
+              <Table className="max-[720px]:hidden">
                 <thead className="sticky top-0 z-10 bg-card">
                   <tr>
                     <th className="w-[22%] px-3 py-2 max-[959px]:w-[38%]">Company</th>
@@ -679,6 +697,7 @@ export function BoardPage() {
                   ))}
                 </tbody>
               </Table>
+              </>
             )}
           </motion.section>
           <TicketFrame
@@ -852,7 +871,7 @@ function TicketFrame({
   }
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <SheetContent id="side" side="bottom" className="flex max-h-[92dvh] flex-col overflow-hidden">
+      <SheetContent id="side" side="bottom" className="flex h-[92dvh] max-h-[92dvh] flex-col gap-0 overflow-hidden px-4 pt-14 pb-4">
         <SheetTitle className="sr-only">Job ticket</SheetTitle>
         <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea>
         {footer}

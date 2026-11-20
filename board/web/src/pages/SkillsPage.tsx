@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { NativeSelect } from "@/components/ui/select";
 import { api } from "@/lib/api";
@@ -137,7 +138,16 @@ export function SkillsPage() {
         <p id="msg" className="m-0 text-sm">
           {msg}
         </p>
-        <div className="min-w-0 overflow-x-auto border border-border bg-card">
+        <RecordDeck>
+          {skills.map((skill) => (
+            <RecordCard key={skill.slug} title={skill.slug || ""} subtitle={skill.role || ""}>
+              <RecordField label="Tags" value={(skill.tags ?? []).join(", ")} />
+              <RecordField label="Scope" value={skill.scope || ""} />
+              <RecordField label="Status" value={skill.status || ""} />
+            </RecordCard>
+          ))}
+        </RecordDeck>
+        <div className="min-w-0 overflow-x-auto border border-border bg-card max-[720px]:hidden">
           <Table>
             <thead>
               <tr>
@@ -161,7 +171,16 @@ export function SkillsPage() {
             </tbody>
           </Table>
         </div>
-        <div className="min-w-0 overflow-x-auto border border-border bg-card">
+        <RecordDeck>
+          {recordings.map((recording, index) => (
+            <RecordCard key={recording.id || index} title={recording.skill || "Recording"} subtitle={recording.id || ""}>
+              <RecordField label="Scope" value={recording.scope || ""} />
+              <RecordField label="Status" value={recording.status || ""} />
+              <RecordField label="Note" value={recording.note || ""} />
+            </RecordCard>
+          ))}
+        </RecordDeck>
+        <div className="min-w-0 overflow-x-auto border border-border bg-card max-[720px]:hidden">
           <Table>
             <thead>
               <tr>

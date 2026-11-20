@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
+import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
@@ -283,10 +284,21 @@ export function DataPage() {
         <p id="err" className="m-0 text-sm text-destructive">
           {err}
         </p>
-        <div id="table" className="min-w-0 overflow-x-auto border border-border bg-card">
+        <div id="table" className="min-w-0">
           {rows.length === 0 ? (
             <p className="m-0 p-4 text-sm text-muted-foreground">No rows match these filters.</p>
           ) : (
+            <>
+            <RecordDeck>
+              {rows.map((row, index) => (
+                <RecordCard key={`${tab}-${index}`} title={row[headers[0]] || "Row"}>
+                  {headers.slice(1).map((header) => (
+                    <RecordField key={header} label={header} value={row[header] || ""} />
+                  ))}
+                </RecordCard>
+              ))}
+            </RecordDeck>
+            <div className="overflow-x-auto border border-border bg-card max-[720px]:hidden">
             <Table>
               <thead>
                 <tr>
@@ -307,6 +319,8 @@ export function DataPage() {
                 ))}
               </tbody>
             </Table>
+            </div>
+            </>
           )}
         </div>
         </motion.div>

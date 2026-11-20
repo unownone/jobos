@@ -4,6 +4,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RecordCard, RecordDeck } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
@@ -220,7 +221,25 @@ export function InvitesPage() {
           <h2 className="mt-0 font-display text-[1.6rem] leading-none font-extrabold [font-family:var(--font-display)]">
             Existing invites
           </h2>
-          <div className="min-w-0 overflow-x-auto">
+          <RecordDeck>
+            {invites.map((invite) => (
+              <RecordCard
+                key={invite.id}
+                title={invite.track || ""}
+                subtitle={invite.mode || ""}
+                actions={
+                  inviteRevoked(invite) ? (
+                    <span className="text-sm text-muted-foreground">revoked</span>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={() => void revoke(invite.id)}>
+                      Revoke
+                    </Button>
+                  )
+                }
+              />
+            ))}
+          </RecordDeck>
+          <div className="min-w-0 overflow-x-auto max-[720px]:hidden">
             <Table>
               <thead>
                 <tr>

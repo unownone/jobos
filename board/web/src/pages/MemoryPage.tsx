@@ -4,6 +4,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/select";
@@ -331,7 +332,40 @@ export function MemoryPage() {
             </Button>
             <span hidden data-edit="" data-solidify="" data-delete="" />
           </div>
-          <div className="min-w-0 overflow-x-auto">
+          <RecordDeck>
+            {items.map((item) => {
+              const canSolidify = item.pod_scope !== "worker" && (item.solidify_status || "none") === "none";
+              return (
+                <RecordCard
+                  key={item.id}
+                  title={item.title || "Memory"}
+                  subtitle={item.body || ""}
+                  actions={
+                    <>
+                      <Button type="button" variant="outline" onClick={() => startEdit(item)}>
+                        Edit
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => setSharingId(item.id)}>
+                        Share
+                      </Button>
+                      {canSolidify ? (
+                        <Button type="button" variant="outline" onClick={() => void solidify(item.id)}>
+                          Solidify
+                        </Button>
+                      ) : null}
+                      <Button type="button" variant="destructive" onClick={() => void removeItem(item.id)}>
+                        Delete
+                      </Button>
+                    </>
+                  }
+                >
+                  <RecordField label="Pod" value={item.pod || ""} />
+                  <RecordField label="Kind" value={item.kind || ""} />
+                </RecordCard>
+              );
+            })}
+          </RecordDeck>
+          <div className="min-w-0 overflow-x-auto max-[720px]:hidden">
             <Table>
               <thead>
                 <tr>

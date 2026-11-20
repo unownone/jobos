@@ -214,6 +214,8 @@ describe("BoardPage", () => {
     expect(byId("side").querySelector("h2")?.className).toContain("truncate");
     expect(byId("side").querySelector("p")?.textContent).toBe(JOB.id);
     expect(byId("list").querySelector("table")?.className).toContain("table-fixed");
+    expect(byId("list").querySelector("table")?.className).toContain("max-[720px]:hidden");
+    expect(byId("list").querySelector("[data-slot='record-deck']")?.textContent).toContain("TicketCo");
     expect([...byId("list").querySelectorAll("th")].find((header) => header.textContent === "Score")?.className).toContain("max-[959px]:hidden");
     expect(byId("list").contains(byId("pager"))).toBe(false);
     expect(byId("main").contains(byId("pager"))).toBe(false);

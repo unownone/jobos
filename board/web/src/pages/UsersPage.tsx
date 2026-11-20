@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { type ShellConn } from "@/components/shell/TopBar";
+import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
 
@@ -55,7 +56,25 @@ export function UsersPage() {
         <p id="who" className="m-0 text-sm text-muted-foreground">
           {who}
         </p>
-        <div className="min-w-0 overflow-x-auto border border-border bg-card">
+        <RecordDeck>
+          {users.map((user) => {
+            const name = user.display_name || user.user_id || "";
+            const track = `${user.track || ""} / ${user.role || ""}`;
+            const seen = user.last_active || user.last_seen || "";
+            return (
+              <RecordCard key={user.user_id || user.display_name} title={name} subtitle={user.kind || ""}>
+                <RecordField label="Track" value={track} />
+                <RecordField label="Status" value={user.status || ""} />
+                <RecordField label="Model" value={user.model || ""} />
+                <RecordField label="Harness" value={user.harness || ""} />
+                <RecordField label="Bed" value={user.bed || ""} />
+                <RecordField label="Last active" value={seen} />
+                <RecordField label="Task" value={user.current_task?.id || ""} />
+              </RecordCard>
+            );
+          })}
+        </RecordDeck>
+        <div className="min-w-0 overflow-x-auto border border-border bg-card max-[720px]:hidden">
           <Table>
             <thead className="sticky top-0 bg-card">
               <tr>
