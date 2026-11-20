@@ -125,7 +125,7 @@ function listPayload(jobs: unknown[], matched = jobs.length === 0 ? 0 : 2) {
   };
 }
 
-function mockBoard(jobs: unknown[] = [JOB]) {
+function mockBoard(jobs: unknown[] = [JOB], presence: unknown[] = []) {
   apiMock.mockImplementation((path: string, opts?: { method?: string; body?: unknown }) => {
     if (path === "/api/whoami") return Promise.resolve(ADMIN);
     if (path === "/api/meta") return Promise.resolve({ statuses: ["discovered", "rejected"], apply_kinds: ["ats"] });
@@ -136,7 +136,7 @@ function mockBoard(jobs: unknown[] = [JOB]) {
     if (path === "/api/jobs/1") return Promise.resolve({ job: jobs[0] ?? JOB });
     if (path.startsWith("/api/events")) return Promise.resolve({ events: [] });
     if (path === "/api/presence/heartbeat") return Promise.resolve({ memory: { items: [] } });
-    if (path === "/api/presence") return Promise.resolve({ users: [] });
+    if (path === "/api/presence") return Promise.resolve({ users: presence });
     if (path.startsWith("/api/queue")) return Promise.resolve({ items: [{ kind: "apply", status: "ready" }] });
     return Promise.reject(new Error(`unexpected ${path} ${opts?.method ?? "GET"}`));
   });
@@ -192,6 +192,21 @@ describe("BoardPage", () => {
     render(<BoardPage />);
     await waitFor(() => expect(byId("f_company")).toHaveValue("TicketCo"));
     expect(apiMock).toHaveBeenCalledWith("/api/jobs/1");
+  });
+
+  it("opens the job a worker is on", async () => {
+    mockBoard([JOB], [{
+      user_id: "u1",
+      display_name: "Ada",
+      status: "working",
+      kind: "human",
+      role: "admin",
+      current_task: { id: "1", kind: "job", job_id: "1" },
+    }]);
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("presenceList")).toHaveTextContent("Ada"));
+    fireEvent.click(byId("presenceList").querySelector("button") as HTMLElement);
+    await waitFor(() => expect(byId("f_company")).toHaveValue("TicketCo"));
   });
 
   it("opens a ticket from the list and saves the allowed fields", async () => {

@@ -77,6 +77,7 @@ type PresenceUser = {
   kind?: string;
   track?: string;
   role?: string;
+  current_task?: { id?: string; kind?: string; job_id?: string } | null;
 };
 
 type MemoryItem = {
@@ -200,7 +201,7 @@ export function BoardPage() {
   const [sourceText, setSourceText] = useState("");
   const [sideErr, setSideErr] = useState("");
   const [presence, setPresence] = useState<PresenceUser[]>([]);
-  const [presenceNote, setPresenceNote] = useState("Workers appear here when they take Hub actions. Click one to see what they are doing.");
+  const [presenceNote, setPresenceNote] = useState("Workers appear here when they take Hub actions.");
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [memoryNote, setMemoryNote] = useState("Heartbeat recalls worker + track + common facts each round.");
   const [queueStats, setQueueStats] = useState("");
@@ -622,13 +623,36 @@ export function BoardPage() {
           >
             <h2 className="mt-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Presence</h2>
             <p id="presenceEmpty" hidden={presence.length > 0} className="text-sm text-muted-foreground">{presenceNote}</p>
-            <div id="presenceList">
-              {presence.map((user) => (
-                <div key={user.user_id || user.display_name} className="py-1 text-sm">
-                  <div className="font-medium">{user.display_name || user.user_id}</div>
-                  <div className="text-muted-foreground">{user.status} · {user.kind || ""} · {user.track || user.role || ""}</div>
-                </div>
-              ))}
+            <div id="presenceList" className="flex flex-col gap-1">
+              {presence.map((user) => {
+                const name = user.display_name || user.user_id || "";
+                const lane = [user.status, user.kind, user.track || user.role].filter(Boolean).join(" · ");
+                const jobId = user.current_task?.job_id || "";
+                const body = (
+                  <>
+                    <div className="font-medium break-words">{name}</div>
+                    <div className="break-words text-muted-foreground">{lane}</div>
+                    {jobId ? <div className="break-all text-muted-foreground">{jobId}</div> : null}
+                  </>
+                );
+                if (!jobId) {
+                  return (
+                    <div key={user.user_id || name} className="py-1 text-sm">
+                      {body}
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    key={user.user_id || name}
+                    type="button"
+                    className="min-h-11 py-1 text-left text-sm"
+                    onClick={() => void openJob(jobId)}
+                  >
+                    {body}
+                  </button>
+                );
+              })}
             </div>
             <h2 className="font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Memory</h2>
             <p id="memoryEmpty" hidden={memories.length > 0} className="text-sm text-muted-foreground">{memoryNote}</p>
@@ -637,7 +661,7 @@ export function BoardPage() {
                 <div key={`${item.pod_scope ?? ""}-${item.title ?? ""}`} className="py-1 text-sm">
                   <div className="text-muted-foreground">{item.pod_scope} · {item.kind}</div>
                   <div className="font-medium">{item.title}</div>
-                  <div className="text-muted-foreground">{item.body}</div>
+                  <div className="break-words text-muted-foreground">{item.body}</div>
                 </div>
               ))}
             </div>
