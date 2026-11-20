@@ -16,7 +16,7 @@ Install and hosting: **[`docs/install.md`](../install.md)** (Docker, Compose pla
 
 ## What you deploy
 
-One FastAPI process (`board/`). PostgreSQL for durable tenant state (jobs, users, candidate, memory, metrics). Files in a volumized BlobStore. Queue is RabbitMQ (AMQP) with `{account_id}.{kind}` routing. Secrets in gitignored `board/.env`. Never paste tokens into git, docs, or group chat.
+The live Hub is the Go API plus the React SPA ([`docs/runtime.md`](../runtime.md)). PostgreSQL holds durable tenant state when `DATABASE_URL` is set. Queue leases are rows in `queue_items`. RabbitMQ is not part of this runtime. Files go through the blob driver (memory, filesystem, or S3). Secrets stay in gitignored env files. Never paste tokens into git, docs, or group chat.
 
 Auth is **username + password** at `/login` (signup on the same page). No dashboard token is required. Multi-tenant design: [`multi-tenant.md`](multi-tenant.md).
 

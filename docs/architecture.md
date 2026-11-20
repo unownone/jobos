@@ -1,6 +1,6 @@
 # Architecture
 
-jobOS is a **job harness**: a multi-agent workflow whose live list is **jobOS Hub** (Postgres + BlobStore + RabbitMQ). The process is stateless. Git `ledger/` is an export snapshot, not canonical state.
+jobOS is a **job harness**: a multi-agent workflow whose live list is **jobOS Hub**. The current runtime is a Go API and a React SPA ([`docs/runtime.md`](runtime.md)). Work leases live in Postgres `queue_items`. RabbitMQ is not part of that runtime. Blobs are memory, filesystem, or any S3-compatible store. Git `ledger/` is an export snapshot, not canonical state.
 
 ## Goals
 

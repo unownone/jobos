@@ -1,6 +1,8 @@
 # Install and host jobOS Hub
 
-jobOS Hub is the live coordination plane for the job harness. One FastAPI process. PostgreSQL for durable state (not a Hub volume). Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
+jobOS Hub is the live coordination plane for the job harness. The current Compose file runs two containers: a Go API and a React SPA. Postgres, Redis, and MinIO are optional profiles. RabbitMQ is not in that file. See [`docs/runtime.md`](runtime.md). Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
+
+Sections below that name port 8787 or the FastAPI image describe the Python `board/` process, which is still in the tree.
 
 **Onboarding is the first thing you do after the process is up.** Until a truthful candidate profile exists, jobs, invites, queues, messages, and A2A sends return `409 candidate_required`. Do not copy `profiles/candidate.example.yaml` into production.
 

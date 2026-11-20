@@ -205,6 +205,17 @@ func TestPackMCPAndMemoryCaps(t *testing.T) {
 	}
 	res.Body.Close()
 
+	res = send(t, client, http.MethodGet, ts.URL+"/api/onboarding", "", "", csrf)
+	onboarded := readBody(res)
+	if res.StatusCode != 200 || !strings.Contains(onboarded, `"skills_zip"`) || !strings.Contains(onboarded, `"connectors_needed"`) || !strings.Contains(onboarded, "job-discovery") {
+		t.Fatalf("onboarding %d %s", res.StatusCode, onboarded)
+	}
+	res = send(t, client, http.MethodGet, ts.URL+"/api/docs/.env", "", "", csrf)
+	if res.StatusCode != 404 {
+		t.Fatalf("env file %d", res.StatusCode)
+	}
+	res.Body.Close()
+
 	res = send(t, client, http.MethodGet, ts.URL+"/api/packs/current/skills.zip", "", "", csrf)
 	raw, _ := io.ReadAll(res.Body)
 	res.Body.Close()
