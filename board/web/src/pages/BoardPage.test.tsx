@@ -262,6 +262,9 @@ describe("BoardPage", () => {
     expect(byId("locationFilter").parentElement).toHaveTextContent("Location");
     expect(byId("sourceFilter").parentElement?.className).toContain("w-44");
     expect(byId("sourceFilter").parentElement).toHaveTextContent("Source");
+    expect(byId("f_company").parentElement?.parentElement?.className).toContain("@min-[36rem]:grid-cols-2");
+    expect(byId("f_company").parentElement?.parentElement).toBe(byId("f_title").parentElement?.parentElement);
+    expect(byId("f_description").parentElement?.className).toContain("@min-[36rem]:col-span-2");
     expect(byId("f_status").tagName).toBe("SELECT");
     expect(byId("f_status").getAttribute("data-slot")).toBe("select");
     expect(byId("f_rejection_by").tagName).toBe("SELECT");
