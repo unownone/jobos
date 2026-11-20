@@ -229,10 +229,13 @@ export function BoardPage() {
   }, []);
 
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("job")?.trim() ?? "";
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get("job")?.trim() ?? "";
     if (!id) return;
     void openJob(id).catch((error: unknown) => {
       setSideErr(error instanceof Error ? error.message : "Could not open job");
+      url.searchParams.delete("job");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
     });
   }, []);
 
@@ -613,6 +616,9 @@ export function BoardPage() {
             <Input id="sourceFilter" value={source} placeholder="Source" onChange={(event) => { setOffset(0); setSource(event.target.value); }} />
           </Field>
         </div>
+        {!selected && sideErr ? (
+          <p id="sideErr" className="shrink-0 px-3 py-2 text-sm text-destructive">{sideErr}</p>
+        ) : null}
         <div id="queueRail" hidden={!queueVisible} className="flex shrink-0 gap-2 px-3 py-1 text-sm text-muted-foreground">
           <span>Queue</span>
           <span id="queueStats">{queueStats}</span>

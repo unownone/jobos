@@ -192,6 +192,16 @@ describe("BoardPage", () => {
     render(<BoardPage />);
     await waitFor(() => expect(byId("f_company")).toHaveValue("TicketCo"));
     expect(apiMock).toHaveBeenCalledWith("/api/jobs/1");
+    expect(window.location.search).toContain("job=1");
+  });
+
+  it("shows an error and drops a job link that cannot be opened", async () => {
+    window.history.replaceState({}, "", "/board?job=missing");
+    mockBoard();
+    render(<BoardPage />);
+    await waitFor(() => expect(byId("sideErr")).toHaveTextContent("unexpected /api/jobs/missing"));
+    expect(document.getElementById("f_company")).not.toBeInTheDocument();
+    expect(window.location.search).not.toContain("job=");
   });
 
   it("opens the job a worker is on", async () => {
