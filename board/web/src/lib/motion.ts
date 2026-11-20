@@ -15,7 +15,9 @@ export function pageVariants(reduce: boolean) {
     };
   }
   return {
-    initial: pageMotion.initial,
+    // The prerender is the first paint. CSS `.hub-enter` fades it in.
+    // A Framer `initial` of opacity 0 would leave the document blank until JS.
+    initial: false as const,
     animate: pageMotion.animate,
     exit: pageMotion.exit,
   };

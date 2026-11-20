@@ -22,6 +22,9 @@ function jsonResponse(body: unknown, status: number): Response {
 function mockFetch(routes: Record<string, (init: RequestInit | undefined) => Response>) {
   return vi.fn(async (input: FetchInput, init?: RequestInit) => {
     const url = requestUrl(input);
+    if (url === "/api/auth/me" && !routes[url]) {
+      return jsonResponse({ detail: "unauthorized" }, 401);
+    }
     const handler = routes[url];
     if (!handler) {
       throw new Error(`unexpected ${url}`);
@@ -62,6 +65,22 @@ describe("LoginPage", () => {
     expect(card?.className).toContain("max-w-md");
     expect(card?.parentElement?.className).toContain("place-items-center");
     expect(container.querySelector("[data-testid='hub-frame']")).not.toBeInTheDocument();
+  });
+
+  it("leaves for the requested page when a session is already signed in", async () => {
+    window.history.replaceState({}, "", "/login?next=/admin/memory");
+    const fetchMock = mockFetch({
+      "/api/auth/me": () => jsonResponse({ actor: "ada" }, 200),
+      "/api/candidate/status": () => jsonResponse({ onboarded: true }, 200),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<LoginPage />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/admin/memory");
+    });
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/auth/login", expect.anything());
   });
 
   it("goes to onboarding when the candidate is not onboarded", async () => {
@@ -109,7 +128,10 @@ describe("LoginPage", () => {
     });
     expect(window.location.pathname).toBe("/login");
     expect(window.location.search).toBe("");
-    expect(fetchMock.mock.calls.map((call) => requestUrl(call[0]))).toEqual(["/api/auth/login"]);
+    const calls = fetchMock.mock.calls.map((call) => requestUrl(call[0]));
+    expect(calls).toContain("/api/auth/login");
+    const probe = fetchMock.mock.calls.find((call) => requestUrl(call[0]) === "/api/auth/me");
+    expect(probe?.[1]?.method ?? "GET").toBe("GET");
   });
 
   it("follows next after an onboarded candidate and maps /start to the board", async () => {

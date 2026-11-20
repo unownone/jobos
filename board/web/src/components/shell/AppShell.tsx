@@ -94,7 +94,7 @@ export function AppShell({
           className={cn("flex min-h-0 min-w-0 flex-1 flex-col", scrollPortClass(scroll))}
         >
           <motion.div
-            className={motionClass(scroll)}
+            className={cn(motionClass(scroll), "hub-enter")}
             initial={variants.initial}
             animate={variants.animate}
             exit={variants.exit}

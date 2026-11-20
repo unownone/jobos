@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,26 @@ const navLink =
 const sectionTitle = `${publicDisplay} mb-3 text-[clamp(1.8rem,3.4vw,2.6rem)] leading-none font-extrabold`;
 
 type PublicPage = "landing" | "start";
+
+export function useOpenBoard(): boolean {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me", { credentials: "same-origin" })
+      .then((res) => {
+        if (!cancelled && res.ok) setOpen(true);
+      })
+      .catch(() => {
+        // A missing session keeps the login links.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return open;
+}
 
 function sectionHref(page: PublicPage, id: "capabilities" | "loop"): string {
   switch (page) {
@@ -93,7 +113,17 @@ export function PublicStep({
   );
 }
 
-export function PublicFrame({ page, children }: { page: PublicPage; children: ReactNode }) {
+export function PublicFrame({
+  page,
+  signedIn = false,
+  children,
+}: {
+  page: PublicPage;
+  signedIn?: boolean;
+  children: ReactNode;
+}) {
+  const accountHref = signedIn ? "/board" : "/login";
+  const accountLabel = signedIn ? "Open board" : "Log in";
   const reduceMotion = useReducedMotion() === true;
 
   useEffect(() => {
@@ -148,7 +178,7 @@ export function PublicFrame({ page, children }: { page: PublicPage; children: Re
             GitHub
           </a>
           <Button asChild className="ml-1 shrink-0">
-            <a href="/login">Log in</a>
+            <a href={accountHref}>{accountLabel}</a>
           </Button>
         </nav>
       </header>
@@ -206,11 +236,12 @@ export function LandingPage() {
   const reduceMotion = useReducedMotion() === true;
   const variants = pageVariants(reduceMotion);
   const transition = usePageTransition();
+  const signedIn = useOpenBoard();
 
   return (
-    <PublicFrame page="landing">
+    <PublicFrame page="landing" signedIn={signedIn}>
       <motion.div
-        className={`${wrap} grid grid-cols-1 items-center gap-10 py-12 max-[880px]:pt-7 min-[881px]:grid-cols-[minmax(0,1.15fr)_minmax(16rem,0.85fr)] min-[881px]:gap-x-12`}
+        className={`${wrap} hub-enter grid grid-cols-1 items-center gap-10 py-12 max-[880px]:pt-7 min-[881px]:grid-cols-[minmax(0,1.15fr)_minmax(16rem,0.85fr)] min-[881px]:gap-x-12`}
         initial={variants.initial}
         animate={variants.animate}
         exit={variants.exit}
@@ -229,7 +260,7 @@ export function LandingPage() {
           </p>
           <p className="flex flex-wrap gap-3">
             <Button asChild>
-              <a href="/login">Log in or create an account</a>
+              <a href={signedIn ? "/board" : "/login"}>{signedIn ? "Open board" : "Log in or create an account"}</a>
             </Button>
             <Button asChild variant="secondary" className="border border-border">
               <a href="/start">Get started</a>

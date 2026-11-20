@@ -200,7 +200,7 @@ export function HomePage() {
     >
       <motion.main
         id="main"
-        className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5"
+        className="hub-enter mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-5"
         initial={variants.initial}
         animate={variants.animate}
         exit={variants.exit}

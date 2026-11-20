@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 
 import { pageVariants, usePageTransition } from "@/lib/motion";
 
-import { PublicFrame, PublicLink, PublicMono, PublicStep, publicDisplay } from "./LandingPage";
+import { PublicFrame, PublicLink, PublicMono, PublicStep, publicDisplay, useOpenBoard } from "./LandingPage";
 
 const DOCS = "https://github.com/unownone/jobos/blob/main/docs";
 const GITHUB = "https://github.com/unownone/jobos";
@@ -18,11 +18,12 @@ export function StartPage() {
   const reduceMotion = useReducedMotion() === true;
   const variants = pageVariants(reduceMotion);
   const transition = usePageTransition();
+  const signedIn = useOpenBoard();
 
   return (
-    <PublicFrame page="start">
+    <PublicFrame page="start" signedIn={signedIn}>
       <motion.div
-        className={`${column} py-10`}
+        className={`${column} hub-enter py-10`}
         initial={variants.initial}
         animate={variants.animate}
         exit={variants.exit}

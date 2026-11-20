@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -52,6 +52,22 @@ export function LoginPage() {
   const [username, setUsername] = useState(savedUsername);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me", { credentials: "same-origin" })
+      .then(async (res) => {
+        if (!res.ok || cancelled) return;
+        const status = await api<CandidateStatus>("/api/candidate/status");
+        if (!cancelled) assignHref(destination(status));
+      })
+      .catch(() => {
+        // No session yet. The form stays.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function send(kind: AuthKind) {
     setError("");
