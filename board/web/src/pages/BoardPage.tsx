@@ -20,7 +20,7 @@ import { NativeSelect } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
-import { panelVariants, usePageTransition, usePanelPlay } from "@/lib/motion";
+import { panelVariants, usePageTransition, usePanelPlay, ticketMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 type Who = {
@@ -721,8 +721,8 @@ export function BoardPage() {
             {selected ? (
               <motion.div
                 key={selected.id}
-                initial={panel.initial}
-                animate={panel.animate}
+                initial={ticketMotion(narrow, panel).initial}
+                animate={ticketMotion(narrow, panel).animate}
                 transition={transition}
                 className="flex flex-col gap-1 p-3"
               >

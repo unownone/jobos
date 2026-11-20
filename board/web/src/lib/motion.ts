@@ -49,6 +49,12 @@ export function sheetVariants(reduce: boolean) {
   return { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 } };
 }
 
+/** Phone tickets already rise with the sheet. A second y would move the fields twice. */
+export function ticketMotion<T extends { initial: unknown; animate: unknown }>(narrow: boolean, panel: T) {
+  if (narrow) return { initial: false as const, animate: { opacity: 1 } };
+  return panel;
+}
+
 export function usePanelPlay() {
   const [play, setPlay] = useState(false);
   useEffect(() => setPlay(true), []);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pageVariants, panelVariants, sheetVariants } from "./motion";
+import { pageVariants, panelVariants, sheetVariants, ticketMotion } from "./motion";
 
 describe("panelVariants", () => {
   it("keeps the first paint visible", () => {
@@ -32,5 +32,13 @@ describe("sheetVariants", () => {
       initial: { opacity: 0, y: 16 },
       animate: { opacity: 1, y: 0 },
     });
+  });
+});
+
+describe("ticketMotion", () => {
+  it("lets the sheet carry the phone ticket and still slides the desktop ticket", () => {
+    const panel = panelVariants(false, true);
+    expect(ticketMotion(true, panel)).toEqual({ initial: false, animate: { opacity: 1 } });
+    expect(ticketMotion(false, panel)).toEqual(panel);
   });
 });
