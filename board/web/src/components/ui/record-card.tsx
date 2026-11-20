@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { softBreak } from "@/lib/soft-break";
 import { cn } from "@/lib/utils";
 
 import { Card } from "./card";
@@ -51,8 +52,8 @@ function RecordField({ label, value }: { label: string; value: string }) {
   return (
     <>
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="m-0 min-w-0 break-all" title={value}>
-        {value}
+      <dd className="m-0 min-w-0 break-words" title={value}>
+        {softBreak(value)}
       </dd>
     </>
   );

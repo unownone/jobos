@@ -5,6 +5,7 @@ import { type ShellConn } from "@/components/shell/TopBar";
 import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
+import { softBreak } from "@/lib/soft-break";
 
 function lane(track?: string, role?: string): string {
   const left = track?.trim() ?? "";
@@ -18,19 +19,6 @@ function seenLabel(value?: string): string {
   const prefix = "Last active:";
   if (text.toLowerCase().startsWith(prefix.toLowerCase())) return text.slice(prefix.length).trim();
   return text;
-}
-
-function softBreak(value: string) {
-  return value.split(/([ \-_/])/).map((part, index) =>
-    part === " " || part === "-" || part === "_" || part === "/" ? (
-      <span key={index}>
-        {part}
-        <wbr />
-      </span>
-    ) : (
-      <span key={index}>{part}</span>
-    ),
-  );
 }
 
 type DirectoryUser = {

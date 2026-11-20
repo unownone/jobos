@@ -62,9 +62,12 @@ describe("hub primitives", () => {
         <RecordField label="ID" value="board__audit-fixture-co-staff-software-engineer" />
       </RecordCard>,
     );
-    const value = screen.getByText("board__audit-fixture-co-staff-software-engineer");
-    expect(value.className).toContain("break-all");
-    expect(value.className).not.toContain("truncate");
+    const value = document.querySelector("dd");
+    expect(value?.textContent).toBe("board__audit-fixture-co-staff-software-engineer");
+    expect(value?.className).toContain("break-words");
+    expect(value?.className).not.toContain("break-all");
+    expect(value?.querySelectorAll("wbr").length).toBeGreaterThan(0);
+    expect(value?.className).not.toContain("truncate");
     expect(screen.getByText("Audit Fixture Co").className).not.toContain("truncate");
   });
 
