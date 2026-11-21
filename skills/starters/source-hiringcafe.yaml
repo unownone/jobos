@@ -16,7 +16,7 @@ outputs: [job, apply_packet]
 body: |
   # Hiring Cafe source
 
-  Aggregated career pages. `python3 scripts/fetch_hiringcafe.py` or public `/jobs/{slug}`.
+  Aggregated career pages. Public `/jobs/{slug}` via browser, Exa crawl, or WebFetch.
 
   ## Steps
 

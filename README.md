@@ -36,7 +36,7 @@ curl -sS "$HUB_URL/agents.txt"
 
 Git copies: [`llms.txt`](llms.txt), [`agents.txt`](agents.txt), [`docs/llms.txt`](docs/llms.txt), [`docs/agents.txt`](docs/agents.txt). Hub also serves `/.well-known/llms.txt` and `/.well-known/agents.txt` as `text/plain`.
 
-The live coordination plane is **jobOS Hub**: the Go API and the React SPA. Maintainer owns it. Sign up at `/login` (username + password). Git `ledger/` is an export snapshot (`GET /api/export/ledger`), not the live list. See [`docs/runtime.md`](docs/runtime.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md), [`docs/job-hub/multi-tenant.md`](docs/job-hub/multi-tenant.md). The Python `board/` app is still in the tree.
+The live coordination plane is **jobOS Hub**: the Go API and the React SPA. Maintainer owns it. Sign up at `/login` (username + password). Git `ledger/` is an export snapshot (`GET /api/export/ledger`), not the live list. See [`docs/runtime.md`](docs/runtime.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md), [`docs/job-hub/multi-tenant.md`](docs/job-hub/multi-tenant.md). `board/` holds local secrets and `start.sh` only.
 
 ## Start here
 
@@ -169,7 +169,7 @@ Attach what you have. Degrade if you do not.
 
 | Need | Preferred | Fallback |
 | --- | --- | --- |
-| Deep research | Exa MCP (`deep_researcher_*`, `agent_run`, company + people search) | Local [dzhng/deep-research](https://github.com/dzhng/deep-research) (`scripts/run_deep_research.py`), Firecrawl, Tavily, Parallel Search MCP (`https://search.parallel.ai/mcp`), built-in web search |
+| Deep research | Exa MCP (`deep_researcher_*`, `agent_run`, company + people search) | Local [dzhng/deep-research](https://github.com/dzhng/deep-research) (`bash scripts/setup_deep_research.sh`), Firecrawl, Tavily, Parallel Search MCP (`https://search.parallel.ai/mcp`), built-in web search |
 | Job search API | Official Indeed MCP (OAuth) | Public pages + Google dorks |
 | YC startups | `uvx workatastartup-mcp==0.1.2` (`bash scripts/mcp/workatastartup.sh`) | workatastartup.com in a browser |
 | Remote feed | `https://remoteok.com/api` | RemoteOK site |
@@ -178,7 +178,7 @@ Attach what you have. Degrade if you do not.
 | LinkedIn DM | Logged-in browser / official LinkedIn tools you already have | Copy the DM into the ledger for a human to send |
 | Browser apply | Playwright MCP (`@playwright/mcp`) on the apply bot only | Human completes the last submit |
 | Public ATS boards | `uvx ats-jobs-mcp==1.0.0` (`bash scripts/mcp/ats-jobs.sh`) | Google dorks + employer careers page |
-| Hiring Cafe | `python3 scripts/fetch_hiringcafe.py` | Public hiring.cafe `/jobs/{slug}` page |
+| Hiring Cafe | Public hiring.cafe / hiringcafe.com `/jobs/{slug}` pages | Exa crawl / WebFetch when Cloudflare blocks |
 
 Do not scrape behind logins you do not own. Do not build exploit PoCs. Prefer official APIs, public feeds, and career pages.
 
@@ -223,7 +223,7 @@ docs/sharing.md           Airgapped ledger protocol
 docs/catalogs/            Platforms, MCPs, career sites, research
 docs/catalogs/skill-outline.md  Skill registry contract
 docs/research/            Build plans (MCP coverage, deep-research wrap)
-docs/install.md           Docker / Compose / uv / TLS
+docs/install.md           Docker / Compose / TLS
 docs/deploy.md            Optional: this GitHub repo’s OCI host deploy
 docs/demo/                Screenshots + video of that live Hub (when present)
 skills/                   Agent Skills (SKILL.md) — canonical OS skills
@@ -234,7 +234,7 @@ skills/starters/          Tagged platform YAML seeded into the Hub registry
 skills/lists/             Maintainer lists: adopted / wanted / rejected YAML
 server/                   Go Hub API (Gin)
 web/                      React SPA
-board/                    Python Hub, still in the tree
+board/                    Local Hub secrets + `start.sh` (not the API)
 vendor/mcp/PINNED.txt     uvx / git SHA pins for local MCPs (no source trees)
 mcp/hosted/               Copy-paste hosted MCP snippets
 mcp/SETUP.md              How to attach local vs hosted MCPs
@@ -246,22 +246,18 @@ profiles/                 Candidate profile (example committed; live file gitign
 mcp/                      Example MCP config
 handoffs/                 Packet templates
 assets/                   Resumes (local) + writing templates
-scripts/rebuild_index.py  Optional INDEX.md generator
-scripts/rebuild_skill_index.py  skills/lists/INDEX.md from YAML
 scripts/setup_deep_research.sh  Clone dzhng/open-deep-research
-scripts/run_deep_research.py    Non-interactive research API wrapper
-docker-compose.yml        Go API + React SPA. SPA :8080, API :8081
-docker-compose.plain.yml  Go API + React SPA, Postgres always on
-docker-compose.traefik.yml Traefik on 80/443 in front of the SPA
+docker-compose.yml        Single `hub` image (Go + SPA) on :8787
+docker-compose.split.yml  Separate API + SPA containers
+docker-compose.plain.yml  Same Hub with Postgres always on
+docker-compose.traefik.yml Traefik on 80/443 in front of the Hub
 docs/coolify.md           Coolify: named volumes, no ${...} in volume sources
 ```
 
 ## Run a cycle
 
 ```bash
-# optional, if uv is available
-uv run scripts/rebuild_index.py
-uv run scripts/rebuild_skill_index.py
+# keep skills/lists/INDEX.md in sync with the YAML lists by hand
 
 # live Hub (maintainer): Go API and React SPA, gitignored tokens on first start
 bash board/start.sh

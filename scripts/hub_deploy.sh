@@ -4,8 +4,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-# Python project + venv always live in repo board/. JOBHUB_BOARD_DIR is the
-# secrets/data dir (defaults to that same package) so tests can isolate .env.
+# JOBHUB_BOARD_DIR is the secrets/data dir (defaults to board/) so tests can isolate .env.
 BOARD="${JOBHUB_BOARD_DIR:-$REPO/board}"
 export PATH="$HOME/.local/bin:$PATH"
 

@@ -1,5 +1,5 @@
 # Source of truth for tools Job Apply OS uses or is wired to use.
-# Rebuild the human board: uv run scripts/rebuild_skill_index.py
+# Rebuild the human board: edit skills/lists/INDEX.md to match these YAML lists
 updated: "2026-09-06"
 actor: cursor-cloud-agent
 
@@ -92,7 +92,7 @@ items:
     roles: [all]
     platforms: [web]
     source: https://github.com/dzhng/deep-research
-    install: bash scripts/setup_deep_research.sh then python3 scripts/run_deep_research.py
+    install: bash scripts/setup_deep_research.sh then npm --prefix agent-tools/open-deep-research run api
     auth: firecrawl_plus_openai
     verdict: use
     notes: Cloud-agent wired via .cursor/environment.json. Not an MCP. Needs FIRECRAWL_KEY + OPENAI_KEY.
@@ -191,7 +191,7 @@ items:
     roles: [discovery]
     platforms: [hiringcafe]
     source: https://hiringcafe.com
-    install: python3 scripts/fetch_hiringcafe.py --query "staff software engineer"
+    install: public hiringcafe.com /jobs pages (Exa crawl / WebFetch)
     auth: none
     verdict: use
     notes: >
@@ -343,6 +343,6 @@ items:
     notes: >
       Maintainer-owned live FastAPI + SQLite coordination plane. Discovery creates
       rows; apply/outreach patch their fields; admin stops/edits. Tokens generated
-      by scripts/board_gen_tokens.py into gitignored board/.env — never committed.
+      by scripts/hub_deploy.sh / board/start.sh into gitignored board/.env — never committed.
       Git ledger remains the airgap protocol. Discovery/apply/outreach consume this;
       they do not own it.

@@ -54,7 +54,7 @@ This is **not** an MCP. It is a recursive Firecrawl + LLM loop with an HTTP API.
 
 Upstream `.env.local` names, with Job Apply OS aliases:
 
-| Upstream | Also accepted by `scripts/run_deep_research.py` |
+| Upstream | Also accepted as common aliases in the shell |
 | --- | --- |
 | `FIRECRAWL_KEY` | `FIRECRAWL_API_KEY` |
 | `OPENAI_KEY` | `OPENAI_API_KEY` |
@@ -70,18 +70,16 @@ Needs **Node 22**. Interactive `npm start` is the upstream UX. Cloud agents **mu
 ```bash
 bash scripts/setup_deep_research.sh   # idempotent clone + npm ci
 # FIRECRAWL_KEY and OPENAI_KEY must already be in the environment
-python3 scripts/run_deep_research.py \
-  --query "Is <company> still hiring <role>? Cite careers URL, team, red flags." \
-  --depth 2 --breadth 3 \
-  --brief-out ledger/.cache/research-brief.md
+npm --prefix agent-tools/open-deep-research run api
+# then POST /api/research (see below) with your query / depth / breadth
 ```
 
 Then compress into the YAML shape below. Do not paste the full `report.md` into a job file.
 
-**API contract we wrap**
+**API contract**
 
 - `POST http://127.0.0.1:3051/api/research` `{ query, depth, breadth }` → `{ success, answer, learnings, visitedUrls }`
-- Do **not** call `/api/generate-report` from the wrapper: upstream returns the markdown as the Express response instead of `res.json`, so clients hang or mis-parse.
+- Do **not** call `/api/generate-report`: upstream returns the markdown as the Express response instead of `res.json`, so clients hang or mis-parse.
 
 **Fit vs Exa**
 

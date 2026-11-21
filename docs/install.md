@@ -130,7 +130,8 @@ Compose is required for a full install. The Hub image is stateless.
 This path starts the Go API and serves `web/dist`. It mints the one-time bootstrap token itself. Needs Go, Node, and OpenSSL.
 
 ```bash
-bash scripts/setup_uv.sh          # if uv is missing
+# needs Go + Node (for web/dist) + OpenSSL
+cd web && npm ci && npm run build && cd ..
 export HUB_PUBLIC_HOST=127.0.0.1:8787
 bash scripts/hub_deploy.sh
 ```

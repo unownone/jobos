@@ -29,7 +29,7 @@ Shipped vs spec (document, do not “fix” here): no `POST /api/auth/bootstrap/
 | Process contract | `docs/process.md`, `docs/roles.md` | Roles; Hub is live |
 | JobStore | Hub Postgres `jobs` / `events` | Tenant-scoped; git YAML is export-only |
 | Hunt board | `server/` Go API + `web/` React SPA | Username/password session; compat `X-Role` is `acc_compat` |
-| Token gen | `scripts/board_gen_tokens.py` | Compat only; signup does not need a dashboard token |
+| Token gen | `bash scripts/hub_deploy.sh` / `board/start.sh` | Mints gitignored role + bootstrap tokens; signup does not need a dashboard token |
 | Skills | Hub registry (`GET /api/registry/skills`) | Git `skills/` seeds the registry |
 | Export | `GET /api/export/ledger` | Snapshot, not dual-write |
 

@@ -70,7 +70,7 @@ Work the platform catalog in [`docs/catalogs/platforms.md`](catalogs/platforms.m
 4. Wellfound
 5. Google Jobs + dorks against Greenhouse / Lever / Ashby / Workday
 6. RemoteOK public API
-7. Hiring Cafe (`scripts/fetch_hiringcafe.py` / hiring.cafe public pages)
+7. Hiring Cafe (hiring.cafe / hiringcafe.com public pages)
 8. Named marketplaces (Flexiple, Turing, Weekday, Toptal, Lemon.io, BairesDev, Roro Remote) — record whether each item is a **posting** or a **network apply**
 9. Big-company career sites the candidate cares about
 
@@ -236,12 +236,12 @@ Goal: keep the skill/MCP inventory true, keep the Hub registry honest, and keep 
 1. Claim `maintainer` on `ledger/INDEX.md`.
 2. Load [`skills/skill-maintainer`](../skills/skill-maintainer/SKILL.md).
 3. Search at least two registries. Vet. Write `skills/lists/{adopted,wanted,rejected,by-platform,sources}.yaml`.
-4. `uv run scripts/rebuild_skill_index.py`.
+4. Update `skills/lists/INDEX.md` so it matches the YAML lists.
 5. Patch `mcp/mcp.example.json` / `.cursor/environment.json` only for tools that moved to **adopted**.
 6. **Skill registry:** claim `skill.record` (maintenance only). Proctor first against the [`skill-outline`](catalogs/skill-outline.md) rubric. Promote only on pass. Fail with a note; the submitter may keep the local copy. Memory facts that were solidified stay in this same queue (`origin=memory`).
 7. Anyone (any track) may enqueue a recording (`POST /api/registry/recordings` or queue push `skill.record`). Only maintainer / admin **consumes**.
 8. Seed / re-seed GitHub starters (`POST /api/registry/seed`) if needed. Does not overwrite promoted non-github shared slugs.
 9. Append catalog workspace log + `ledger/events.jsonl`.
-10. Hunt board (when this hunt uses one): generate/rotate tokens with `scripts/board_gen_tokens.py`, keep `board/start.sh` up, import ledger history if needed, run hygiene. Tokens stay gitignored.
+10. Hunt Hub (when this hunt uses one): `bash board/start.sh` (or Compose). Tokens mint into gitignored `board/.env` on first start. Import ledger history via admin `POST /api/import` if needed.
 
 Do not start a discovery search from this pass.

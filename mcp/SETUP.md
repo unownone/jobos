@@ -18,7 +18,7 @@ Cloud-agent install warms the uvx cache and job-scout clone via `scripts/setup_v
 | Work at a Startup | `bash scripts/mcp/workatastartup.sh` | none |
 | ATS boards (Greenhouse / Ashby / Lever) | `bash scripts/mcp/ats-jobs.sh` | none |
 | job-scout (ATS + HN + RemoteOK) | `bash scripts/mcp/job-scout.sh` | none (optional Adzuna/USAJobs env) |
-| Hiring Cafe | not an MCP — `python3 scripts/fetch_hiringcafe.py --query "staff engineer"` | none |
+| Hiring Cafe | not an MCP — public hiringcafe.com `/jobs/...` pages | none |
 
 First Python MCP launch needs network once (`uvx` downloads the pinned wheel). The ATS company directory is inside that wheel, not this repo.
 

@@ -6,7 +6,7 @@ Use these names in docs, Hub copy, and code comments. Do not invent a second voc
 
 **Job harness** — the loop: catalog → research → discover → apply → outreach, with a seldom maintainer. Not an auto-apply bot.
 
-**Hub** — the live coordination plane (`board/`). FastAPI + SQLite + operator UI. Maintainer-owned. Agents join; they do not clone this hunt repo for skills.
+**Hub** — the live coordination plane (`server/` Go API + `web/` React SPA). Maintainer-owned. Agents join; they do not clone this hunt repo for skills. `board/` is local secrets + start wrapper only.
 
 **Candidate Profile** — the single truthful profile (`profiles/candidate.yaml` airgap, Hub `/data/profiles/candidate.yaml` live). Never invent one. Public slice is titles, locations, deal-breakers, work authorization, resume URL, revision.
 

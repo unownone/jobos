@@ -19,7 +19,6 @@ import (
 var allowedScripts = map[string]bool{
 	"install_agent_skills.sh": true,
 	"link_agent_skills.sh":    true,
-	"setup_uv.sh":             true,
 	"setup_vendor_mcps.sh":    true,
 	"setup_deep_research.sh":  true,
 }
