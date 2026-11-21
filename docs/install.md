@@ -2,7 +2,7 @@
 
 jobOS Hub is the live coordination plane for the job harness. The current Compose file runs two containers: a Go API and a React SPA. Postgres, Redis, and MinIO are optional profiles. RabbitMQ is not in that file. See [`docs/runtime.md`](runtime.md). Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
 
-`scripts/hub_deploy.sh` starts the Go API and serves the built React SPA on port 8787. `board/docker-compose.yml` and the repo-root Compose files run the API and the SPA as separate containers. Traefik also answers on port 8787 and sends that traffic to the SPA.
+`scripts/hub_deploy.sh` starts the Go API and serves the built React SPA on port 8787. `docker-compose.yml` and the repo-root Compose files run the API and the SPA as separate containers. Traefik also answers on port 8787 and sends that traffic to the SPA.
 
 **Onboarding is the first thing you do after the process is up.** Until a truthful candidate profile exists, jobs, invites, queues, messages, and A2A sends return `409 candidate_required`. Do not copy `profiles/candidate.example.yaml` into production.
 
@@ -61,7 +61,7 @@ The bundled `postgres` service starts only with `--profile data`. The API uses `
 
 To use a Postgres that this stack does not create, set secret `DATABASE_URL` (Coolify or Railway environment, repo-root `.env`, or the shell). Compose passes that value through. Leave it unset to use the bundled service.
 
-From inside the Hub container, Postgres on the Docker host is `host.docker.internal`, not `127.0.0.1`. Put `sslmode` in the URL when the server requires TLS. Bare metal still reads `DATABASE_URL` from `board/.env`.
+From inside the Hub container, Postgres on the Docker host is `host.docker.internal`, not `127.0.0.1`. Put `sslmode` in the URL when the server requires TLS. Bare metal still reads `DATABASE_URL` from `.hub/.env`.
 
 ```bash
 DATABASE_URL='postgresql://user:pass@db.example:5432/jobos?sslmode=require' \
@@ -135,7 +135,7 @@ export HUB_PUBLIC_HOST=127.0.0.1:8787
 bash scripts/hub_deploy.sh
 ```
 
-Listens on `0.0.0.0:8787` and serves the SPA from that same port. Secrets: gitignored `board/.env` and `board/tokens.local.json`. Set `DATABASE_URL` to PostgreSQL. Dry run: `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
+Listens on `0.0.0.0:8787` and serves the SPA from that same port. Secrets: gitignored `.hub/.env` and `.hub/tokens.local.json`. Set `DATABASE_URL` to PostgreSQL. Dry run: `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
 
 ## Reverse proxy / TLS
 
@@ -221,7 +221,7 @@ make deploy
 
 ## What not to do
 
-- Do not commit `board/.env`, `tokens.local.json`, live `candidate.yaml`, or `*.db`.
+- Do not commit `.hub/.env`, `tokens.local.json`, live `candidate.yaml`, or `*.db`.
 - Do not Easy Apply during discovery.
 - Do not send employer email through A2A or `/api/messages` (inbox is agent-to-agent only).
 - Do not clone this hunt repo on consumer agents — use `/api/onboarding` + the zip.

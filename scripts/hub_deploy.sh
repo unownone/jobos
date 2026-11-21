@@ -4,9 +4,15 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-# Python project + venv always live in repo board/. JOBHUB_BOARD_DIR is the
-# secrets/data dir (defaults to that same package) so tests can isolate .env.
-BOARD="${JOBHUB_BOARD_DIR:-$REPO/board}"
+# Local Hub secrets live in gitignored .hub/ (JOBHUB_DIR). Legacy board/ is
+# accepted once if .hub is empty so existing hosts keep their tokens.
+if [[ -n "${JOBHUB_DIR:-}" ]]; then
+  BOARD="$JOBHUB_DIR"
+elif [[ -d "$REPO/.hub" || ! -d "$REPO/board" ]]; then
+  BOARD="$REPO/.hub"
+else
+  BOARD="$REPO/board"
+fi
 export PATH="$HOME/.local/bin:$PATH"
 
 if ! command -v openssl >/dev/null 2>&1; then

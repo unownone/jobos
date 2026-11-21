@@ -198,7 +198,7 @@ Every send is a touch on the Hub job (`PATCH /api/jobs/{id}`) and people row (`/
 - Events append in Postgres (`GET /api/events`).
 - `GET /api/export/ledger` writes a snapshot tarball when you need git/airgap files.
 - Never delete another role’s packet to “clean up.”
-- Discovery creates rows only; apply/outreach only advance their fields; **any patch role** may set `status: rejected` plus `rejection` remarks; admin stops/edits. **Maintainer** owns schema and hygiene — see [`board/README.md`](../board/README.md). Operator/agent Hub docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). Git `ledger/` is **export-only**, not the live list.
+- Discovery creates rows only; apply/outreach only advance their fields; **any patch role** may set `status: rejected` plus `rejection` remarks; admin stops/edits. **Maintainer** owns schema and hygiene — see [`docs/job-hub/human.md`](../docs/job-hub/human.md). Operator/agent Hub docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). Git `ledger/` is **export-only**, not the live list.
 
 `rejected` is a shared close. It is not lane-scoped. Required: `rejection.by` = `company` | `user`. Optional: `company_remarks`, `user_remarks`. Shorthand: `{ "by": "company", "remarks": "filled internally" }` writes the text onto that party’s remarks field. `closed_rejected` still works for outreach; prefer `rejected` when you know who said no.
 
@@ -242,6 +242,6 @@ Goal: keep the skill/MCP inventory true, keep the Hub registry honest, and keep 
 7. Anyone (any track) may enqueue a recording (`POST /api/registry/recordings` or queue push `skill.record`). Only maintainer / admin **consumes**.
 8. Seed / re-seed GitHub starters (`POST /api/registry/seed`) if needed. Does not overwrite promoted non-github shared slugs.
 9. Append catalog workspace log + `ledger/events.jsonl`.
-10. Hunt board (when this hunt uses one): generate/rotate tokens with `scripts/board_gen_tokens.py`, keep `board/start.sh` up, import ledger history if needed, run hygiene. Tokens stay gitignored.
+10. Hunt board (when this hunt uses one): generate/rotate tokens with `scripts/board_gen_tokens.py`, keep `scripts/hub_start.sh` up, import ledger history if needed, run hygiene. Tokens stay gitignored.
 
 Do not start a discovery search from this pass.

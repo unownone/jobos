@@ -2,7 +2,7 @@
 
 <!-- impeccable:design-schema 1 -->
 
-One visual world: industrial terminal-ops. Public landing persuades; Hub operates. Same chassis, amber, type, and tokens. Tokens live in `board/app/static/theme.css`. Surfaces must not re-declare the palette.
+One visual world: industrial terminal-ops. Public landing persuades; Hub operates. Same chassis, amber, type, and tokens. Tokens live in `web/src/styles.css`. Surfaces must not re-declare the palette.
 
 ## World
 

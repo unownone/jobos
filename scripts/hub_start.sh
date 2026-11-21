@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Start the Go Hub. Interactive on a TTY; Docker sets JOBOS_NONINTERACTIVE=1.
-# Token minting and the API process live in scripts/hub_deploy.sh.
+# Interactive Hub start. Asks for the public host on a TTY, then runs hub_deploy.sh.
+# Docker / noninteractive callers should run scripts/hub_deploy.sh directly.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-REPO="$(cd "$ROOT/.." && pwd)"
-cd "$ROOT"
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+HUB_DIR="${JOBHUB_DIR:-$REPO/.hub}"
 export PATH="$HOME/.local/bin:$PATH"
 
 jobos_normalize_url() {
@@ -43,10 +42,16 @@ jobos_default_host() {
   hostname -I 2>/dev/null | awk '{print $1}'
 }
 
-if [[ -f "$ROOT/.env" ]]; then
+# Prefer .hub secrets; fall back to legacy board/ once for existing hosts.
+if [[ -f "$HUB_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
-  source "$ROOT/.env"
+  source "$HUB_DIR/.env"
+  set +a
+elif [[ -f "$REPO/board/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$REPO/board/.env"
   set +a
 fi
 
@@ -89,10 +94,10 @@ upsert_env() {
 }
 
 if [[ -n "${HUB_PUBLIC_URL:-}" || -n "${HUB_PUBLIC_HOST:-}" ]]; then
-  mkdir -p "$ROOT"
-  touch "$ROOT/.env"
-  upsert_env "$ROOT/.env" HUB_PUBLIC_HOST "${HUB_PUBLIC_HOST:-}"
-  upsert_env "$ROOT/.env" HUB_PUBLIC_URL "${HUB_PUBLIC_URL:-}"
+  mkdir -p "$HUB_DIR"
+  touch "$HUB_DIR/.env"
+  upsert_env "$HUB_DIR/.env" HUB_PUBLIC_HOST "${HUB_PUBLIC_HOST:-}"
+  upsert_env "$HUB_DIR/.env" HUB_PUBLIC_URL "${HUB_PUBLIC_URL:-}"
 fi
 
 export BOARD_HOST="${BOARD_HOST:-0.0.0.0}"
@@ -104,7 +109,7 @@ fi
 export HUB_ADDR="${HUB_ADDR:-${BOARD_HOST}:${BOARD_PORT}}"
 export HUB_REPO_ROOT="${HUB_REPO_ROOT:-$REPO}"
 export HUB_WEB_ROOT="${HUB_WEB_ROOT:-$REPO/web/dist}"
-export JOBHUB_BOARD_DIR="$ROOT"
+export JOBHUB_DIR="$HUB_DIR"
 
 echo "Job Hub → http://${BOARD_HOST}:${BOARD_PORT}/  (Go API, SPA from web/dist)"
 echo "Sibling agents: ${HUB_PUBLIC_URL:-http://127.0.0.1:${BOARD_PORT}}/api/jobs with Bearer keys (or X-Role + X-Token compat)"

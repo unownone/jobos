@@ -36,7 +36,7 @@ curl -sS "$HUB_URL/agents.txt"
 
 Git copies: [`llms.txt`](llms.txt), [`agents.txt`](agents.txt), [`docs/llms.txt`](docs/llms.txt), [`docs/agents.txt`](docs/agents.txt). Hub also serves `/.well-known/llms.txt` and `/.well-known/agents.txt` as `text/plain`.
 
-The live coordination plane is **jobOS Hub**: the Go API and the React SPA. Maintainer owns it. Sign up at `/login` (username + password). Git `ledger/` is an export snapshot (`GET /api/export/ledger`), not the live list. See [`docs/runtime.md`](docs/runtime.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md), [`docs/job-hub/multi-tenant.md`](docs/job-hub/multi-tenant.md). The Python `board/` app is still in the tree.
+The live coordination plane is **jobOS Hub**: the Go API and the React SPA. Maintainer owns it. Sign up at `/login` (username + password). Git `ledger/` is an export snapshot (`GET /api/export/ledger`), not the live list. See [`docs/runtime.md`](docs/runtime.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md), [`docs/job-hub/multi-tenant.md`](docs/job-hub/multi-tenant.md). The live Hub is the Go API plus the React SPA in `web/`.
 
 ## Start here
 
@@ -146,7 +146,7 @@ When `HUB_URL` is set, that is the live list — see [`docs/job-hub/human.md`](d
 | Export snapshot | `GET /api/export/ledger` → `ledger/jobs/*.yaml` | Airgap copy, never dual-write |
 | Optional overlay | Google Drive / Sheet | Only if someone wants a spreadsheet; not source of truth |
 
-**Maintainer** owns the live Hub (schema, uptime, hygiene). Details: [`docs/sharing.md`](docs/sharing.md) and [`board/README.md`](board/README.md).
+**Maintainer** owns the live Hub (schema, uptime, hygiene). Details: [`docs/sharing.md`](docs/sharing.md) and [`docs/job-hub/human.md`](docs/job-hub/human.md).
 
 ## Skills in this repo
 
@@ -155,7 +155,7 @@ GitHub `skills/` (role playbooks) and `skills/starters/` (tagged platform YAML) 
 | Skill | Owner | Job |
 | --- | --- | --- |
 | [`skill-and-mcp-catalog`](skills/skill-and-mcp-catalog/SKILL.md) | Discovery first, maintainer as subroutine | Discover, vet, and add skills/MCPs from any registry |
-| [`skill-maintainer`](skills/skill-maintainer/SKILL.md) | Maintainer (seldom) | Search registries, write `skills/lists/`, prune dead tools, own `board/`, seed + proctor the Hub skill registry |
+| [`skill-maintainer`](skills/skill-maintainer/SKILL.md) | Maintainer (seldom) | Search registries, write `skills/lists/`, prune dead tools, own the Hub, seed + proctor the Hub skill registry |
 | [`deep-research`](skills/deep-research/SKILL.md) | Shared | Company, people, role, and portal research |
 | [`job-discovery`](skills/job-discovery/SKILL.md) | Discovery | Portals, career sites, dorks, shortlist, apply packets; Hub: pick tagged `source` skills |
 | [`job-apply`](skills/job-apply/SKILL.md) | Apply | High-quality submit + proof; Hub: pick tagged `apply` skills |
@@ -234,7 +234,6 @@ skills/starters/          Tagged platform YAML seeded into the Hub registry
 skills/lists/             Maintainer lists: adopted / wanted / rejected YAML
 server/                   Go Hub API (Gin)
 web/                      React SPA
-board/                    Python Hub, still in the tree
 vendor/mcp/PINNED.txt     uvx / git SHA pins for local MCPs (no source trees)
 mcp/hosted/               Copy-paste hosted MCP snippets
 mcp/SETUP.md              How to attach local vs hosted MCPs
@@ -264,7 +263,7 @@ uv run scripts/rebuild_index.py
 uv run scripts/rebuild_skill_index.py
 
 # live Hub (maintainer): Go API and React SPA, gitignored tokens on first start
-bash board/start.sh
+bash scripts/hub_start.sh
 # or: docker compose up -d --build
 ```
 

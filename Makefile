@@ -1,31 +1,16 @@
-.PHONY: board board-tokens board-lint board-test board-test-unit board-test-e2e board-bench board-docker deploy deploy-check
+.PHONY: hub deploy deploy-check docker docker-plain
 
-board:
-	bash board/start.sh
-
-board-tokens:
-	uv run scripts/board_gen_tokens.py --print
-
-board-lint:
-	$(MAKE) -C board lint
-
-board-test:
-	$(MAKE) -C board test
-
-board-test-unit:
-	$(MAKE) -C board test-unit
-
-board-test-e2e:
-	$(MAKE) -C board test-e2e
-
-board-bench:
-	uv run board/scripts/benchmark.py
-
-board-docker:
-	bash scripts/hub_docker.sh
+hub:
+	bash scripts/hub_start.sh
 
 deploy:
 	bash scripts/hub_host_deploy.sh
 
 deploy-check:
 	bash scripts/github_ssh_selftest.sh
+
+docker:
+	bash scripts/hub_docker.sh
+
+docker-plain:
+	bash scripts/hub_docker_plain.sh

@@ -23,7 +23,7 @@ One private board for sibling agents — not a spreadsheet, not a consumer job b
 
 ## Operating Context
 
-- FastAPI serves static HTML from `board/app/static/`; sessions are cookie + CSRF. Agents use Bearer keys.
+- Go Hub serves the Vite React SPA; sessions are cookie + CSRF. Agents use Bearer keys.
 - Airgap fallback is git `ledger/`; this UI is the live plane.
 - Must keep working IDs/copy that tests pin: `All statuses`, `jobOS Harness`, `helps find jobs`, `Hunt funnel`, `Skill registry`, `Memory pods`, `jobOS data`, `Candidate onboarding`, `Directory`, `Join`, `data-solidify`, `id="add-item"`.
 - No invented candidate, employers, or metrics in the UI.
@@ -34,7 +34,7 @@ One private board for sibling agents — not a spreadsheet, not a consumer job b
 - Board: search/filter/paginate jobs, open a row (ticket hidden until then), patch allowed fields including job description / expectations / pay / posted date, pause/stop/resume/delete, presence rail, memory from heartbeat, hygiene for admins.
 - Home: funnel (found → applied → outreached), agent total vs working, jobs found/applied today, oldest open job with posted date.
 - **Inferred (unattended):** keep the existing HTML/JS architecture (no new SPA framework). Shared CSS/JS is allowed. Stack is already FastAPI + static HTML.
-- Visual world is industrial terminal-ops for **all** HTML (landing + Hub + login). Tokens: `board/app/static/theme.css`.
+- Visual world is industrial terminal-ops for **all** UI (landing + Hub + login). Tokens live in `web/src/styles.css`.
 - Superdesign CLI login and Impeccable engine download were unavailable this session; direction is code-led from product truth.
 
 ## Brand Commitments
@@ -46,9 +46,9 @@ One private board for sibling agents — not a spreadsheet, not a consumer job b
 
 ## Evidence on Hand
 
-- Live UI source in `board/app/static/*.html`.
-- Operator docs: `board/README.md`, `docs/job-hub/human.md`.
-- Brand rasters under `board/app/static/brand/`.
+- Live UI source in `web/src/` (TypeScript React SPA).
+- Operator docs: `docs/job-hub/human.md`.
+- Brand rasters under `web/src/assets/brand/`.
 - No DESIGN.md existed at start. Do not fabricate screenshots of a deployed hunt.
 
 ## Product Principles

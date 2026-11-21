@@ -108,7 +108,7 @@ Feature branches never auto-deploy. Merge (or push) to `main` only after **Deplo
 
 ## Secrets
 
-Do not put Hub tokens, bootstrap URLs, `board/.env`, or deploy **private** keys in git or in workflow YAML. Host env is `~/.jobos/deploy.env` (mode 600) plus named volumes `pgdata` / `blobs`. The SSH private key is `~/.ssh/jobos_deploy`. Optional Actions secret: `JOBOS_DEPLOY_KEY`.
+Do not put Hub tokens, bootstrap URLs, `.hub/.env`, or deploy **private** keys in git or in workflow YAML. Host env is `~/.jobos/deploy.env` (mode 600) plus named volumes `pgdata` / `blobs`. The SSH private key is `~/.ssh/jobos_deploy`. Optional Actions secret: `JOBOS_DEPLOY_KEY`.
 
 ## Troubleshooting
 
