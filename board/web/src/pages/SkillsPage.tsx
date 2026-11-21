@@ -1,0 +1,237 @@
+import { useEffect, useState } from "react";
+
+import { AppShell } from "@/components/shell/AppShell";
+import { type ShellConn } from "@/components/shell/TopBar";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { RecordCard, RecordDeck, RecordField } from "@/components/ui/record-card";
+import { Table, Td, Th } from "@/components/ui/table";
+import { NativeSelect } from "@/components/ui/select";
+import { api } from "@/lib/api";
+import { sessionLine, type SessionLine } from "@/lib/session";
+import { cn } from "@/lib/utils";
+
+type Skill = {
+  slug: string;
+  role: string;
+  tags?: string[];
+  scope: string;
+  status: string;
+};
+
+type Recording = {
+  id?: string;
+  skill?: string;
+  scope?: string;
+  status?: string;
+  note?: string;
+};
+
+export function SkillsPage() {
+  const [who, setWho] = useState("Checking session…");
+  const [conn, setConn] = useState<ShellConn>("signing in");
+  const [tag, setTag] = useState("");
+  const [scope, setScope] = useState("");
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [msg, setMsg] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [recordingsFailed, setRecordingsFailed] = useState(false);
+  function report(message: string, isError = false) {
+    setMsg(message);
+    setFailed(isError);
+  }
+
+  async function loadSkills(nextTag = tag, nextScope = scope) {
+    const params = new URLSearchParams();
+    if (nextTag) params.set("tag", nextTag);
+    if (nextScope) params.set("scope", nextScope);
+    const data = await api<{ skills?: Skill[] }>(`/api/registry/skills?${params.toString()}`);
+    setSkills(data.skills ?? []);
+  }
+
+  async function loadRecordings() {
+    try {
+      const data = await api<{ recordings?: Recording[] }>("/api/registry/recordings");
+      setRecordings(data.recordings ?? []);
+      setRecordingsFailed(false);
+    } catch (error) {
+      setRecordings([]);
+      setRecordingsFailed(true);
+      report(error instanceof Error ? error.message : "Could not load recordings", true);
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    async function boot() {
+      try {
+        const me = await api<SessionLine>("/api/auth/me");
+        if (cancelled) return;
+        setWho(sessionLine(me));
+        setConn("signed in");
+      } catch (error) {
+        if (!cancelled) {
+          setWho(error instanceof Error ? error.message : "Sign in required.");
+          setConn("sign in required");
+        }
+        return;
+      }
+      try {
+        await loadSkills();
+      } catch (error) {
+        if (!cancelled) report(error instanceof Error ? error.message : "Could not load skills", true);
+      }
+      if (!cancelled) await loadRecordings();
+    }
+    void boot();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function seed() {
+    report("");
+    try {
+      const data = await api<{ counts?: Record<string, number> }>("/api/registry/seed", { method: "POST" });
+      report(`Seeded: ${JSON.stringify(data.counts || {})}`);
+      await loadSkills();
+    } catch (error) {
+      report(error instanceof Error ? error.message : "Seed failed", true);
+    }
+  }
+
+  return (
+    <AppShell title="Skill registry" scroll="page" path="/admin/skills" who={who} conn={conn}>
+      <main id="main" className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5">
+        <p className="m-0 text-sm text-muted-foreground">
+          GitHub starters seed shared skills. Local forks stay on the owning bot. Only maintainer consumes skill.record after proctor.
+        </p>
+        <p id="who" className="m-0 text-sm text-muted-foreground">
+          {who}
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <Field className="w-44 max-w-full shrink-0">
+            Tag
+            <NativeSelect
+              id="tag"
+              value={tag}
+              onChange={(next) => {
+                setTag(next);
+                void loadSkills(next, scope);
+              }}
+              options={[
+                { value: "", label: "all tags" },
+                { value: "source", label: "source" },
+                { value: "apply", label: "apply" },
+                { value: "outreach", label: "outreach" },
+              ]}
+            />
+          </Field>
+          <Field className="w-44 max-w-full shrink-0">
+            Scope
+            <NativeSelect
+              id="scope"
+              value={scope}
+              onChange={(next) => {
+                setScope(next);
+                void loadSkills(tag, next);
+              }}
+              options={[
+                { value: "", label: "shared + mine" },
+                { value: "shared", label: "shared" },
+                { value: "local", label: "local" },
+              ]}
+            />
+          </Field>
+          <Button
+            id="reload"
+            type="button"
+            variant="outline"
+            onClick={() => {
+              void loadSkills();
+              void loadRecordings();
+            }}
+          >
+            Reload
+          </Button>
+          <Button id="seed" type="button" onClick={() => void seed()}>
+            Seed
+          </Button>
+        </div>
+        <p id="msg" className={cn("m-0 text-sm", failed && "text-destructive")}>
+          {msg}
+        </p>
+        <h2 className="m-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Skills</h2>
+        <RecordDeck>
+          {skills.map((skill) => (
+            <RecordCard key={skill.slug} title={skill.slug || ""} subtitle={skill.role || ""}>
+              <RecordField label="Tags" value={(skill.tags ?? []).join(", ")} />
+              <RecordField label="Scope" value={skill.scope || ""} />
+              <RecordField label="Status" value={skill.status || ""} />
+            </RecordCard>
+          ))}
+        </RecordDeck>
+        <div className="min-w-0 overflow-x-auto border border-border bg-card max-[720px]:hidden">
+          <Table>
+            <thead>
+              <tr>
+                <Th className="w-[26%] max-[959px]:w-1/2">Slug</Th>
+                <Th className="w-[20%] max-[959px]:w-1/2">Role</Th>
+                <Th className="w-[30%] max-[959px]:hidden">Tags</Th>
+                <Th className="w-[12%] max-[959px]:hidden">Scope</Th>
+                <Th className="w-[12%] max-[959px]:hidden">Status</Th>
+              </tr>
+            </thead>
+            <tbody id="skills">
+              {skills.map((skill) => (
+                <tr key={skill.slug} className="border-t border-border">
+                  <Td truncate={false} className="break-all" title={skill.slug}>{skill.slug}</Td>
+                  <Td truncate={false} className="break-words" title={skill.role}>{skill.role}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden break-words" title={(skill.tags ?? []).join(", ")}>{(skill.tags ?? []).join(", ")}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden" title={skill.scope}>{skill.scope}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden" title={skill.status}>{skill.status}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+        <h2 className="m-0 font-display text-[1.4rem] leading-none font-extrabold [font-family:var(--font-display)]">Recordings</h2>
+        {recordings.length === 0 && !recordingsFailed ? <p className="m-0 text-sm text-muted-foreground">No recordings yet.</p> : null}
+        <RecordDeck>
+          {recordings.map((recording, index) => (
+            <RecordCard key={recording.id || index} title={recording.skill || "Recording"} subtitle={recording.id || ""}>
+              <RecordField label="Scope" value={recording.scope || ""} />
+              <RecordField label="Status" value={recording.status || ""} />
+              <RecordField label="Note" value={recording.note || ""} />
+            </RecordCard>
+          ))}
+        </RecordDeck>
+        <div className="min-w-0 overflow-x-auto border border-border bg-card max-[720px]:hidden">
+          <Table>
+            <thead>
+              <tr>
+                <Th className="w-[22%] max-[959px]:w-[34%]">Recording</Th>
+                <Th className="w-[16%] max-[959px]:w-[22%]">Skill</Th>
+                <Th className="w-[12%] max-[959px]:hidden">Scope</Th>
+                <Th className="w-[12%] max-[959px]:hidden">Status</Th>
+                <Th className="w-[38%] max-[959px]:w-[44%]">Note</Th>
+              </tr>
+            </thead>
+            <tbody id="recordings">
+              {recordings.map((recording, index) => (
+                <tr key={recording.id || index} className="border-t border-border">
+                  <Td truncate={false} className="break-all" title={recording.id}>{recording.id}</Td>
+                  <Td truncate={false} className="break-words" title={recording.skill}>{recording.skill}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden" title={recording.scope}>{recording.scope}</Td>
+                  <Td truncate={false} className="max-[959px]:hidden" title={recording.status}>{recording.status}</Td>
+                  <Td truncate={false} className="break-words" title={recording.note}>{recording.note}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      </main>
+    </AppShell>
+  );
+}

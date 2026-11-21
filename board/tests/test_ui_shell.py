@@ -1,10 +1,13 @@
-"""Static Hub UI shell: shared theme + operator CSS on every operator page."""
+"""Static Hub UI shell: one theme and one built stylesheet on every page."""
 
+import re
 from pathlib import Path
 
 STATIC = Path(__file__).resolve().parents[1] / "app" / "static"
 
 PAGES = [
+    "landing.html",
+    "start.html",
     "index.html",
     "home.html",
     "login.html",
@@ -16,23 +19,31 @@ PAGES = [
     "users.html",
     "skills.html",
     "memory.html",
-    "connect.html",
 ]
+
+APP_CSS = re.compile(r'href="(/static/app/[^"]+\.css)"')
 
 
 def test_every_html_page_uses_shared_shell() -> None:
-    missing_css = []
+    hrefs: list[str] = []
     missing_viewport = []
+    missing_theme = []
+    missing_css = []
     for name in PAGES:
         text = (STATIC / name).read_text(encoding="utf-8")
-        if "/static/hub.css" not in text:
-            missing_css.append(name)
-        if "/static/theme.css" not in text:
-            missing_css.append(f"{name}:theme")
         if "viewport-fit=cover" not in text:
             missing_viewport.append(name)
-    assert not missing_css, f"pages missing hub.css: {missing_css}"
+        if "/static/theme.css" not in text:
+            missing_theme.append(name)
+        match = APP_CSS.search(text)
+        if match is None:
+            missing_css.append(name)
+        else:
+            hrefs.append(match.group(1))
     assert not missing_viewport, f"pages missing viewport-fit: {missing_viewport}"
+    assert not missing_theme, f"pages missing theme.css: {missing_theme}"
+    assert not missing_css, f"pages missing the built stylesheet: {missing_css}"
+    assert len(set(hrefs)) == 1, hrefs
 
 
 def test_hub_css_blocks_are_balanced() -> None:
@@ -41,20 +52,17 @@ def test_hub_css_blocks_are_balanced() -> None:
     assert "}\n.drop .menu button" in text.replace("\r\n", "\n")
 
 
-def test_authenticated_pages_have_mobile_dock() -> None:
-    for name in ("index.html", "home.html", "admin.html", "data.html", "users.html", "skills.html", "memory.html", "onboarding.html", "connect.html"):
+def test_authenticated_pages_use_the_hub_frame() -> None:
+    for name in ("index.html", "home.html", "admin.html", "data.html", "users.html", "skills.html", "memory.html", "onboarding.html"):
         text = (STATIC / name).read_text(encoding="utf-8")
-        assert "hub-dock" in text, name
-        assert "hub-rail" in text, name
+        assert 'data-testid="hub-frame"' in text or "hub-frame" in text, name
         assert "/admin/memory" in text, name
 
 
-def test_onboarding_prefills_saved_profile_and_stays_in_hub() -> None:
+def test_onboarding_keeps_the_profile_fields_and_returns_to_the_board() -> None:
     text = (STATIC / "onboarding.html").read_text(encoding="utf-8")
-    assert "function fillForm" in text
-    assert "function loadProfile" in text
-    assert 'Accept: "application/json"' in text
-    assert 'location.href = "/connect"' in text
+    assert 'id="full_name"' in text
+    assert "/board" in text
     assert 'location.href = "/"' not in text
     assert 'location.href = "/admin"' not in text
 
@@ -74,8 +82,7 @@ def test_board_unauthorized_stays_on_hub_login_next() -> None:
     assert "'/login?next=/'" not in text
 
 
-def test_login_treats_public_next_as_board() -> None:
+def test_login_has_the_account_fields() -> None:
     text = (STATIC / "login.html").read_text(encoding="utf-8")
-    assert "function nextPath" in text
-    assert 'requested === "/"' in text
-    assert 'return "/connect"' in text
+    assert 'id="username"' in text
+    assert "Create account" in text
