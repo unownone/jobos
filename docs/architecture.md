@@ -1,6 +1,6 @@
 # Architecture
 
-jobOS is a **job harness**: a multi-agent workflow whose live list is **jobOS Hub** (Postgres + BlobStore + RabbitMQ). The process is stateless. Git `ledger/` is an export snapshot, not canonical state.
+jobOS is a **job harness**: a multi-agent workflow whose live list is **jobOS Hub**. The current runtime is a Go API and a React SPA ([`docs/runtime.md`](runtime.md)). Work leases live in Postgres `queue_items`. RabbitMQ is not part of that runtime. Blobs are memory, filesystem, or any S3-compatible store. Git `ledger/` is an export snapshot, not canonical state.
 
 ## Goals
 
@@ -111,7 +111,7 @@ Source of truth: Hub Postgres `jobs` / `events` / `people`, scoped by `account_i
 
 ### Hunt board (live plane)
 
-[`board/`](../board/README.md) is FastAPI + PostgreSQL + RabbitMQ + BlobStore. Username + password at `/login`. Compat `X-Role` + `X-Token` maps to `acc_compat` and is deprecated. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. Operator/agent docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md).
+The live board is the Go API and the React SPA ([`docs/runtime.md`](runtime.md)). Username + password at `/login`. Compat `X-Role` + `X-Token` maps to `acc_compat` and is deprecated. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. Operator/agent docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). The Python `board/` app is still in the tree.
 
 **Memory pods** live in the same Hub Postgres: per-worker private, per-track shared, plus a common pod — all tenant-scoped. Agents recall every heartbeat and queue claim; writes are gated. Durable track/common facts may be **solidified** into the skill registry. [`docs/job-hub/memory.md`](job-hub/memory.md).
 

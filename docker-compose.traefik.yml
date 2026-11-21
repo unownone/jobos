@@ -1,18 +1,8 @@
-# jobOS Hub behind Traefik. From repo root:
+# LEGACY Hub behind Traefik. Port 8787 and env names match the old deploy.
+# Go API + SPA in one `hub` container. No RabbitMQ.
+#
 #   HUB_PUBLIC_HOST=hunt.example.com bash scripts/hub_docker.sh
-# Traefik listens on 80 and 443. Landing is served at /. Board is /board.
-# Default Hub-only compose (no Traefik): docker compose up -d --build  (port 8787)
-#
-# Durable state: named volumes pgdata, blobs, rabbitmq (Coolify-safe).
-# Traefik config is repo-relative ./traefik/*. Do not put ${...} in volume sources.
-#
-# First operator step after signup is always /onboarding.
-#
-# HUB_PUBLIC_HOST may be a hostname, IPv4, or IP:port (invites use that origin).
-#
-# Outside Postgres: set secret DATABASE_URL (Coolify/Railway, repo-root .env,
-# or the shell). Unset uses the bundled `postgres` service.
-# A database on the Docker host is host.docker.internal, not 127.0.0.1.
+# Traefik listens on 80, 443, and 8787. All three reach hub:8787.
 
 name: jobos-traefik
 
@@ -32,20 +22,6 @@ services:
       retries: 20
     restart: unless-stopped
 
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
-      RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
-    volumes:
-      - "rabbitmq:/var/lib/rabbitmq"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-    restart: unless-stopped
-
   traefik:
     image: traefik:v3.3
     ports:
@@ -60,6 +36,7 @@ services:
       hub:
         condition: service_healthy
 
+  # LEGACY: service name `hub`, BOARD_* / JOBOS_PG_* / BLOB_* unchanged.
   hub:
     build:
       context: .
@@ -70,16 +47,19 @@ services:
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
+      HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
       DATABASE_URL: "${DATABASE_URL:-}"
       JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
       JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
       JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
       JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
-      AMQP_URL: "amqp://${JOBOS_AMQP_USER:-jobos}:${JOBOS_AMQP_PASSWORD:-jobos}@rabbitmq:5672/%2F"
-      QUEUE_ADAPTER: "rabbitmq"
+      # LEGACY: kept for existing secrets. Queue is Postgres; AMQP unused.
+      AMQP_URL: "${AMQP_URL:-}"
+      QUEUE_ADAPTER: "${QUEUE_ADAPTER:-postgres}"
       BLOB_ROOT: "/var/lib/jobos/blobs"
-      BLOB_ADAPTER: "filesystem"
+      BLOB_ADAPTER: "${BLOB_ADAPTER:-filesystem}"
+      BLOB_DRIVER: "${BLOB_DRIVER:-}"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
@@ -93,16 +73,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8787/health"]
       interval: 10s
       timeout: 5s
       retries: 12
 
 volumes:
   pgdata:
-  rabbitmq:
   blobs:

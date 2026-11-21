@@ -16,7 +16,7 @@ Install and hosting: **[`docs/install.md`](../install.md)** (Docker, Compose pla
 
 ## What you deploy
 
-One FastAPI process (`board/`). PostgreSQL for durable tenant state (jobs, users, candidate, memory, metrics). Files in a volumized BlobStore. Queue is RabbitMQ (AMQP) with `{account_id}.{kind}` routing. Secrets in gitignored `board/.env`. Never paste tokens into git, docs, or group chat.
+The live Hub is the Go API plus the React SPA ([`docs/runtime.md`](../runtime.md)). PostgreSQL holds durable tenant state when `DATABASE_URL` is set. Queue leases are rows in `queue_items`. RabbitMQ is not part of this runtime. Files go through the blob driver (memory, filesystem, or S3). Secrets stay in gitignored env files. Never paste tokens into git, docs, or group chat.
 
 Auth is **username + password** at `/login` (signup on the same page). No dashboard token is required. Multi-tenant design: [`multi-tenant.md`](multi-tenant.md).
 
@@ -29,27 +29,25 @@ bash scripts/hub_deploy.sh
 Or Docker:
 
 ```bash
-# plain Hub on :8787
-docker compose -f docker-compose.plain.yml up -d --build
-# or Traefik on :80 / :443
-HUB_PUBLIC_HOST=12.234.244.34 bash scripts/hub_docker.sh
+docker compose up -d --build
+# SPA http://127.0.0.1:8080  API http://127.0.0.1:8081
 ```
 
 Full hosting: [`docs/install.md`](../install.md). **After signup, open `/onboarding` before minting invites.**
 
 `HUB_PUBLIC_HOST=12.234.244.34:343` becomes `http://12.234.244.34:343` on invite URLs. `:443` becomes `https://`. A full `HUB_PUBLIC_URL` still wins.
 
+`scripts/hub_deploy.sh` starts the Go API and serves the React SPA on `BOARD_HOST`/`BOARD_PORT` (default `0.0.0.0:8787`). Compose runs those as two containers.
+
 What the script does:
 
-1. Ensures `uv` is on PATH (`scripts/setup_uv.sh` if needed).
-2. Mints compat role tokens (`scripts/board_gen_tokens.py`) if empty.
-3. Mints a one-time `jh_boot_*` bootstrap token if there is no admin user (`scripts/hub_ensure_bootstrap.py`).
-4. Builds the onboarding pack (`scripts/hub_build_pack.py`).
-5. Starts `board/start.sh` (Gunicorn + Uvicorn workers on `BOARD_HOST`/`BOARD_PORT`, default `0.0.0.0:8787`).
+1. Mints compat role tokens into gitignored `board/.env` and `board/tokens.local.json` when they are empty.
+2. Mints a one-time `jh_boot_*` bootstrap token and prints the signup URL.
+3. Builds `web/dist` when it is missing, then starts `go run ./cmd/hub`. The API reads the skill tree from the repo, so there is no separate pack step.
 
 Stdout prints `Admin signup: $public_origin/admin/signup#bootstrap=…` once for a **fresh** deploy. After that, anyone may create an account at `/login` (username + password). `/admin/signup` still consumes the one-time bootstrap token if no admin exists yet.
 
-Dry run (no gunicorn): `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
+Dry run (does not start the API): `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
 
 `GET /health` is public and includes `admin_bootstrapped` (boolean). It does not leak tokens.
 
@@ -87,7 +85,7 @@ Process aliases the Hub accepts on input: `apply` → `application`, `maintainer
 In the UI: `/admin/invites` (same admin HTML). Or:
 
 ```bash
-export HUB_URL="${HUB_URL:-http://127.0.0.1:8787}"
+export HUB_URL="${HUB_URL:-http://127.0.0.1:8080}"
 # Cookie session from the browser is easier. From curl, use an admin Bearer after you have one,
 # or stay on the Invites page so you never put the key in a committed file.
 

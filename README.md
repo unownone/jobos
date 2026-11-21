@@ -14,7 +14,7 @@
 
 **jobOS** is a **job harness** — the only harness you need to find a job. It can be distributed among multiple agents for an efficient loop and better recon.
 
-One-click / easy deploy uses this repo’s Hub image (`Dockerfile`) and Compose (`docker-compose.yml`, Hub on **8787**). **Railway:** button above → `railway.json` + root `Dockerfile` (maps PaaS `PORT` to Hub). **Coolify:** new Docker Compose resource → GitHub `unownone/jobos` → compose file `docker-compose.yml` → keep named volumes `pgdata`, `blobs`, and `rabbitmq` → set `HUB_PUBLIC_URL` to the Coolify FQDN. Volume sources must be named volumes (no `${...}`, no `~`). Same stack as local Compose, not a second image. Details: [`docs/coolify.md`](docs/coolify.md), [`docs/install.md`](docs/install.md).
+The live Hub is two containers: a Go API (`server/`) and a React SPA (`web/`). `docker compose up -d --build` publishes the SPA on **8080** and the API on **8081**. Postgres, Redis, and MinIO are optional profiles. RabbitMQ is not in that file. **Coolify:** new Docker Compose resource → GitHub `unownone/jobos` → compose file `docker-compose.yml` → keep named volumes `pgdata` and `blobs` → set `HUB_PUBLIC_URL` to the Coolify FQDN. Volume sources must be named volumes (no `${...}`, no `~`). Details: [`docs/runtime.md`](docs/runtime.md), [`docs/coolify.md`](docs/coolify.md), [`docs/install.md`](docs/install.md). The Railway button builds the root `Dockerfile`, which serves the API and the SPA from one container. Compose keeps them separate.
 
 Not a single auto-apply bot. One repo. Four owners today (three job-search roles plus a seldom maintainer). Canonical state lives in Hub Postgres + a volumized BlobStore. Git `ledger/` is export-only.
 
@@ -36,16 +36,17 @@ curl -sS "$HUB_URL/agents.txt"
 
 Git copies: [`llms.txt`](llms.txt), [`agents.txt`](agents.txt), [`docs/llms.txt`](docs/llms.txt), [`docs/agents.txt`](docs/agents.txt). Hub also serves `/.well-known/llms.txt` and `/.well-known/agents.txt` as `text/plain`.
 
-The live coordination plane is **jobOS Hub** (`board/`): FastAPI + PostgreSQL + RabbitMQ + operator UI. Maintainer owns it. Sign up at `/login` (username + password). Git `ledger/` is an export snapshot (`GET /api/export/ledger`), not the live list. See [`board/README.md`](board/README.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md), [`docs/job-hub/multi-tenant.md`](docs/job-hub/multi-tenant.md).
+The live coordination plane is **jobOS Hub**: the Go API and the React SPA. Maintainer owns it. Sign up at `/login` (username + password). Git `ledger/` is an export snapshot (`GET /api/export/ledger`), not the live list. See [`docs/runtime.md`](docs/runtime.md), [`docs/job-hub/human.md`](docs/job-hub/human.md), [`docs/job-hub/agent.md`](docs/job-hub/agent.md), [`docs/job-hub/multi-tenant.md`](docs/job-hub/multi-tenant.md). The Python `board/` app is still in the tree.
 
 ## Start here
 
 **Onboard the candidate before anything else.** The Hub will not let you hunt, invite agents, or send A2A messages until a truthful profile exists. Do not invent one. Do not ship `candidate.example.yaml` as live data.
 
 1. **Install the Hub** — [`docs/install.md`](docs/install.md) / [`INSTALL.md`](INSTALL.md).
-   - Default Compose (Hub on **8787**): `docker compose up -d --build`
-   - Same image, named project: `docker compose -f docker-compose.plain.yml up -d --build`
-   - Traefik (80/443): `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` (uses [`docker-compose.traefik.yml`](docker-compose.traefik.yml))
+   - Default Compose (SPA on **8080**, API on **8081**): `docker compose up -d --build`
+   - With Postgres, Redis, and MinIO: `docker compose --profile data --profile cache --profile blobs up -d --build`
+   - Same stack with Postgres always on: `docker compose -f docker-compose.plain.yml up -d --build`
+   - Traefik on 80/443: `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh`
    - `docker run` and uv/bare metal are in the same guide.
    - **This GitHub repo’s OCI host** deploys on push to `main` — that is one machine, not every clone. Details: [`docs/deploy.md`](docs/deploy.md). Feature walkthrough of that host: [`docs/demo/README.md`](docs/demo/README.md).
 2. **Create the admin** at the printed `/admin/signup` URL (one-time).
@@ -133,7 +134,7 @@ Full writeup: [`docs/architecture.md`](docs/architecture.md). Domain names: [`CO
 
 ## Shared list: Hub is canonical
 
-Canonical jobs, events, people, skills, memory, and queue traffic live in **jobOS Hub** (Postgres + BlobStore + RabbitMQ), namespaced by account id. Sign up at `/login`. Landing is `/`. Board is `/board`.
+Canonical jobs, events, people, skills, memory, and queue traffic live in **jobOS Hub** (Postgres when `DATABASE_URL` is set, otherwise the in-memory store; blobs via the memory, filesystem, or S3 driver), namespaced by account id. Queue leases are `queue_items` rows. Sign up at `/login`. The SPA is `/`. Board is `/board`.
 
 `GET /api/export/ledger` writes a YAML snapshot when you need files. Git `ledger/` is **not** the live list.
 
@@ -141,7 +142,7 @@ When `HUB_URL` is set, that is the live list — see [`docs/job-hub/human.md`](d
 
 | Layer | What it is | When to use |
 | --- | --- | --- |
-| **Live Hub** | [`board/`](board/README.md) FastAPI + Postgres + RabbitMQ + BlobStore | Production and local compose |
+| **Live Hub** | Go API (`server/`) + React SPA (`web/`) | Production and local compose |
 | Export snapshot | `GET /api/export/ledger` → `ledger/jobs/*.yaml` | Airgap copy, never dual-write |
 | Optional overlay | Google Drive / Sheet | Only if someone wants a spreadsheet; not source of truth |
 
@@ -231,7 +232,9 @@ skills/starters/          Tagged platform YAML seeded into the Hub registry
 .claude/skills/<name>     Per-skill symlink for Claude Code
 .cursor/skills/<name>     Per-skill symlink for Cursor
 skills/lists/             Maintainer lists: adopted / wanted / rejected YAML
-board/                    Live Hub (FastAPI + SQLite). Maintainer-owned.
+server/                   Go Hub API (Gin)
+web/                      React SPA
+board/                    Python Hub, still in the tree
 vendor/mcp/PINNED.txt     uvx / git SHA pins for local MCPs (no source trees)
 mcp/hosted/               Copy-paste hosted MCP snippets
 mcp/SETUP.md              How to attach local vs hosted MCPs
@@ -247,9 +250,9 @@ scripts/rebuild_index.py  Optional INDEX.md generator
 scripts/rebuild_skill_index.py  skills/lists/INDEX.md from YAML
 scripts/setup_deep_research.sh  Clone dzhng/open-deep-research
 scripts/run_deep_research.py    Non-interactive research API wrapper
-docker-compose.yml        Default Hub image on :8787
-docker-compose.plain.yml  Same Hub, Compose project name jobos-plain
-docker-compose.traefik.yml Traefik on 80/443 wrapping the same image
+docker-compose.yml        Go API + React SPA. SPA :8080, API :8081
+docker-compose.plain.yml  Go API + React SPA, Postgres always on
+docker-compose.traefik.yml Traefik on 80/443 in front of the SPA
 docs/coolify.md           Coolify: named volumes, no ${...} in volume sources
 ```
 
@@ -260,7 +263,7 @@ docs/coolify.md           Coolify: named volumes, no ${...} in volume sources
 uv run scripts/rebuild_index.py
 uv run scripts/rebuild_skill_index.py
 
-# live Hub (maintainer): generates gitignored tokens on first start
+# live Hub (maintainer): Go API and React SPA, gitignored tokens on first start
 bash board/start.sh
 # or: docker compose up -d --build
 ```

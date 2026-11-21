@@ -9,7 +9,7 @@ DOCS="$ROOT/docs"
 mkdir -p "$DOCS"
 
 if [[ ! -f "$ROOT/.env" ]]; then
-  echo "board/.env missing. Generate tokens first: uv run scripts/board_gen_tokens.py --print" >&2
+  echo "board/.env missing. Generate tokens first: bash scripts/hub_deploy.sh (or board/start.sh)" >&2
   exit 1
 fi
 
@@ -68,6 +68,6 @@ export SHOT_FILTERS="$DOCS/02-filters.png"
 export SHOT_DETAIL="$DOCS/03-detail.png"
 export SHOT_DETAIL_ID="shot__blocked-${stamp}"
 
-cd "$ROOT"
-uv run --with playwright python "$ROOT/scripts/capture_readme_shots.py"
-echo "wrote $SHOT_DASH $SHOT_FILTERS $SHOT_DETAIL"
+echo "Seeded demo jobs on $BOARD_URL."
+echo "Capture $SHOT_DASH, $SHOT_FILTERS, and $SHOT_DETAIL from the admin UI (Python Playwright capture was removed)."
+echo "Open the board, then save screenshots into board/docs/."

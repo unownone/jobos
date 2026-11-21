@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Start Job Hub (hunt board). Interactive on a TTY; Docker sets JOBOS_NONINTERACTIVE=1.
+# Start the Go Hub. Interactive on a TTY; Docker sets JOBOS_NONINTERACTIVE=1.
+# Token minting and the API process live in scripts/hub_deploy.sh.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -67,87 +68,45 @@ if [[ -z "${HUB_PUBLIC_URL:-}" && -n "${HUB_PUBLIC_HOST:-}" ]]; then
   export HUB_PUBLIC_URL="$(jobos_normalize_url "$HUB_PUBLIC_HOST")"
 fi
 
+upsert_env() {
+  local file="$1" key="$2" value="$3" line found=0 tmp
+  [[ -n "$value" ]] || return 0
+  tmp="$(mktemp)"
+  if [[ -f "$file" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" == "$key="* ]]; then
+        printf '%s=%s\n' "$key" "$value"
+        found=1
+      else
+        printf '%s\n' "$line"
+      fi
+    done < "$file" > "$tmp"
+  fi
+  if [[ "$found" == 0 ]]; then
+    printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  fi
+  mv "$tmp" "$file"
+}
+
 if [[ -n "${HUB_PUBLIC_URL:-}" || -n "${HUB_PUBLIC_HOST:-}" ]]; then
-  python3 - "$ROOT/.env" "${HUB_PUBLIC_HOST:-}" "${HUB_PUBLIC_URL:-}" <<'PY'
-from pathlib import Path
-import sys
-path = Path(sys.argv[1])
-host, url = sys.argv[2], sys.argv[3]
-existing = {}
-if path.is_file():
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        if not raw.strip() or raw.lstrip().startswith("#") or "=" not in raw:
-            continue
-        k, v = raw.split("=", 1)
-        existing[k.strip()] = v.strip()
-if host:
-    existing["HUB_PUBLIC_HOST"] = host
-if url:
-    existing["HUB_PUBLIC_URL"] = url.rstrip("/")
-lines = []
-if path.is_file():
-    seen = set()
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        if "=" in raw and not raw.lstrip().startswith("#"):
-            k = raw.split("=", 1)[0].strip()
-            if k in existing:
-                lines.append(f"{k}={existing[k]}")
-                seen.add(k)
-                continue
-        lines.append(raw)
-    for k, v in existing.items():
-        if k not in seen and k in {"HUB_PUBLIC_HOST", "HUB_PUBLIC_URL"}:
-            lines.append(f"{k}={v}")
-else:
-    lines = [f"{k}={v}" for k, v in existing.items() if v]
-path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-PY
+  mkdir -p "$ROOT"
+  touch "$ROOT/.env"
+  upsert_env "$ROOT/.env" HUB_PUBLIC_HOST "${HUB_PUBLIC_HOST:-}"
+  upsert_env "$ROOT/.env" HUB_PUBLIC_URL "${HUB_PUBLIC_URL:-}"
 fi
 
-# `exec fn` looks up a binary named fn; bash functions are not valid exec targets.
-# PEP 723 headers on scripts/ also make `uv run --frozen script.py` fail. Use the venv.
-if [[ ! -x "$ROOT/.venv/bin/python" || ! -x "$ROOT/.venv/bin/gunicorn" ]]; then
-  uv sync --project "$ROOT" --frozen --no-dev
-fi
-HUB_PY="$ROOT/.venv/bin/python"
-HUB_GUNICORN="$ROOT/.venv/bin/gunicorn"
-export PATH="$ROOT/.venv/bin:$PATH"
-
-if [[ ! -f "$ROOT/.env" && ! -f "$ROOT/tokens.local.json" ]]; then
-  echo "No role tokens yet. Generating gitignored board/.env ..."
-  "$HUB_PY" "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT" --print
-else
-  "$HUB_PY" "$REPO/scripts/board_gen_tokens.py" --dir "$ROOT"
-fi
-
-"$HUB_PY" "$REPO/scripts/hub_ensure_bootstrap.py" --dir "$ROOT"
-"$HUB_PY" "$REPO/scripts/hub_build_pack.py" --dir "$ROOT" --repo "$REPO"
-
-if [[ -f "$ROOT/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "$ROOT/.env"
-  set +a
-fi
-
-HOST="${BOARD_HOST:-0.0.0.0}"
+export BOARD_HOST="${BOARD_HOST:-0.0.0.0}"
 if [[ -n "${PORT:-}" ]]; then
-  PORT="$PORT"
+  export BOARD_PORT="$PORT"
 else
-  PORT="${BOARD_PORT:-8787}"
+  export BOARD_PORT="${BOARD_PORT:-8787}"
 fi
-PUBLIC="${HUB_PUBLIC_URL:-http://127.0.0.1:${PORT}}"
-PUBLIC="${PUBLIC%/}"
+export HUB_ADDR="${HUB_ADDR:-${BOARD_HOST}:${BOARD_PORT}}"
+export HUB_REPO_ROOT="${HUB_REPO_ROOT:-$REPO}"
+export HUB_WEB_ROOT="${HUB_WEB_ROOT:-$REPO/web/dist}"
+export JOBHUB_BOARD_DIR="$ROOT"
 
-echo "Job Hub → http://${HOST}:${PORT}/  (process bind)"
-echo "Public origin: ${PUBLIC}  (invites, signup, onboarding)"
-echo "Gitignored secrets: ${ROOT}/.env ${ROOT}/tokens.local.json"
-if [[ -n "${HUB_BOOTSTRAP_TOKEN:-}" && "${HUB_BOOTSTRAP_USED:-}" != "1" ]]; then
-  echo "Admin signup (one-time): ${PUBLIC}/admin/signup#bootstrap=${HUB_BOOTSTRAP_TOKEN}"
-  echo "Then onboard the candidate (required): ${PUBLIC}/onboarding"
-  echo "After that admin exists, /admin/signup redirects to /login."
-fi
-echo "Sibling agents: ${PUBLIC}/api/jobs with Bearer keys (or X-Role + X-Token compat)"
-echo "Maintainer owns this process. Do not commit .env. Durable state is PostgreSQL."
+echo "Job Hub → http://${BOARD_HOST}:${BOARD_PORT}/  (Go API, SPA from web/dist)"
+echo "Sibling agents: ${HUB_PUBLIC_URL:-http://127.0.0.1:${BOARD_PORT}}/api/jobs with Bearer keys (or X-Role + X-Token compat)"
 
-exec "$HUB_GUNICORN" --config gunicorn.conf.py
+exec bash "$REPO/scripts/hub_deploy.sh"

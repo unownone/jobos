@@ -1,15 +1,15 @@
 # Hunt board benchmarks
 
-Maintainer-owned measurements for the live coordination plane. Numbers below are **starting placeholders** until a hunt has real traffic. Re-run `uv run board/scripts/benchmark.py` on the box that hosts the board and paste a dated row into the table when you care.
+Maintainer-owned measurements for the live coordination plane. Numbers below are **starting placeholders** until a hunt has real traffic. Re-run `curl health` on the box that hosts the board and paste a dated row into the table when you care.
 
 ## How to run
 
 ```bash
 # in-process (no server; uses a throwaway SQLite under board/data/benchmark.db)
-uv run board/scripts/benchmark.py
+curl health
 
 # against the live board (needs gitignored tokens in board/.env)
-uv run board/scripts/benchmark.py --url http://127.0.0.1:8787 --runs 25 --load 50
+curl health --url http://127.0.0.1:8787 --runs 25 --load 50
 ```
 
 Makefile: `make -C board bench` or `make board-bench`.

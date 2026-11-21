@@ -2,7 +2,7 @@
 # Deploy Job Hub on this host from GitHub main (or a pinned SHA).
 # Intended for the live clone at $JOBOS_REPO (default: $HOME/jobos-live),
 # not the agent's working tree. Durable data is named Docker volumes
-# (pgdata, blobs, rabbitmq). Coolify forbids ${...} in volume sources and
+# (pgdata, blobs). Coolify forbids ${...} in volume sources and
 # would wipe ~/ binds on each helper checkout. See docs/coolify.md.
 set -euo pipefail
 
@@ -37,7 +37,7 @@ Env (optional file: $HOME/.jobos/deploy.env):
   JOBOS_PG_PASSWORD    Postgres password (default: jobos). Not published; Hub-only.
                        Used when DATABASE_URL is unset (bundled service).
   DATABASE_URL         Outside Postgres. Secret / repo-root .env. Wins over the bundled URL.
-                       Durable data is named volumes pgdata, blobs, rabbitmq.
+                       Durable data is named volumes pgdata and blobs.
 EOF
 }
 
@@ -62,6 +62,7 @@ jobos_load_github_ssh
 
 REPO="${JOBOS_REPO:-${HOME}/jobos-live}"
 COMPOSE_FILE="${JOBOS_COMPOSE_FILE:-docker-compose.yml}"
+# LEGACY: production hub listens on 8787 (same as Coolify docker-compose.yml).
 HEALTH_URL="${JOBOS_HEALTH_URL:-http://127.0.0.1:8787/health}"
 STATE_DIR="${JOBOS_STATE_DIR:-${HOME}/.jobos}"
 mkdir -p "$STATE_DIR"
@@ -97,26 +98,26 @@ elif [[ -n "${HUB_PUBLIC_HOST:-}" ]]; then
 fi
 
 if [[ -n "${HUB_PUBLIC_HOST:-}" || -n "${HUB_PUBLIC_URL:-}" ]]; then
-  python3 - "$REPO/.env" "${HUB_PUBLIC_HOST:-}" "${HUB_PUBLIC_URL:-}" <<'PY'
-from pathlib import Path
-import sys
-path = Path(sys.argv[1])
-host, url = sys.argv[2], sys.argv[3]
-existing = {}
-if path.is_file():
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        if not raw.strip() or raw.lstrip().startswith("#") or "=" not in raw:
-            continue
-        k, v = raw.split("=", 1)
-        existing[k.strip()] = v.strip()
-if host:
-    existing["HUB_PUBLIC_HOST"] = host
-if url:
-    existing["HUB_PUBLIC_URL"] = url.rstrip("/")
-lines = [f"{k}={v}" for k, v in existing.items() if v]
-path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-PY
-  chmod 600 "$REPO/.env" 2>/dev/null || true
+  env_file="$REPO/.env"
+  tmp="$(mktemp)"
+  declare -A existing=()
+  if [[ -f "$env_file" ]]; then
+    while IFS= read -r raw || [[ -n "$raw" ]]; do
+      [[ -z "${raw// }" || "$raw" == \#* || "$raw" != *=* ]] && continue
+      key="${raw%%=*}"
+      value="${raw#*=}"
+      existing["${key%% }"]="${value}"
+    done <"$env_file"
+  fi
+  [[ -n "${HUB_PUBLIC_HOST:-}" ]] && existing[HUB_PUBLIC_HOST]="$HUB_PUBLIC_HOST"
+  [[ -n "${HUB_PUBLIC_URL:-}" ]] && existing[HUB_PUBLIC_URL]="${HUB_PUBLIC_URL%/}"
+  : >"$tmp"
+  for key in "${!existing[@]}"; do
+    value="${existing[$key]}"
+    [[ -n "$value" ]] && printf '%s=%s\n' "$key" "$value" >>"$tmp"
+  done
+  mv "$tmp" "$env_file"
+  chmod 600 "$env_file" 2>/dev/null || true
 fi
 
 docker_cmd() {

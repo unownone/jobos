@@ -1,7 +1,10 @@
-# Prefer repo-root: docker compose up -d --build
-# Postgres is internal-only. Data: named volume pgdata (Coolify-safe).
-# Outside Postgres: set DATABASE_URL in secrets. Unset uses this bundled service.
-# From inside Hub, a host database is host.docker.internal, not 127.0.0.1.
+# LEGACY board/ compose. Same port and envs as repo-root docker-compose.yml.
+# Go API + SPA in one `hub` container. No RabbitMQ.
+# Prefer: docker compose -f ../docker-compose.yml up -d --build
+#
+# From board/: docker compose up -d --build
+# Hub: http://127.0.0.1:8787
+
 name: jobos
 
 services:
@@ -20,39 +23,50 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # LEGACY: `hub` on 8787 with BOARD_* / JOBOS_PG_* / BLOB_*.
   hub:
     build:
       context: ..
       dockerfile: Dockerfile
+    ports:
+      - "8787:8787"
     environment:
       JOBOS_NONINTERACTIVE: "1"
       BOARD_HOST: "0.0.0.0"
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
+      HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
       DATABASE_URL: "${DATABASE_URL:-}"
       JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
       JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
       JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
       JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
+      # LEGACY: kept for existing secrets. Queue is Postgres; AMQP unused.
+      AMQP_URL: "${AMQP_URL:-}"
+      QUEUE_ADAPTER: "${QUEUE_ADAPTER:-postgres}"
+      BLOB_ROOT: "/var/lib/jobos/blobs"
+      BLOB_ADAPTER: "${BLOB_ADAPTER:-filesystem}"
+      BLOB_DRIVER: "${BLOB_DRIVER:-}"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
-      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
+      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8787}"
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
       OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
+    volumes:
+      - "blobs:/var/lib/jobos/blobs"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "8787:8787"
     depends_on:
       postgres:
         condition: service_healthy
-    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8787/health"]
       interval: 10s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
 
 volumes:
   pgdata:
+  blobs:

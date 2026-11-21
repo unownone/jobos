@@ -1,6 +1,8 @@
 # Install and host jobOS Hub
 
-jobOS Hub is the live coordination plane for the job harness. One FastAPI process. PostgreSQL for durable state (not a Hub volume). Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
+jobOS Hub is the live coordination plane for the job harness. The current Compose file runs two containers: a Go API and a React SPA. Postgres, Redis, and MinIO are optional profiles. RabbitMQ is not in that file. See [`docs/runtime.md`](runtime.md). Agents do **not** clone this repo. They curl `$HUB_URL/llms.txt` and `$HUB_URL/agents.txt`.
+
+`scripts/hub_deploy.sh` starts the Go API and serves the built React SPA on port 8787. `board/docker-compose.yml` and the repo-root Compose files run the API and the SPA as separate containers. Traefik also answers on port 8787 and sends that traffic to the SPA.
 
 **Onboarding is the first thing you do after the process is up.** Until a truthful candidate profile exists, jobs, invites, queues, messages, and A2A sends return `409 candidate_required`. Do not copy `profiles/candidate.example.yaml` into production.
 
@@ -10,10 +12,12 @@ Full operator API: [`docs/job-hub/human.md`](job-hub/human.md). Agents: [`docs/j
 
 | How | When | Command |
 | --- | --- | --- |
-| **Docker Compose (plain)** | Laptop, single VM, port 8787 | `docker compose up -d --build` or `docker compose -f docker-compose.plain.yml up -d --build` |
-| **Docker Compose + Traefik** | Public host, ports 80/443 | `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` (file: `docker-compose.traefik.yml`) |
+| **Docker Compose** | Laptop or VM. SPA on 8080, API on 8081 | `docker compose up -d --build` |
+| **Compose + data profiles** | Postgres, Redis, and MinIO on the same network | `docker compose --profile data --profile cache --profile blobs up -d --build` |
+| **Compose, Postgres always on** | Same API and SPA, Postgres is not a profile | `docker compose -f docker-compose.plain.yml up -d --build` |
+| **Docker Compose + Traefik** | Public host, ports 80/443/8787 | `HUB_PUBLIC_HOST=your.host bash scripts/hub_docker.sh` |
 | **`docker build` / `docker run`** | One container, no Compose | See [Docker (no Compose)](#docker-no-compose) |
-| **uv / bare metal** | Cursor Cloud, no Docker | `bash scripts/hub_deploy.sh` |
+| **Go / bare metal** | Cursor Cloud, no Docker | `bash scripts/hub_deploy.sh` |
 | **Coolify** | Self-hosted PaaS, Compose from GitHub | [`docs/coolify.md`](coolify.md) — named volumes, no `${...}` in volume sources |
 | **Push to `main`** | This OCI host (Traefik + Hub already up) | [Deploy on push](deploy.md) |
 
@@ -38,28 +42,22 @@ curl -sS -X POST "$HUB_URL/api/jobs" -H "X-Role: discovery" ...
 # 409 {"detail":{"code":"candidate_required","onboarding_url":"/onboarding"}}
 ```
 
-## Docker Compose (plain)
+## Docker Compose
 
-Hub only. Binds **8787**. Persistence is PostgreSQL + RabbitMQ + blobs on **named Docker volumes** (`pgdata`, `rabbitmq`, `blobs`). Postgres/RabbitMQ have **no published ports**. Packs rebuild into `/tmp`. There is no separate vector database. Volume sources are named volumes (no `${...}`, no `~`) so Coolify continuous deploys keep data — see [`docs/coolify.md`](coolify.md).
+Two containers. The SPA is `http://127.0.0.1:8080`. The API is also on `http://127.0.0.1:8081`. `docker compose up` does not start Postgres, Redis, or MinIO. Add `--profile data`, `--profile cache`, and `--profile blobs` when you want them. `HUB_PLUGINS=auto` attaches a driver when that hostname resolves. Filesystem blobs use the named volume `blobs`. Postgres uses `pgdata`. There is no RabbitMQ volume. Volume sources are named volumes (no `${...}`, no `~`) so Coolify continuous deploys keep data — see [`docs/coolify.md`](coolify.md). Driver details: [`docs/runtime.md`](runtime.md).
 
 ```bash
 cd /path/to/jobos
-export HUB_PUBLIC_HOST=127.0.0.1:8787   # or your VM IP:8787
+export HUB_PUBLIC_URL=http://127.0.0.1:8080
 docker compose up -d --build
-# equivalent named project:
-docker compose -f docker-compose.plain.yml up -d --build
-docker compose -f docker-compose.plain.yml logs -f hub
+docker compose logs -f api web
 ```
 
-Equivalent wrapper: `bash scripts/hub_docker_plain.sh`.
-
-Open `http://127.0.0.1:8787/` then `/login`. After signup, `/onboarding`. Board UI is `/board`.
-
-Override the published port with `HUB_PORT=343` if 8787 is taken (`http://127.0.0.1:343` — also set `HUB_PUBLIC_HOST` / `HUB_PUBLIC_URL` to match).
+Open `http://127.0.0.1:8080/login`. After signup, `/onboarding`. Board UI is `/board`.
 
 ### Outside Postgres
 
-The bundled `postgres` service still starts with the default Compose files. Hub uses it when no secret URL is set.
+The bundled `postgres` service starts only with `--profile data`. The API uses `DATABASE_URL` when that variable is set. When it is empty and `HUB_PLUGINS=auto`, the API fills a URL if the hostname `postgres` resolves.
 
 To use a Postgres that this stack does not create, set secret `DATABASE_URL` (Coolify or Railway environment, repo-root `.env`, or the shell). Compose passes that value through. Leave it unset to use the bundled service.
 
@@ -70,15 +68,15 @@ DATABASE_URL='postgresql://user:pass@db.example:5432/jobos?sslmode=require' \
   docker compose up -d --build
 ```
 
-When `DATABASE_URL` is unset, Hub builds the URL from `JOBOS_PG_USER`, `JOBOS_PG_PASSWORD`, `JOBOS_PG_HOST`, `JOBOS_PG_PORT`, and `JOBOS_PG_DB`. The bundled image always initializes user and database `jobos`; `JOBOS_PG_PASSWORD` is its password. `JOBOS_PG_HOST=host.docker.internal` points the fallback at a host Postgres without assembling a URL. A Docker secret file mounted at `/run/secrets/database_url` is used when `DATABASE_URL` is unset.
+When `DATABASE_URL` is empty and `HUB_PLUGINS=auto`, the API uses `JOBOS_PG_USER`, `JOBOS_PG_PASSWORD`, and `JOBOS_PG_DB` against host `postgres`. The bundled image initializes user and database `jobos`.
 
-Stop: `docker compose -f docker-compose.plain.yml down` (keeps named volumes). Destroy data: `docker compose -f docker-compose.plain.yml down -v`.
+Stop: `docker compose down` (keeps named volumes). Destroy data: `docker compose down -v`.
 
 Browser e2e (Playwright against Compose Hub): `bash scripts/e2e_browser.sh`. Inventory: [`e2e/FLOWS.md`](../e2e/FLOWS.md).
 
 ## Docker Compose + Traefik (public host)
 
-Ports **80** and **443** plus **8787**. Landing is `/`. Board is `/board`. File-based Traefik config (no Docker socket): `traefik/traefik.yml`, `traefik/dynamic.yml`.
+Ports **80**, **443**, and **8787** all reach the SPA. The SPA proxies the API. Board is `/board`. File-based Traefik config (no Docker socket): `traefik/traefik.yml`, `traefik/dynamic.yml`.
 
 ```bash
 # hostname, IPv4, or IP:port. :443 → https:// on invite URLs.
@@ -95,17 +93,16 @@ Put a real TLS certificate in front if you need one (Traefik `websecure` already
 Coolify has no universal one-click URL. Create a **Docker Compose** resource pointed at this GitHub repo. Full notes (including why volume sources cannot use `${...}`): [`docs/coolify.md`](coolify.md).
 
 1. Source: `https://github.com/unownone/jobos` (branch `main`).
-2. Compose file: `docker-compose.yml` (Hub on 8787 plus internal Postgres). Do not invent a second stack.
-3. Set `HUB_PUBLIC_URL` (and usually `HUB_PUBLIC_HOST`) to the Coolify FQDN, e.g. `https://hub.example.com`.
-4. Confirm Persistent Storage lists named volumes `pgdata`, `rabbitmq`, and `blobs` (Coolify prefixes them). Do not convert them to `${...}` or `~` binds.
-5. After first boot, open `/login` (or `/admin/signup` if the database is empty) then `/onboarding`. Healthcheck is `GET /health` on 8787 inside the container.
-6. OpenTelemetry logs go to container stdout (`OTEL_LOGS_EXPORTER=console`). No collector or OTLP endpoint. `OTEL_SDK_DISABLED=true` or `OTEL_LOGS_EXPORTER=none` turns them off.
+2. Compose file: `docker-compose.yml` (Go API + React SPA). Postgres, Redis, and MinIO are profiles. Do not invent a second stack.
+3. Set `HUB_PUBLIC_URL` to the Coolify FQDN, e.g. `https://hub.example.com`.
+4. Confirm Persistent Storage lists named volumes `pgdata` and `blobs` (Coolify prefixes them). Do not convert them to `${...}` or `~` binds.
+5. After first boot, open `/login`, then `/onboarding`. Healthcheck is `GET /health` on port 8080 inside the API container.
 
-Same image as Railway and local Compose (`Dockerfile` at repo root).
+The Railway button builds the root `Dockerfile`, which is the Go API serving the SPA from the same container. Local and Coolify Compose build `server/Dockerfile` and `web/Dockerfile` as two containers.
 
 ## Railway
 
-Use the README **Deploy on Railway** button (`railway.json` + `Dockerfile`). Railway injects `PORT`; Gunicorn binds that port (see `board/gunicorn.conf.py`). Override worker count with `WEB_CONCURRENCY`.
+Use the README **Deploy on Railway** button (`railway.json` + `Dockerfile`). Railway injects `PORT`. The process binds that port. Compose remains the two-container layout.
 
 Set after the first domain exists:
 
@@ -128,9 +125,9 @@ docker build -t jobos-hub .
 
 Compose is required for a full install. The Hub image is stateless.
 
-## Bare metal (uv)
+## Bare metal
 
-Needs Python 3.11+ and [`uv`](https://docs.astral.sh/uv/).
+This path starts the Go API and serves `web/dist`. It mints the one-time bootstrap token itself. Needs Go, Node, and OpenSSL.
 
 ```bash
 bash scripts/setup_uv.sh          # if uv is missing
@@ -138,15 +135,15 @@ export HUB_PUBLIC_HOST=127.0.0.1:8787
 bash scripts/hub_deploy.sh
 ```
 
-Listens on `0.0.0.0:8787`. Secrets: gitignored `board/.env` and `board/tokens.local.json`. Set `DATABASE_URL` to PostgreSQL. Dry run: `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
+Listens on `0.0.0.0:8787` and serves the SPA from that same port. Secrets: gitignored `board/.env` and `board/tokens.local.json`. Set `DATABASE_URL` to PostgreSQL. Dry run: `HUB_DEPLOY_DRY_RUN=1 bash scripts/hub_deploy.sh`.
 
 ## Reverse proxy / TLS
 
-Plain Compose already publishes 8787. For a hostname:
+Plain Compose publishes the SPA on 8080. For a hostname:
 
-- **Caddy** (example): `hunt.example.com { reverse_proxy 127.0.0.1:8787 }`
-- **nginx**: `proxy_pass http://127.0.0.1:8787;` plus WebSocket-unrelated HTTP/1.1
-- **Cloudflare Tunnel / Tailscale**: point at 8787; set `HUB_PUBLIC_URL` to the public origin so invite links work
+- **Caddy** (example): `hunt.example.com { reverse_proxy 127.0.0.1:8080 }`
+- **nginx**: `proxy_pass http://127.0.0.1:8080;` and forward `Upgrade` for `/ws`
+- **Cloudflare Tunnel / Tailscale**: point at 8080; set `HUB_PUBLIC_URL` to the public origin so invite links work
 - **Traefik template**: repo-root `docker-compose.traefik.yml`
 
 Always set `HUB_PUBLIC_URL` (or `HUB_PUBLIC_HOST`) to the origin browsers and agents actually use. Never put `jh_boot_` / `jh_agt_` / `BOARD_TOKEN_*` in that URL.
@@ -159,9 +156,9 @@ The Hub container stores nothing durable on disk. PostgreSQL is the database.
 | --- | --- |
 | Postgres (bundled Compose service, or `DATABASE_URL` from secrets) | Jobs, users, sessions, queue, messages, A2A, memory pods, candidate YAML, resume PDF, bootstrap token, token-burn metrics |
 | `/tmp/jobos-packs/` in Hub | Skill/MCP zip snapshots (rebuilt on start) |
-| Named volume `pgdata` | Postgres files |
-| Named volume `blobs` | Resume PDFs and other blob files |
-| Named volume `rabbitmq` | RabbitMQ durable queue state |
+| Named volume `pgdata` | Postgres files, when the `data` profile is running |
+| Named volume `blobs` | Resume PDFs and other filesystem blob files |
+| Named volume `minio` | MinIO data, when the `blobs` profile is running |
 
 Backup the database Hub is actually using.
 
@@ -209,13 +206,13 @@ See [`docs/job-hub/a2a.md`](job-hub/a2a.md).
 | Agents invent a candidate | Hub `candidate.present` is false — they must stop. |
 | Lost admin password | Restore the `pgdata` volume from backup. Do not invent `candidate.yaml` to “unblock”. |
 | Coolify: `Invalid volume source: contains forbidden character '${'` | Volume sources must be named volumes, not `${VAR:-...}` binds. See [`docs/coolify.md`](coolify.md). |
-| Coolify redeploy emptied Postgres/RabbitMQ | Bind mounts under `~` or `/artifacts` reset each deploy. Use named volumes. |
-| Docker healthcheck failing | `docker compose logs hub`. `/health` must answer on 8787 inside the container. |
-| Traefik 404 | Confirm `traefik/dynamic.yml` service URL is `http://hub:8787` and the `hub` service is healthy. |
+| Coolify redeploy emptied Postgres | Bind mounts under `~` or `/artifacts` reset each deploy. Use named volumes. |
+| Docker healthcheck failing | `docker compose logs api`. `/health` must answer on port 8080 inside the API container. |
+| Traefik 404 | Confirm `traefik/dynamic.yml` service URL is `http://web:80` and the `web` service is healthy. |
 
 ## Deploy on push (this host)
 
-GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose, named volumes `pgdata` / `blobs` / `rabbitmq`). Pull requests run **Deploy check** first (SSH wiring; no ship). GitHub SSH uses `ssh.github.com:443` and `~/.ssh/jobos_deploy`. Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
+GitHub `unownone/jobos` is origin. A push to `main` rebuilds Job Hub on the OCI box (`/home/opc/jobos-live`, Docker Compose, named volumes `pgdata` / `blobs`). Pull requests run **Deploy check** first (SSH wiring; no ship). GitHub SSH uses `ssh.github.com:443` and `~/.ssh/jobos_deploy`. Details, systemd units, and the Actions **Deploy** button: [`docs/deploy.md`](deploy.md).
 
 ```bash
 bash scripts/hub_host_deploy.sh   # manual ship of origin/main on the host

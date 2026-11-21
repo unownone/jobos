@@ -1,15 +1,8 @@
-# jobOS Hub only (no Traefik). From repo root:
+# LEGACY Hub-only compose (no Traefik). Same port and envs as production deploy.
+# Go API + SPA in one `hub` container. No RabbitMQ.
+#
 #   docker compose -f docker-compose.plain.yml up -d --build
-# Hub listens on http://127.0.0.1:8787
-#
-# Durable state: named volumes pgdata, rabbitmq, blobs (Coolify-safe).
-# Postgres/RabbitMQ have no published ports. See docs/coolify.md.
-#
-# First visit: /login (username + password) → /onboarding → invites/agents.
-#
-# Outside Postgres: set secret DATABASE_URL (Coolify/Railway, repo-root .env,
-# or the shell). Unset uses the bundled `postgres` service.
-# A database on the Docker host is host.docker.internal, not 127.0.0.1.
+# Hub: http://127.0.0.1:8787
 
 name: jobos-plain
 
@@ -29,20 +22,7 @@ services:
       retries: 20
     restart: unless-stopped
 
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: "${JOBOS_AMQP_USER:-jobos}"
-      RABBITMQ_DEFAULT_PASS: "${JOBOS_AMQP_PASSWORD:-jobos}"
-    volumes:
-      - "rabbitmq:/var/lib/rabbitmq"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-    restart: unless-stopped
-
+  # LEGACY: `hub` on ${HUB_PORT:-8787}, BOARD_* / JOBOS_PG_* / BLOB_* unchanged.
   hub:
     build:
       context: .
@@ -55,16 +35,19 @@ services:
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
+      HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
       DATABASE_URL: "${DATABASE_URL:-}"
       JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
       JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
       JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
       JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
-      AMQP_URL: "amqp://${JOBOS_AMQP_USER:-jobos}:${JOBOS_AMQP_PASSWORD:-jobos}@rabbitmq:5672/%2F"
-      QUEUE_ADAPTER: "rabbitmq"
+      # LEGACY: kept for existing secrets. Queue is Postgres; AMQP unused.
+      AMQP_URL: "${AMQP_URL:-}"
+      QUEUE_ADAPTER: "${QUEUE_ADAPTER:-postgres}"
       BLOB_ROOT: "/var/lib/jobos/blobs"
-      BLOB_ADAPTER: "filesystem"
+      BLOB_ADAPTER: "${BLOB_ADAPTER:-filesystem}"
+      BLOB_DRIVER: "${BLOB_DRIVER:-}"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-127.0.0.1:8787}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8787}"
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
@@ -76,10 +59,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8787/health"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -87,5 +68,4 @@ services:
 
 volumes:
   pgdata:
-  rabbitmq:
   blobs:

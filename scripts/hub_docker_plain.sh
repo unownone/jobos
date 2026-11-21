@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plain Docker Compose install (Hub on :8787, no Traefik).
+# Plain Docker Compose install (SPA on :8080, API on :8081, no Traefik).
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,9 +10,9 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-default_host="${HUB_PUBLIC_HOST:-127.0.0.1:${HUB_PORT:-8787}}"
+default_host="${HUB_PUBLIC_HOST:-127.0.0.1:${HUB_PORT:-8080}}"
 if [[ -z "${HUB_PUBLIC_HOST:-}" && -t 0 ]]; then
-  echo "Job Hub Docker (plain, port ${HUB_PORT:-8787}, no Traefik)"
+  echo "Job Hub Docker (plain, SPA on ${HUB_PORT:-8080}, API on 8081, no Traefik)"
   read -r -p "Public host [${default_host}]: " entered
   HUB_PUBLIC_HOST="${entered:-$default_host}"
 fi

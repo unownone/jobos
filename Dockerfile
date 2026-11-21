@@ -1,36 +1,31 @@
-FROM python:3.12-slim-bookworm
+# One container for hosts that take a single Dockerfile (Railway, docker run).
+# Compose still runs the API and the SPA as separate containers.
+FROM node:22-alpine AS web
+WORKDIR /src
+COPY web/package.json web/package-lock.json* ./
+RUN npm install
+COPY web/ ./
+RUN npm run build
 
-COPY --from=ghcr.io/astral-sh/uv:0.12.13 /uv /usr/local/bin/uv
+FROM golang:1.22-bookworm AS build
+WORKDIR /src/server
+COPY server/go.mod server/go.sum ./
+COPY server/third_party ./third_party
+RUN go mod download
+COPY server/ ./
+RUN CGO_ENABLED=0 go build -o /hub ./cmd/hub
 
-WORKDIR /app
-ENV UV_LINK_MODE=copy \
-    UV_NO_DEV=1 \
-    UV_FROZEN=1 \
-    PATH="/app/board/.venv/bin:/usr/local/bin:${PATH}" \
-    JOBOS_NONINTERACTIVE=1 \
-    HUB_REPO_ROOT=/app \
-    BOARD_HOST=0.0.0.0 \
-    BOARD_PORT=8787 \
-    BOARD_DB=/tmp/board.db \
-    HUB_PACKS_DIR=/tmp/jobos-packs \
-    OTEL_SERVICE_NAME=jobos-hub
-
-COPY board/pyproject.toml board/uv.lock /app/board/
-WORKDIR /app/board
-RUN UV_COMPILE_BYTECODE=1 uv sync --frozen --no-dev
-
-WORKDIR /app
-COPY AGENTS.md skills-lock.json llms.txt agents.txt ./
-COPY board ./board
-COPY scripts ./scripts
-COPY skills ./skills
-COPY docs ./docs
-COPY mcp ./mcp
-COPY handoffs ./handoffs
-COPY profiles/candidate.example.yaml ./profiles/candidate.example.yaml
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh /app/board/start.sh
-
-EXPOSE 8787
-WORKDIR /app/board
-ENTRYPOINT ["/docker-entrypoint.sh"]
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
+COPY --from=build /hub /usr/local/bin/hub
+COPY --from=web /src/dist /opt/jobos/web
+COPY AGENTS.md llms.txt agents.txt /opt/jobos/
+COPY docs /opt/jobos/docs
+COPY skills /opt/jobos/skills
+COPY mcp /opt/jobos/mcp
+COPY scripts /opt/jobos/scripts
+COPY handoffs /opt/jobos/handoffs
+ENV HUB_REPO_ROOT=/opt/jobos
+ENV HUB_WEB_ROOT=/opt/jobos/web
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/hub"]

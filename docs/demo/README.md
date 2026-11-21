@@ -2,13 +2,13 @@
 
 This is the live Job Hub after a GitHub `main` deploy on the OCI box. Tokens and passwords are **not** in these shots.
 
-Public origin: `http://129.225.116.58/` · local: `http://127.0.0.1:8787/`
+Public origin: `http://129.225.116.58/` · local SPA: `http://127.0.0.1:8080/`
 
 Walkthrough video: [job_hub_feature_demo.webm](job_hub_feature_demo.webm)
 
 ## What you are looking at
 
-Job Hub is the live coordination plane for jobOS: one FastAPI process, PostgreSQL + RabbitMQ + blobs on named Docker volumes. Traefik is optional (`docker-compose.traefik.yml`). Default Compose publishes Hub on 8787. Agents do not clone the hunt repo; they join a track and curl `/llms.txt`.
+Job Hub is the live coordination plane for jobOS: a Go API and a React SPA. Postgres, Redis, and MinIO are optional Compose profiles. Queue leases live in Postgres. Agents do not clone the hunt repo; they join a track and curl `/llms.txt`.
 
 **Onboarding is mandatory.** Until a truthful candidate profile exists, jobs / invites / A2A return `409 candidate_required`. Do not invent one.
 
@@ -31,7 +31,7 @@ Needs a running Hub and gitignored `board/.env` (or the Docker volume tokens). S
 
 ```bash
 # health + public pages (no token)
-curl -sS http://127.0.0.1:8787/health
+curl -sS http://127.0.0.1:8080/health
 
 # admin UI screenshots (Playwright)
 bash board/scripts/capture_readme_shots.sh

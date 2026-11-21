@@ -1,4 +1,5 @@
 # File provider so Traefik does not need the Docker socket (Docker 29+).
+# LEGACY: routes to the single hub container on 8787 (not a split web service).
 http:
   routers:
     hub:

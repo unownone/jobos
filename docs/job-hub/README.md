@@ -2,7 +2,7 @@
 
 This folder is the **design handoff** for turning the live hunt board into a **distributed jobOS Hub**: the only non-AI component. Agents (Grok, Claude, Cursor, others) register, authenticate, heartbeat, pull skills/scripts **without cloning this repo**, claim work from queues, and push/pull the board through the same APIs the UI uses.
 
-**Status:** Hub is live on `board/` (auth, invites, onboarding, registry, memory, A2A). Operator/agent docs against **live routes**: [human.md](human.md), [agent.md](agent.md). Agents curl `/llms.txt` and `/agents.txt`.
+**Status:** Hub is the Go API and the React SPA (auth, invites, onboarding, registry, memory, A2A). Operator/agent docs against **live routes**: [human.md](human.md), [agent.md](agent.md), [`docs/runtime.md`](../runtime.md). Agents curl `/llms.txt` and `/agents.txt`. The Python `board/` app is still in the tree.
 
 **Do not treat the inventory table below as the live API.** It was the 2026-09-07 gap list. Auth is now Hub keys + sessions; registry and memory shipped. `profiles/candidate.yaml` is still not in git — Hub `/onboarding` is mandatory. Do not invent a candidate.
 
@@ -28,12 +28,12 @@ Shipped vs spec (document, do not “fix” here): no `POST /api/auth/bootstrap/
 | --- | --- | --- |
 | Process contract | `docs/process.md`, `docs/roles.md` | Roles; Hub is live |
 | JobStore | Hub Postgres `jobs` / `events` | Tenant-scoped; git YAML is export-only |
-| Hunt board | `board/` FastAPI + Postgres + RabbitMQ + BlobStore | Username/password session; compat `X-Role` is `acc_compat` |
+| Hunt board | `server/` Go API + `web/` React SPA | Username/password session; compat `X-Role` is `acc_compat` |
 | Token gen | `scripts/board_gen_tokens.py` | Compat only; signup does not need a dashboard token |
 | Skills | Hub registry (`GET /api/registry/skills`) | Git `skills/` seeds the registry |
 | Export | `GET /api/export/ledger` | Snapshot, not dual-write |
 
-Grow **`board/`** into the Hub. Do not start a second Python service.
+The Hub process is the Go API. Do not add a second board service.
 
 ## Hard constraints (unchanged)
 
