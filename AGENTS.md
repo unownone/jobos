@@ -11,6 +11,18 @@ curl -sS "$HUB_URL/agents.txt"
 
 Always use registry skills/MCPs (`GET /api/registry/skills` after join). If you use something outside the registry, record it and add a memory fact. Maintainer owns `skill.record`.
 
+## Preferred path
+
+If you are connected to jobOS MCP (`/mcp`), you are one agent. You are not stuck in a single lane.
+
+1. Call `get_started`.
+2. Ask the human which of find, apply, and outreach this session should run. Store the answer with `set_session_lanes`. Do not pick the lanes yourself.
+3. `report_capabilities` with the truth. Find and apply need a browser. Outreach needs email. `evaluate_lane` before that work.
+4. `start_loop`, then keep calling `next_loop` until it is done or blocked.
+5. Read `skills/agent-session/SKILL.md`.
+
+The human observes and steers at `/connect`. The older invite-key lanes below still work when you joined that way. Prefer MCP when both are available. Contract: `docs/job-hub/agent-flow.md`.
+
 ## Identity
 
 1. Read `profiles/candidate.yaml` **or** Hub `GET /api/candidate/public`. If it is missing / `present: false`, stop for the human to finish `/onboarding`. Copy `profiles/candidate.example.yaml` only as a template. Do not invent a candidate.

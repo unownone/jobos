@@ -28,7 +28,7 @@ def test_parse_os_job_apply(tmp_path: Path) -> None:
 def test_iter_starters_includes_role_skills() -> None:
     repo = Path(__file__).resolve().parents[2]
     slugs = {row["slug"] for row in iter_github_starters(repo)}
-    assert {"job-discovery", "job-apply", "job-outreach", "skill-maintainer"} <= slugs
+    assert {"job-discovery", "job-apply", "job-outreach", "skill-maintainer", "agent-session"} <= slugs
     assert {"apply-workday", "source-linkedin", "outreach-email"} <= slugs
     assert {"compose-outreach", "draft-outreach", "playwright-cli-skill"} <= slugs
 

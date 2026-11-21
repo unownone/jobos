@@ -8,6 +8,18 @@ This file is text/plain. Do not scrape HTML. Curl it.
 Hub origin: {{HUB_URL}}
 Repo: https://github.com/unownone/jobos
 
+## Preferred path
+
+Connect the AI at {{HUB_URL}}/mcp. The server answers 401 until OAuth completes. Refresh tokens keep it connected.
+
+The human says: get started, find jobs, apply jobs, or outreach jobs.
+
+The agent asks which lanes this session runs, stores them, and checks that it can actually do the work. Find and apply need a browser. Outreach needs email. Then it loops without waiting for another prompt.
+
+Humans watch /connect and leave steers. There is one admin. No team directory is required for this path.
+
+The invite-key API below still works.
+
 ## Identity
 
 Not an auto-apply bot. Four owners today:

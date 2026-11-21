@@ -30,6 +30,10 @@ def test_path_is_public_allowlist() -> None:
     assert path_is_public("/brand/logo.png") is True
     assert path_is_public("/static/hub.css") is True
     assert path_is_public("/static/hub.js") is True
+    assert path_is_public("/mcp") is True
+    assert path_is_public("/oauth/register") is True
+    assert path_is_public("/oauth/authorize") is True
+    assert path_is_public("/oauth/token") is True
 
 
 def test_path_is_public_rejects_sensitive_surfaces() -> None:

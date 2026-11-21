@@ -20,7 +20,7 @@ from app.tenant_schema import ensure_tenant_schema
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
 TAG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 
-SKILL_ROLES = ("discovery", "apply", "outreach", "research", "maintain")
+SKILL_ROLES = ("discovery", "apply", "outreach", "research", "maintain", "agent")
 SKILL_KINDS = ("skill", "mcp", "http", "builtin")
 SKILL_SCOPES = ("shared", "local")
 SKILL_STATUSES = ("draft", "recorded", "proctoring", "approved", "rejected", "retired")

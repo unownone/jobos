@@ -276,6 +276,10 @@ def _migrate(conn: SqlConnection) -> None:
     from app.mcp_store import ensure_mcp_schema
 
     ensure_mcp_schema(conn)
+    # agent_flow imports BoardDB; load it after this module finishes importing.
+    from app.agent_flow import ensure_agent_flow_schema
+
+    ensure_agent_flow_schema(conn)
     ensure_tenant_schema(conn)
     _ensure_job_posting_columns(conn)
 

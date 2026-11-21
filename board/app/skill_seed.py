@@ -49,6 +49,12 @@ ROLE_DEFAULTS: dict[str, dict[str, Any]] = {
         "inputs": ["catalog"],
         "outputs": ["skills_and_mcps"],
     },
+    "agent-session": {
+        "role": "agent",
+        "tags": ["agent"],
+        "inputs": ["session"],
+        "outputs": ["lanes", "loop"],
+    },
 }
 
 SKIP_SKILL_DIRS = frozenset({"lists", "starters"})
@@ -153,6 +159,7 @@ def _role_from_list(roles: Any) -> str:
         "maintainer": "maintain",
         "maintain": "maintain",
         "research": "research",
+        "agent": "agent",
     }
     items = _as_list(roles)
     for item in items:
