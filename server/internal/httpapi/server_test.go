@@ -22,10 +22,12 @@ import (
 	"github.com/unownone/jobos/server/internal/config"
 	"github.com/unownone/jobos/server/internal/realtime"
 	"github.com/unownone/jobos/server/internal/store"
+	"github.com/unownone/jobos/server/internal/telemetry"
 )
 
 func testServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	telemetry.Init(telemetry.Options{Exporter: "none", ServiceName: "jobos-hub-test"})
 	srv := New(config.Config{}, store.NewMemory(), blob.NewMemory(), cache.NewMemory(), realtime.New())
 	if n := srv.Seed(context.Background()); n < 5 {
 		t.Fatalf("seeded %d", n)
