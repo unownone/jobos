@@ -45,7 +45,7 @@ Write yourself under **Active operators** in `ledger/INDEX.md` as `maintainer`. 
    | `skills/lists/by-platform.yaml` | Map from `docs/catalogs/platforms.md` ids to list ids |
    | `skills/lists/sources.yaml` | This pass: registries, queries, actor |
 
-5. Rebuild the human board: `uv run scripts/rebuild_skill_index.py`.
+5. Rebuild the human board: edit `skills/lists/INDEX.md` to match the YAML lists.
 6. Append a row to the catalog workspace log. If coverage changed, update `docs/research/platform-mcp-build-plan.md`.
 7. If a tool is clearly adopted, **pin it** (`uvx package==version`, or a SHA clone into gitignored `agent-tools/`). Do not copy 50k-line data files or upstream trees into git. Hosted tools get a snippet in `mcp/hosted/`. Third-party skills go in `.agents/skills/` via `npx skills add`.
 8. Append `ledger/events.jsonl`. No job YAML.

@@ -43,6 +43,6 @@ Live Hub skills are a **different** store: `GET /api/registry/skills`. This cata
 
 A short table: capability, chosen tool, install line, role, leftover gaps.
 
-If you were invoked as **maintainer**, also write `skills/lists/` and run `uv run scripts/rebuild_skill_index.py`.
+If you were invoked as **maintainer**, also write `skills/lists/` and run edit `skills/lists/INDEX.md` to match the YAML lists.
 
 Then stop, unless you were called as a prelude to `job-discovery`.

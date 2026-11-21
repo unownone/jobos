@@ -12,9 +12,9 @@ Local no-key servers are launched with `bash scripts/mcp/*.sh` (`uvx` pins; job-
 4. **workatastartup-mcp** — `bash scripts/mcp/workatastartup.sh` (`uvx` pin)
 5. **ats-jobs-mcp** — `bash scripts/mcp/ats-jobs.sh` (`uvx` pin; directory.json is in the wheel)
 6. **job-scout-mcp** — `bash scripts/mcp/job-scout.sh` (clone to `agent-tools/` on first run)
-7. **Hiring Cafe** — `python3 scripts/fetch_hiringcafe.py` (not an MCP)
+7. **Hiring Cafe** — public hiringcafe.com pages (not an MCP)
 
-Local recursive research is **not** an MCP: `.cursor/environment.json` clones [dzhng/deep-research](https://github.com/dzhng/deep-research) and operators run `python3 scripts/run_deep_research.py`. See [`docs/catalogs/deep-research.md`](../docs/catalogs/deep-research.md).
+Local recursive research is **not** an MCP: `.cursor/environment.json` clones [dzhng/deep-research](https://github.com/dzhng/deep-research) and operators run `npm --prefix agent-tools/open-deep-research run api`. See [`docs/catalogs/deep-research.md`](../docs/catalogs/deep-research.md).
 
 ## Outreach
 

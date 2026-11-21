@@ -2,7 +2,7 @@
 
 Machine-readable source: `adopted.yaml`, `wanted.yaml`, `rejected.yaml`, `by-platform.yaml`, `sources.yaml`.
 
-Rebuild: `uv run scripts/rebuild_skill_index.py`.
+Rebuild: edit this file by hand when the YAML lists change.
 
 **Last maintainer pass:** 2026-09-06 by `cursor-cloud-agent`.
 
@@ -29,7 +29,7 @@ Narrative inventory: [`docs/catalogs/skills-and-mcps.md`](../../docs/catalogs/sk
 | `job-outreach` | job-outreach | skill | outreach, mail | outreach | use | in-repo |
 | `deep-research` | deep-research | skill | research | all | use | in-repo |
 | `exa-mcp` | Exa MCP | mcp | research, discovery | all | use | https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,company_research_exa,linkedin_search_exa,deep_researcher_start,deep_researcher_check,agent_run,crawling_exa |
-| `dzhng-open-deep-research` | dzhng/deep-research (open-deep-research) | local | research | all | use | bash scripts/setup_deep_research.sh then python3 scripts/run_deep_research.py |
+| `dzhng-open-deep-research` | dzhng/deep-research (open-deep-research) | local | research | all | use | bash scripts/setup_deep_research.sh then npm --prefix agent-tools/open-deep-research run api |
 | `firecrawl-mcp` | Firecrawl MCP | mcp | research | discovery, maintainer | use | npx -y firecrawl-mcp |
 | `tavily-mcp` | Tavily MCP | mcp | research | all | use | npx -y tavily-mcp@latest or https://mcp.tavily.com/mcp/?tavilyApiKey= |
 | `parallel-search-mcp` | Parallel Search MCP | mcp | research | all | use | https://search.parallel.ai/mcp |
@@ -37,7 +37,7 @@ Narrative inventory: [`docs/catalogs/skills-and-mcps.md`](../../docs/catalogs/sk
 | `workatastartup-mcp` | workatastartup-mcp | mcp | discovery, research | discovery | use | bash scripts/mcp/workatastartup.sh (uvx workatastartup-mcp==0.1.2) |
 | `ats-jobs-mcp` | ats-jobs-mcp | mcp | discovery | discovery | use | bash scripts/mcp/ats-jobs.sh (uvx ats-jobs-mcp==1.0.0) |
 | `job-scout-mcp` | job-scout-mcp | mcp | discovery | discovery | use | bash scripts/mcp/job-scout.sh (clone to gitignored agent-tools/) |
-| `hiringcafe-http` | Hiring Cafe public pages | http | discovery | discovery | use | python3 scripts/fetch_hiringcafe.py --query "staff software engineer" |
+| `hiringcafe-http` | Hiring Cafe public pages | http | discovery | discovery | use | public hiringcafe.com /jobs pages |
 | `compose-outreach` | anthropics compose-outreach | skill | outreach | outreach | use | bash scripts/install_agent_skills.sh |
 | `draft-outreach` | anthropics draft-outreach | skill | outreach | outreach | use | bash scripts/install_agent_skills.sh |
 | `playwright-cli-skill` | microsoft/playwright-cli | skill | apply | apply | use | bash scripts/install_agent_skills.sh |

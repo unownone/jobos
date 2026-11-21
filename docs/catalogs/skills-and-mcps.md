@@ -45,7 +45,7 @@ These are the defaults the three skills expect. Swap implementations, keep the *
 | Capability | Default | Config | Used by |
 | --- | --- | --- | --- |
 | Deep research | Exa MCP | `https://mcp.exa.ai/mcp?tools=web_search_exa,web_search_advanced_exa,company_research_exa,linkedin_search_exa,deep_researcher_start,deep_researcher_check,agent_run,crawling_exa` | all |
-| Recursive local research | dzhng/open-deep-research | `bash scripts/setup_deep_research.sh` then `python3 scripts/run_deep_research.py` (`FIRECRAWL_KEY` + `OPENAI_KEY`) | research |
+| Recursive local research | dzhng/open-deep-research | `bash scripts/setup_deep_research.sh` then `npm --prefix agent-tools/open-deep-research run api` (`FIRECRAWL_KEY` + `OPENAI_KEY`) | research |
 | Extraction fallback | Firecrawl MCP | `npx -y firecrawl-mcp` / `FIRECRAWL_API_KEY` | discovery, research |
 | Fast search fallback | Tavily or Parallel Search MCP | `TAVILY_API_KEY` or `https://search.parallel.ai/mcp` (no key on free tier) | all |
 | Indeed jobs | Official Indeed MCP (OAuth) | `https://mcp.indeed.com/claude/mcp` — Claude connector historically | discovery |
@@ -95,7 +95,7 @@ Legend: **D** discovery, **R** research / hiring-manager lookup, **M** mail, **O
 | Greenhouse / Ashby / Lever | `ats-jobs-mcp` | y | | | | | **use** | none | Public board APIs, ~7.5k mapped companies. `list_open_jobs`, `compare_companies`. No scraping, no key |
 | Greenhouse Harvest | [mikelane/greenhouse-mcp-server](https://github.com/mikelane/greenhouse-mcp-server) | | | | | y | **reject** for applicants | Harvest API token | Recruiter-side. Not for Job Apply OS applicants |
 | RemoteOK | HTTP `https://remoteok.com/api` | y | | | | | **use** | none | First JSON element is metadata — skip it |
-| Hiring Cafe | `scripts/fetch_hiringcafe.py` | y | | | | | **use** | none | Public `__NEXT_DATA__`. Store employer apply URL |
+| Hiring Cafe | public pages | y | | | | | **use** | none | Public `__NEXT_DATA__`. Store employer apply URL |
 | Weekday | none found | y | | | | | **gap** | | Public pages / Workable |
 | Roro Remote | none found | | | | | | **gap** | | Confirm live URL on first discovery cycle |
 | Flexiple / Turing / Toptal / Lemon.io / BairesDev | none found | | | | y | y | **gap** | profile | `apply_kind: network`. Playwright for intake forms (apply role) |
@@ -172,7 +172,7 @@ When you vet one, append a `### <name>` block. 2026-09-06 verdicts:
 | --- | --- | --- | --- | --- |
 | 2026-09-06 | template | skills.sh, skills-hub.ai, GitHub, Indeed docs, Exa docs | Exa deep research, Indeed MCP, workatastartup-mcp, RemoteOK API, Gmail attachments | combined auto-apply as discovery |
 | 2026-09-06 | cursor-cloud-agent | skills.sh, skills-hub CLI, GitHub, PyPI, Indeed/Exa/Firecrawl/Tavily/Hunter/Apollo/Google Workspace docs, dzhng/deep-research clone | dzhng/open-deep-research local runner + cloud `environment.json`; ats-jobs-mcp; Hunter MCP; Playwright MCP; Google Calendar/Drive (already attached); platform MCP matrix | LinkedIn cookie messengers as discovery; Smartlead/Instantly sequences; Greenhouse Harvest recruiter MCP; resume-optimizer skills; jobpilot/jobhound combined apply; Apify scrapers as default |
-| 2026-09-06 | cursor-cloud-agent (maintainer) | npx skills add + hiringcafe.com public pages | Pinned uvx MCPs (no source trees); agent skills compose/draft-outreach + playwright-cli; Hiring Cafe platform + fetch_hiringcafe.py; mcp/hosted copy-paste configs | Apify HiringCafe scrapers; LinkedIn session MCPs not vendored; ats-jobs directory.json stays in the PyPI wheel |
+| 2026-09-06 | cursor-cloud-agent (maintainer) | npx skills add + hiringcafe.com public pages | Pinned uvx MCPs (no source trees); agent skills compose/draft-outreach + playwright-cli; Hiring Cafe public pages; mcp/hosted copy-paste configs | Apify HiringCafe scrapers; LinkedIn session MCPs not vendored; ats-jobs directory.json stays in the PyPI wheel |
 | 2026-09-15 | cursor-cloud-agent (maintainer) | Hub registry + memory solidify e2e (no new marketplace search) | In-process e2e for tagged skills, memory solidify, maintainer proctor/promote; catalog date refreshed so discovery.search is unblocked | no new rejections |
 
 ## Indeed MCP notes
@@ -211,7 +211,7 @@ First-party live coordination plane: [`board/README.md`](../../board/README.md).
 
 Not a marketplace MCP. Do not confuse with rejected `job-tracker-sqlite` (third-party MCP). Git `ledger/` remains the airgap protocol.
 
-Install: `bash board/start.sh`. Tokens: `uv run scripts/board_gen_tokens.py --print` (gitignored).
+Install: `bash board/start.sh` (or Compose). Tokens mint into gitignored `board/.env` on first start.
 
 ## Hunter / Apollo notes
 

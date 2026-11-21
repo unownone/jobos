@@ -7,7 +7,7 @@ This repo is **jobOS**, a job harness — not a live job search. Keep PII and li
 1. Edit `docs/process.md` (contract)
 2. Align `docs/architecture.md` / `docs/roles.md` / `docs/sharing.md` if the motion changed
 3. Update the matching `skills/*/SKILL.md` (Claude agents see the same files via `.claude/skills` → `../skills`)
-4. If you added or dropped a tool, update `skills/lists/` and run `uv run scripts/rebuild_skill_index.py`
+4. If you added or dropped a tool, update `skills/lists/` and keep `skills/lists/INDEX.md` in sync
 5. Update catalogs if portals or MCPs changed
 
 Skills should stay short and point at docs. Do not fork the status enum in three places — `ledger/schema/job.schema.json` is the list of statuses (Hub jobs use the same enum).
@@ -26,18 +26,20 @@ Document the claim name in `docs/roles.md`. Do not add another job-search owner.
 
 ## Tests
 
-Hub isolation + board:
+Hub API:
 
 ```bash
-cd board && uv run pytest -q
+cd server && go test ./...
+```
+
+SPA build:
+
+```bash
+cd web && npm ci && npm run build
 ```
 
 Export snapshots (`GET /api/export/ledger`) may still write `ledger/jobs/*.yaml` for airgap copies. Those files are not the live list.
 
-Hunt board (maintainer-owned):
-
 ```bash
-make -C board test
+make deploy-check
 ```
-
-Do not commit `board/.env`, `*.local.json`, or leftover `board/data/*.db`. Hub durable state is PostgreSQL (`DATABASE_URL`).

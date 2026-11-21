@@ -19,7 +19,7 @@ Hub registry: `GET /api/registry/skills?tag=research`. Forks stay local. Outline
 ## Stack (use the first that exists)
 
 1. Exa MCP — `deep_researcher_start` / `deep_researcher_check`, `agent_run`, `company_research_exa`, `linkedin_search_exa`, `web_search_advanced_exa`, `crawling_exa`
-2. Local [dzhng/deep-research](https://github.com/dzhng/deep-research) via `python3 scripts/run_deep_research.py` when Exa is missing and Firecrawl + OpenAI/Fireworks keys exist
+2. Local [dzhng/deep-research](https://github.com/dzhng/deep-research) via `bash scripts/setup_deep_research.sh` then `npm --prefix agent-tools/open-deep-research run api` when Exa is missing and Firecrawl + OpenAI/Fireworks keys exist
 3. Firecrawl agent / scrape
 4. Tavily
 5. Parallel Search MCP (`https://search.parallel.ai/mcp`, no key on the free tier)
@@ -33,13 +33,11 @@ Read `docs/catalogs/deep-research.md` for tool notes and the local runner. If Ex
 
 ```bash
 bash scripts/setup_deep_research.sh
-python3 scripts/run_deep_research.py \
-  --query "<specific instruction>" \
-  --depth 2 --breadth 3 \
-  --brief-out ledger/.cache/research-brief.md
+# then in another shell (needs FIRECRAWL_KEY + OPENAI_KEY / FIREWORKS_KEY):
+npm --prefix agent-tools/open-deep-research run api
 ```
 
-`npm start` is interactive. Do not use it in this environment. The wrapper hits `POST /api/research`. Compress the JSON into the catalog brief; do not commit reports or keys.
+`npm start` is interactive. Do not use it in this environment. Hit the local API’s research endpoint, compress the JSON into the catalog brief, and do not commit reports or keys.
 
 ## Modes
 

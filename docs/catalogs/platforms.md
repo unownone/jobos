@@ -19,7 +19,7 @@ Legend for `kind`:
 | google_jobs | Google Jobs | board | Google Jobs UI | none | Search + “Jobs” pack | Always store the employer apply URL, not only the Google card |
 | google_dorks | Google ATS dorks | dork | web search | none | Operators in this file | High signal for Greenhouse/Lever/Ashby/Workday |
 | remoteok | RemoteOK | feed | https://remoteok.com | none | `https://remoteok.com/api` | Credit RemoteOK; use original job URL |
-| hiringcafe | Hiring Cafe | board | https://hiringcafe.com | none | `python3 scripts/fetch_hiringcafe.py` or public `/jobs/{slug}` pages. Aggregates company career pages; Reddit `r/hiringcafe`. `hiring.cafe` redirects here. | Always store employer `apply_url` when the hit has one, not only the Hiring Cafe card. If Cloudflare 403, Exa crawl / WebFetch the same URL |
+| hiringcafe | Hiring Cafe | board | https://hiringcafe.com | none | Public `/jobs/{slug}` pages. Aggregates company career pages; Reddit `r/hiringcafe`. `hiring.cafe` redirects here. | Always store employer `apply_url` when the hit has one, not only the Hiring Cafe card. If Cloudflare 403, Exa crawl / WebFetch the same URL |
 | weekday | Weekday | board | https://jobs.weekday.works | none/session | Public job pages / Workable | Often India + remote listings |
 | rororemote | Roro Remote | board | confirm in fork | unknown | Treat as named portal; record actual URL when found | If no board, `apply_kind: outreach_only` |
 | flexiple | Flexiple | network | https://flexiple.com | profile | Open roles if listed; else network apply | Often marketplace matching |
@@ -90,16 +90,11 @@ No auth. Credit RemoteOK and keep the original URL. First element of the JSON fe
 
 Public job search engine that indexes company career pages (Greenhouse, Lever, Workday, and others). It spread on Reddit (`r/hiringcafe`) and Blind. Canonical site today: [hiringcafe.com](https://hiringcafe.com) (`hiring.cafe` 308s there).
 
-Discovery method (no login):
-
-```bash
-python3 scripts/fetch_hiringcafe.py --query "staff software engineer" --location "Remote"
-python3 scripts/fetch_hiringcafe.py --url "https://hiringcafe.com/jobs/software-engineer"
-```
+Discovery method (no login): open the public listing URL (browser, Exa crawl, or WebFetch) and parse `__NEXT_DATA__` / the employer apply link.
 
 Listing URLs: `https://hiringcafe.com/jobs/{query-slug}` or `https://hiringcafe.com/jobs/{query-slug}-{location-slug}`.
 
-If the fetcher gets **HTTP 403** (Cloudflare bot challenge on some cloud IPs), do **not** invent listings. Fall back to Exa `crawling_exa` or WebFetch of the same public URL and parse `__NEXT_DATA__`. Do not use Apify HiringCafe scrapers.
+If you get **HTTP 403** (Cloudflare bot challenge on some cloud IPs), do **not** invent listings. Fall back to Exa `crawling_exa` or WebFetch of the same public URL. Do not use Apify HiringCafe scrapers.
 
 IDs: `hiringcafe__<requisition_or_slug>`. Always prefer the employer `apply_url` on the hit over the Hiring Cafe card URL.
 

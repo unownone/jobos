@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -18,7 +17,8 @@ import (
 	"github.com/unownone/jobos/server/internal/store"
 )
 
-const pythonArgon2 = "$argon2id$v=19$m=65536,t=3,p=4$iDStID8zd9immTbvsyDNlQ$ShyjGfR3NLR1cCA9NP59YJo+jJO4DwWm9PnXDzTnSnQ"
+// Fixed argon2id hash for password "long-enough" (params match the former Python Hub).
+const legacyArgon2 = "$argon2id$v=19$m=65536,t=3,p=4$iDStID8zd9immTbvsyDNlQ$ShyjGfR3NLR1cCA9NP59YJo+jJO4DwWm9PnXDzTnSnQ"
 
 func TestHealthNextStepBeforeSignup(t *testing.T) {
 	ts := testServer(t)
@@ -76,9 +76,9 @@ func TestMetaIncludesRegistry(t *testing.T) {
 	}
 }
 
-func TestLoginAcceptsPythonArgon2AndBcrypt(t *testing.T) {
-	if !checkPassword(pythonArgon2, "long-enough") || checkPassword(pythonArgon2, "nope") || checkPassword("!locked", "long-enough") {
-		t.Fatal("python argon2id hash did not verify")
+func TestLoginAcceptsLegacyArgon2AndBcrypt(t *testing.T) {
+	if !checkPassword(legacyArgon2, "long-enough") || checkPassword(legacyArgon2, "nope") || checkPassword("!locked", "long-enough") {
+		t.Fatal("legacy argon2id hash did not verify")
 	}
 	fresh, err := hashPassword("long-enough")
 	if err != nil || !strings.HasPrefix(fresh, "$argon2id$v=19$m=65536,t=3,p=4$") || !checkPassword(fresh, "long-enough") {
@@ -88,17 +88,10 @@ func TestLoginAcceptsPythonArgon2AndBcrypt(t *testing.T) {
 	if err != nil || !checkPassword(string(old), "long-enough") {
 		t.Fatal("bcrypt")
 	}
-	if _, err := exec.LookPath("uv"); err == nil {
-		cmd := exec.Command("uv", "run", "--frozen", "python", "-c", "from argon2 import PasswordHasher; import sys; PasswordHasher().verify(sys.argv[1], 'long-enough')", fresh)
-		cmd.Dir = "../../../board"
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("python rejected a Go argon2id hash: %v %s", err, out)
-		}
-	}
 
 	db := store.NewMemory()
 	if err := db.CreateAccount(context.Background(), store.Account{
-		ID: "acc_py", Username: "ada", PasswordHash: pythonArgon2, CreatedAt: now(),
+		ID: "acc_py", Username: "ada", PasswordHash: legacyArgon2, CreatedAt: now(),
 	}, store.User{
 		ID: "usr_py", AccountID: "acc_py", Kind: "admin", DisplayName: "ada", Metadata: []byte("{}"), CreatedAt: now(),
 	}); err != nil {

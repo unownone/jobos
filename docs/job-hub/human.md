@@ -137,7 +137,7 @@ curl -sS "$HUB_URL/api/export/ledger?format=json" \
 
 Admin or **maintenance** only. Tarball contains `ledger/INDEX.md`, `ledger/events.jsonl`, `ledger/jobs/*.yaml`, `ledger/people/*.yaml`. Secrets are stripped; export refuses if `BOARD_TOKEN` or `blob_encrypted` residue is detected.
 
-Import the other way: `uv run scripts/board_import_ledger.py` (admin/maintenance `POST /api/import`).
+Import the other way: admin/maintenance `POST /api/import`.
 
 ## People (outreach)
 

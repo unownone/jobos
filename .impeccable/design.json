@@ -3,7 +3,7 @@
   "world": "industrial-terminal-ops",
   "mode": "operate",
   "colorStrategy": "committed",
-  "tokenFile": "board/app/static/theme.css",
+  "tokenFile": "web/src/styles.css",
   "tokens": {
     "chassis": "#0b1220",
     "ink": "#f3eee3",

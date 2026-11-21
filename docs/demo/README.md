@@ -33,10 +33,8 @@ Needs a running Hub and gitignored `board/.env` (or the Docker volume tokens). S
 # health + public pages (no token)
 curl -sS http://127.0.0.1:8080/health
 
-# admin UI screenshots (Playwright)
+# admin UI screenshots (Playwright / browser)
 bash board/scripts/capture_readme_shots.sh
-# extra demo reel used for this page:
-uv run --with playwright python docs/demo/capture_demo.py
 ```
 
 Operator docs: [`docs/job-hub/human.md`](../job-hub/human.md). Deploy: [`docs/deploy.md`](../deploy.md). Install: [`docs/install.md`](../install.md).
