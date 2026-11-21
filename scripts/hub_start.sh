@@ -42,13 +42,14 @@ jobos_default_host() {
   hostname -I 2>/dev/null | awk '{print $1}'
 }
 
-# Prefer .hub secrets; fall back to legacy board/ once for existing hosts.
+# Prefer .hub secrets. Legacy board/.env is migrated by hub_deploy.sh on first run.
 if [[ -f "$HUB_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
   source "$HUB_DIR/.env"
   set +a
 elif [[ -f "$REPO/board/.env" ]]; then
+  # Source for HUB_PUBLIC_* prompts only; tokens migrate in hub_deploy.sh.
   set -a
   # shellcheck disable=SC1091
   source "$REPO/board/.env"

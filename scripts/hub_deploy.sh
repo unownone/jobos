@@ -4,14 +4,17 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-# Local Hub secrets live in gitignored .hub/ (JOBHUB_DIR). Legacy board/ is
-# accepted once if .hub is empty so existing hosts keep their tokens.
-if [[ -n "${JOBHUB_DIR:-}" ]]; then
-  BOARD="$JOBHUB_DIR"
-elif [[ -d "$REPO/.hub" || ! -d "$REPO/board" ]]; then
-  BOARD="$REPO/.hub"
-else
-  BOARD="$REPO/board"
+# Local Hub secrets live in gitignored .hub/ (override with JOBHUB_DIR).
+BOARD="${JOBHUB_DIR:-$REPO/.hub}"
+# If an old checkout still has board/.env only, copy into the secrets dir once
+# so existing BOARD_TOKEN_* values stay valid for agents.
+if [[ ! -f "$BOARD/.env" && -f "$REPO/board/.env" ]]; then
+  mkdir -p "$BOARD"
+  cp -a "$REPO/board/.env" "$BOARD/.env"
+  if [[ -f "$REPO/board/tokens.local.json" ]]; then
+    cp -a "$REPO/board/tokens.local.json" "$BOARD/tokens.local.json"
+  fi
+  echo "hub_deploy: migrated legacy board/ secrets into ${BOARD}"
 fi
 export PATH="$HOME/.local/bin:$PATH"
 
