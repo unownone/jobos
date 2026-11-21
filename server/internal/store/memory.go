@@ -95,6 +95,16 @@ func (m *Memory) AccountByUsername(_ context.Context, username string) (Account,
 	return a, u, nil
 }
 
+func (m *Memory) Account(_ context.Context, id string) (Account, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	a, ok := m.accounts[id]
+	if !ok {
+		return Account{}, ErrNotFound
+	}
+	return a, nil
+}
+
 func (m *Memory) CreateUser(_ context.Context, u User) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -113,6 +123,21 @@ func (m *Memory) User(_ context.Context, id string) (User, error) {
 		return User{}, ErrNotFound
 	}
 	return u, nil
+}
+
+func (m *Memory) UserByEmail(_ context.Context, email string) (User, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	want := strings.ToLower(strings.TrimSpace(email))
+	if want == "" {
+		return User{}, ErrNotFound
+	}
+	for _, u := range m.users {
+		if strings.ToLower(strings.TrimSpace(u.Email)) == want {
+			return u, nil
+		}
+	}
+	return User{}, ErrNotFound
 }
 
 func (m *Memory) FirstAdmin(_ context.Context) (User, error) {

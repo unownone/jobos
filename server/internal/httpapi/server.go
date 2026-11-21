@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -441,10 +442,23 @@ func (s *Server) setSession(c *gin.Context, user store.User) {
 		ExpiresAt: time.Now().UTC().Add(14 * 24 * time.Hour).Format(time.RFC3339),
 		LastSeen:  now(),
 	})
-	secure := strings.HasPrefix(s.Cfg.PublicURL, "https://")
+	secure := cookieSecure(c, s.Cfg.PublicURL)
 	c.SetCookie(cookieSession, token, 14*24*3600, "/", "", secure, true)
 	c.SetCookie(cookieCSRF, csrf, 14*24*3600, "/", "", secure, false)
 	c.Header("X-CSRF", csrf)
+}
+
+// cookieSecure follows the live hop, not HUB_PUBLIC_URL alone. A Hub whose
+// public URL is https://… but is hit over plain HTTP (local smoke) must still
+// set non-Secure cookies or the browser drops the session after login.
+func cookieSecure(c *gin.Context, _ string) bool {
+	switch strings.ToLower(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto"))) {
+	case "https":
+		return true
+	case "http":
+		return false
+	}
+	return c.Request.TLS != nil
 }
 
 func hash(s string) string {
@@ -723,14 +737,50 @@ func (s *Server) login(c *gin.Context) {
 		fail(c, 422, "username or email is required")
 		return
 	}
-	acc, user, err := s.DB.AccountByUsername(c.Request.Context(), ident)
-	if err != nil || !checkPassword(acc.PasswordHash, body.Password) {
+	// Password hashes stay on store structs (json:"-" only affects JSON). Login
+	// reads them straight from the DB/memory store — never via Redis/JSON cache.
+	acc, user, pwHash, err := s.credentialsForLogin(c.Request.Context(), ident)
+	if err != nil || user.DisabledAt != "" || !checkPassword(pwHash, body.Password) {
 		fail(c, 401, "invalid username or password")
 		return
 	}
 	s.setSession(c, user)
-	_, _ = s.DB.AddEvent(c.Request.Context(), store.Event{AccountID: acc.ID, TS: now(), ActorRole: "admin", Actor: user.DisplayName, Action: "login"})
+	actor := user.DisplayName
+	if actor == "" {
+		actor = user.Email
+	}
+	_, _ = s.DB.AddEvent(c.Request.Context(), store.Event{AccountID: acc.ID, TS: now(), ActorRole: "admin", Actor: actor, Action: "login"})
 	c.JSON(http.StatusOK, gin.H{"ok": true, "user": publicUser(user), "account": gin.H{"id": acc.ID, "username": acc.Username}})
+}
+
+// credentialsForLogin returns account + admin/user and the password hash to
+// verify. Prefer the account hash; fall back to the user hash (email login /
+// older rows). Hash values come from store Scan/maps, not JSON unmarshaling.
+func (s *Server) credentialsForLogin(ctx context.Context, ident string) (store.Account, store.User, string, error) {
+	acc, user, err := s.DB.AccountByUsername(ctx, ident)
+	if err == nil {
+		hash := acc.PasswordHash
+		if hash == "" {
+			hash = user.PasswordHash
+		}
+		return acc, user, hash, nil
+	}
+	if !errors.Is(err, store.ErrNotFound) {
+		return store.Account{}, store.User{}, "", err
+	}
+	user, err = s.DB.UserByEmail(ctx, ident)
+	if err != nil {
+		return store.Account{}, store.User{}, "", err
+	}
+	acc, err = s.DB.Account(ctx, user.AccountID)
+	if err != nil {
+		return store.Account{}, store.User{}, "", err
+	}
+	hash := acc.PasswordHash
+	if hash == "" {
+		hash = user.PasswordHash
+	}
+	return acc, user, hash, nil
 }
 
 func (s *Server) logout(c *gin.Context) {

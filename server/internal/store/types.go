@@ -297,9 +297,11 @@ type Store interface {
 
 	CreateAccount(ctx context.Context, a Account, admin User) error
 	AccountByUsername(ctx context.Context, username string) (Account, User, error)
+	Account(ctx context.Context, id string) (Account, error)
 
 	CreateUser(ctx context.Context, u User) error
 	User(ctx context.Context, id string) (User, error)
+	UserByEmail(ctx context.Context, email string) (User, error)
 	ListUsers(ctx context.Context, accountID, kind, track string) ([]User, error)
 	FirstAdmin(ctx context.Context) (User, error)
 	SaveUser(ctx context.Context, u User) error
