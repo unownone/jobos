@@ -133,12 +133,19 @@ func TestLoginByEmailWithoutRedis(t *testing.T) {
 	}
 }
 
-func TestCookieSecureIgnoresHttpsPublicURLOnPlainHTTP(t *testing.T) {
+func TestCookieSecureFollowsForwardedProtoAndPublicURL(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/api/auth/login", nil)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = req
+	if !cookieSecure(c, "https://hub.example.test") {
+		t.Fatal("missing forwarded proto should fall back to https PublicURL")
+	}
+	if cookieSecure(c, "") {
+		t.Fatal("plain HTTP with empty PublicURL must stay non-Secure")
+	}
+	c.Request.Header.Set("X-Forwarded-Proto", "http")
 	if cookieSecure(c, "https://hub.example.test") {
-		t.Fatal("plain HTTP request must not force Secure cookies just because PublicURL is https")
+		t.Fatal("X-Forwarded-Proto=http must keep cookies non-Secure even when PublicURL is https")
 	}
 	c.Request.Header.Set("X-Forwarded-Proto", "https")
 	if !cookieSecure(c, "") {

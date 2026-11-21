@@ -448,17 +448,21 @@ func (s *Server) setSession(c *gin.Context, user store.User) {
 	c.Header("X-CSRF", csrf)
 }
 
-// cookieSecure follows the live hop, not HUB_PUBLIC_URL alone. A Hub whose
-// public URL is https://… but is hit over plain HTTP (local smoke) must still
-// set non-Secure cookies or the browser drops the session after login.
-func cookieSecure(c *gin.Context, _ string) bool {
+// cookieSecure prefers the live hop, then falls back to HUB_PUBLIC_URL.
+// X-Forwarded-Proto=http keeps local/plain hops non-Secure even when the
+// configured public URL is https. When the proxy omits the header (TLS
+// terminated upstream), PublicURL still marks cookies Secure.
+func cookieSecure(c *gin.Context, publicURL string) bool {
 	switch strings.ToLower(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto"))) {
 	case "https":
 		return true
 	case "http":
 		return false
 	}
-	return c.Request.TLS != nil
+	if c.Request.TLS != nil {
+		return true
+	}
+	return strings.HasPrefix(publicURL, "https://")
 }
 
 func hash(s string) string {
