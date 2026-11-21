@@ -45,6 +45,12 @@ TENANT_TABLES = (
     "a2a_tasks",
     "a2a_peers",
     "hub_blobs",
+    "mcp_auth_codes",
+    "mcp_grants",
+    "agent_sessions",
+    "agent_loops",
+    "agent_uses",
+    "agent_steers",
 )
 
 

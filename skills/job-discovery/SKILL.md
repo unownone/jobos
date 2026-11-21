@@ -14,6 +14,10 @@ outputs: [job, apply_packet]
 
 You find work. You do not apply.
 
+## Capability gate
+
+If you are on jobOS MCP, call `evaluate_lane` with `find` before any step below. Find needs a browser in this agent session. If `can` is false, tell the human and stop. If session lanes are empty, ask which lanes this session should run and `set_session_lanes` before searching. You may also hold apply or outreach when the human said so. Do not assume you are locked to discovery. Do not Easy Apply.
+
 ## Registry
 
 When `HUB_URL` is set, **select a matching tagged `source` skill** from `GET /api/registry/skills?tag=source` (filter `platform`, `url`, or `ats`). GitHub starters seed that table. If you mutate a playbook for one portal, `POST /api/registry/skills/{id}/fork` and keep it **local**. Submit a recording for maintainer proctor if it should be shared. Airgapped: follow this role skill plus `docs/catalogs/platforms.md`.

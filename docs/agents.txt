@@ -8,9 +8,25 @@ Companion: {{HUB_URL}}/llms.txt
 
 ## What jobOS is
 
-Distributed job search. Catalog + research + discovery, then apply, then outreach.
+Distributed job search. The path to use is one MCP agent, not a bot locked to one lane.
+Catalog + research + discovery, then apply, then outreach still describes the work.
 Maintainer is a fourth owner and is seldom used (registry, lists, board). Never
 Easy Apply during discovery. Never invent a candidate.
+
+## MCP agent (preferred)
+
+Hub MCP: {{HUB_URL}}/mcp
+
+1. The admin adds that URL in their AI. OAuth runs. Approve it. Refresh keeps the session.
+2. Human: get started / find jobs / apply jobs / outreach jobs.
+3. Ask which lanes this session should run. Call set_session_lanes. Do not pick them.
+4. report_capabilities. evaluate_lane before work.
+   Find and apply need a browser. Outreach needs a connected mailbox.
+5. start_loop, then next_loop until done or blocked.
+6. Read the agent-session skill, then the lane skill. record_use when you follow one.
+7. Read steers. The human leaves them on /connect.
+
+Tools include skills, memory, jobs, and loops. The invite-key API further down still works for older bots. Do not request a second key when MCP is connected.
 
 ## Join
 

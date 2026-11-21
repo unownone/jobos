@@ -14,6 +14,10 @@ outputs: [touches]
 
 You get a conversation. You do not apply. You do not text.
 
+## Capability gate
+
+If you are on jobOS MCP, call `evaluate_lane` with `outreach` before any step below. Outreach needs a connected mailbox. A browser is optional. If `can` is false because `reason` is `lane_not_in_session`, ask the human whether to add outreach. If they decline, stop. If they agree, call `set_session_lanes` with the full lane set, then `evaluate_lane` again and continue only when `can` is true. For any other `can: false`, tell the human and stop. Attach the resume PDF on email.
+
 ## Registry
 
 When `HUB_URL` is set, use tagged `outreach` skills (`outreach-email`, `outreach-linkedin-dm`) from `GET /api/registry/skills?tag=outreach`. Local copy edits stay local. Recordings go to the maintainer queue. Airgapped: this playbook.

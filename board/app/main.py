@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.auth import Principal, optional_principal, require_admin, require_owner_or_admin, require_principal
 from app.auth_gate import AuthGateMiddleware, redact_secrets
 from app.a2a import create_a2a_router
+from app.mcp_http import create_mcp_router
 from app.bootstrap import (
     consume_bootstrap,
     ensure_bootstrap,
@@ -413,6 +414,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.mount("/brand", StaticFiles(directory=brand_dir), name="brand")
 
     app.include_router(create_briefing_router(settings))
+    app.include_router(create_mcp_router(principal_dep))
     app.include_router(create_onboarding_router(settings, db, pack, principal_dep))
 
     @app.get("/", response_model=None)
