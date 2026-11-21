@@ -23,11 +23,15 @@ func (c *Config) applyPlugins(getenv func(string) string, up func(string) bool) 
 	if !strings.EqualFold(getenv("HUB_PLUGINS"), "auto") {
 		return
 	}
-	if getenv("DATABASE_URL") == "" && up("postgres") {
-		user := first(getenv("JOBOS_PG_USER"), "jobos")
-		pass := first(getenv("JOBOS_PG_PASSWORD"), "jobos")
-		name := first(getenv("JOBOS_PG_DB"), "jobos")
-		c.DatabaseURL = "postgres://" + url.QueryEscape(user) + ":" + url.QueryEscape(pass) + "@postgres:5432/" + url.PathEscape(name) + "?sslmode=disable"
+	if getenv("DATABASE_URL") == "" {
+		host := first(getenv("JOBOS_PG_HOST"), "postgres")
+		if up(host) {
+			user := first(getenv("JOBOS_PG_USER"), "jobos")
+			pass := first(getenv("JOBOS_PG_PASSWORD"), "jobos")
+			name := first(getenv("JOBOS_PG_DB"), "jobos")
+			port := first(getenv("JOBOS_PG_PORT"), "5432")
+			c.DatabaseURL = "postgres://" + url.QueryEscape(user) + ":" + url.QueryEscape(pass) + "@" + net.JoinHostPort(host, port) + "/" + url.PathEscape(name) + "?sslmode=disable"
+		}
 	}
 	if getenv("REDIS_URL") == "" && up("redis") {
 		c.RedisURL = "redis://redis:6379/0"

@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api.js";
 import { LABELS, STEP1, STEP2, STEP3, emptyProfile, fromYaml, toYaml } from "./profile.js";
+import { useSession } from "./session.js";
+
+export { useSession };
+export { Landing, Start } from "./public.jsx";
 
 const STATUSES = ["discovered", "shortlisted", "apply_ready", "applied", "outreach_ready", "rejected", "closed_withdrawn"];
 const TRACKS = ["discovery", "application", "outreach", "maintenance"];
@@ -11,18 +15,19 @@ const KINDS = {
   common: ["process_note", "tool_failure", "catalog_note", "candidate_constraint", "hub_note"],
 };
 
-export function useSession() {
-  const [state, setState] = useState({ status: "loading", me: null });
-  useEffect(() => {
-    api("/api/auth/me").then((me) => setState({ status: "in", me })).catch(() => setState({ status: "out", me: null }));
-  }, []);
-  return state;
+function loginPath(next) {
+  const path = next && next.startsWith("/") && !next.startsWith("//") ? next : "/board";
+  return `/login?next=${encodeURIComponent(path)}`;
 }
 
 export function Gate({ children }) {
   const session = useSession();
+  const location = useLocation();
   if (session.status === "loading") return <p>Checking session</p>;
-  if (session.status === "out") return <Navigate to="/login" replace />;
+  if (session.status === "out") {
+    const next = `${location.pathname}${location.search || ""}`;
+    return <Navigate to={loginPath(next)} replace />;
+  }
   return children(session.me);
 }
 
@@ -65,28 +70,6 @@ function Shell({ me, who = "who", children }) {
   );
 }
 
-export function Landing() {
-  const session = useSession();
-  return (
-    <main className="shell">
-      <h1>Find jobs</h1>
-      <p>One board for discovery, applications, and outreach.</p>
-      <p><Link to="/login">Log in</Link></p>
-      {session.status === "in" ? <p><Link to="/board">Open board</Link></p> : <p><Link to="/start">Get started</Link></p>}
-    </main>
-  );
-}
-
-export function Start() {
-  return (
-    <main className="shell">
-      <h1>Get started</h1>
-      <p>Jobs, invites, and A2A return candidate_required until the profile is saved.</p>
-      <p><Link to="/login">Log in</Link></p>
-    </main>
-  );
-}
-
 export function Login() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -102,7 +85,8 @@ export function Login() {
       const path = signup ? "/api/auth/signup" : "/api/auth/login";
       await api(path, { method: "POST", body: JSON.stringify({ username, password }) });
       const next = params.get("next") || "/board";
-      navigate(signup ? "/onboarding" : (next.startsWith("/") ? next : "/board"));
+      const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/board";
+      navigate(signup ? "/onboarding" : safe);
     } catch (err) {
       setError(err.message || "Login failed");
     }

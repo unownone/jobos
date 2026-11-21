@@ -4,6 +4,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -33,8 +34,8 @@ func Load() Config {
 	cfg := Config{
 		Addr:           listenAddr(),
 		PublicURL:      strings.TrimRight(os.Getenv("HUB_PUBLIC_URL"), "/"),
-		RepoRoot:       os.Getenv("HUB_REPO_ROOT"),
-		WebRoot:        strings.TrimSpace(os.Getenv("HUB_WEB_ROOT")),
+		RepoRoot:       env("HUB_REPO_ROOT", "/opt/jobos"),
+		WebRoot:        webRoot(),
 		DatabaseURL:    strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		RedisURL:       strings.TrimSpace(os.Getenv("REDIS_URL")),
 		BlobDriver:     blobDriver(),
@@ -71,7 +72,7 @@ func env(key, fallback string) string {
 }
 
 // listenAddr keeps legacy BOARD_HOST/BOARD_PORT (Coolify hub compose) working.
-// HUB_ADDR wins, then Railway PORT, then BOARD_*, then :8080.
+// HUB_ADDR wins, then Railway PORT, then BOARD_*, then :8787 (root Dockerfile).
 func listenAddr() string {
 	if addr := strings.TrimSpace(os.Getenv("HUB_ADDR")); addr != "" {
 		if !strings.Contains(addr, ":") {
@@ -89,7 +90,20 @@ func listenAddr() string {
 		}
 		return host + ":" + port
 	}
-	return ":8080"
+	return ":8787"
+}
+
+// webRoot prefers HUB_WEB_ROOT. An empty override still falls back to the image
+// path so Coolify/host env wipes do not serve a bare Gin 404 for `/`.
+func webRoot() string {
+	if v := strings.TrimSpace(os.Getenv("HUB_WEB_ROOT")); v != "" {
+		return v
+	}
+	fallback := "/opt/jobos/web"
+	if info, err := os.Stat(filepath.Join(fallback, "index.html")); err == nil && !info.IsDir() {
+		return fallback
+	}
+	return ""
 }
 
 // blobDriver accepts the legacy BLOB_ADAPTER name used by Coolify hub envs.

@@ -1,0 +1,140 @@
+/* jobOS shared theme — industrial terminal-ops.
+   One world for landing, get-started, login, and Hub.
+   Change tokens here; surfaces consume them. Do not re-declare hex palettes in hub.css / public.css. */
+
+@font-face {
+  font-family: "Big Shoulders Display";
+  src: url("/static/fonts/big-shoulders-display-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Big Shoulders Display";
+  src: url("/static/fonts/big-shoulders-display-800.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Red Hat Text";
+  src: url("/static/fonts/red-hat-text-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Red Hat Text";
+  src: url("/static/fonts/red-hat-text-400-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Red Hat Text";
+  src: url("/static/fonts/red-hat-text-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Red Hat Text";
+  src: url("/static/fonts/red-hat-text-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Red Hat Mono";
+  src: url("/static/fonts/red-hat-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Red Hat Mono";
+  src: url("/static/fonts/red-hat-mono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Primitive field */
+  --chassis: #0b1220;
+  --chassis-2: #101827;
+  --panel: #172033;
+  --bezel: #243044;
+  --ink: #f3eee3;
+  --ink-dim: #cbb892;
+  --amber: #e0992d;
+  --amber-hot: #f3bc5a;
+  --amber-deep: #b57516;
+  --good: #3f9d7a;
+  --warn: #c9893a;
+  --bad: #c45c4a;
+  --line: rgba(224, 153, 45, 0.32);
+  --line-soft: rgba(243, 238, 227, 0.1);
+  --line-strong: rgba(224, 153, 45, 0.5);
+  --shadow: 0 18px 40px rgba(4, 8, 14, 0.45);
+  --elev-amber: 0 10px 22px color-mix(in srgb, var(--amber-deep) 40%, transparent);
+  --console: #070b12;
+  --radius: 2px;
+  --radius-pill: 999px;
+  --radius-sheet: 12px;
+  --font-display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --font-body: "Red Hat Text", "Segoe UI", sans-serif;
+  --font-mono: "Red Hat Mono", ui-monospace, monospace;
+  --space: 1rem;
+  --measure: 70ch;
+  --touch: 2.75rem;
+
+  /* Semantic aliases — Hub/login keep historic names, same materials */
+  --bg: var(--chassis);
+  --text: var(--ink);
+  --paper: var(--chassis);
+  --paper-2: var(--chassis-2);
+  --panel-2: var(--bezel);
+  --wood: var(--chassis);
+  --wood-2: var(--bezel);
+  --wood-text: var(--ink);
+  --navy: var(--amber);
+  --navy-2: var(--amber-deep);
+  --navy-text: var(--chassis);
+  --accent: var(--amber);
+  --accent-text: var(--chassis);
+  --muted: var(--ink-dim);
+  --ink-soft: var(--ink-dim);
+  --focus: var(--amber);
+  --stamp: var(--bad);
+  --stop: #8a3228;
+  --orange: var(--amber-deep);
+  --teal: var(--good);
+  --grey: var(--ink-dim);
+  --font: var(--font-body);
+  --mono: var(--font-mono);
+}
+
+html {
+  color-scheme: dark;
+  scrollbar-color: var(--amber) var(--chassis-2);
+}
+
+::selection {
+  background: var(--amber);
+  color: var(--chassis);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+::placeholder {
+  color: color-mix(in srgb, var(--ink-dim) 85%, var(--chassis));
+  opacity: 1;
+}
+
+input, textarea, select {
+  caret-color: var(--amber);
+}

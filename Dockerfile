@@ -1,9 +1,10 @@
-# One container for hosts that take a single Dockerfile (Railway, docker run).
-# Compose still runs the API and the SPA as separate containers.
+# One container for hosts that take a single Dockerfile (Coolify, Railway, docker run).
+# Compose still runs this image as the legacy `hub` service on port 8787.
+# Split api+web layout: docker-compose.split.yml
 FROM node:22-alpine AS web
 WORKDIR /src
-COPY web/package.json web/package-lock.json* ./
-RUN npm install
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
 COPY web/ ./
 RUN npm run build
 
@@ -25,7 +26,14 @@ COPY skills /opt/jobos/skills
 COPY mcp /opt/jobos/mcp
 COPY scripts /opt/jobos/scripts
 COPY handoffs /opt/jobos/handoffs
-ENV HUB_REPO_ROOT=/opt/jobos
-ENV HUB_WEB_ROOT=/opt/jobos/web
-EXPOSE 8080
+COPY scripts/hub_healthcheck.sh /usr/local/bin/hub-healthcheck
+RUN chmod +x /usr/local/bin/hub-healthcheck
+# Legacy Coolify/host compose publishes 8787. Railway/Render inject PORT and win.
+ENV HUB_REPO_ROOT=/opt/jobos \
+    HUB_WEB_ROOT=/opt/jobos/web \
+    BOARD_HOST=0.0.0.0 \
+    BOARD_PORT=8787
+EXPOSE 8787
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 \
+  CMD ["/usr/local/bin/hub-healthcheck"]
 ENTRYPOINT ["/usr/local/bin/hub"]
