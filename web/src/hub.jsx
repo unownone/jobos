@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api.js";
 import { LABELS, STEP1, STEP2, STEP3, emptyProfile, fromYaml, toYaml } from "./profile.js";
+import { useSession } from "./session.js";
+
+export { useSession };
+export { Landing, Start } from "./public.jsx";
 
 const STATUSES = ["discovered", "shortlisted", "apply_ready", "applied", "outreach_ready", "rejected", "closed_withdrawn"];
 const TRACKS = ["discovery", "application", "outreach", "maintenance"];
@@ -10,14 +14,6 @@ const KINDS = {
   track: ["portal_quirk", "blocker", "tool_failure", "company_note", "process_note", "person_hint", "search_coverage"],
   common: ["process_note", "tool_failure", "catalog_note", "candidate_constraint", "hub_note"],
 };
-
-export function useSession() {
-  const [state, setState] = useState({ status: "loading", me: null });
-  useEffect(() => {
-    api("/api/auth/me").then((me) => setState({ status: "in", me })).catch(() => setState({ status: "out", me: null }));
-  }, []);
-  return state;
-}
 
 export function Gate({ children }) {
   const session = useSession();
@@ -62,52 +58,6 @@ function Shell({ me, who = "who", children }) {
       {me ? <Who me={me} id={who} /> : null}
       {children}
     </div>
-  );
-}
-
-export function Landing() {
-  const session = useSession();
-  return (
-    <main className="shell landing">
-      <header className="top">
-        <h1>job<span className="accent">OS</span></h1>
-        <nav>
-          <Link to="/start">Get started</Link>
-          {session.status === "in" ? <Link to="/board">Board</Link> : <Link to="/login">Log in</Link>}
-        </nav>
-      </header>
-      <section className="hero card">
-        <p className="status">Job harness</p>
-        <h2>Find jobs with a board, not a spreadsheet.</h2>
-        <p className="muted">Discovery shortlists. Apply submits from a packet. Outreach follows by email and LinkedIn DM. Live state lives in Hub.</p>
-        <p className="row">
-          {session.status === "in" ? (
-            <Link className="button" to="/board">Open board</Link>
-          ) : (
-            <>
-              <Link className="button" to="/login">Log in or create an account</Link>
-              <Link className="button quiet" to="/start">Get started</Link>
-            </>
-          )}
-        </p>
-      </section>
-    </main>
-  );
-}
-
-export function Start() {
-  return (
-    <main className="shell">
-      <header className="top">
-        <h1>job<span className="accent">OS</span></h1>
-        <nav><Link to="/login">Log in</Link></nav>
-      </header>
-      <section className="card">
-        <h2>Get started</h2>
-        <p className="muted">Jobs, invites, and A2A return <code>candidate_required</code> until the profile is saved on <Link to="/onboarding">/onboarding</Link>.</p>
-        <p className="row"><Link className="button" to="/login">Log in</Link></p>
-      </section>
-    </main>
   );
 }
 
