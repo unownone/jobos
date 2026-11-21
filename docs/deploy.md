@@ -2,7 +2,7 @@
 
 GitHub is the source of truth (`git@github.com:unownone/jobos.git`). This OCI host deploys **Job Hub** whenever `main` moves.
 
-Live Hub origin on this box: `http://129.225.116.58/` (also `:80` / `:443` via Traefik). The Compose SPA listens on 8080 and the API on 8081.
+Live Hub origin on this box: `http://129.225.116.58/` (also `:80` / `:443` via Traefik, and `:8787`). Production Compose runs the Go API + React SPA in one `hub` container on **8787** (`docker-compose.yml`). The split `api`/`web` layout (`docker-compose.split.yml`) is optional for local/dev only.
 
 Git fetch/push uses **SSH on port 443** (`ssh.github.com`) with the repo deploy key at `~/.ssh/jobos_deploy`. Port 22 to `github.com` is often filtered.
 

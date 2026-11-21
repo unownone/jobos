@@ -27,11 +27,33 @@ button, input, textarea, select {
 button { background: var(--accent); color: #1a1408; border: 0; cursor: pointer; font-weight: 700; }
 button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--line); }
 
-.shell { max-width: 1080px; margin: 0 auto; padding: 1.25rem; }
+.shell { max-width: 1080px; margin: 0 auto; padding: 1.25rem; min-height: 100dvh; }
 .top { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 0.8rem; }
 .top h1 { font-size: 2rem; letter-spacing: 0.04em; margin: 0; }
+.accent { color: var(--accent); }
 nav { display: flex; gap: 1rem; }
 nav a { text-decoration: none; color: var(--muted); }
+nav a:hover { color: var(--ink); }
+.landing .hero { margin-top: 2rem; padding: 1.5rem; }
+.landing .hero h2 { font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.05; margin: 0.35rem 0 0.75rem; max-width: 16ch; }
+a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--accent);
+  color: #1a1408;
+  text-decoration: none;
+  font-weight: 700;
+  border: 0;
+}
+a.button.quiet {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
 .grid { display: grid; gap: 0.75rem; }
 .card { background: var(--panel); border: 1px solid var(--line); padding: 0.9rem 1rem; }
 .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }

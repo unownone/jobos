@@ -41,6 +41,8 @@ services:
       BOARD_PORT: "8787"
       BOARD_DB: "/tmp/board.db"
       HUB_PACKS_DIR: "/tmp/jobos-packs"
+      HUB_REPO_ROOT: "/opt/jobos"
+      HUB_WEB_ROOT: "/opt/jobos/web"
       HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
       DATABASE_URL: "${DATABASE_URL:-}"
       JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"

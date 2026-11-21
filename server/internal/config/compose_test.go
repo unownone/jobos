@@ -76,7 +76,15 @@ func TestComposeCoolifyContract(t *testing.T) {
 	if !strings.Contains(text, `DATABASE_URL: "${DATABASE_URL:-}"`) && !strings.Contains(text, "DATABASE_URL: ${DATABASE_URL:-}") {
 		t.Fatalf("root compose DATABASE_URL must pass through empty default")
 	}
-	for _, needle := range []string{"BOARD_PORT: \"8787\"", "BOARD_HOST:", "BLOB_ADAPTER:", "QUEUE_ADAPTER:", "8787:8787"} {
+	for _, needle := range []string{
+		"BOARD_PORT: \"8787\"",
+		"BOARD_HOST:",
+		"BLOB_ADAPTER:",
+		"QUEUE_ADAPTER:",
+		"8787:8787",
+		`HUB_WEB_ROOT: "/opt/jobos/web"`,
+		`HUB_REPO_ROOT: "/opt/jobos"`,
+	} {
 		if !strings.Contains(text, needle) {
 			t.Fatalf("root compose missing legacy %s", needle)
 		}

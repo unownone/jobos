@@ -68,11 +68,29 @@ function Shell({ me, who = "who", children }) {
 export function Landing() {
   const session = useSession();
   return (
-    <main className="shell">
-      <h1>Find jobs</h1>
-      <p>One board for discovery, applications, and outreach.</p>
-      <p><Link to="/login">Log in</Link></p>
-      {session.status === "in" ? <p><Link to="/board">Open board</Link></p> : <p><Link to="/start">Get started</Link></p>}
+    <main className="shell landing">
+      <header className="top">
+        <h1>job<span className="accent">OS</span></h1>
+        <nav>
+          <Link to="/start">Get started</Link>
+          {session.status === "in" ? <Link to="/board">Board</Link> : <Link to="/login">Log in</Link>}
+        </nav>
+      </header>
+      <section className="hero card">
+        <p className="status">Job harness</p>
+        <h2>Find jobs with a board, not a spreadsheet.</h2>
+        <p className="muted">Discovery shortlists. Apply submits from a packet. Outreach follows by email and LinkedIn DM. Live state lives in Hub.</p>
+        <p className="row">
+          {session.status === "in" ? (
+            <Link className="button" to="/board">Open board</Link>
+          ) : (
+            <>
+              <Link className="button" to="/login">Log in or create an account</Link>
+              <Link className="button quiet" to="/start">Get started</Link>
+            </>
+          )}
+        </p>
+      </section>
     </main>
   );
 }
@@ -80,9 +98,15 @@ export function Landing() {
 export function Start() {
   return (
     <main className="shell">
-      <h1>Get started</h1>
-      <p>Jobs, invites, and A2A return candidate_required until the profile is saved.</p>
-      <p><Link to="/login">Log in</Link></p>
+      <header className="top">
+        <h1>job<span className="accent">OS</span></h1>
+        <nav><Link to="/login">Log in</Link></nav>
+      </header>
+      <section className="card">
+        <h2>Get started</h2>
+        <p className="muted">Jobs, invites, and A2A return <code>candidate_required</code> until the profile is saved on <Link to="/onboarding">/onboarding</Link>.</p>
+        <p className="row"><Link className="button" to="/login">Log in</Link></p>
+      </section>
     </main>
   );
 }
