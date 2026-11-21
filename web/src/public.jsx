@@ -332,7 +332,8 @@ export function Start() {
             <Link className="text-link" to="/login?next=/onboarding">
               /onboarding
             </Link>
-            . Until onboarded, jobs and invites return <Mono>409 candidate_required</Mono>.
+            . Until onboarded, jobs and invites return <Mono>409 candidate_required</Mono>. A2A{" "}
+            <Mono>message/send</Mono> returns JSON-RPC error <Mono>-32090</Mono>.
           </Step>
           <Step n="4" title="Read the contract, pick a role">
             <Ext href={`${DOCS}/process.md`}>docs/process.md</Ext> and{" "}

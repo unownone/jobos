@@ -50,20 +50,23 @@ To use a database Coolify (or another host) already runs, set secret `DATABASE_U
 3. Set `HUB_PUBLIC_URL` (and usually `HUB_PUBLIC_HOST`) to the Coolify FQDN (`https://jobs.example.com`).
 4. Confirm Persistent Storage shows `pgdata` and `blobs`. Do not convert them to bind mounts with `${` or `~`.
 5. After first boot: `/login`, then `/onboarding`. Probe `GET /health` on port **8787**.
-6. If Coolify is configured as a **Dockerfile** app instead of Compose, keep the public port on **8787** (image default `BOARD_PORT=8787`). Railway/Render may inject `PORT`; that wins over `BOARD_PORT`.
+6. If Coolify is configured as a **Dockerfile** app instead of Compose, keep the public port on **8787** (image default `BOARD_PORT=8787`). Railway/Render may inject `PORT`; that wins over `BOARD_PORT`. A Dockerfile-only deploy does **not** include the Compose Postgres service — set secret `DATABASE_URL` to an external Postgres, and set durable blobs (`BLOB_ADAPTER=filesystem` + a persistent `BLOB_ROOT`, or S3/`BLOB_DRIVER=s3`). Leaving those unset uses in-memory defaults that are wiped on restart.
 7. Redeploy on every push to `main`. Named volumes are not recreated.
 
 If a previous deploy already failed on `${` in volume sources, Coolify may have stored a broken Persistent Storage row (it then errors even after git is fixed). Remove those storage entries or recreate the Compose resource so it reparses this file, then deploy again.
 
 ## Migrating from `~/.jobos/...` binds
 
-If an older host already has data in `~/.jobos/pgdata` or `~/.jobos/blobs`, copy it into the named volumes **once** after the first compose create, with Postgres stopped:
+If an older host already has data in `~/.jobos/pgdata` or `~/.jobos/blobs`, copy it into the named volumes **once**. The bundled `postgres` service may initialize `pgdata` on first `compose up`, so **stop Postgres and ensure the target volume is empty** before copying (or preserve/rename any existing volume you care about before replacing it):
 
 ```bash
 # volume names are <compose-project>_pgdata (local default: jobos_pgdata)
 docker compose stop postgres hub
+# empty target if Postgres already initialized it (backs up nothing — rename the volume first if unsure)
+docker run --rm -v jobos_pgdata:/to alpine sh -c 'rm -rf /to/* /to/.[!.]*'
 docker run --rm -v jobos_pgdata:/to -v "$HOME/.jobos/pgdata":/from alpine \
   sh -c 'cd /from && cp -a . /to/'
+docker run --rm -v jobos_blobs:/to alpine sh -c 'rm -rf /to/* /to/.[!.]*'
 docker run --rm -v jobos_blobs:/to -v "$HOME/.jobos/blobs":/from alpine \
   sh -c 'cd /from && cp -a . /to/'
 docker compose up -d

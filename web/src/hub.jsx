@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api.js";
 import { LABELS, STEP1, STEP2, STEP3, emptyProfile, fromYaml, toYaml } from "./profile.js";
 import { useSession } from "./session.js";
@@ -15,10 +15,19 @@ const KINDS = {
   common: ["process_note", "tool_failure", "catalog_note", "candidate_constraint", "hub_note"],
 };
 
+function loginPath(next) {
+  const path = next && next.startsWith("/") && !next.startsWith("//") ? next : "/board";
+  return `/login?next=${encodeURIComponent(path)}`;
+}
+
 export function Gate({ children }) {
   const session = useSession();
+  const location = useLocation();
   if (session.status === "loading") return <p>Checking session</p>;
-  if (session.status === "out") return <Navigate to="/login" replace />;
+  if (session.status === "out") {
+    const next = `${location.pathname}${location.search || ""}`;
+    return <Navigate to={loginPath(next)} replace />;
+  }
   return children(session.me);
 }
 
@@ -76,7 +85,8 @@ export function Login() {
       const path = signup ? "/api/auth/signup" : "/api/auth/login";
       await api(path, { method: "POST", body: JSON.stringify({ username, password }) });
       const next = params.get("next") || "/board";
-      navigate(signup ? "/onboarding" : (next.startsWith("/") ? next : "/board"));
+      const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/board";
+      navigate(signup ? "/onboarding" : safe);
     } catch (err) {
       setError(err.message || "Login failed");
     }

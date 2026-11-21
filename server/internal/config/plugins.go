@@ -30,7 +30,7 @@ func (c *Config) applyPlugins(getenv func(string) string, up func(string) bool) 
 			pass := first(getenv("JOBOS_PG_PASSWORD"), "jobos")
 			name := first(getenv("JOBOS_PG_DB"), "jobos")
 			port := first(getenv("JOBOS_PG_PORT"), "5432")
-			c.DatabaseURL = "postgres://" + url.QueryEscape(user) + ":" + url.QueryEscape(pass) + "@" + host + ":" + port + "/" + url.PathEscape(name) + "?sslmode=disable"
+			c.DatabaseURL = "postgres://" + url.QueryEscape(user) + ":" + url.QueryEscape(pass) + "@" + net.JoinHostPort(host, port) + "/" + url.PathEscape(name) + "?sslmode=disable"
 		}
 	}
 	if getenv("REDIS_URL") == "" && up("redis") {

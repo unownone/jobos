@@ -22,6 +22,13 @@ func TestPluginsStayOffUntilHostsExist(t *testing.T) {
 	if cfg.DatabaseURL != "postgres://jobos:s3cret@db:5433/jobos?sslmode=disable" {
 		t.Fatalf("host/port database url %s", cfg.DatabaseURL)
 	}
+	env["JOBOS_PG_HOST"] = "::1"
+	up["::1"] = true
+	cfg.DatabaseURL = ""
+	cfg.applyPlugins(func(key string) string { return env[key] }, func(name string) bool { return up[name] })
+	if cfg.DatabaseURL != "postgres://jobos:s3cret@[::1]:5433/jobos?sslmode=disable" {
+		t.Fatalf("ipv6 database url %s", cfg.DatabaseURL)
+	}
 	if cfg.RedisURL != "" || cfg.BlobDriver != "memory" {
 		t.Fatalf("unrelated drivers changed: %#v", cfg)
 	}

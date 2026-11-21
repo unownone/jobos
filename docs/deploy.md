@@ -101,7 +101,7 @@ The README badges hit these workflows:
 | --- | --- |
 | `/home/opc/jobos-live` | What production is running (`main` only) |
 | `/home/opc/jobOS` | Native git checkout for agents / humans |
-| `http://127.0.0.1:8080/health` | Local health through the SPA |
+| `http://127.0.0.1:8787/health` | Local health on the Hub container |
 | `http://129.225.116.58/` | Public Hub (Traefik) |
 
 Feature branches never auto-deploy. Merge (or push) to `main` only after **Deploy check** is green on the PR.
