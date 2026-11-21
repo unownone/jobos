@@ -97,26 +97,26 @@ elif [[ -n "${HUB_PUBLIC_HOST:-}" ]]; then
 fi
 
 if [[ -n "${HUB_PUBLIC_HOST:-}" || -n "${HUB_PUBLIC_URL:-}" ]]; then
-  python3 - "$REPO/.env" "${HUB_PUBLIC_HOST:-}" "${HUB_PUBLIC_URL:-}" <<'PY'
-from pathlib import Path
-import sys
-path = Path(sys.argv[1])
-host, url = sys.argv[2], sys.argv[3]
-existing = {}
-if path.is_file():
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        if not raw.strip() or raw.lstrip().startswith("#") or "=" not in raw:
-            continue
-        k, v = raw.split("=", 1)
-        existing[k.strip()] = v.strip()
-if host:
-    existing["HUB_PUBLIC_HOST"] = host
-if url:
-    existing["HUB_PUBLIC_URL"] = url.rstrip("/")
-lines = [f"{k}={v}" for k, v in existing.items() if v]
-path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-PY
-  chmod 600 "$REPO/.env" 2>/dev/null || true
+  env_file="$REPO/.env"
+  tmp="$(mktemp)"
+  declare -A existing=()
+  if [[ -f "$env_file" ]]; then
+    while IFS= read -r raw || [[ -n "$raw" ]]; do
+      [[ -z "${raw// }" || "$raw" == \#* || "$raw" != *=* ]] && continue
+      key="${raw%%=*}"
+      value="${raw#*=}"
+      existing["${key%% }"]="${value}"
+    done <"$env_file"
+  fi
+  [[ -n "${HUB_PUBLIC_HOST:-}" ]] && existing[HUB_PUBLIC_HOST]="$HUB_PUBLIC_HOST"
+  [[ -n "${HUB_PUBLIC_URL:-}" ]] && existing[HUB_PUBLIC_URL]="${HUB_PUBLIC_URL%/}"
+  : >"$tmp"
+  for key in "${!existing[@]}"; do
+    value="${existing[$key]}"
+    [[ -n "$value" ]] && printf '%s=%s\n' "$key" "$value" >>"$tmp"
+  done
+  mv "$tmp" "$env_file"
+  chmod 600 "$env_file" 2>/dev/null || true
 fi
 
 docker_cmd() {

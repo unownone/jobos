@@ -76,27 +76,30 @@ user_config="${SSH_DIR}/config"
 touch "$user_config"
 chmod 600 "$user_config"
 if grep -q "$MARKER_BEGIN" "$user_config"; then
-  python3 - "$user_config" "$MARKER_BEGIN" "$MARKER_END" <<'PY'
-from pathlib import Path
-import sys
-path = Path(sys.argv[1])
-begin, end = sys.argv[2], sys.argv[3]
-text = path.read_text(encoding="utf-8")
-out, skipping, found = [], False, False
-for line in text.splitlines(keepends=True):
-    if line.startswith(begin):
-        skipping = True
-        found = True
-        continue
-    if skipping and line.startswith(end):
-        skipping = False
-        continue
-    if not skipping:
-        out.append(line)
-if not found:
-    raise SystemExit("marker begin not paired")
-path.write_text("".join(out), encoding="utf-8")
-PY
+  tmp="$(mktemp)"
+  skipping=0
+  found=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "$MARKER_BEGIN"* ]]; then
+      skipping=1
+      found=1
+      continue
+    fi
+    if [[ "$skipping" -eq 1 && "$line" == "$MARKER_END"* ]]; then
+      skipping=0
+      continue
+    fi
+    if [[ "$skipping" -eq 0 ]]; then
+      printf '%s\n' "$line" >>"$tmp"
+    fi
+  done <"$user_config"
+  if [[ "$found" -ne 1 ]]; then
+    echo "marker begin not paired" >&2
+    rm -f "$tmp"
+    exit 1
+  fi
+  mv "$tmp" "$user_config"
+  chmod 600 "$user_config"
 fi
 
 {

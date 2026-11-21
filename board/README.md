@@ -1,6 +1,9 @@
 # jobOS Hub
 
-Private **live coordination plane** for a multi-agent job hunt. FastAPI + PostgreSQL + an operator web UI.
+Private **live coordination plane** for a multi-agent job hunt. The live Hub is
+the **Go API** in `server/` plus the React SPA in `web/` (start with
+`bash start.sh` or root `docker compose up`). The Python FastAPI board was
+removed.
 
 **jobOS** is a job harness. **Maintainer owns and maintains this Hub** (skill-maintainer / `maintenance` role): process hygiene, token issuance and rotation, uptime, schema, benchmarks, and share/tunnel setup. Discovery, apply, and outreach **consume** it. They do not own it.
 
@@ -29,7 +32,7 @@ We run the hunt on **one shared board**, not a Sheet or CSV mirror.
 ```mermaid
 flowchart LR
   subgraph maintainer [Maintainer owns]
-    board[Hunt board FastAPI + Postgres]
+    board[Hunt board Go API + Postgres]
     tokens[gitignored role tokens]
     metrics[token_burn in Postgres]
   end
@@ -89,7 +92,7 @@ Side panel on an open job: packets, events, Pause / Stop / Resume. Discovery/app
 | **This board** | Live private UI + API. PostgreSQL + RabbitMQ + BlobStore. | Production. Multi-tenant. |
 | **Export tarball** | `GET /api/export/ledger` YAML snapshot | Airgap copy. Not the live list. |
 
-Do not write live jobs into git `ledger/`. Maintainer may import a snapshot (`scripts/board_import_ledger.py`) into a tenant.
+Do not write live jobs into git `ledger/`. Maintainer may import a snapshot (`POST /api/import`) into a tenant.
 
 ## Secrets (no tokens in git)
 
@@ -102,13 +105,13 @@ Placeholders only: [`board/.env.example`](.env.example).
 
 ```bash
 # first time / empty tokens
-uv run scripts/board_gen_tokens.py --print
+bash scripts/hub_deploy.sh (mints tokens into board/.env)
 
 # rotate one role (invalidates that bot’s old token)
-uv run scripts/board_gen_tokens.py --rotate apply --print
+edit BOARD_TOKEN_APPLY in board/.env then restart
 
 # rotate everyone
-uv run scripts/board_gen_tokens.py --rotate-all --print
+re-run bash scripts/hub_deploy.sh
 ```
 
 Give each bot **only** its role token, out of band (not in the codebase, not in group chat). Root `.env` may hold `BOARD_URL` + `BOARD_ROLE` + `BOARD_TOKEN` locally; those files are gitignored.
@@ -133,7 +136,7 @@ After the first `POST /api/auth/bootstrap`, signup is closed: `/admin/signup` re
 
 ```bash
 make -C board test          # API + token generator tests
-uv run board/scripts/benchmark.py
+curl -fsS "$HUB_URL/health" (Python benchmark removed)
 bash board/scripts/capture_readme_shots.sh   # refresh docs/*.png from a live UI
 ```
 
@@ -228,8 +231,8 @@ Paused or stopped jobs cannot be patched except by admin. Resume with `POST /api
 Maintainer measures board efficiency and skill token burn. Full notes: [`BENCHMARKS.md`](BENCHMARKS.md).
 
 ```bash
-uv run board/scripts/benchmark.py
-uv run board/scripts/benchmark.py --url http://127.0.0.1:8787
+curl -fsS "$HUB_URL/health" (Python benchmark removed)
+curl -fsS "$HUB_URL/health" (Python benchmark removed) --url http://127.0.0.1:8787
 ```
 
 Agents should log model/tool usage so we can improve the system (swap expensive tools, see which lane burns tokens):
@@ -256,11 +259,11 @@ Any authenticated role may POST. Summaries (`GET /api/metrics/summary`) are admi
 2. `bash scripts/hub_deploy.sh` (or `bash board/start.sh`). Generates compat role tokens and a one-time bootstrap token on first run.
 3. Issue each bot its token from `board/.env` / `--print`. Do not commit that file.
 4. Optional: import git history  
-   `uv run scripts/board_import_ledger.py --db board/data/board.db`  
+   `POST /api/import with an admin session (Python import script removed)`  
    (`DATABASE_URL` selects Postgres; `--db` is only a schema key in tests)  
    (skips `_example.yaml`; no resume PDFs).
 5. Keep the process up. Rotate a token if a bot leaks it (`--rotate ROLE`).
-6. Periodically: `uv run board/scripts/benchmark.py --url http://127.0.0.1:8787` and read [`BENCHMARKS.md`](BENCHMARKS.md).
+6. Periodically: `curl -fsS "$HUB_URL/health" (Python benchmark removed) --url http://127.0.0.1:8787` and read [`BENCHMARKS.md`](BENCHMARKS.md).
 7. Schema lives in `board/app/db.py` + `board/app/constants.py`. Statuses must stay aligned with `ledger/schema/job.schema.json`.
 
 ## How to share with humans

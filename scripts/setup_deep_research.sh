@@ -27,4 +27,4 @@ npm --prefix "$DEST" ci --no-audit --no-fund \
   || npm --prefix "$DEST" install --no-audit --no-fund
 
 echo "setup_deep_research: ready at $DEST"
-echo "setup_deep_research: run with python3 scripts/run_deep_research.py --help"
+echo "setup_deep_research: run the cloned tool with npm --prefix \"$DEST\" run api"
