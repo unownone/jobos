@@ -19,6 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 
+	"github.com/unownone/jobos/server/internal/agentflow"
 	"github.com/unownone/jobos/server/internal/blob"
 	"github.com/unownone/jobos/server/internal/cache"
 	"github.com/unownone/jobos/server/internal/config"
@@ -39,10 +40,11 @@ type Server struct {
 	Blobs blob.Store
 	Cache cache.Cache
 	RT    *realtime.Hub
+	Flow  *agentflow.Flow
 }
 
 func New(cfg config.Config, db store.Store, blobs blob.Store, c cache.Cache, rt *realtime.Hub) *Server {
-	return &Server{Cfg: cfg, DB: db, Blobs: blobs, Cache: c, RT: rt}
+	return &Server{Cfg: cfg, DB: db, Blobs: blobs, Cache: c, RT: rt, Flow: agentflow.New()}
 }
 
 type principal struct {
@@ -63,7 +65,8 @@ func (s *Server) Router() *gin.Engine {
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", c.GetHeader("Origin"))
 		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-CSRF, X-Role, X-Token, X-Actor, X-Hub-Key")
+		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-CSRF, X-Role, X-Token, X-Actor, X-Hub-Key, Mcp-Session-Id, MCP-Protocol-Version")
+		c.Header("Access-Control-Expose-Headers", "Mcp-Session-Id, WWW-Authenticate")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		if c.Request.Method == http.MethodOptions {
 			c.Status(http.StatusNoContent)
@@ -96,6 +99,7 @@ func (s *Server) Router() *gin.Engine {
 	r.POST("/a2a", s.a2a)
 	r.POST("/a2a/:track", s.a2a)
 	r.GET("/a2a", s.a2aInfo)
+	s.mountAgent(r)
 
 	authed := r.Group("/")
 	authed.Use(s.requireAuth, s.candidateGate)
