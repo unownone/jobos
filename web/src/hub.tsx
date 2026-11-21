@@ -120,8 +120,8 @@ export function Login() {
     <Shell>
       <form className="stack" onSubmit={submit}>
         <h2>Log in</h2>
-        <input id="username" placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} />
-        <input id="password" placeholder="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <input id="username" placeholder="username or email" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
+        <input id="password" placeholder="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         <p id="err" className="error">{error}</p>
         <div className="row">
           <button id="loginBtn" type="submit">Log in</button>
