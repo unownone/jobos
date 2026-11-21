@@ -15,13 +15,13 @@ import (
 func GinRequest() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		path := c.Request.URL.Path
 		c.Next()
 		status := c.Writer.Status()
 		latency := time.Since(start)
+		route := routeOf(c)
 		attrs := []any{
 			"http.method", c.Request.Method,
-			"http.route", path,
+			"http.route", route,
 			"http.status_code", status,
 			"http.duration_ms", latency.Milliseconds(),
 			"client.address", c.ClientIP(),
@@ -34,7 +34,7 @@ func GinRequest() gin.HandlerFunc {
 		}
 
 		log := L()
-		quiet := path == "/health" || path == "/ready"
+		quiet := route == "/health" || route == "/ready"
 		switch {
 		case status >= 500:
 			log.Error("http request failed", attrs...)
@@ -57,7 +57,7 @@ func GinRecovery() gin.HandlerFunc {
 					"error.message", fmt.Sprint(rec),
 					"exception.stacktrace", string(debug.Stack()),
 					"http.method", c.Request.Method,
-					"http.route", c.Request.URL.Path,
+					"http.route", routeOf(c),
 				)
 				c.AbortWithStatus(http.StatusInternalServerError)
 			}
@@ -66,16 +66,13 @@ func GinRecovery() gin.HandlerFunc {
 	}
 }
 
-// HTTPFail logs API fail() responses: 5xx error, 4xx warn.
-func HTTPFail(status int, msg string, attrs ...any) {
-	fields := append([]any{"http.status_code", status, "error.message", msg}, attrs...)
-	if status >= 500 {
-		L().Error("api error", fields...)
+// NoteFail attaches an API failure message to the Gin context so GinRequest
+// can include it on the single request log line (avoids double-counting).
+func NoteFail(c *gin.Context, msg string) {
+	if c == nil || msg == "" {
 		return
 	}
-	if status >= 400 {
-		L().Warn("api rejected", fields...)
-	}
+	_ = c.Error(fmt.Errorf("%s", msg))
 }
 
 // FromRequest returns a logger with request route attrs when available.
@@ -85,6 +82,18 @@ func FromRequest(c *gin.Context) *slog.Logger {
 	}
 	return L().With(
 		"http.method", c.Request.Method,
-		"http.route", c.Request.URL.Path,
+		"http.route", routeOf(c),
 	)
+}
+
+// routeOf prefers the matched Gin route template (low cardinality) and falls
+// back to the raw path when nothing matched (e.g. 404).
+func routeOf(c *gin.Context) string {
+	if c == nil || c.Request == nil {
+		return ""
+	}
+	if route := c.FullPath(); route != "" {
+		return route
+	}
+	return c.Request.URL.Path
 }

@@ -248,7 +248,7 @@ func (s *Server) requireAuth(c *gin.Context) {
 		if errors.As(err, &he) {
 			status = he.code
 		}
-		telemetry.HTTPFail(status, err.Error(), "http.method", c.Request.Method, "http.route", c.Request.URL.Path)
+		telemetry.NoteFail(c, err.Error())
 		c.AbortWithStatusJSON(status, gin.H{"detail": err.Error()})
 		return
 	}
@@ -264,11 +264,7 @@ type httpError struct {
 func (e *httpError) Error() string { return e.msg }
 
 func fail(c *gin.Context, code int, msg string) {
-	attrs := []any{}
-	if c != nil && c.Request != nil {
-		attrs = append(attrs, "http.method", c.Request.Method, "http.route", c.Request.URL.Path)
-	}
-	telemetry.HTTPFail(code, msg, attrs...)
+	telemetry.NoteFail(c, msg)
 	c.JSON(code, gin.H{"detail": msg})
 }
 

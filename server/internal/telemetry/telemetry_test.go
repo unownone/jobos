@@ -96,3 +96,35 @@ func TestGinRequestSeverities(t *testing.T) {
 	}
 	_ = Shutdown(context.Background())
 }
+
+func TestGinRequestUsesRouteTemplate(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var buf bytes.Buffer
+	Init(Options{ServiceName: "hub", Exporter: "console", Writer: &buf, MinLevel: slog.LevelInfo})
+
+	r := gin.New()
+	r.Use(GinRequest())
+	r.GET("/api/jobs/:id", func(c *gin.Context) {
+		NoteFail(c, "missing credentials")
+		c.JSON(401, gin.H{"detail": "missing credentials"})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/jobs/analytical-engines-engineer-ec2031", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	out := strings.TrimSpace(buf.String())
+	lines := strings.Split(out, "\n")
+	if len(lines) != 1 {
+		t.Fatalf("want one log line (no double-count), got %d: %s", len(lines), out)
+	}
+	if !strings.Contains(out, `"http.route":"/api/jobs/:id"`) {
+		t.Fatalf("want route template, got %s", out)
+	}
+	if strings.Contains(out, "analytical-engines-engineer-ec2031") {
+		t.Fatalf("raw path leaked into route: %s", out)
+	}
+	if !strings.Contains(out, "missing credentials") {
+		t.Fatalf("want NoteFail message on the request line: %s", out)
+	}
+}
