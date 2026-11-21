@@ -280,3 +280,5 @@ Then, in the agent:
 This repo is meant to be copied, then maintained. Keep process changes in `docs/`, keep skill instructions executable, keep live candidate data out of git.
 
 License: [MIT](LICENSE). Made by [unownone](https://github.com/unownone). Source: [github.com/unownone/jobos](https://github.com/unownone/jobos).
+
+Hello World
