@@ -89,7 +89,10 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 	log.Info("hub shutting down")
-	_ = httpSrv.Shutdown(shutdownCtx)
+	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+		log.Warn("hub graceful shutdown incomplete", "error.message", err.Error())
+		_ = httpSrv.Close()
+	}
 }
 
 func first(v, fallback string) string {

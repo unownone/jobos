@@ -16,7 +16,7 @@ import (
 
 func TestConsoleHandlerSeverity(t *testing.T) {
 	var buf bytes.Buffer
-	log := Init(Options{ServiceName: "jobos-hub-test", Exporter: "console", Writer: &buf, MinLevel: slog.LevelDebug})
+	log := Init(Options{ServiceName: "jobos-hub-test", Exporter: "console", Writer: &buf, MinLevel: Level(slog.LevelDebug)})
 	log.Info("booted")
 	log.Warn("auth failed", "http.status_code", 401)
 	log.Error("db down", "error.message", "connection refused")
@@ -44,6 +44,42 @@ func TestConsoleHandlerSeverity(t *testing.T) {
 	}
 }
 
+type readyValuer struct{}
+
+func (readyValuer) LogValue() slog.Value { return slog.StringValue("ready") }
+
+func TestAttrValueResolvesLogValuer(t *testing.T) {
+	got := attrValue(slog.AnyValue(readyValuer{}))
+	if got != "ready" {
+		t.Fatalf("LogValuer=%v want ready", got)
+	}
+}
+
+func TestWithGroupPreservesScopedAttrs(t *testing.T) {
+	var buf bytes.Buffer
+	log := Init(Options{ServiceName: "hub", Exporter: "console", Writer: &buf, MinLevel: Level(slog.LevelInfo)})
+	log.WithGroup("request").With("id", "r").WithGroup("job").With("id", "j").Info("done")
+
+	var rec map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(buf.String())), &rec); err != nil {
+		t.Fatal(err)
+	}
+	attrs, _ := rec["Attributes"].(map[string]any)
+	if attrs["request.id"] != "r" || attrs["request.job.id"] != "j" {
+		t.Fatalf("attrs=%v", attrs)
+	}
+}
+
+func TestExplicitMinLevelOverridesEnv(t *testing.T) {
+	t.Setenv("LOG_LEVEL", "error")
+	var buf bytes.Buffer
+	log := Init(Options{ServiceName: "hub", Exporter: "console", Writer: &buf, MinLevel: Level(slog.LevelInfo)})
+	log.Warn("should appear")
+	if !strings.Contains(buf.String(), `"SeverityText":"WARN"`) {
+		t.Fatalf("explicit INFO MinLevel should allow WARN: %s", buf.String())
+	}
+}
+
 func TestLWithoutInitDoesNotDeadlock(t *testing.T) {
 	mu.Lock()
 	active = nil
@@ -64,7 +100,7 @@ func TestLWithoutInitDoesNotDeadlock(t *testing.T) {
 func TestGinRequestSeverities(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	var buf bytes.Buffer
-	Init(Options{ServiceName: "hub", Exporter: "console", Writer: &buf, MinLevel: slog.LevelInfo})
+	Init(Options{ServiceName: "hub", Exporter: "console", Writer: &buf, MinLevel: Level(slog.LevelInfo)})
 
 	r := gin.New()
 	r.Use(GinRecovery(), GinRequest())
@@ -100,7 +136,7 @@ func TestGinRequestSeverities(t *testing.T) {
 func TestGinRequestUsesRouteTemplate(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	var buf bytes.Buffer
-	Init(Options{ServiceName: "hub", Exporter: "console", Writer: &buf, MinLevel: slog.LevelInfo})
+	Init(Options{ServiceName: "hub", Exporter: "console", Writer: &buf, MinLevel: Level(slog.LevelInfo)})
 
 	r := gin.New()
 	r.Use(GinRequest())
