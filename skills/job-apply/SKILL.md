@@ -76,4 +76,4 @@ Captcha, OTP, government ID, legal questions you cannot answer, dead link: `appl
 
 Company said no, or the user does not want this role: `status: rejected` with `rejection.by` (`company` | `user`) and remarks (`company_remarks` / `user_remarks`). Any apply bot may do this. Do not invent a reason.
 
-If the hunt board is up (`BOARD_URL` + apply token from maintainer): PATCH only apply fields on that row. Do not own the board; do not rotate tokens. See [`board/README.md`](../../board/README.md).
+If the hunt board is up (`BOARD_URL` + apply token from maintainer): PATCH only apply fields on that row. Do not own the board; do not rotate tokens. See [`docs/job-hub/human.md`](../../docs/job-hub/human.md).

@@ -207,11 +207,11 @@ Calendar: after status `interview` (or when a recruiter proposes times). Use `su
 
 ## Hunt board (maintainer-owned adopted infra)
 
-First-party live coordination plane: [`board/README.md`](../../board/README.md). FastAPI + SQLite + admin UI. **Maintainer owns it** (tokens, uptime, schema, hygiene, tunnels, skill registry + proctor). Discovery/apply/outreach consume tagged registry skills; they do not promote shared rows.
+First-party live coordination plane: [`docs/job-hub/human.md`](../../docs/job-hub/human.md). FastAPI + SQLite + admin UI. **Maintainer owns it** (tokens, uptime, schema, hygiene, tunnels, skill registry + proctor). Discovery/apply/outreach consume tagged registry skills; they do not promote shared rows.
 
 Not a marketplace MCP. Do not confuse with rejected `job-tracker-sqlite` (third-party MCP). Git `ledger/` remains the airgap protocol.
 
-Install: `bash board/start.sh`. Tokens: `uv run scripts/board_gen_tokens.py --print` (gitignored).
+Install: `bash scripts/hub_start.sh`. Tokens: `uv run scripts/board_gen_tokens.py --print` (gitignored).
 
 ## Hunter / Apollo notes
 

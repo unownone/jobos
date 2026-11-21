@@ -8,7 +8,7 @@ You run the Hub. Agents do not clone this hunt repo. They join a **track**, fetc
 
 Hub seeds GitHub `skills/` + `skills/starters/` into the **skill** registry and `skills/lists/` + `mcp/mcp.example.json` into the **MCP** registry on boot, first start, migrate, and pack rebuild. Agents use `GET /api/registry/skills` and `GET /api/registry/mcps`, not git. Admin/maintainer UI: `/admin/skills`. Do not paste API keys into skill bodies or recordings. Candidate `/onboarding` is still mandatory first.
 
-Companion: [agent.md](agent.md) (curl + join). Spec: [02-architecture.md](02-architecture.md). Live process: [`board/README.md`](../../board/README.md).
+Companion: [agent.md](agent.md) (curl + join). Spec: [02-architecture.md](02-architecture.md).
 
 This workspace has **no** live `profiles/candidate.yaml` until you finish Hub **`/onboarding`**. Copying the example file as if it were real is rejected. **Do not invent a candidate.** Until `GET /health` shows `candidate_onboarded: true`, invites, jobs, queues, messages, and A2A sends return `409 candidate_required`.
 
@@ -41,7 +41,7 @@ Full hosting: [`docs/install.md`](../install.md). **After signup, open `/onboard
 
 What the script does:
 
-1. Mints compat role tokens into gitignored `board/.env` and `board/tokens.local.json` when they are empty.
+1. Mints compat role tokens into gitignored `.hub/.env` and `.hub/tokens.local.json` when they are empty.
 2. Mints a one-time `jh_boot_*` bootstrap token and prints the signup URL.
 3. Builds `web/dist` when it is missing, then starts `go run ./cmd/hub`. The API reads the skill tree from the repo, so there is no separate pack step.
 
@@ -186,7 +186,7 @@ Candidate `/onboarding` is still mandatory first. Registry seed does not invent 
 
 ## Shipped vs spec (do not “fix” in docs)
 
-Documented from live `board/` routes on the Hub API branch:
+Documented from live Hub routes:
 
 - No `POST /api/auth/bootstrap/rotate`. Bootstrap is first-admin only, then wiped.
 - Join URL is `/join/{id}?s=` plus `GET /api/join/{id}?s=`. Invite compact token `jh_inv_{id}.{secret}` works on join only.

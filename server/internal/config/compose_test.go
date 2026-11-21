@@ -31,7 +31,6 @@ func TestComposeCoolifyContract(t *testing.T) {
 		"docker-compose.yml",
 		"docker-compose.plain.yml",
 		"docker-compose.traefik.yml",
-		"board/docker-compose.yml",
 	}
 	for _, rel := range files {
 		raw, err := os.ReadFile(filepath.Join(root, rel))
@@ -89,7 +88,7 @@ func TestComposeCoolifyContract(t *testing.T) {
 			t.Fatalf("root compose missing legacy %s", needle)
 		}
 	}
-	example, err := os.ReadFile(filepath.Join(root, "board/.env.example"))
+	example, err := os.ReadFile(filepath.Join(root, ".env.example"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +99,7 @@ func TestComposeCoolifyContract(t *testing.T) {
 		}
 		key, value, _ := strings.Cut(trim, "=")
 		if strings.TrimSpace(key) == "DATABASE_URL" && strings.TrimSpace(value) != "" {
-			t.Fatalf("board/.env.example must not set DATABASE_URL, got %q", value)
+			t.Fatalf(".env.example must not set DATABASE_URL, got %q", value)
 		}
 	}
 }

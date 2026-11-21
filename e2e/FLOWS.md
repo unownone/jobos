@@ -1,7 +1,7 @@
 # Hub flow coverage
 
 Each live Hub surface has a Playwright owner. In-process FastAPI tests in
-`board/tests/` stay responsible for unit and HTTP contract branches.
+`server/` Go tests stay responsible for unit and HTTP contract branches.
 
 ## Frontend pages
 
@@ -26,7 +26,7 @@ Each live Hub surface has a Playwright owner. In-process FastAPI tests in
 | Family | Covered by |
 | --- | --- |
 | Auth signup/login/logout/me | `test_onboarding.py` |
-| Candidate PUT/GET JSON/resume/status | `test_onboarding.py` + `board/tests/test_candidate_gate.py` |
+| Candidate PUT/GET JSON/resume/status | `server/` HTTP tests + Hub candidate routes |
 | Jobs create/list/get isolation | `test_worker.py`, `test_isolation.py` |
 | Queue push/claim/ack (+ catalog.refresh) | `test_worker.py` |
 | Presence heartbeat + directory | `test_worker.py` |
@@ -40,14 +40,14 @@ Each live Hub surface has a Playwright owner. In-process FastAPI tests in
 | Token-burn metrics | `test_admin_shell.py` |
 | A2A cards + directory | `test_public.py`, `test_admin_shell.py` |
 | Briefing `/llms.txt` `/agents.txt` | `test_public.py` |
-| Unauth gate | `test_public.py` + `board/tests/test_unauth_*` |
+| Unauth gate | `server/` HTTP tests for unauth gates |
 
 ## Isolation
 
 `test_isolation.py` creates two admins in separate browser contexts and asserts
 jobs and candidate fields never leak across tenants.
 
-## Not a browser page (API-only, already in `board/tests`)
+## Not a browser page (API-only, covered by Go Hub tests)
 
 A2A JSON-RPC send, recording proctor/promote/decline, pack rebuild, compat
 X-Role tokens, OpenTelemetry, SQL migrations. Those stay in-process e2e/unit.

@@ -32,7 +32,7 @@ flowchart LR
   subgraph shared [Shared]
     research[Deep research]
     store[Hub JobStore]
-    board[board/ live API + UI]
+    board[Hub Go API + React SPA]
     registry[skill registry Postgres]
   end
 
@@ -111,7 +111,7 @@ Source of truth: Hub Postgres `jobs` / `events` / `people`, scoped by `account_i
 
 ### Hunt board (live plane)
 
-The live board is the Go API and the React SPA ([`docs/runtime.md`](runtime.md)). Username + password at `/login`. Compat `X-Role` + `X-Token` maps to `acc_compat` and is deprecated. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. Operator/agent docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). The Python `board/` app is still in the tree.
+The live board is the Go API and the React SPA ([`docs/runtime.md`](runtime.md)). Username + password at `/login`. Compat `X-Role` + `X-Token` maps to `acc_compat` and is deprecated. **Maintainer owns it.** Discovery creates rows; apply and outreach only advance their fields; admin can stop or edit. Operator/agent docs: [`docs/job-hub/human.md`](job-hub/human.md), [`docs/job-hub/agent.md`](job-hub/agent.md). The live Hub is the Go API plus the React SPA in `web/`.
 
 **Memory pods** live in the same Hub Postgres: per-worker private, per-track shared, plus a common pod — all tenant-scoped. Agents recall every heartbeat and queue claim; writes are gated. Durable track/common facts may be **solidified** into the skill registry. [`docs/job-hub/memory.md`](job-hub/memory.md).
 
@@ -169,7 +169,7 @@ Outreach
 Maintainer (seldom, repo-wide)
   ├─ skills/lists + catalog + mcp.example.json
   ├─ Hub registry: seed starters, claim skill.record, proctor, promote
-  └─ hunt board (board/): tokens, schema, uptime, hygiene, tunnels
+  └─ Hub: tokens, schema, uptime, hygiene, tunnels
 ```
 
 Each subdivision still writes the same job file. If two discovery bots find the same posting, they merge onto one `id` (see sharing rules). Local mutations are `scope=local` on the same role, not a new owner.
@@ -190,4 +190,4 @@ Each subdivision still writes the same job file. If two discovery bots find the 
 - SMS / WhatsApp
 - Git as the live job list
 
-The **Hub** in `board/` is maintainer-owned live infra. Secrets stay gitignored. Export YAML is a snapshot, not a second source of truth.
+The **Hub** is maintainer-owned live infra (Go API + SPA). Secrets stay in gitignored `.hub/`. Export YAML is a snapshot, not a second source of truth.

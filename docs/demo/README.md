@@ -27,14 +27,14 @@ GitHub Actions tab: **Deploy** → **Run workflow** (`workflow_dispatch`) for a 
 
 ## Reproduce the shots
 
-Needs a running Hub and gitignored `board/.env` (or the Docker volume tokens). Synthetic demo jobs only — never a real candidate.
+Needs a running Hub and gitignored `.hub/.env` (or the Docker volume tokens). Synthetic demo jobs only — never a real candidate.
 
 ```bash
 # health + public pages (no token)
 curl -sS http://127.0.0.1:8080/health
 
 # admin UI screenshots (Playwright)
-bash board/scripts/capture_readme_shots.sh
+# Screenshots were captured against a local Hub; re-shoot manually if the UI changes.
 # extra demo reel used for this page:
 uv run --with playwright python docs/demo/capture_demo.py
 ```

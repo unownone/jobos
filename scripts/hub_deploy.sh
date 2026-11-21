@@ -4,9 +4,18 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-# Python project + venv always live in repo board/. JOBHUB_BOARD_DIR is the
-# secrets/data dir (defaults to that same package) so tests can isolate .env.
-BOARD="${JOBHUB_BOARD_DIR:-$REPO/board}"
+# Local Hub secrets live in gitignored .hub/ (override with JOBHUB_DIR).
+BOARD="${JOBHUB_DIR:-$REPO/.hub}"
+# If an old checkout still has board/.env only, copy into the secrets dir once
+# so existing BOARD_TOKEN_* values stay valid for agents.
+if [[ ! -f "$BOARD/.env" && -f "$REPO/board/.env" ]]; then
+  mkdir -p "$BOARD"
+  cp -a "$REPO/board/.env" "$BOARD/.env"
+  if [[ -f "$REPO/board/tokens.local.json" ]]; then
+    cp -a "$REPO/board/tokens.local.json" "$BOARD/tokens.local.json"
+  fi
+  echo "hub_deploy: migrated legacy board/ secrets into ${BOARD}"
+fi
 export PATH="$HOME/.local/bin:$PATH"
 
 if ! command -v openssl >/dev/null 2>&1; then

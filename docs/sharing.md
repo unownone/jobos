@@ -36,4 +36,4 @@ Maintainer runs the Go API and the React SPA ([`docs/runtime.md`](runtime.md)). 
 
 ## Secrets
 
-Never commit `board/.env`, `board/tokens.local.json`, or resume PDFs. Passwords are Argon2 hashes in Postgres.
+Never commit `.hub/.env`, `.hub/tokens.local.json`, or resume PDFs. Passwords are Argon2 hashes in Postgres.

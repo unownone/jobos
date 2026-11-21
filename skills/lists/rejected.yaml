@@ -159,8 +159,8 @@ items:
     source: https://github.com/kurkul608/job-tracker-mcp
     reason: >
       Third-party SQLite tracker MCP. Job Apply OS uses git YAML as the airgap
-      ledger and the first-party hunt board (board/) as the live overlay.
-      Do not install this MCP alongside board/.
+      ledger and the first-party Hub as the live overlay.
+      Do not install this MCP alongside Hub.
 
   - id: skills-hub-false-positives
     kind: skill

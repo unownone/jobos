@@ -82,7 +82,7 @@ Local mutations are `scope=local` on this role.
 
 **Also runs:** catalog skill as a subroutine (search registries, vet). Writes [`skills/lists/`](../skills/lists/). Consumes Hub `skill.record` and proctors against [`docs/catalogs/skill-outline.md`](catalogs/skill-outline.md).
 
-**Owns:** `skills/` (in-repo SKILL.md files), `skills/starters/`, `skills/lists/`, `docs/catalogs/` inventory, `mcp/mcp.example.json`, cloud-agent tool wiring in `.cursor/environment.json`, the Hub **skill registry** (seed, claim `skill.record`, proctor, promote), and the **live hunt board** in [`board/`](../board/README.md) (tokens, schema, uptime, hygiene, share/tunnel setup).
+**Owns:** `skills/` (in-repo SKILL.md files), `skills/starters/`, `skills/lists/`, `docs/catalogs/` inventory, `mcp/mcp.example.json`, cloud-agent tool wiring in `.cursor/environment.json`, the Hub **skill registry** (seed, claim `skill.record`, proctor, promote), and the **live Hub** (tokens, schema, uptime, hygiene, share/tunnel setup). Operator docs: [`docs/job-hub/human.md`](job-hub/human.md).
 
 **Writes:** adopted / wanted / rejected lists, catalog workspace log, example MCP config, environment install/egress. Rebuilds `skills/lists/INDEX.md`. Issues board role tokens out of band (never committed). Promotes recordings to `scope=shared` only after proctor pass.
 

@@ -20,4 +20,4 @@ Agent Skills for this template.
 | [draft-outreach](../.agents/skills/draft-outreach/SKILL.md) | outreach | outreach |
 | [compose-outreach](../.agents/skills/compose-outreach/SKILL.md) | outreach | outreach |
 
-The three job owners are discovery, apply, outreach. Catalog and deep research are capabilities those owners call. Maintainer is a fourth owner and is seldom used: it writes `skills/lists/`, owns `board/`, seeds GitHub starters into the registry, and is the **only consumer** of `skill.record`. Human board for tools: [`lists/INDEX.md`](lists/INDEX.md). Tagged platform playbooks: [`starters/README.md`](starters/README.md).
+The three job owners are discovery, apply, outreach. Catalog and deep research are capabilities those owners call. Maintainer is a fourth owner and is seldom used: it writes `skills/lists/`, owns the Hub, seeds GitHub starters into the registry, and is the **only consumer** of `skill.record`. Human board for tools: [`lists/INDEX.md`](lists/INDEX.md). Tagged platform playbooks: [`starters/README.md`](starters/README.md).

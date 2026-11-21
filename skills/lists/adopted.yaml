@@ -336,13 +336,13 @@ items:
     capability: [maintain]
     roles: [maintainer]
     platforms: []
-    source: board/README.md
-    install: bash board/start.sh
+    source: docs/job-hub/human.md
+    install: bash scripts/hub_start.sh
     auth: role_tokens_gitignored
     verdict: use
     notes: >
       Maintainer-owned live FastAPI + SQLite coordination plane. Discovery creates
       rows; apply/outreach patch their fields; admin stops/edits. Tokens generated
-      by scripts/board_gen_tokens.py into gitignored board/.env — never committed.
+      by scripts/board_gen_tokens.py into gitignored .hub/.env — never committed.
       Git ledger remains the airgap protocol. Discovery/apply/outreach consume this;
       they do not own it.

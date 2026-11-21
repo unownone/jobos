@@ -3,15 +3,14 @@
 **/__pycache__
 **/*.pyc
 **/.pytest_cache
-board/data/*
-!board/data/.gitkeep
-board/.env
-board/tokens.local.json
+.hub/
+.hub/**
+board/
+board/**
 **/*.local.json
 .env
 .env.*
 !.env.example
-!board/.env.example
 profiles/candidate.yaml
 assets/resume/*.pdf
 agent-tools
@@ -20,3 +19,5 @@ agent-transcripts
 .claude
 .agents
 *.db
+web/node_modules
+web/dist

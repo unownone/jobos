@@ -2,7 +2,7 @@
 
 This folder is the **design handoff** for turning the live hunt board into a **distributed jobOS Hub**: the only non-AI component. Agents (Grok, Claude, Cursor, others) register, authenticate, heartbeat, pull skills/scripts **without cloning this repo**, claim work from queues, and push/pull the board through the same APIs the UI uses.
 
-**Status:** Hub is the Go API and the React SPA (auth, invites, onboarding, registry, memory, A2A). Operator/agent docs against **live routes**: [human.md](human.md), [agent.md](agent.md), [`docs/runtime.md`](../runtime.md). Agents curl `/llms.txt` and `/agents.txt`. The Python `board/` app is still in the tree.
+**Status:** Hub is the Go API and the React SPA (auth, invites, onboarding, registry, memory, A2A). Operator/agent docs against **live routes**: [human.md](human.md), [agent.md](agent.md), [`docs/runtime.md`](../runtime.md). Agents curl `/llms.txt` and `/agents.txt`. The live Hub is the Go API plus the React SPA in `web/`.
 
 **Do not treat the inventory table below as the live API.** It was the 2026-09-07 gap list. Auth is now Hub keys + sessions; registry and memory shipped. `profiles/candidate.yaml` is still not in git — Hub `/onboarding` is mandatory. Do not invent a candidate.
 
@@ -40,7 +40,7 @@ The Hub process is the Go API. Do not add a second board service.
 - Do not fabricate candidate experience.
 - Do not apply during discovery (Easy Apply is apply-role).
 - Default channels: email + LinkedIn DMs. No SMS.
-- No credentials in committed hunt-board files (`board/.env`, `board/tokens.local.json`).
+- No credentials in committed hunt-board files (`.hub/.env`, `.hub/tokens.local.json`).
 - Every state change still has an **event** + **job record**.
 - Discovery starts with the catalog skill unless `docs/catalogs/skills-and-mcps.md` was updated this week.
 - Maintainer is seldom-used and must not source jobs.

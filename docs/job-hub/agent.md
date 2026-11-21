@@ -143,7 +143,7 @@ curl -sS "$HUB_URL/api/scripts/install_agent_skills.sh" \
   -H "Authorization: Bearer $HUB_KEY"
 ```
 
-Path traversal (`/api/docs/../board/.env`, `candidate.yaml`, `.env`) → **404**. Pack never includes full `profiles/candidate.yaml`.
+Path traversal (`/api/docs/../.hub/.env`, `candidate.yaml`, `.env`) → **404**. Pack never includes full `profiles/candidate.yaml`.
 
 Install skills from the zip + allowlisted scripts. Put MCP secrets in **your** env, not in Hub requests. `connectors_needed` is a checklist.
 
