@@ -1,9 +1,8 @@
-# jobOS Hub: Go API + React SPA, with Postgres always on.
-#   docker compose -f docker-compose.plain.yml up -d --build
-# SPA http://127.0.0.1:8080  API http://127.0.0.1:8081
+# LEGACY Hub-only compose (no Traefik). Same port and envs as production deploy.
+# Go API + SPA in one `hub` container. No RabbitMQ.
 #
-# Durable state: named volumes pgdata and blobs.
-# Queue leases are queue_items. RabbitMQ is not in this file.
+#   docker compose -f docker-compose.plain.yml up -d --build
+# Hub: http://127.0.0.1:8787
 
 name: jobos-plain
 
@@ -23,24 +22,36 @@ services:
       retries: 20
     restart: unless-stopped
 
-  api:
+  # LEGACY: `hub` on ${HUB_PORT:-8787}, BOARD_* / JOBOS_PG_* / BLOB_* unchanged.
+  hub:
     build:
       context: .
-      dockerfile: server/Dockerfile
+      dockerfile: Dockerfile
     ports:
-      - "8081:8080"
+      - "${HUB_PORT:-8787}:8787"
     environment:
-      HUB_ADDR: ":8080"
+      JOBOS_NONINTERACTIVE: "1"
+      BOARD_HOST: "0.0.0.0"
+      BOARD_PORT: "8787"
+      BOARD_DB: "/tmp/board.db"
+      HUB_PACKS_DIR: "/tmp/jobos-packs"
       HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
-      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8080}"
       DATABASE_URL: "${DATABASE_URL:-}"
       JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
       JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
       JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
       JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
-      BLOB_DRIVER: filesystem
-      BLOB_ROOT: /var/lib/jobos/blobs
+      # LEGACY: kept for existing secrets. Queue is Postgres; AMQP unused.
+      AMQP_URL: "${AMQP_URL:-}"
+      QUEUE_ADAPTER: "${QUEUE_ADAPTER:-postgres}"
+      BLOB_ROOT: "/var/lib/jobos/blobs"
+      BLOB_ADAPTER: "${BLOB_ADAPTER:-filesystem}"
+      BLOB_DRIVER: "${BLOB_DRIVER:-}"
+      HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-127.0.0.1:8787}"
+      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8787}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
+      OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
       - "blobs:/var/lib/jobos/blobs"
     extra_hosts:
@@ -49,20 +60,10 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8787/health"]
       interval: 10s
       timeout: 5s
       retries: 12
-    restart: unless-stopped
-
-  web:
-    build:
-      context: ./web
-    ports:
-      - "${HUB_PORT:-8080}:80"
-    depends_on:
-      api:
-        condition: service_healthy
     restart: unless-stopped
 
 volumes:

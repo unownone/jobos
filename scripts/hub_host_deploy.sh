@@ -62,7 +62,8 @@ jobos_load_github_ssh
 
 REPO="${JOBOS_REPO:-${HOME}/jobos-live}"
 COMPOSE_FILE="${JOBOS_COMPOSE_FILE:-docker-compose.yml}"
-HEALTH_URL="${JOBOS_HEALTH_URL:-http://127.0.0.1:8080/health}"
+# LEGACY: production hub listens on 8787 (same as Coolify docker-compose.yml).
+HEALTH_URL="${JOBOS_HEALTH_URL:-http://127.0.0.1:8787/health}"
 STATE_DIR="${JOBOS_STATE_DIR:-${HOME}/.jobos}"
 mkdir -p "$STATE_DIR"
 

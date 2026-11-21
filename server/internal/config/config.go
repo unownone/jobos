@@ -31,13 +31,13 @@ type Config struct {
 
 func Load() Config {
 	cfg := Config{
-		Addr:           env("HUB_ADDR", ":8080"),
+		Addr:           listenAddr(),
 		PublicURL:      strings.TrimRight(os.Getenv("HUB_PUBLIC_URL"), "/"),
 		RepoRoot:       os.Getenv("HUB_REPO_ROOT"),
 		WebRoot:        strings.TrimSpace(os.Getenv("HUB_WEB_ROOT")),
 		DatabaseURL:    strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		RedisURL:       strings.TrimSpace(os.Getenv("REDIS_URL")),
-		BlobDriver:     strings.ToLower(env("BLOB_DRIVER", "memory")),
+		BlobDriver:     blobDriver(),
 		BlobRoot:       env("BLOB_ROOT", "/tmp/jobos-blobs"),
 		S3Endpoint:     strings.TrimSpace(os.Getenv("S3_ENDPOINT")),
 		S3Region:       env("S3_REGION", "us-east-1"),
@@ -47,12 +47,6 @@ func Load() Config {
 		S3UsePathStyle: env("S3_USE_PATH_STYLE", "true") != "false",
 		CompatTokens:   map[string]string{},
 		BootstrapToken: strings.TrimSpace(os.Getenv("HUB_BOOTSTRAP_TOKEN")),
-	}
-	if cfg.Addr != "" && !strings.Contains(cfg.Addr, ":") {
-		cfg.Addr = ":" + cfg.Addr
-	}
-	if port := os.Getenv("PORT"); port != "" && os.Getenv("HUB_ADDR") == "" {
-		cfg.Addr = ":" + port
 	}
 	for role, key := range map[string]string{
 		"discovery":   "BOARD_TOKEN_DISCOVERY",
@@ -74,4 +68,37 @@ func env(key, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+// listenAddr keeps legacy BOARD_HOST/BOARD_PORT (Coolify hub compose) working.
+// HUB_ADDR wins, then Railway PORT, then BOARD_*, then :8080.
+func listenAddr() string {
+	if addr := strings.TrimSpace(os.Getenv("HUB_ADDR")); addr != "" {
+		if !strings.Contains(addr, ":") {
+			return ":" + addr
+		}
+		return addr
+	}
+	if port := strings.TrimSpace(os.Getenv("PORT")); port != "" {
+		return ":" + port
+	}
+	if port := strings.TrimSpace(os.Getenv("BOARD_PORT")); port != "" {
+		host := strings.TrimSpace(os.Getenv("BOARD_HOST"))
+		if host == "" || host == "0.0.0.0" {
+			return ":" + port
+		}
+		return host + ":" + port
+	}
+	return ":8080"
+}
+
+// blobDriver accepts the legacy BLOB_ADAPTER name used by Coolify hub envs.
+func blobDriver() string {
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv("BLOB_DRIVER"))); v != "" {
+		return v
+	}
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv("BLOB_ADAPTER"))); v != "" {
+		return v
+	}
+	return "memory"
 }

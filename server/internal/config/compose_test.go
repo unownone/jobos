@@ -42,6 +42,12 @@ func TestComposeCoolifyContract(t *testing.T) {
 		if strings.Contains(text, "\nrabbitmq:") || strings.Contains(text, "\n  rabbitmq:") {
 			t.Fatalf("%s still declares rabbitmq", rel)
 		}
+		if !strings.Contains(text, "hub:") {
+			t.Fatalf("%s missing legacy hub service", rel)
+		}
+		if !strings.Contains(text, "LEGACY") {
+			t.Fatalf("%s should mark the deploy shape as LEGACY", rel)
+		}
 		for _, source := range serviceVolumeSources(text) {
 			for _, needle := range coolifyForbidden {
 				if strings.Contains(source, needle) {
@@ -70,9 +76,9 @@ func TestComposeCoolifyContract(t *testing.T) {
 	if !strings.Contains(text, `DATABASE_URL: "${DATABASE_URL:-}"`) && !strings.Contains(text, "DATABASE_URL: ${DATABASE_URL:-}") {
 		t.Fatalf("root compose DATABASE_URL must pass through empty default")
 	}
-	for _, needle := range []string{"services:", "api:", "web:", "postgres:", "profiles:", "redis:", "minio:"} {
+	for _, needle := range []string{"BOARD_PORT: \"8787\"", "BOARD_HOST:", "BLOB_ADAPTER:", "QUEUE_ADAPTER:", "8787:8787"} {
 		if !strings.Contains(text, needle) {
-			t.Fatalf("root compose missing %s", needle)
+			t.Fatalf("root compose missing legacy %s", needle)
 		}
 	}
 	example, err := os.ReadFile(filepath.Join(root, "board/.env.example"))

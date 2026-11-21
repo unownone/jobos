@@ -1,79 +1,79 @@
-# jobOS: React SPA + Go API.
-# Postgres, Redis, and MinIO are optional profiles.
+# LEGACY deploy shape (Coolify / host docker compose).
+# Single `hub` service on port 8787 with the same env names as the old Python Hub.
+# The process inside is the Go API + SPA (root Dockerfile). Queue leases are
+# Postgres `queue_items` — RabbitMQ is not required and is not started.
+#
+# Prefer this file for production deploys that already point at jobos compose.
+# Newer split layout (api + web): docker-compose.split.yml
 #
 #   docker compose up -d --build
-#   docker compose --profile data --profile cache --profile blobs up -d --build
+# Hub: http://127.0.0.1:8787
+#
+# Outside Postgres: set secret DATABASE_URL. Unset uses the bundled `postgres`
+# service. A database on the Docker host is host.docker.internal, not 127.0.0.1.
 
 name: jobos
 
 services:
-  api:
-    build:
-      context: .
-      dockerfile: server/Dockerfile
-    environment:
-      HUB_ADDR: ":8080"
-      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-http://127.0.0.1:8080}"
-      HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
-      JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
-      JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
-      JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
-      DATABASE_URL: "${DATABASE_URL:-}"
-      REDIS_URL: "${REDIS_URL:-}"
-      CACHE_DRIVER: "${CACHE_DRIVER:-memory}"
-      BLOB_DRIVER: "${BLOB_DRIVER:-}"
-      BLOB_ROOT: /var/lib/jobos/blobs
-      S3_ENDPOINT: "${S3_ENDPOINT:-}"
-      S3_BUCKET: "${S3_BUCKET:-jobos}"
-      S3_ACCESS_KEY: "${S3_ACCESS_KEY:-}"
-      S3_SECRET_KEY: "${S3_SECRET_KEY:-}"
-      S3_USE_PATH_STYLE: "true"
-    ports:
-      - "8081:8080"
-    volumes:
-      - blobs:/var/lib/jobos/blobs
-    restart: unless-stopped
-
-  web:
-    build:
-      context: ./web
-    ports:
-      - "8080:80"
-    depends_on:
-      - api
-    restart: unless-stopped
-
   postgres:
-    profiles: ["data"]
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: jobos
       POSTGRES_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       POSTGRES_DB: jobos
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - "pgdata:/var/lib/postgresql/data"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jobos -d jobos"]
       interval: 5s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
 
-  redis:
-    profiles: ["cache"]
-    image: redis:7-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-
-  minio:
-    profiles: ["blobs"]
-    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
-    command: server /data --console-address ":9001"
+  # LEGACY: service name `hub`, public port 8787, BOARD_* / JOBOS_PG_* / BLOB_* envs.
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
-      MINIO_ROOT_USER: "${S3_ACCESS_KEY:-jobos}"
-      MINIO_ROOT_PASSWORD: "${S3_SECRET_KEY:-jobossecret}"
+      JOBOS_NONINTERACTIVE: "1"
+      BOARD_HOST: "0.0.0.0"
+      BOARD_PORT: "8787"
+      BOARD_DB: "/tmp/board.db"
+      HUB_PACKS_DIR: "/tmp/jobos-packs"
+      HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
+      JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
+      JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
+      JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
+      JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
+      # LEGACY env names kept for Coolify/host secrets. Queue is Postgres; AMQP is unused.
+      AMQP_URL: "${AMQP_URL:-}"
+      QUEUE_ADAPTER: "${QUEUE_ADAPTER:-postgres}"
+      BLOB_ROOT: "/var/lib/jobos/blobs"
+      BLOB_ADAPTER: "${BLOB_ADAPTER:-filesystem}"
+      BLOB_DRIVER: "${BLOB_DRIVER:-}"
+      HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
+      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
+      OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
-      - minio:/data
+      - "blobs:/var/lib/jobos/blobs"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8787:8787"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8787/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
 volumes:
   pgdata:
   blobs:
-  minio:

@@ -1,7 +1,8 @@
-# jobOS Hub behind Traefik. From repo root:
+# LEGACY Hub behind Traefik. Port 8787 and env names match the old deploy.
+# Go API + SPA in one `hub` container. No RabbitMQ.
+#
 #   HUB_PUBLIC_HOST=hunt.example.com bash scripts/hub_docker.sh
-# Traefik listens on 80, 443, and 8787. All three reach the SPA.
-# The SPA proxies /api, /ws, /health, and /a2a to the Go API.
+# Traefik listens on 80, 443, and 8787. All three reach hub:8787.
 
 name: jobos-traefik
 
@@ -32,52 +33,52 @@ services:
       - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
     restart: unless-stopped
     depends_on:
-      web:
+      hub:
         condition: service_healthy
 
-  api:
+  # LEGACY: service name `hub`, BOARD_* / JOBOS_PG_* / BLOB_* unchanged.
+  hub:
     build:
       context: .
-      dockerfile: server/Dockerfile
+      dockerfile: Dockerfile
     environment:
-      HUB_ADDR: ":8080"
+      JOBOS_NONINTERACTIVE: "1"
+      BOARD_HOST: "0.0.0.0"
+      BOARD_PORT: "8787"
+      BOARD_DB: "/tmp/board.db"
+      HUB_PACKS_DIR: "/tmp/jobos-packs"
       HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
-      HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
-      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
       DATABASE_URL: "${DATABASE_URL:-}"
       JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
       JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
       JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
       JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
       JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
-      BLOB_DRIVER: filesystem
-      BLOB_ROOT: /var/lib/jobos/blobs
+      # LEGACY: kept for existing secrets. Queue is Postgres; AMQP unused.
+      AMQP_URL: "${AMQP_URL:-}"
+      QUEUE_ADAPTER: "${QUEUE_ADAPTER:-postgres}"
+      BLOB_ROOT: "/var/lib/jobos/blobs"
+      BLOB_ADAPTER: "${BLOB_ADAPTER:-filesystem}"
+      BLOB_DRIVER: "${BLOB_DRIVER:-}"
+      HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
+      HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
+      OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-console}"
     volumes:
       - "blobs:/var/lib/jobos/blobs"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    expose:
+      - "8787"
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8787/health"]
       interval: 10s
       timeout: 5s
       retries: 12
-    restart: unless-stopped
-
-  web:
-    build:
-      context: ./web
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-    restart: unless-stopped
 
 volumes:
   pgdata:
