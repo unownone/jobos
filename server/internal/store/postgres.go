@@ -107,17 +107,16 @@ func rawOr(b []byte, fallback string) string {
 }
 
 func (p *Postgres) AccountByUsername(ctx context.Context, username string) (Account, User, error) {
-	var a Account
-	err := p.pool.QueryRow(ctx, `SELECT id, username, password_hash, created_at FROM accounts WHERE lower(username)=lower($1)`, username).
-		Scan(&a.ID, &a.Username, &a.PasswordHash, &a.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Account{}, User{}, ErrNotFound
-	}
+	a, err := scanAccount(p.pool.QueryRow(ctx, accountSelect+` WHERE lower(username)=lower($1)`, username))
 	if err != nil {
 		return Account{}, User{}, err
 	}
 	u, err := p.adminFor(ctx, a.ID)
 	return a, u, err
+}
+
+func (p *Postgres) Account(ctx context.Context, id string) (Account, error) {
+	return scanAccount(p.pool.QueryRow(ctx, accountSelect+` WHERE id=$1`, id))
 }
 
 func (p *Postgres) adminFor(ctx context.Context, accountID string) (User, error) {
@@ -132,7 +131,19 @@ func (p *Postgres) adminFor(ctx context.Context, accountID string) (User, error)
 	return scanUser(rows)
 }
 
-const userSelect = `SELECT id, account_id, kind, track, email, password_hash, display_name, metadata_json, created_by, disabled_at, created_at FROM users`
+// COALESCE keeps NULLs from older Python rows scannable into Go strings.
+const accountSelect = `SELECT id, username, coalesce(password_hash,''), created_at FROM accounts`
+
+const userSelect = `SELECT id, account_id, kind, coalesce(track,''), coalesce(email,''), coalesce(password_hash,''), coalesce(display_name,''), coalesce(metadata_json,'{}'), coalesce(created_by,''), coalesce(disabled_at,''), created_at FROM users`
+
+func scanAccount(row pgx.Row) (Account, error) {
+	var a Account
+	err := row.Scan(&a.ID, &a.Username, &a.PasswordHash, &a.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Account{}, ErrNotFound
+	}
+	return a, err
+}
 
 func scanUser(row pgx.Row) (User, error) {
 	var u User
@@ -160,8 +171,16 @@ func (p *Postgres) User(ctx context.Context, id string) (User, error) {
 	return scanUser(p.pool.QueryRow(ctx, userSelect+` WHERE id=$1`, id))
 }
 
+func (p *Postgres) UserByEmail(ctx context.Context, email string) (User, error) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return User{}, ErrNotFound
+	}
+	return scanUser(p.pool.QueryRow(ctx, userSelect+` WHERE lower(email)=lower($1) AND email <> ''`, email))
+}
+
 func (p *Postgres) FirstAdmin(ctx context.Context) (User, error) {
-	row := p.pool.QueryRow(ctx, userSelect+` WHERE kind='admin' AND disabled_at='' ORDER BY created_at LIMIT 1`)
+	row := p.pool.QueryRow(ctx, userSelect+` WHERE kind='admin' AND coalesce(disabled_at,'')='' ORDER BY created_at LIMIT 1`)
 	return scanUser(row)
 }
 
