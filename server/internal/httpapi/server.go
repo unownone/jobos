@@ -26,6 +26,7 @@ import (
 	"github.com/unownone/jobos/server/internal/config"
 	"github.com/unownone/jobos/server/internal/realtime"
 	"github.com/unownone/jobos/server/internal/store"
+	"github.com/unownone/jobos/server/internal/telemetry"
 )
 
 const (
@@ -62,7 +63,7 @@ type principal struct {
 func (s *Server) Router() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.Use(gin.Recovery(), gin.Logger())
+	r.Use(telemetry.GinRecovery(), telemetry.GinRequest())
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", c.GetHeader("Origin"))
 		c.Header("Access-Control-Allow-Credentials", "true")
@@ -248,6 +249,7 @@ func (s *Server) requireAuth(c *gin.Context) {
 		if errors.As(err, &he) {
 			status = he.code
 		}
+		telemetry.NoteFail(c, err.Error())
 		c.AbortWithStatusJSON(status, gin.H{"detail": err.Error()})
 		return
 	}
@@ -262,7 +264,10 @@ type httpError struct {
 
 func (e *httpError) Error() string { return e.msg }
 
-func fail(c *gin.Context, code int, msg string) { c.JSON(code, gin.H{"detail": msg}) }
+func fail(c *gin.Context, code int, msg string) {
+	telemetry.NoteFail(c, msg)
+	c.JSON(code, gin.H{"detail": msg})
+}
 
 func principalFrom(c *gin.Context) principal {
 	v, _ := c.Get("principal")
