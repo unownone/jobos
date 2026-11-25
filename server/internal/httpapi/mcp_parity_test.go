@@ -345,6 +345,122 @@ func TestMCPPollEventsResetsStaleCursor(t *testing.T) {
 	}
 }
 
+func TestMCPSkillVisibilityStopEventsAndMemoryPods(t *testing.T) {
+	ts, _ := parityTestServer(t)
+	defer ts.Close()
+
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"p2admin","password":"long-enough"}`, "")
+	csrf := res.Header.Get("X-CSRF")
+	res.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
+	res.Body.Close()
+
+	access, session := mcpOAuthSession(t, client, ts.URL, csrf)
+
+	whoAdmin := mcpToolText(t, ts.URL, access, session, 1, "whoami", `{}`)
+	var adminWho struct {
+		UserID string `json:"user_id"`
+	}
+	if err := json.Unmarshal([]byte(whoAdmin), &adminWho); err != nil || adminWho.UserID == "" {
+		t.Fatalf("admin whoami %s", whoAdmin)
+	}
+
+	agentAText := mcpToolText(t, ts.URL, access, session, 2, "create_agent", `{"display_name":"p2-bot-a","track":"discovery"}`)
+	var agentA struct {
+		APIKey string `json:"api_key"`
+		User   struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal([]byte(agentAText), &agentA); err != nil || agentA.APIKey == "" || agentA.User.ID == "" {
+		t.Fatalf("create_agent A %s", agentAText)
+	}
+	agentBText := mcpToolText(t, ts.URL, access, session, 3, "create_agent", `{"display_name":"p2-bot-b","track":"discovery"}`)
+	var agentB struct {
+		APIKey string `json:"api_key"`
+		User   struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal([]byte(agentBText), &agentB); err != nil || agentB.APIKey == "" || agentB.User.ID == "" {
+		t.Fatalf("create_agent B %s", agentBText)
+	}
+
+	aSession := mcpAPIKeySession(t, ts.URL, agentA.APIKey)
+	bSession := mcpAPIKeySession(t, ts.URL, agentB.APIKey)
+
+	skillText := mcpToolText(t, ts.URL, agentA.APIKey, aSession, 10, "create_skill", `{"name":"bot-a-private","body":"# private local skill for bot A"}`)
+	var skillPayload struct {
+		Skill struct {
+			ID string `json:"id"`
+		} `json:"skill"`
+	}
+	if err := json.Unmarshal([]byte(skillText), &skillPayload); err != nil || skillPayload.Skill.ID == "" {
+		t.Fatalf("create_skill %s", skillText)
+	}
+
+	listedB := mcpToolText(t, ts.URL, agentB.APIKey, bSession, 11, "list_skills", `{}`)
+	if strings.Contains(listedB, skillPayload.Skill.ID) || strings.Contains(listedB, "bot-a-private") {
+		t.Fatalf("list_skills leaked another bot local skill: %s", listedB)
+	}
+	_, getErr := mcpToolResult(t, ts.URL, agentB.APIKey, bSession, 12, "get_skill", `{"id":"`+skillPayload.Skill.ID+`"}`)
+	if !getErr {
+		t.Fatalf("get_skill should hide another bot local skill")
+	}
+	listedA := mcpToolText(t, ts.URL, agentA.APIKey, aSession, 13, "list_skills", `{}`)
+	if !strings.Contains(listedA, skillPayload.Skill.ID) {
+		t.Fatalf("owner should see own local skill: %s", listedA)
+	}
+
+	imported := mcpToolText(t, ts.URL, access, session, 20, "import_jobs", `{"jobs":[{"id":"p2-stop-job","company":"P2 Co","title":"Engineer","status":"discovered"}]}`)
+	if !strings.Contains(imported, `"imported": 1`) && !strings.Contains(imported, `"imported":1`) {
+		t.Fatalf("import_jobs %s", imported)
+	}
+	stopped := mcpToolText(t, ts.URL, access, session, 21, "stop_job", `{"id":"p2-stop-job","reason":"p2-audit"}`)
+	if !strings.Contains(stopped, `"stopped": true`) && !strings.Contains(stopped, `"stopped":true`) {
+		t.Fatalf("stop_job %s", stopped)
+	}
+	events := mcpToolText(t, ts.URL, access, session, 22, "list_events", `{"job_id":"p2-stop-job"}`)
+	if !strings.Contains(events, `"action": "stop"`) && !strings.Contains(events, `"action":"stop"`) {
+		t.Fatalf("list_events missing stop event: %s", events)
+	}
+	if !strings.Contains(events, "p2-audit") {
+		t.Fatalf("list_events missing stop reason: %s", events)
+	}
+	resumed := mcpToolText(t, ts.URL, access, session, 23, "resume_job", `{"id":"p2-stop-job"}`)
+	if !strings.Contains(resumed, `"stopped": false`) && !strings.Contains(resumed, `"stopped":false`) {
+		t.Fatalf("resume_job %s", resumed)
+	}
+	events2 := mcpToolText(t, ts.URL, access, session, 24, "list_events", `{"job_id":"p2-stop-job"}`)
+	if !strings.Contains(events2, `"action": "resume"`) && !strings.Contains(events2, `"action":"resume"`) {
+		t.Fatalf("list_events missing resume event: %s", events2)
+	}
+
+	memText := mcpToolText(t, ts.URL, access, session, 30, "write_memory", `{"kind":"working_note","title":"admin worker note","body":"private admin worker memory for pod visibility checks","pod":"worker:`+adminWho.UserID+`"}`)
+	var memPayload struct {
+		Item struct {
+			ID string `json:"id"`
+		} `json:"item"`
+	}
+	if err := json.Unmarshal([]byte(memText), &memPayload); err != nil || memPayload.Item.ID == "" {
+		t.Fatalf("write_memory %s", memText)
+	}
+	_, delErr := mcpToolResult(t, ts.URL, agentB.APIKey, bSession, 31, "delete_memory", `{"id":"`+memPayload.Item.ID+`"}`)
+	if !delErr {
+		t.Fatalf("delete_memory should reject unread pod")
+	}
+	_, solErr := mcpToolResult(t, ts.URL, agentB.APIKey, bSession, 32, "solidify_memory", `{"id":"`+memPayload.Item.ID+`"}`)
+	if !solErr {
+		t.Fatalf("solidify_memory should reject unread pod")
+	}
+	deleted := mcpToolText(t, ts.URL, access, session, 33, "delete_memory", `{"id":"`+memPayload.Item.ID+`"}`)
+	if !strings.Contains(deleted, `"ok": true`) && !strings.Contains(deleted, `"ok":true`) {
+		t.Fatalf("admin delete_memory %s", deleted)
+	}
+}
+
 func parityTestServer(t *testing.T) (*httptest.Server, string) {
 	t.Helper()
 	telemetry.Init(telemetry.Options{Exporter: "none", ServiceName: "jobos-hub-test"})
@@ -412,6 +528,17 @@ func mcpOAuthSession(t *testing.T, client *http.Client, base, csrf string) (acce
 		t.Fatalf("init %d %s", init.StatusCode, initBody)
 	}
 	return access, session
+}
+
+func mcpAPIKeySession(t *testing.T, base, apiKey string) string {
+	t.Helper()
+	init := mcpCall(t, base, apiKey, "", `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"ParityAgent"}}}`)
+	session := init.Header.Get("Mcp-Session-Id")
+	initBody := readBody(init)
+	if init.StatusCode != 200 || session == "" {
+		t.Fatalf("api key init %d %s", init.StatusCode, initBody)
+	}
+	return session
 }
 
 func mcpToolText(t *testing.T, base, token, session string, id int, name, argsJSON string) string {

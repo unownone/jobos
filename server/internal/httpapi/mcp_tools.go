@@ -84,6 +84,13 @@ func (s *Server) toolSetStopped(c *gin.Context, grant agentflow.Grant, id string
 	if err := s.DB.SaveJob(c.Request.Context(), job); err != nil {
 		return nil, err
 	}
+	action := "resume"
+	if stopped {
+		action = "stop"
+	}
+	_, _ = s.DB.AddEvent(c.Request.Context(), store.Event{
+		AccountID: p.AccountID, TS: now(), JobID: job.ID, ActorRole: p.Role, Actor: p.Actor, Action: action, Note: job.StopReason,
+	})
 	s.invalidateJobs(c, grant.AccountID)
 	return gin.H{"job": job}, nil
 }
@@ -319,17 +326,31 @@ func (s *Server) toolUpdatePerson(c *gin.Context, grant agentflow.Grant, args ma
 }
 
 func (s *Server) toolListSkills(c *gin.Context, grant agentflow.Grant, args map[string]any) (gin.H, error) {
+	p, err := s.principalFromGrant(c, grant)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.DB.ListSkills(c.Request.Context(), grant.AccountID, strAny(args["scope"]), strAny(args["status"]), strAny(args["tag"]))
 	if err != nil {
 		return nil, err
 	}
-	if rows == nil {
-		rows = []store.Skill{}
+	var visible []store.Skill
+	for _, sk := range rows {
+		if canSeeSkill(p, sk) {
+			visible = append(visible, sk)
+		}
 	}
-	return gin.H{"skills": rows}, nil
+	if visible == nil {
+		visible = []store.Skill{}
+	}
+	return gin.H{"skills": visible}, nil
 }
 
 func (s *Server) toolGetSkill(c *gin.Context, grant agentflow.Grant, id string) (gin.H, error) {
+	p, err := s.principalFromGrant(c, grant)
+	if err != nil {
+		return nil, err
+	}
 	skill, err := s.DB.Skill(c.Request.Context(), id)
 	if err != nil {
 		skills, listErr := s.DB.ListSkills(c.Request.Context(), grant.AccountID, "", "", "")
@@ -337,13 +358,16 @@ func (s *Server) toolGetSkill(c *gin.Context, grant agentflow.Grant, id string) 
 			return nil, errString("skill not found")
 		}
 		for _, row := range skills {
-			if row.ID == id || row.Slug == id || row.Name == id {
+			if (row.ID == id || row.Slug == id || row.Name == id) && canSeeSkill(p, row) {
 				return gin.H{"skill": row}, nil
 			}
 		}
 		return nil, errString("skill not found")
 	}
 	if skill.AccountID != grant.AccountID && skill.AccountID != "shared" && skill.Scope != "shared" {
+		return nil, errString("skill not found")
+	}
+	if !canSeeSkill(p, skill) {
 		return nil, errString("skill not found")
 	}
 	return gin.H{"skill": skill}, nil
@@ -369,6 +393,14 @@ func (s *Server) toolGetMCP(c *gin.Context, grant agentflow.Grant, id string) (g
 }
 
 func (s *Server) toolDeleteMemory(c *gin.Context, grant agentflow.Grant, id string) (gin.H, error) {
+	p, err := s.principalFromGrant(c, grant)
+	if err != nil {
+		return nil, err
+	}
+	item, err := s.DB.Memory(c.Request.Context(), grant.AccountID, id)
+	if err != nil || !canReadPod(p, item.Pod) {
+		return nil, errString("memory item not found")
+	}
 	if err := s.DB.DeleteMemory(c.Request.Context(), grant.AccountID, id); err != nil {
 		return nil, errString("memory item not found")
 	}
@@ -382,7 +414,7 @@ func (s *Server) toolSolidifyMemory(c *gin.Context, grant agentflow.Grant, id st
 		return nil, err
 	}
 	item, err := s.DB.Memory(c.Request.Context(), grant.AccountID, id)
-	if err != nil {
+	if err != nil || !canReadPod(p, item.Pod) {
 		return nil, errString("memory item not found")
 	}
 	item.SolidifyStatus = "queued"
