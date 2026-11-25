@@ -88,7 +88,10 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`,
 		dropNotNullIfPresentSQL("mcps", "content_hash"),
-		// Python PK was (account_id, id); Go upserts ON CONFLICT (id).
+		// Python PK was (account_id, id), so the same skill id can exist on many
+		// accounts. Go upserts ON CONFLICT (id) and needs a single row per id.
+		dedupeByIDSQL("skills"),
+		dedupeByIDSQL("skill_recordings"),
 		`CREATE UNIQUE INDEX IF NOT EXISTS skills_id_uidx ON skills (id)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS skill_recordings_id_uidx ON skill_recordings (id)`,
 		// Python Hub stored these as INTEGER 0/1. Go writes bool; pgx cannot encode
@@ -175,6 +178,59 @@ BEGIN
   END IF;
 END
 $migrate$;`, table, column, table, column, table, column)
+}
+
+// dedupeByIDSQL drops extra rows that share an id so CREATE UNIQUE INDEX on id
+// can succeed on databases upgraded from Python's (account_id, id) primary key.
+func dedupeByIDSQL(table string) string {
+	orderBy := "ctid ASC"
+	switch table {
+	case "skills":
+		orderBy = `CASE WHEN status = 'approved' THEN 0 ELSE 1 END,
+      CASE WHEN scope = 'shared' THEN 0 ELSE 1 END,
+      version DESC NULLS LAST,
+      updated_at DESC NULLS LAST,
+      created_at DESC NULLS LAST,
+      ctid ASC`
+	case "skill_recordings":
+		orderBy = `CASE WHEN status = 'approved' THEN 0 WHEN status = 'pending' THEN 1 ELSE 2 END,
+      created_at DESC NULLS LAST,
+      ctid ASC`
+	default:
+		// Keep the helper locked to known tables; callers pass constants only.
+	}
+	return fmt.Sprintf(`
+DELETE FROM %s
+WHERE ctid IN (
+  SELECT ctid FROM (
+    SELECT ctid,
+           ROW_NUMBER() OVER (PARTITION BY id ORDER BY %s) AS rn
+    FROM %s
+  ) ranked
+  WHERE rn > 1
+);`, table, orderBy, table)
+}
+
+// RetryableOpenError is true for transient Postgres connectivity failures.
+// Schema conflicts (unique violations during migrate) must not loop until the
+// Cloud Run / Railway listen probe times out.
+func RetryableOpenError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) {
+		switch pg.Code {
+		case "23505", "42P07", "42701", "42703", "42P01":
+			return false
+		default:
+			return true
+		}
+	}
+	if strings.Contains(err.Error(), "SQLSTATE 23505") {
+		return false
+	}
+	return true
 }
 
 func (p *Postgres) Name() string { return "postgres" }

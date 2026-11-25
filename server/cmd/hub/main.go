@@ -34,6 +34,10 @@ func main() {
 		if err == nil || cfg.DatabaseURL == "" {
 			break
 		}
+		if !store.RetryableOpenError(err) {
+			log.Error("store open failed", "error.message", err.Error())
+			os.Exit(1)
+		}
 		if ctx.Err() != nil {
 			log.Error("store open failed", "error.message", err.Error())
 			os.Exit(1)
