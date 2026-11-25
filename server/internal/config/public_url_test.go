@@ -39,4 +39,29 @@ func TestPublicURLFromEnvPrefersURLThenHost(t *testing.T) {
 	if got := publicURLFromEnv(); got != "https://jobs.example.com" {
 		t.Fatalf("full host %q", got)
 	}
+
+	t.Setenv("HUB_PUBLIC_HOST", "::1")
+	if got := publicURLFromEnv(); got != "http://[::1]" {
+		t.Fatalf("bare ipv6 loopback %q", got)
+	}
+
+	t.Setenv("HUB_PUBLIC_HOST", "[::1]")
+	if got := publicURLFromEnv(); got != "http://[::1]" {
+		t.Fatalf("bracketed ipv6 %q", got)
+	}
+
+	t.Setenv("HUB_PUBLIC_HOST", "[::1]:8080")
+	if got := publicURLFromEnv(); got != "http://[::1]:8080" {
+		t.Fatalf("bracketed ipv6 with port %q", got)
+	}
+
+	t.Setenv("HUB_PUBLIC_HOST", "[::1]:443")
+	if got := publicURLFromEnv(); got != "https://[::1]" {
+		t.Fatalf("bracketed ipv6 :443 %q", got)
+	}
+
+	t.Setenv("HUB_PUBLIC_HOST", "fe80::443")
+	if got := publicURLFromEnv(); got != "http://[fe80::443]" {
+		t.Fatalf("ipv6 ending in :443 must not strip port suffix %q", got)
+	}
 }

@@ -3,6 +3,7 @@
 package config
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,6 +124,7 @@ func blobDriver() string {
 //
 // Scheme rules (invite join_url must be pasteable by agents):
 //   - explicit http(s):// in HUB_PUBLIC_HOST wins
+//   - IPv6 literals are bracketed before :80/:443 handling (::1 → http://[::1])
 //   - :443 → https, :80 or any other host:port → http
 //   - bare localhost / loopback / IP → http
 //   - bare DNS name (ikr.one) → https (prod default when operators omit the scheme)
@@ -138,6 +140,39 @@ func publicURLFromEnv() string {
 	if strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") {
 		return strings.TrimRight(host, "/")
 	}
+	host, scheme := hostAndScheme(host)
+	return scheme + "://" + host
+}
+
+// hostAndScheme normalizes a schemeless HUB_PUBLIC_HOST into host[/port] + scheme.
+// Bracket IPv6 before port-suffix handling so values like fe80::443 are not mangled.
+func hostAndScheme(host string) (string, string) {
+	if strings.HasPrefix(host, "[") {
+		if h, port, err := net.SplitHostPort(host); err == nil {
+			switch port {
+			case "80":
+				return bracketIPLiteral(h), "http"
+			case "443":
+				return bracketIPLiteral(h), "https"
+			default:
+				return host, "http"
+			}
+		}
+		inner := strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+		if net.ParseIP(inner) != nil {
+			return "[" + inner + "]", "http"
+		}
+		return host, "https"
+	}
+
+	// Unbracketed IPv6 (two+ colons). Must bracket before IPv4-style :80/:443 suffixes.
+	if strings.Count(host, ":") >= 2 {
+		if net.ParseIP(host) != nil {
+			return "[" + host + "]", "http"
+		}
+		return host, "http"
+	}
+
 	scheme := "https"
 	switch {
 	case strings.HasSuffix(host, ":80"):
@@ -147,13 +182,19 @@ func publicURLFromEnv() string {
 		host = strings.TrimSuffix(host, ":443")
 		scheme = "https"
 	case strings.Contains(host, ":"):
-		// 127.0.0.1:8787 / board-style local binds stay http.
-		// Bracketed IPv6 with a port also lands here.
+		// 127.0.0.1:8787 / DNS:port stay http.
 		scheme = "http"
 	case isLoopbackOrIP(host):
 		scheme = "http"
 	}
-	return scheme + "://" + host
+	return host, scheme
+}
+
+func bracketIPLiteral(host string) string {
+	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
+		return "[" + host + "]"
+	}
+	return host
 }
 
 func isLoopbackOrIP(host string) bool {
