@@ -273,11 +273,11 @@ function TimezoneField({ value, onChange }: { value: string; onChange: (value: s
       />
       <select
         id="timezone"
-        value={filtered.some((zone) => zone === selected) ? selected : (filtered[0] || selected)}
+        value={selected}
         onChange={(e) => onChange(e.target.value)}
       >
-        {!filtered.some((zone) => zone === selected) && selected ? (
-          <option value={selected}>{selected} (system)</option>
+        {!filtered.some((zone) => zone === selected) ? (
+          <option value={selected}>{selected === systemTimezone() ? `${selected} (system)` : selected}</option>
         ) : null}
         {filtered.map((zone) => (
           <option key={zone} value={zone}>
@@ -297,12 +297,14 @@ export function Onboarding({ me }: { me: SessionMe }) {
     base.timezone = systemTimezone();
     return base;
   });
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(emptyProfile()));
   const [step, setStep] = useState(1);
   const [editAll, setEditAll] = useState(false);
   const [offerResume, setOfferResume] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const dirty = JSON.stringify(values) !== savedSnapshot;
 
   useEffect(() => {
     api<{ yaml?: string }>("/api/candidate").then((data) => {
@@ -310,8 +312,13 @@ export function Onboarding({ me }: { me: SessionMe }) {
         const next = fromYaml(data.yaml);
         if (!next.timezone) next.timezone = systemTimezone();
         setValues(next);
+        setSavedSnapshot(JSON.stringify(next));
         setEditAll(true);
         setStep(1);
+      } else {
+        const draft = emptyProfile();
+        draft.timezone = systemTimezone();
+        setSavedSnapshot(JSON.stringify(draft));
       }
       setLoaded(true);
     }).catch((err) => {
@@ -322,6 +329,17 @@ export function Onboarding({ me }: { me: SessionMe }) {
 
   function set(id: ProfileKey, value: string) {
     setValues((prev) => ({ ...prev, [id]: value }));
+  }
+
+  function goStep(n: number) {
+    if (n === 4 && dirty) {
+      setError("Save your edits before opening Resume.");
+      return;
+    }
+    if (editAll || n <= step || (n === 4 && !dirty)) {
+      setError("");
+      setStep(n);
+    }
   }
 
   function advance(from: number) {
@@ -352,6 +370,7 @@ export function Onboarding({ me }: { me: SessionMe }) {
     try {
       await api("/api/candidate", { method: "PUT", body: toYaml(nextValues), headers: { "Content-Type": "text/yaml" } });
       setValues(nextValues);
+      setSavedSnapshot(JSON.stringify(nextValues));
       setNote("Profile saved. Upload a resume PDF so outreach can attach it.");
       setOfferResume(true);
       setStep(4);
@@ -420,7 +439,7 @@ export function Onboarding({ me }: { me: SessionMe }) {
         <ol className="stepper" aria-label="Onboarding steps">
           {STEP_META.map((item) => (
             <li key={item.n} className={step === item.n ? "active" : step > item.n ? "done" : ""}>
-              <button type="button" onClick={() => { if (editAll || item.n <= step) setStep(item.n); }}>
+              <button type="button" onClick={() => goStep(item.n)}>
                 <span className="step-n">{item.n}</span>
                 <span>
                   <strong>{item.title}</strong>
@@ -447,7 +466,7 @@ export function Onboarding({ me }: { me: SessionMe }) {
         {(editAll || step === 2) && !reviewing ? renderStepFields(2, STEP2) : null}
         {(editAll || step === 3) && !reviewing ? renderStepFields(3, STEP3) : null}
 
-        {reviewing || offerResume ? (
+        {(reviewing || offerResume) && !dirty ? (
           <div id="step4" className="step-panel">
             <p>Profile is saved. Add a resume PDF (stored in Hub object storage / S3 when configured) or open the board.</p>
             <label className="field">
@@ -459,6 +478,12 @@ export function Onboarding({ me }: { me: SessionMe }) {
               <button id="uploadResume" type="button" onClick={upload}>Upload resume</button>
               <button id="skipResume" type="button" className="quiet" onClick={() => navigate("/board")}>Skip for now</button>
             </div>
+          </div>
+        ) : null}
+        {reviewing && dirty ? (
+          <div className="banner warn">
+            <p>You have unsaved edits. Save the profile before uploading a resume or opening the board.</p>
+            <button id="save" type="submit">Save profile</button>
           </div>
         ) : null}
 

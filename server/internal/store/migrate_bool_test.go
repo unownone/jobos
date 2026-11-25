@@ -36,3 +36,18 @@ func TestCopyColumnIfPresentSQLRenamesPythonBody(t *testing.T) {
 		}
 	}
 }
+
+func TestDropNotNullIfPresentSQLRelaxesLegacyColumns(t *testing.T) {
+	sql := dropNotNullIfPresentSQL("skills", "content_hash")
+	for _, needle := range []string{
+		"table_name = 'skills'",
+		"column_name = 'content_hash'",
+		"is_nullable = 'NO'",
+		"DROP NOT NULL",
+		"SET DEFAULT",
+	} {
+		if !strings.Contains(sql, needle) {
+			t.Fatalf("missing %q in:\n%s", needle, sql)
+		}
+	}
+}

@@ -64,6 +64,9 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`,
 		copyColumnIfPresentSQL("skills", "body_md", "body"),
+		// Go inserts omit Python-era NOT NULL columns; drop the constraint after copy.
+		dropNotNullIfPresentSQL("skills", "body_md"),
+		dropNotNullIfPresentSQL("skills", "content_hash"),
 		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS submitter_user_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT ''`,
@@ -72,6 +75,8 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''`,
 		copyColumnIfPresentSQL("skill_recordings", "payload_json", "body"),
 		copyColumnIfPresentSQL("skill_recordings", "submitted_by", "submitter_user_id"),
+		dropNotNullIfPresentSQL("skill_recordings", "payload_json"),
+		dropNotNullIfPresentSQL("skill_recordings", "submitted_by"),
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS capability_json TEXT NOT NULL DEFAULT '[]'`,
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS roles_json TEXT NOT NULL DEFAULT '[]'`,
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS platforms_json TEXT NOT NULL DEFAULT '[]'`,
@@ -82,6 +87,10 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT 'github'`,
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`,
+		dropNotNullIfPresentSQL("mcps", "content_hash"),
+		// Python PK was (account_id, id); Go upserts ON CONFLICT (id).
+		`CREATE UNIQUE INDEX IF NOT EXISTS skills_id_uidx ON skills (id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS skill_recordings_id_uidx ON skill_recordings (id)`,
 		// Python Hub stored these as INTEGER 0/1. Go writes bool; pgx cannot encode
 		// false into int4. Coerce leftover integer columns on every boot.
 		coerceIntBoolSQL("invites", "allow_multiple_owners"),
@@ -147,6 +156,25 @@ BEGIN
   END IF;
 END
 $migrate$;`, table, src, table, dst, table, dst, src, dst, dst, src)
+}
+
+// dropNotNullIfPresentSQL lets Go inserts omit Python-era columns.
+func dropNotNullIfPresentSQL(table, column string) string {
+	return fmt.Sprintf(`
+DO $migrate$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = '%s'
+      AND column_name = '%s'
+      AND is_nullable = 'NO'
+  ) THEN
+    EXECUTE format('ALTER TABLE %%I ALTER COLUMN %%I DROP NOT NULL', '%s', '%s');
+    EXECUTE format('ALTER TABLE %%I ALTER COLUMN %%I SET DEFAULT ''''', '%s', '%s');
+  END IF;
+END
+$migrate$;`, table, column, table, column, table, column)
 }
 
 func (p *Postgres) Name() string { return "postgres" }
