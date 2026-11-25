@@ -20,7 +20,7 @@ func TestOwnerOnlyNeedsAllowMultipleOwners(t *testing.T) {
 	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	res.Body.Close()
 
-	first := postJSON(t, client, ts.URL+"/api/invites", `{"track":"outreach","mode":"owner_only","max_redemptions":1}`, csrf)
+	first := postJSON(t, client, ts.URL+"/api/invites", `{"track":"outreach","mode":"owner_only","max_redemptions":1,"mcp_bootstrap":false}`, csrf)
 	body := readBody(first)
 	if first.StatusCode != 200 {
 		t.Fatalf("invite %d %s", first.StatusCode, body)
@@ -40,7 +40,7 @@ func TestOwnerOnlyNeedsAllowMultipleOwners(t *testing.T) {
 		t.Fatalf("first owner %d %s", join1.StatusCode, j1)
 	}
 
-	blocked := postJSON(t, client, ts.URL+"/api/invites", `{"track":"outreach","mode":"owner_only","max_redemptions":1}`, csrf)
+	blocked := postJSON(t, client, ts.URL+"/api/invites", `{"track":"outreach","mode":"owner_only","max_redemptions":1,"mcp_bootstrap":false}`, csrf)
 	blockedBody := readBody(blocked)
 	var blockedInv struct {
 		Secret string `json:"secret"`
@@ -54,7 +54,7 @@ func TestOwnerOnlyNeedsAllowMultipleOwners(t *testing.T) {
 		t.Fatalf("expected 403 without flag, got %d %s", denied.StatusCode, readBody(denied))
 	}
 
-	flagged := postJSON(t, client, ts.URL+"/api/invites", `{"track":"outreach","mode":"owner_only","max_redemptions":1,"allow_multiple_owners":true}`, csrf)
+	flagged := postJSON(t, client, ts.URL+"/api/invites", `{"track":"outreach","mode":"owner_only","max_redemptions":1,"allow_multiple_owners":true,"mcp_bootstrap":false}`, csrf)
 	flagBody := readBody(flagged)
 	var flaggedInv struct {
 		Secret string `json:"secret"`
@@ -85,7 +85,7 @@ func TestOwnerThenAgentsSecondJoinIsAgent(t *testing.T) {
 	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	res.Body.Close()
 
-	created := postJSON(t, client, ts.URL+"/api/invites", `{"track":"discovery","mode":"owner_then_agents","max_redemptions":3,"allow_multiple_owners":true}`, csrf)
+	created := postJSON(t, client, ts.URL+"/api/invites", `{"track":"discovery","mode":"owner_then_agents","max_redemptions":3,"allow_multiple_owners":true,"mcp_bootstrap":false}`, csrf)
 	body := readBody(created)
 	var inv struct {
 		Secret string `json:"secret"`

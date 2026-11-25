@@ -256,18 +256,57 @@ func (f *Flow) mintLocked(accountID, userID, clientID, clientName, scopeValue, s
 	f.grants[id] = Grant{
 		ID: id, AccountID: accountID, UserID: userID, ClientID: clientID, ClientName: clientName, Scope: scopeValue,
 		AccessHash: sha(access), RefreshHash: sha(refresh), PreviousRefreshHash: prev,
-		AccessExpiresAt: time.Now().UTC().Add(time.Hour).Format(time.RFC3339),
+		AccessExpiresAt: time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339),
 		RefreshExpiresAt: time.Now().UTC().Add(90 * 24 * time.Hour).Format(time.RFC3339),
 		SessionID: sessionID, LastUsedAt: now(),
 	}
 	return map[string]any{
-		"access_token": access, "token_type": "Bearer", "expires_in": 3600,
+		"access_token": access, "token_type": "Bearer", "expires_in": 86400,
 		"refresh_token": refresh, "scope": scopeValue, "grant_id": id,
 	}
 }
 
+// EnsureHubKeyGrant binds a long-lived Hub API key (jh_agt_… / jh_own_…) to an MCP grant.
+// Access lasts 90 days; clients keep the Bearer key in MCP config (no OAuth refresh needed).
+func (f *Flow) EnsureHubKeyGrant(accountID, userID, clientName, apiKey string) Grant {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	digest := sha(apiKey)
+	for id, grant := range f.grants {
+		if grant.AccessHash != digest {
+			continue
+		}
+		if grant.RevokedAt != "" {
+			continue
+		}
+		if grant.AccessExpiresAt < now() {
+			grant.AccessExpiresAt = time.Now().UTC().Add(90 * 24 * time.Hour).Format(time.RFC3339)
+		}
+		grant.AccountID = accountID
+		grant.UserID = userID
+		if clientName != "" {
+			grant.ClientName = clientName
+		}
+		grant.LastUsedAt = now()
+		f.grants[id] = grant
+		return grant
+	}
+	id := "mgr_key_" + token(8)
+	if clientName == "" {
+		clientName = "Hub API key"
+	}
+	grant := Grant{
+		ID: id, AccountID: accountID, UserID: userID, ClientID: "hub_key", ClientName: clientName, Scope: scope,
+		AccessHash: digest, AccessExpiresAt: time.Now().UTC().Add(90 * 24 * time.Hour).Format(time.RFC3339),
+		RefreshExpiresAt: time.Now().UTC().Add(90 * 24 * time.Hour).Format(time.RFC3339),
+		LastUsedAt: now(),
+	}
+	f.grants[id] = grant
+	return grant
+}
+
 func (f *Flow) GrantForAccess(token string) (Grant, string) {
-	if !strings.HasPrefix(token, accessPrefix) {
+	if token == "" {
 		return Grant{}, "invalid_token"
 	}
 	f.mu.Lock()
