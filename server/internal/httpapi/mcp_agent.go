@@ -949,7 +949,7 @@ func toolCatalog() []gin.H {
 		{"name": "list_peers", "description": "List A2A peers.", "inputSchema": obj(gin.H{})},
 		{"name": "create_peer", "description": "Register an A2A peer.", "inputSchema": obj(gin.H{"url": gin.H{"type": "string"}, "name": gin.H{"type": "string"}}, "url")},
 		{"name": "send_peer", "description": "Submit a task toward an A2A peer.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "payload": gin.H{"type": "object"}}, "id")},
-		{"name": "poll_events", "description": "Poll buffered Hub events (MCP equivalent of /ws and /api/stream).", "inputSchema": obj(gin.H{"after_seq": gin.H{"type": "integer"}, "limit": gin.H{"type": "integer"}})},
+		{"name": "poll_events", "description": "Poll buffered Hub events (MCP equivalent of /ws and /api/stream).", "inputSchema": obj(gin.H{"after_seq": gin.H{"type": "integer"}, "epoch": gin.H{"type": "string"}, "limit": gin.H{"type": "integer"}})},
 	}
 }
 

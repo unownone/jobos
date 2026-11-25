@@ -63,9 +63,15 @@ func (s *Server) toolCreateInvite(c *gin.Context, grant agentflow.Grant, args ma
 	if track == "" {
 		return nil, errString("unknown track")
 	}
-	mode := canonicalInviteMode(strAny(args["mode"]))
-	if mode == "" {
-		mode = "owner_then_agents"
+	mode := "owner_then_agents"
+	if rawMode, ok := args["mode"]; ok {
+		// Match HTTP: omit / empty → default; explicit invalid → reject.
+		if s := strAny(rawMode); s != "" {
+			mode = canonicalInviteMode(s)
+			if mode == "" {
+				return nil, errString("mode must be owner_then_agents, owner_only, or agents_only")
+			}
+		}
 	}
 	maxRedemptions := intAny(args["max_redemptions"], 5)
 	if maxRedemptions <= 0 {
@@ -977,6 +983,20 @@ func (s *Server) toolPollEvents(c *gin.Context, grant agentflow.Grant, args map[
 	}
 	after := int64(intAny(args["after_seq"], 0))
 	limit := intAny(args["limit"], 32)
+	hubEpoch := s.RT.Epoch()
+	reset := false
+	if after > 0 {
+		if rawEpoch, ok := args["epoch"]; ok {
+			if strAny(rawEpoch) != hubEpoch {
+				after = 0
+				reset = true
+			}
+		} else if after > s.RT.CurrentSeq() {
+			// Stale cursor from a prior Hub process (seq restarted at 0).
+			after = 0
+			reset = true
+		}
+	}
 	events := s.RT.Recent(p.AccountID, after, limit)
 	out := make([]gin.H, 0, len(events))
 	var last int64 = after
@@ -988,7 +1008,8 @@ func (s *Server) toolPollEvents(c *gin.Context, grant agentflow.Grant, args map[
 	}
 	return gin.H{
 		"events": out, "count": len(out), "after_seq": after, "next_seq": last,
-		"hint": "MCP poll equivalent of /ws and /api/stream. Pass next_seq as after_seq on the next call.",
+		"epoch": hubEpoch, "cursor_reset": reset,
+		"hint": "MCP poll equivalent of /ws and /api/stream. Pass epoch and next_seq as after_seq on the next call.",
 	}, nil
 }
 

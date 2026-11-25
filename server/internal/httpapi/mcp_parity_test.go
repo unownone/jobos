@@ -128,14 +128,15 @@ func TestMCPParitySurfacesViaTools(t *testing.T) {
 		t.Fatalf("poll_events missing message publish: %s", poll1)
 	}
 	var pollPayload struct {
-		NextSeq int64 `json:"next_seq"`
-		Count   int   `json:"count"`
+		NextSeq int64  `json:"next_seq"`
+		Count   int    `json:"count"`
+		Epoch   string `json:"epoch"`
 	}
 	_ = json.Unmarshal([]byte(poll1), &pollPayload)
-	if pollPayload.Count < 1 || pollPayload.NextSeq < 1 {
+	if pollPayload.Count < 1 || pollPayload.NextSeq < 1 || pollPayload.Epoch == "" {
 		t.Fatalf("poll_events seq %#v %s", pollPayload, poll1)
 	}
-	poll2 := mcpToolText(t, ts.URL, access, session, 19, "poll_events", `{"after_seq":`+itoa64(pollPayload.NextSeq)+`}`)
+	poll2 := mcpToolText(t, ts.URL, access, session, 19, "poll_events", `{"after_seq":`+itoa64(pollPayload.NextSeq)+`,"epoch":"`+pollPayload.Epoch+`"}`)
 	if !strings.Contains(poll2, `"count": 0`) && !strings.Contains(poll2, `"count":0`) {
 		t.Fatalf("poll_events should be empty after cursor: %s", poll2)
 	}
@@ -246,6 +247,9 @@ func TestMCPParitySurfacesViaTools(t *testing.T) {
 
 func TestRealtimeRecentPollBuffer(t *testing.T) {
 	hub := realtime.New()
+	if hub.Epoch() == "" {
+		t.Fatal("hub epoch missing")
+	}
 	hub.Publish("acc", "job", map[string]any{"id": "j1"})
 	hub.Publish("acc", "message", map[string]any{"id": "m1"})
 	all := hub.Recent("acc", 0, 10)
@@ -259,6 +263,85 @@ func TestRealtimeRecentPollBuffer(t *testing.T) {
 	empty := hub.Recent("acc", all[1].Seq, 10)
 	if len(empty) != 0 {
 		t.Fatalf("expected empty %#v", empty)
+	}
+}
+
+func TestMCPCreateInviteRejectsInvalidMode(t *testing.T) {
+	ts, _ := parityTestServer(t)
+	defer ts.Close()
+
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"modeadmin","password":"long-enough"}`, "")
+	csrf := res.Header.Get("X-CSRF")
+	res.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
+	res.Body.Close()
+
+	access, session := mcpOAuthSession(t, client, ts.URL, csrf)
+
+	errText, isErr := mcpToolResult(t, ts.URL, access, session, 1, "create_invite", `{"track":"discovery","mode":"not_a_real_mode","mcp_bootstrap":true}`)
+	if !isErr {
+		t.Fatalf("expected invalid mode rejection, got %s", errText)
+	}
+	if !strings.Contains(errText, "mode must be") {
+		t.Fatalf("unexpected error text: %s", errText)
+	}
+
+	okText, isErr := mcpToolResult(t, ts.URL, access, session, 2, "create_invite", `{"track":"discovery","mcp_bootstrap":false}`)
+	if isErr {
+		t.Fatalf("omitted mode should default: %s", okText)
+	}
+	if !strings.Contains(okText, `"mode": "owner_then_agents"`) && !strings.Contains(okText, `"mode":"owner_then_agents"`) {
+		t.Fatalf("default mode missing: %s", okText)
+	}
+}
+
+func TestMCPPollEventsResetsStaleCursor(t *testing.T) {
+	ts, _ := parityTestServer(t)
+	defer ts.Close()
+
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"polladmin","password":"long-enough"}`, "")
+	csrf := res.Header.Get("X-CSRF")
+	res.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
+	res.Body.Close()
+
+	access, session := mcpOAuthSession(t, client, ts.URL, csrf)
+	_ = mcpToolText(t, ts.URL, access, session, 1, "create_message", `{"body":"poll-reset","to_track":"discovery"}`)
+
+	stale := mcpToolText(t, ts.URL, access, session, 2, "poll_events", `{"after_seq":999999}`)
+	var stalePayload struct {
+		Count        int    `json:"count"`
+		CursorReset  bool   `json:"cursor_reset"`
+		Epoch        string `json:"epoch"`
+		NextSeq      int64  `json:"next_seq"`
+	}
+	if err := json.Unmarshal([]byte(stale), &stalePayload); err != nil {
+		t.Fatalf("decode stale poll %v %s", err, stale)
+	}
+	if !stalePayload.CursorReset || stalePayload.Count < 1 || stalePayload.Epoch == "" {
+		t.Fatalf("expected cursor reset with events: %#v %s", stalePayload, stale)
+	}
+
+	wrongEpoch := mcpToolText(t, ts.URL, access, session, 3, "poll_events", `{"after_seq":`+itoa64(stalePayload.NextSeq)+`,"epoch":"deadbeef"}`)
+	var wrongPayload struct {
+		Count       int  `json:"count"`
+		CursorReset bool `json:"cursor_reset"`
+	}
+	_ = json.Unmarshal([]byte(wrongEpoch), &wrongPayload)
+	if !wrongPayload.CursorReset || wrongPayload.Count < 1 {
+		t.Fatalf("expected epoch mismatch reset: %#v %s", wrongPayload, wrongEpoch)
+	}
+
+	ok := mcpToolText(t, ts.URL, access, session, 4, "poll_events", `{"after_seq":`+itoa64(stalePayload.NextSeq)+`,"epoch":"`+stalePayload.Epoch+`"}`)
+	if !strings.Contains(ok, `"count": 0`) && !strings.Contains(ok, `"count":0`) {
+		t.Fatalf("matching epoch should not reset: %s", ok)
+	}
+	if strings.Contains(ok, `"cursor_reset": true`) || strings.Contains(ok, `"cursor_reset":true`) {
+		t.Fatalf("matching epoch should not set cursor_reset: %s", ok)
 	}
 }
 
@@ -333,6 +416,15 @@ func mcpOAuthSession(t *testing.T, client *http.Client, base, csrf string) (acce
 
 func mcpToolText(t *testing.T, base, token, session string, id int, name, argsJSON string) string {
 	t.Helper()
+	text, isErr := mcpToolResult(t, base, token, session, id, name, argsJSON)
+	if isErr {
+		t.Fatalf("%s error response %s", name, text)
+	}
+	return text
+}
+
+func mcpToolResult(t *testing.T, base, token, session string, id int, name, argsJSON string) (text string, isError bool) {
+	t.Helper()
 	payload := `{"jsonrpc":"2.0","id":` + itoa(id) + `,"method":"tools/call","params":{"name":"` + name + `","arguments":` + argsJSON + `}}`
 	res := mcpCall(t, base, token, session, payload)
 	body := readBody(res)
@@ -351,10 +443,14 @@ func mcpToolText(t *testing.T, base, token, session string, id int, name, argsJS
 	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
 		t.Fatalf("%s decode %v %s", name, err, body)
 	}
-	if envelope.Error != nil || envelope.Result.IsError || len(envelope.Result.Content) == 0 {
-		t.Fatalf("%s error response %s", name, body)
+	if len(envelope.Result.Content) == 0 {
+		t.Fatalf("%s empty content %s", name, body)
 	}
-	return envelope.Result.Content[0].Text
+	text = envelope.Result.Content[0].Text
+	if envelope.Error != nil || envelope.Result.IsError {
+		return text, true
+	}
+	return text, false
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }

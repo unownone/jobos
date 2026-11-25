@@ -2,9 +2,13 @@
 package realtime
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type subscription struct {
@@ -27,10 +31,29 @@ type Hub struct {
 	seq     atomic.Int64
 	recent  map[string][]Event
 	ringCap int
+	epoch   string
+}
+
+func newEpoch() string {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return strconv.FormatInt(time.Now().UnixNano(), 16)
+	}
+	return hex.EncodeToString(b)
 }
 
 func New() *Hub {
-	return &Hub{subs: map[int]subscription{}, recent: map[string][]Event{}, ringCap: 128}
+	return &Hub{subs: map[int]subscription{}, recent: map[string][]Event{}, ringCap: 128, epoch: newEpoch()}
+}
+
+// Epoch identifies this Hub process generation for poll cursors.
+func (h *Hub) Epoch() string {
+	return h.epoch
+}
+
+// CurrentSeq is the last assigned publish sequence (0 if none yet).
+func (h *Hub) CurrentSeq() int64 {
+	return h.seq.Load()
 }
 
 func (h *Hub) Subscribe(account string) (int, <-chan []byte) {
@@ -57,10 +80,13 @@ func (h *Hub) Publish(account, event string, payload any) {
 	if err != nil {
 		return
 	}
-	seq := h.seq.Add(1)
-	ev := Event{Seq: seq, Event: event, Data: payload, RawJSON: body}
+	// Assign seq under the ring lock so concurrent publishes cannot reorder
+	// relative to poll_events cursor advance (seq N must be in the ring
+	// before seq N+1 can be observed).
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	seq := h.seq.Add(1)
+	ev := Event{Seq: seq, Event: event, Data: payload, RawJSON: body}
 	ring := append(h.recent[account], ev)
 	if len(ring) > h.ringCap {
 		ring = ring[len(ring)-h.ringCap:]
