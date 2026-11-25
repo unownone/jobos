@@ -475,10 +475,11 @@ func (s *Server) createInvite(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Track          string `json:"track"`
-		Mode           string `json:"mode"`
-		MaxRedemptions int    `json:"max_redemptions"`
-		TTLHours       int    `json:"ttl_hours"`
+		Track               string `json:"track"`
+		Mode                string `json:"mode"`
+		MaxRedemptions      int    `json:"max_redemptions"`
+		TTLHours            int    `json:"ttl_hours"`
+		AllowMultipleOwners bool   `json:"allow_multiple_owners"`
 	}
 	if err := c.BindJSON(&body); err != nil {
 		return
@@ -501,7 +502,7 @@ func (s *Server) createInvite(c *gin.Context) {
 	inv := store.Invite{
 		ID: newID("inv_"), AccountID: p.AccountID, Track: track, Mode: body.Mode, SecretHash: hash(secret),
 		MaxRedemptions: body.MaxRedemptions, ExpiresAt: time.Now().UTC().Add(time.Duration(body.TTLHours) * time.Hour).Format(time.RFC3339),
-		CreatedBy: p.UserID, CreatedAt: now(),
+		CreatedBy: p.UserID, AllowMultipleOwners: body.AllowMultipleOwners, CreatedAt: now(),
 	}
 	if err := s.DB.CreateInvite(c.Request.Context(), inv); err != nil {
 		fail(c, 500, err.Error())
@@ -527,7 +528,12 @@ func canonicalTrack(v string) string {
 }
 
 func publicInvite(inv store.Invite) gin.H {
-	return gin.H{"id": inv.ID, "track": inv.Track, "mode": inv.Mode, "max_redemptions": inv.MaxRedemptions, "redemptions": inv.Redemptions, "expires_at": inv.ExpiresAt, "revoked_at": inv.RevokedAt}
+	return gin.H{
+		"id": inv.ID, "track": inv.Track, "mode": inv.Mode,
+		"max_redemptions": inv.MaxRedemptions, "redemptions": inv.Redemptions,
+		"expires_at": inv.ExpiresAt, "revoked_at": inv.RevokedAt,
+		"allow_multiple_owners": inv.AllowMultipleOwners,
+	}
 }
 
 func (s *Server) listInvites(c *gin.Context) {

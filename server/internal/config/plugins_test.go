@@ -47,4 +47,14 @@ func TestPluginsStayOffUntilHostsExist(t *testing.T) {
 	if cfg.BlobDriver != "memory" {
 		t.Fatalf("explicit blob driver replaced: %s", cfg.BlobDriver)
 	}
+
+	delete(env, "BLOB_DRIVER")
+	cfg.BlobDriver = "filesystem"
+	cfg.applyPlugins(func(key string) string { return env[key] }, func(name string) bool { return up[name] })
+	if cfg.BlobDriver != "s3" {
+		t.Fatalf("empty BLOB_DRIVER should let MinIO replace filesystem adapter, got %s", cfg.BlobDriver)
+	}
+	if cfg.S3Endpoint != "http://minio:9000" {
+		t.Fatalf("s3 endpoint %s", cfg.S3Endpoint)
+	}
 }
