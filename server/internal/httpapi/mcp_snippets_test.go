@@ -50,6 +50,20 @@ func TestToolCatalogCoversParitySurface(t *testing.T) {
 		"recall_memory", "write_memory", "delete_memory", "solidify_memory",
 		"get_candidate", "candidate_status", "list_skills", "list_mcps",
 		"list_people", "create_person", "list_events", "heartbeat", "whoami",
+		"meta", "list_invites", "create_invite", "revoke_invite",
+		"list_agents", "create_agent", "rotate_agent_key", "disable_agent",
+		"put_candidate", "get_resume", "put_resume",
+		"memory_pods", "patch_memory", "move_memory",
+		"list_presence", "get_presence",
+		"create_message", "list_messages", "read_message",
+		"create_skill", "patch_skill", "fork_skill",
+		"create_recording", "list_recordings", "get_recording",
+		"proctor_recording", "promote_recording", "decline_recording",
+		"hygiene", "vacuum", "import_jobs", "export_ledger",
+		"skills_zip", "rebuild_pack",
+		"add_token_burn", "list_token_burns", "token_burn_summary",
+		"a2a_directory", "list_peers", "create_peer", "send_peer",
+		"poll_events",
 	}
 	for _, name := range required {
 		if !names[name] {
