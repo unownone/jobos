@@ -36,6 +36,8 @@ func (c *Config) applyPlugins(getenv func(string) string, up func(string) bool) 
 	if getenv("REDIS_URL") == "" && up("redis") {
 		c.RedisURL = "redis://redis:6379/0"
 	}
+	// Empty BLOB_DRIVER lets MinIO win even when legacy BLOB_ADAPTER=filesystem
+	// was loaded first. Set BLOB_DRIVER=filesystem explicitly to keep the volume.
 	if getenv("BLOB_DRIVER") == "" && up("minio") {
 		c.BlobDriver = "s3"
 		if getenv("S3_ENDPOINT") == "" {
@@ -50,6 +52,7 @@ func (c *Config) applyPlugins(getenv func(string) string, up func(string) bool) 
 		if c.S3Bucket == "" {
 			c.S3Bucket = "jobos"
 		}
+		c.S3UsePathStyle = true
 	}
 }
 

@@ -46,12 +46,135 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE`,
 		`ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS tags_json TEXT NOT NULL DEFAULT '[]'`,
 		`CREATE INDEX IF NOT EXISTS memory_items_fts ON memory_items USING GIN (to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(body,'') || ' ' || coalesce(company,'')))`,
+		// Python Hub used body_md; Go selects body. CREATE TABLE IF NOT EXISTS
+		// does not rename columns on an existing production database.
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS account_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS slug TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'skill'`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS tags_json TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'shared'`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS owner_user_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'approved'`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS platform TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`,
+		copyColumnIfPresentSQL("skills", "body_md", "body"),
+		// Go inserts omit Python-era NOT NULL columns; drop the constraint after copy.
+		dropNotNullIfPresentSQL("skills", "body_md"),
+		dropNotNullIfPresentSQL("skills", "content_hash"),
+		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS submitter_user_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'`,
+		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS proctor_note TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE skill_recordings ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''`,
+		copyColumnIfPresentSQL("skill_recordings", "payload_json", "body"),
+		copyColumnIfPresentSQL("skill_recordings", "submitted_by", "submitter_user_id"),
+		dropNotNullIfPresentSQL("skill_recordings", "payload_json"),
+		dropNotNullIfPresentSQL("skill_recordings", "submitted_by"),
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS capability_json TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS roles_json TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS platforms_json TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS install TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS auth TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT 'github'`,
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`,
+		dropNotNullIfPresentSQL("mcps", "content_hash"),
+		// Python PK was (account_id, id); Go upserts ON CONFLICT (id).
+		`CREATE UNIQUE INDEX IF NOT EXISTS skills_id_uidx ON skills (id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS skill_recordings_id_uidx ON skill_recordings (id)`,
+		// Python Hub stored these as INTEGER 0/1. Go writes bool; pgx cannot encode
+		// false into int4. Coerce leftover integer columns on every boot.
+		coerceIntBoolSQL("invites", "allow_multiple_owners"),
+		coerceIntBoolSQL("jobs", "stopped"),
+		coerceIntBoolSQL("people", "do_not_contact"),
+		coerceIntBoolSQL("memory_items", "pinned"),
+		coerceIntBoolSQL("skills", "reproducible"),
 	} {
 		if _, err := p.pool.Exec(ctx, stmt); err != nil {
-			return err
+			return fmt.Errorf("migrate: %w", err)
 		}
 	}
 	return nil
+}
+
+// coerceIntBoolSQL rewrites a Python-era INTEGER flag column to BOOLEAN.
+func coerceIntBoolSQL(table, column string) string {
+	return fmt.Sprintf(`
+DO $migrate$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = '%s'
+      AND column_name = '%s'
+      AND data_type IN ('integer', 'smallint', 'bigint')
+  ) THEN
+    EXECUTE format(
+      'ALTER TABLE %%I ALTER COLUMN %%I DROP DEFAULT',
+      '%s', '%s'
+    );
+    EXECUTE format(
+      'ALTER TABLE %%I ALTER COLUMN %%I TYPE BOOLEAN USING (COALESCE(%%I, 0) <> 0)',
+      '%s', '%s', '%s'
+    );
+    EXECUTE format(
+      'ALTER TABLE %%I ALTER COLUMN %%I SET DEFAULT FALSE',
+      '%s', '%s'
+    );
+  END IF;
+END
+$migrate$;`, table, column, table, column, table, column, column, table, column)
+}
+
+// copyColumnIfPresentSQL copies src into dst when src still exists (Python rename).
+func copyColumnIfPresentSQL(table, src, dst string) string {
+	return fmt.Sprintf(`
+DO $migrate$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = '%s' AND column_name = '%s'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = '%s' AND column_name = '%s'
+  ) THEN
+    EXECUTE format(
+      'UPDATE %%I SET %%I = %%I WHERE (%%I IS NULL OR %%I::text = '''') AND %%I IS NOT NULL',
+      '%s', '%s', '%s', '%s', '%s', '%s'
+    );
+  END IF;
+END
+$migrate$;`, table, src, table, dst, table, dst, src, dst, dst, src)
+}
+
+// dropNotNullIfPresentSQL lets Go inserts omit Python-era columns.
+func dropNotNullIfPresentSQL(table, column string) string {
+	return fmt.Sprintf(`
+DO $migrate$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = '%s'
+      AND column_name = '%s'
+      AND is_nullable = 'NO'
+  ) THEN
+    EXECUTE format('ALTER TABLE %%I ALTER COLUMN %%I DROP NOT NULL', '%s', '%s');
+    EXECUTE format('ALTER TABLE %%I ALTER COLUMN %%I SET DEFAULT ''''', '%s', '%s');
+  END IF;
+END
+$migrate$;`, table, column, table, column, table, column)
 }
 
 func (p *Postgres) Name() string { return "postgres" }

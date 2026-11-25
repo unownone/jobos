@@ -54,8 +54,15 @@ services:
       AMQP_URL: "${AMQP_URL:-}"
       QUEUE_ADAPTER: "${QUEUE_ADAPTER:-postgres}"
       BLOB_ROOT: "/var/lib/jobos/blobs"
+      # Prefer S3 when the blobs profile (MinIO) is up. Filesystem stays the
+      # offline default so Coolify named volume `blobs` keeps working.
       BLOB_ADAPTER: "${BLOB_ADAPTER:-filesystem}"
       BLOB_DRIVER: "${BLOB_DRIVER:-}"
+      S3_ENDPOINT: "${S3_ENDPOINT:-}"
+      S3_BUCKET: "${S3_BUCKET:-jobos}"
+      S3_ACCESS_KEY: "${S3_ACCESS_KEY:-}"
+      S3_SECRET_KEY: "${S3_SECRET_KEY:-}"
+      S3_USE_PATH_STYLE: "${S3_USE_PATH_STYLE:-true}"
       HUB_PUBLIC_HOST: "${HUB_PUBLIC_HOST:-}"
       HUB_PUBLIC_URL: "${HUB_PUBLIC_URL:-}"
       OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-jobos-hub}"
@@ -76,6 +83,18 @@ services:
       timeout: 5s
       retries: 12
 
+  minio:
+    profiles: ["blobs"]
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: "${S3_ACCESS_KEY:-jobos}"
+      MINIO_ROOT_PASSWORD: "${S3_SECRET_KEY:-jobossecret}"
+    volumes:
+      - "minio:/data"
+    restart: unless-stopped
+
 volumes:
   pgdata:
   blobs:
+  minio:
