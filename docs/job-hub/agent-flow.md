@@ -1,18 +1,31 @@
 # Agent flow
 
-This is the path to use. The older invite and role API stays.
+This is the path to use. The older invite and role API stays as a fallback.
 
 One admin. No team collaboration is required. Agents read, find, and add skills, MCPs, and memories for the lanes the human picks. Humans observe, leave steers, and do not have to re-prompt each step.
 
-## Connect
+## Connect (MCP-first)
+
+**Preferred — invite paste**
+
+1. Admin opens Invites and creates an MCP invite (bootstraps a long-lived Hub API key).
+2. Copy a client block (Cursor, Claude, Grok, or Codex) and paste it into the AI’s MCP settings.
+3. The block points at `{HUB_PUBLIC_URL}/mcp` with `Authorization: Bearer jh_agt_…` / `jh_own_…`.
+4. That Bearer key lasts ~90 days on MCP. Ask the agent to call `get_started` and operate only through MCP tools.
+
+Set `HUB_PUBLIC_URL=https://ikr.one` (or `HUB_PUBLIC_HOST=ikr.one`) in production so paste snippets and join links use the public host, not `*.run.app`.
+
+**Alternate — OAuth on /connect**
 
 1. Log in at `/login`.
 2. Open `/connect`.
 3. Add the shown URL (`/mcp` on that origin) to the AI’s MCP settings.
 4. The AI receives `401` with `WWW-Authenticate` pointing at `/.well-known/oauth-protected-resource/mcp`.
 5. It registers, opens `/oauth/authorize`, and the admin approves.
-6. `POST /oauth/token` returns an access token (1 hour) and a refresh token (90 days). Refresh rotates. Reusing an old refresh token revokes the grant.
+6. `POST /oauth/token` returns an access token (~24 hours) and a refresh token (90 days). Refresh rotates. Reusing an old refresh token revokes the grant.
 7. `POST /mcp` speaks MCP. `DELETE /mcp` ends the agent session. The grant can initialize a new one.
+
+Browser `/join/{id}?s=…` remains a fallback that also returns MCP client snippets after redeem.
 
 ## Session
 
@@ -31,7 +44,7 @@ The agent session belongs to the connection. jobOS does not pick lanes.
 
 `read_skill` prefixes the playbook with the capability gate. `record_use` stores which skill or MCP the agent actually used. `recall_memory` / `write_memory` are the memory pods. `read_steers` returns notes the admin saved on `/connect`.
 
-Job tools: `list_jobs`, `get_job`, `create_job` (find), `update_job` (lane required), `list_people` (outreach).
+Parity tools (mirror Hub HTTP): jobs (`list`/`get`/`create`/`update`/`delete`/`stop`/`pause`/`resume`), queue (`push`/`claim`/`ack`/`nack`/`mine`/`list`), memory (`recall`/`list`/`write`/`delete`/`solidify`), candidate (`get_candidate`/`candidate_status`), registry (`list_skills`/`get_skill`/`list_mcps`/`get_mcp`), people (`list`/`create`/`get`/`update`), events, heartbeat, whoami, onboarding.
 
 ## Human page
 

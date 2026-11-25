@@ -62,6 +62,23 @@ type InviteRow = {
   allow_multiple_owners?: boolean;
   expires_at?: string;
 };
+type McpClientSnippet = {
+  id: string;
+  label: string;
+  format?: string;
+  filename?: string;
+  config: string;
+  instruction?: string;
+};
+type FreshInvite = {
+  join_url: string;
+  token?: string;
+  api_key?: string;
+  mcp_url?: string;
+  mcp_clients?: McpClientSnippet[];
+  auth_hint?: string;
+  mcp_bootstrap_error?: string;
+};
 type AgentRow = { id: string; display_name?: string; track?: string; kind?: string };
 type SkillRow = { id: string; slug?: string; name?: string; tags?: string[]; status?: string; scope?: string };
 type McpRow = { id: string; slug?: string; name?: string; kind?: string; status?: string; source?: string };
@@ -823,6 +840,43 @@ export function Board({ me }: { me: SessionMe }) {
   );
 }
 
+
+function inviteHostMismatch(joinURL: string): string {
+  try {
+    const created = new URL(joinURL);
+    const here = window.location.hostname;
+    if (created.hostname === here) return "";
+    if (created.hostname === "127.0.0.1" || created.hostname === "localhost") {
+      return `Join link points at ${created.hostname}. Set HUB_PUBLIC_URL=https://ikr.one (or HUB_PUBLIC_HOST=ikr.one) on the API before sharing.`;
+    }
+    return `Join link host is ${created.hostname}, but you are on ${here}. Prefer HUB_PUBLIC_URL matching the public Hub origin.`;
+  } catch {
+    return "Join link is not a valid URL.";
+  }
+}
+
+async function copyText(value: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    try {
+      const area = document.createElement("textarea");
+      area.value = value;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.left = "-9999px";
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(area);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 const INVITE_MODES = [
   { id: "owner_then_agents", label: "Owner then agents", help: "First join on an empty track becomes the owner; later joins are agents." },
   { id: "owner_only", label: "Owner only", help: "Every redemption is a track owner. Needs multi-owner if the track already has one." },
@@ -837,8 +891,10 @@ export function Invites({ me }: { me: SessionMe }) {
   const [ttlHours, setTtlHours] = useState(72);
   const [allowMultiple, setAllowMultiple] = useState(false);
   const [invites, setInvites] = useState<InviteRow[]>([]);
-  const [fresh, setFresh] = useState<{ join_url: string; token?: string } | null>(null);
+  const [fresh, setFresh] = useState<FreshInvite | null>(null);
   const [error, setError] = useState("");
+  const [copyNote, setCopyNote] = useState("");
+  const [clientTab, setClientTab] = useState("cursor");
   const [needsCandidate, setNeedsCandidate] = useState(false);
   const [cand, setCand] = useState<CandidateStatus | null>(null);
 
@@ -864,7 +920,7 @@ export function Invites({ me }: { me: SessionMe }) {
     event.preventDefault();
     setError("");
     try {
-      const data = await api<{ join_url: string; token?: string }>("/api/invites", {
+      const data = await api<FreshInvite>("/api/invites", {
         method: "POST",
         body: JSON.stringify({
           track,
@@ -872,9 +928,12 @@ export function Invites({ me }: { me: SessionMe }) {
           max_redemptions: maxRedemptions,
           ttl_hours: ttlHours,
           allow_multiple_owners: allowMultiple,
+          mcp_bootstrap: true,
         }),
       });
       setFresh(data);
+      setClientTab(data.mcp_clients?.[0]?.id || "cursor");
+      setCopyNote("");
       await load();
     } catch (err) {
       if (isCandidateRequired(err)) {
@@ -893,16 +952,62 @@ export function Invites({ me }: { me: SessionMe }) {
 
   const trackMeta = TRACKS.find((item) => item.id === track) || TRACKS[0];
   const modeMeta = INVITE_MODES.find((item) => item.id === mode) || INVITE_MODES[0];
+  const clients = fresh?.mcp_clients || [];
+  const activeClient = clients.find((item) => item.id === clientTab) || clients[0] || null;
   const prompt = fresh
-    ? `Join ${fresh.join_url} and read AGENTS.md before you search. Review the packet before any apply.`
-    : "Create an invite. Share the join URL once — the secret is shown only here.";
+    ? (fresh.api_key
+      ? `Paste the ${activeClient?.label || "MCP"} config into your AI. MCP URL ${fresh.mcp_url || ""}. Auth is the long-lived Bearer API key in that block (~90 days). Call get_started, then operate only through MCP tools. Browser join ${fresh.join_url} is fallback only.`
+      : `Join ${fresh.join_url} (browser fallback), then paste MCP config with the shown API key. Prefer MCP over raw HTTP.`)
+    : "Create an invite. Paste an MCP client block into Cursor, Claude, Grok, or Codex — do not rely on the /join form.";
+  const hostWarn = fresh ? inviteHostMismatch(fresh.join_url) : "";
+
+  async function copyJoin() {
+    if (!fresh) return;
+    const ok = await copyText(fresh.join_url);
+    setCopyNote(ok ? "Join URL copied (fallback). Keep the ?s= secret intact." : "Copy failed — select the URL manually.");
+  }
+
+  async function copyPrompt() {
+    const ok = await copyText(prompt);
+    setCopyNote(ok ? "Agent prompt copied." : "Copy failed — select the prompt manually.");
+  }
+
+  async function copyMcpConfig() {
+    if (!activeClient) return;
+    const ok = await copyText(activeClient.config);
+    setCopyNote(ok ? `${activeClient.label} MCP config copied. Paste into that client.` : "Copy failed — select the config manually.");
+  }
+
+  async function copyApiKey() {
+    if (!fresh?.api_key) return;
+    const ok = await copyText(fresh.api_key);
+    setCopyNote(ok ? "API key copied. Shown once — store as Bearer for /mcp." : "Copy failed.");
+  }
+
+  async function shareJoin() {
+    if (!fresh) return;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "jobOS MCP invite", text: prompt, url: fresh.mcp_url || fresh.join_url });
+        setCopyNote("Shared. Prefer pasting the MCP config block, not only the URL.");
+        return;
+      } catch {
+        // Fall through to clipboard when the share sheet is dismissed or unavailable.
+      }
+    }
+    if (activeClient) {
+      await copyMcpConfig();
+      return;
+    }
+    await copyJoin();
+  }
 
   return (
     <Shell me={me} narrow>
       <CandidateGateBanner status={cand} />
       <div className="card-panel">
         <h2>Invites</h2>
-        <p id="soon" className="muted">Mint a track invite for an agent. Review and resume tailoring stay operator-owned.</p>
+        <p id="soon" className="muted">MCP-first join: mint a track invite, then paste a client config into the agent&apos;s AI. Browser /join is fallback only.</p>
         {needsCandidate ? (
           <div className="empty-state">
             <p className="error">{error}</p>
@@ -939,13 +1044,63 @@ export function Invites({ me }: { me: SessionMe }) {
                 <input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} />
                 Allow multiple owners on this track
               </label>
-              <span className="field-hint">Needed for a second owner_only invite when the track already has an owner. Does not turn later owner_then_agents joins into owners.</span>
-              <button type="submit">Create invite</button>
+              <span className="field-hint">Needed for a second owner_only invite when the track already has an owner. Creating an invite burns one redemption for the MCP API key.</span>
+              <button type="submit">Create MCP invite</button>
             </form>
             {fresh ? (
-              <p id="created" className="banner info">
-                Join URL (shown once): <span id="url" className="mono">{fresh.join_url}</span>
-              </p>
+              <div id="created" className="banner info invite-share">
+                <p className="eyebrow">Shown once — paste into your AI</p>
+                <p className="muted small">{fresh.auth_hint || "Bearer API key on /mcp (~90 days). OAuth via /connect still works."}</p>
+                {fresh.mcp_url ? <p>MCP URL: <span className="mono">{fresh.mcp_url}</span></p> : null}
+                {fresh.api_key ? (
+                  <p>API key: <span id="api-key" className="mono">{fresh.api_key}</span></p>
+                ) : (
+                  <p className="error">{fresh.mcp_bootstrap_error || "No MCP API key minted — use browser join, then paste a key."}</p>
+                )}
+                {hostWarn ? <p className="error">{hostWarn}</p> : null}
+                {clients.length ? (
+                  <div className="mcp-client-blocks">
+                    <div className="row tabs" role="tablist" aria-label="MCP clients">
+                      {clients.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={activeClient?.id === item.id}
+                          className={activeClient?.id === item.id ? "" : "quiet"}
+                          onClick={() => setClientTab(item.id)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                    {activeClient ? (
+                      <>
+                        <p className="field-hint">{activeClient.instruction}</p>
+                        <textarea
+                          id="mcp-config"
+                          className="mono mcp-config"
+                          readOnly
+                          value={activeClient.config}
+                          rows={12}
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="row actions">
+                  {activeClient ? <button type="button" onClick={copyMcpConfig}>Copy {activeClient.label} config</button> : null}
+                  {fresh.api_key ? <button type="button" className="quiet" onClick={copyApiKey}>Copy API key</button> : null}
+                  <button type="button" className="quiet" onClick={copyPrompt}>Copy agent prompt</button>
+                  <button type="button" className="quiet" onClick={shareJoin}>Share</button>
+                  <button type="button" className="quiet" onClick={copyJoin}>Copy /join URL</button>
+                </div>
+                {copyNote ? <p className="muted small">{copyNote}</p> : null}
+                <details className="invite-fallback">
+                  <summary>Browser /join fallback</summary>
+                  <p className="mono small" id="url">{fresh.join_url}</p>
+                </details>
+              </div>
             ) : null}
             <textarea id="prompt" readOnly value={prompt} />
             {error ? <p className="error">{error}</p> : null}
@@ -1273,13 +1428,20 @@ export function Join() {
   const [provider, setProvider] = useState("");
   const [capabilities, setCapabilities] = useState("");
   const [key, setKey] = useState("");
+  const [mcpClients, setMcpClients] = useState<McpClientSnippet[]>([]);
+  const [mcpURL, setMcpURL] = useState("");
   const [error, setError] = useState("");
+  const [copyNote, setCopyNote] = useState("");
   const secret = new URLSearchParams(window.location.search).get("s") || "";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!secret) {
+      setError("This join link is missing the secret (?s=…). Ask the operator to resend the full URL or paste an MCP config from Invites.");
+      return;
+    }
     try {
-      const data = await api<{ api_key: string }>("/api/auth/join", {
+      const data = await api<FreshInvite & { api_key: string }>("/api/auth/join", {
         method: "POST",
         body: JSON.stringify({
           invite_id: id,
@@ -1289,24 +1451,49 @@ export function Join() {
         }),
       });
       setKey(data.api_key);
+      setMcpClients(data.mcp_clients || []);
+      setMcpURL(data.mcp_url || "");
     } catch (err) {
       setError(errMessage(err));
     }
+  }
+
+  async function copyConfig(config: string, label: string) {
+    const ok = await copyText(config);
+    setCopyNote(ok ? `${label} MCP config copied.` : "Copy failed.");
   }
 
   return (
     <Shell narrow>
       <form id="form" className="stack card-panel" onSubmit={submit}>
         <h2>Join {id}</h2>
-        <p className="muted">Redeem the invite secret from the operator. Your API key is shown once.</p>
+        <p className="muted">Browser fallback. Prefer pasting an MCP client block from Invites. Your API key is shown once.</p>
+        {secret ? (
+          <p className="banner info">Invite secret detected in the URL.</p>
+        ) : (
+          <p className="banner warn">Missing ?s= secret in this URL. Sharing apps often strip query params — open the original full link, or use MCP paste from Invites.</p>
+        )}
         <input id="name" placeholder="bot name" value={name} onChange={(e) => setName(e.target.value)} />
         <input id="model" placeholder="model" value={model} onChange={(e) => setModel(e.target.value)} />
         <input id="harness" placeholder="harness" value={harness} onChange={(e) => setHarness(e.target.value)} />
         <input id="bed" placeholder="bed" value={bed} onChange={(e) => setBed(e.target.value)} />
         <input id="provider" placeholder="provider" value={provider} onChange={(e) => setProvider(e.target.value)} />
         <input id="capabilities" placeholder="capabilities" value={capabilities} onChange={(e) => setCapabilities(e.target.value)} />
-        <button type="submit">Redeem invite</button>
-        {key ? <p id="key" className="banner info">API key, shown once: <span className="mono">{key}</span></p> : null}
+        <button type="submit" disabled={!secret}>Redeem invite</button>
+        {key ? (
+          <div className="banner info invite-share">
+            <p id="key">API key, shown once: <span className="mono">{key}</span></p>
+            {mcpURL ? <p className="mono small">{mcpURL}</p> : null}
+            {mcpClients.map((item) => (
+              <div key={item.id} className="stack">
+                <p className="eyebrow">{item.label}</p>
+                <textarea className="mono mcp-config" readOnly value={item.config} rows={8} />
+                <button type="button" className="quiet" onClick={() => copyConfig(item.config, item.label)}>Copy {item.label}</button>
+              </div>
+            ))}
+            {copyNote ? <p className="muted small">{copyNote}</p> : null}
+          </div>
+        ) : null}
         {error ? <p className="error">{error}</p> : null}
       </form>
     </Shell>
