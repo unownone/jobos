@@ -67,7 +67,10 @@ func (p *Postgres) RequireSchema(ctx context.Context) error {
 		{"memory_items", "pinned"},
 		{"skills", "reproducible"},
 	} {
-		dt, _ := p.columnType(ctx, col[0], col[1])
+		dt, _, err := p.columnType(ctx, col[0], col[1])
+		if err != nil {
+			return fmt.Errorf("column type check %s.%s: %w", col[0], col[1], err)
+		}
 		switch dt {
 		case "integer", "smallint", "bigint":
 			return fmt.Errorf("column %s.%s is still %s (Python-era); run: hub migrate", col[0], col[1], dt)
@@ -574,10 +577,13 @@ func (p *Postgres) RevokeUserKeys(ctx context.Context, userID string, at string)
 }
 
 func (p *Postgres) CreateInvite(ctx context.Context, inv Invite) error {
-	flag := p.encodeBoolFlag(ctx, "invites", "allow_multiple_owners", inv.AllowMultipleOwners)
+	flag, err := p.encodeBoolFlag(ctx, "invites", "allow_multiple_owners", inv.AllowMultipleOwners)
+	if err != nil {
+		return err
+	}
 	// DescribeExec: re-describe params so a post-migrate TYPE change is visible
 	// even if an older statement cache still holds int4 OIDs.
-	_, err := p.pool.Exec(ctx, `INSERT INTO invites (id, account_id, track, mode, secret_hash, max_redemptions, redemptions, expires_at, revoked_at, created_by, allow_multiple_owners, created_at)
+	_, err = p.pool.Exec(ctx, `INSERT INTO invites (id, account_id, track, mode, secret_hash, max_redemptions, redemptions, expires_at, revoked_at, created_by, allow_multiple_owners, created_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
 		pgx.QueryExecModeDescribeExec,
 		inv.ID, inv.AccountID, inv.Track, inv.Mode, inv.SecretHash, inv.MaxRedemptions, inv.Redemptions, inv.ExpiresAt, inv.RevokedAt, inv.CreatedBy, flag, inv.CreatedAt)
@@ -587,23 +593,29 @@ func (p *Postgres) CreateInvite(ctx context.Context, inv Invite) error {
 // encodeBoolFlag returns a Go value pgx can bind for a flag column that may still
 // be Python-era INTEGER (0/1) or BOOLEAN. Prefer migrate (coerceIntBoolSQL); this
 // keeps CreateInvite working until operators run hub migrate.
-func (p *Postgres) encodeBoolFlag(ctx context.Context, table, column string, v bool) any {
-	dt, _ := p.columnType(ctx, table, column)
+func (p *Postgres) encodeBoolFlag(ctx context.Context, table, column string, v bool) (any, error) {
+	dt, _, err := p.columnType(ctx, table, column)
+	if err != nil {
+		return nil, err
+	}
 	switch dt {
 	case "integer", "smallint", "bigint":
 		if v {
-			return 1
+			return 1, nil
 		}
-		return 0
+		return 0, nil
 	default:
-		return v
+		return v, nil
 	}
 }
 
-func (p *Postgres) columnType(ctx context.Context, table, column string) (dataType, udt string) {
-	_ = p.pool.QueryRow(ctx, `SELECT data_type, udt_name FROM information_schema.columns
+func (p *Postgres) columnType(ctx context.Context, table, column string) (dataType, udt string, err error) {
+	err = p.pool.QueryRow(ctx, `SELECT data_type, udt_name FROM information_schema.columns
 		WHERE table_schema = current_schema() AND table_name=$1 AND column_name=$2`, table, column).Scan(&dataType, &udt)
-	return dataType, udt
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", nil
+	}
+	return dataType, udt, err
 }
 
 func scanInvite(row pgx.Row) (Invite, error) {

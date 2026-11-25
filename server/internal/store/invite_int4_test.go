@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func postgresTestURL(t *testing.T) string {
@@ -22,8 +25,7 @@ func postgresTestURL(t *testing.T) string {
 	return raw
 }
 
-// postgresURLAllowsSchemaMutation gates ALTER/fixture tests away from shared or
-// production DATABASE_URL values. Opt in with JOBOS_ALLOW_DESTRUCTIVE_PG_TESTS=1.
+// postgresURLAllowsSchemaMutation gates fixture tests away from shared/prod URLs.
 func postgresURLAllowsSchemaMutation(raw string) bool {
 	if os.Getenv("JOBOS_ALLOW_DESTRUCTIVE_PG_TESTS") == "1" {
 		return true
@@ -44,10 +46,52 @@ func postgresURLAllowsSchemaMutation(raw string) bool {
 	return dbName == "jobos" || strings.HasSuffix(dbName, "_test") || strings.HasPrefix(dbName, "jobos_test")
 }
 
+// openIsolatedPostgres creates a disposable schema and a pool whose search_path
+// is pinned to it, so Migrate/ALTER never touch public (or other shared) objects.
+func openIsolatedPostgres(t *testing.T, raw string) *Postgres {
+	t.Helper()
+	ctx := context.Background()
+	schema := fmt.Sprintf("jobos_invite_test_%d", time.Now().UnixNano())
+	ident := pgx.Identifier{schema}.Sanitize()
+
+	boot, err := pgxpool.New(ctx, raw)
+	if err != nil {
+		t.Fatalf("boot pool: %v", err)
+	}
+	if _, err := boot.Exec(ctx, `CREATE SCHEMA `+ident); err != nil {
+		boot.Close()
+		t.Fatalf("create schema: %v", err)
+	}
+	boot.Close()
+
+	cfg, err := pgxpool.ParseConfig(raw)
+	if err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, `SET search_path TO `+ident)
+		return err
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("isolated pool: %v", err)
+	}
+	p := &Postgres{pool: pool}
+	t.Cleanup(func() {
+		p.Close()
+		cleanup, err := pgxpool.New(context.Background(), raw)
+		if err != nil {
+			return
+		}
+		defer cleanup.Close()
+		_, _ = cleanup.Exec(context.Background(), `DROP SCHEMA IF EXISTS `+ident+` CASCADE`)
+	})
+	return p
+}
+
 func forceInvitesAllowMultipleOwnersInteger(t *testing.T, p *Postgres) {
 	t.Helper()
 	ctx := context.Background()
-	// Never DROP TABLE — mutate the column type only, then restore via Migrate in cleanup.
 	if err := p.Migrate(ctx); err != nil {
 		t.Fatalf("migrate before int4 fixture: %v", err)
 	}
@@ -60,22 +104,18 @@ func forceInvitesAllowMultipleOwnersInteger(t *testing.T, p *Postgres) {
 	if err != nil {
 		t.Fatalf("force int4 fixture: %v", err)
 	}
-	t.Cleanup(func() {
-		_ = p.Migrate(context.Background())
-	})
 }
 
 func TestCreateInviteWorksOnPythonEraIntegerColumn(t *testing.T) {
 	raw := postgresTestURL(t)
 	ctx := context.Background()
-	p, err := OpenPostgres(ctx, raw)
+	p := openIsolatedPostgres(t, raw)
+	forceInvitesAllowMultipleOwnersInteger(t, p)
+
+	dt, udt, err := p.columnType(ctx, "invites", "allow_multiple_owners")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer p.Close()
-	forceInvitesAllowMultipleOwnersInteger(t, p)
-
-	dt, udt := p.columnType(ctx, "invites", "allow_multiple_owners")
 	if dt != "integer" || udt != "int4" {
 		t.Fatalf("fixture want integer/int4, got %s/%s", dt, udt)
 	}
@@ -83,9 +123,6 @@ func TestCreateInviteWorksOnPythonEraIntegerColumn(t *testing.T) {
 	suffix := time.Now().UnixNano()
 	idFalse := fmt.Sprintf("inv_int4_ok_%d", suffix)
 	idTrue := fmt.Sprintf("inv_int4_true_%d", suffix)
-	t.Cleanup(func() {
-		_, _ = p.pool.Exec(context.Background(), `DELETE FROM invites WHERE id=$1 OR id=$2`, idFalse, idTrue)
-	})
 	inv := Invite{
 		ID: idFalse, AccountID: "acc1", Track: "discovery", Mode: "owner_then_agents",
 		SecretHash: "hash", MaxRedemptions: 5, Redemptions: 0,
@@ -118,28 +155,27 @@ func TestCreateInviteWorksOnPythonEraIntegerColumn(t *testing.T) {
 func TestMigrateCoercesInviteBoolBeforeUniqueIndex(t *testing.T) {
 	raw := postgresTestURL(t)
 	ctx := context.Background()
-	p, err := OpenPostgres(ctx, raw)
+	p := openIsolatedPostgres(t, raw)
+	forceInvitesAllowMultipleOwnersInteger(t, p)
+
+	pre, _, err := p.columnType(ctx, "invites", "allow_multiple_owners")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer p.Close()
-	forceInvitesAllowMultipleOwnersInteger(t, p)
-
-	pre, _ := p.columnType(ctx, "invites", "allow_multiple_owners")
 	if pre != "integer" {
 		t.Fatalf("pre-migrate want integer, got %s", pre)
 	}
 	if err := p.Migrate(ctx); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	post, udt := p.columnType(ctx, "invites", "allow_multiple_owners")
+	post, udt, err := p.columnType(ctx, "invites", "allow_multiple_owners")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if post != "boolean" || udt != "bool" {
 		t.Fatalf("post-migrate want boolean/bool, got %s/%s", post, udt)
 	}
 	id := fmt.Sprintf("inv_after_migrate_%d", time.Now().UnixNano())
-	t.Cleanup(func() {
-		_, _ = p.pool.Exec(context.Background(), `DELETE FROM invites WHERE id=$1`, id)
-	})
 	inv := Invite{
 		ID: id, AccountID: "acc1", Track: "discovery", Mode: "owner_then_agents",
 		SecretHash: "hash", MaxRedemptions: 5,
@@ -155,14 +191,9 @@ func TestMigrateCoercesInviteBoolBeforeUniqueIndex(t *testing.T) {
 func TestRequireSchemaRejectsIntegerInviteFlag(t *testing.T) {
 	raw := postgresTestURL(t)
 	ctx := context.Background()
-	p, err := OpenPostgres(ctx, raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer p.Close()
-
+	p := openIsolatedPostgres(t, raw)
 	forceInvitesAllowMultipleOwnersInteger(t, p)
-	err = p.RequireSchema(ctx)
+	err := p.RequireSchema(ctx)
 	if err == nil || !strings.Contains(err.Error(), "allow_multiple_owners") || !strings.Contains(err.Error(), "hub migrate") {
 		t.Fatalf("want RequireSchema drift error, got %v", err)
 	}
