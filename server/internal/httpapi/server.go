@@ -596,16 +596,10 @@ func (s *Server) publicURL(c *gin.Context) string {
 	if s.Cfg.PublicURL != "" {
 		return s.Cfg.PublicURL
 	}
+	// Invite join_url / MCP paste origins must not trust client-controlled
+	// X-Forwarded-Host (open redirect / phishing). Set HUB_PUBLIC_URL or
+	// HUB_PUBLIC_HOST in production. Fall back to Request.Host only.
 	host := c.Request.Host
-	if fwd := strings.TrimSpace(c.GetHeader("X-Forwarded-Host")); fwd != "" {
-		// First hop only — Cloudflare / Cloud Run may append a list.
-		if i := strings.IndexByte(fwd, ','); i >= 0 {
-			fwd = strings.TrimSpace(fwd[:i])
-		}
-		if fwd != "" {
-			host = fwd
-		}
-	}
 	scheme := "http"
 	if proto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")); proto != "" {
 		if i := strings.IndexByte(proto, ','); i >= 0 {
