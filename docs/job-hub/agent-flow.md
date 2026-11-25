@@ -44,7 +44,7 @@ The agent session belongs to the connection. jobOS does not pick lanes.
 
 `read_skill` prefixes the playbook with the capability gate. `record_use` stores which skill or MCP the agent actually used. `recall_memory` / `write_memory` are the memory pods. `read_steers` returns notes the admin saved on `/connect`.
 
-Parity tools (mirror Hub HTTP): jobs (`list`/`get`/`create`/`update`/`delete`/`stop`/`pause`/`resume`), queue (`push`/`claim`/`ack`/`nack`/`mine`/`list`), memory (`recall`/`list`/`write`/`delete`/`solidify`), candidate (`get_candidate`/`candidate_status`), registry (`list_skills`/`get_skill`/`list_mcps`/`get_mcp`), people (`list`/`create`/`get`/`update`), events, heartbeat, whoami, onboarding.
+Parity tools (mirror Hub HTTP): jobs (`list`/`get`/`create`/`update`/`delete`/`stop`/`pause`/`resume`), queue (`push`/`claim`/`ack`/`nack`/`mine`/`list`), memory (`recall`/`list`/`write`/`patch`/`move`/`delete`/`solidify`/`pods`), candidate (`get`/`put`/`status`/`resume get|put`), invites (`list`/`create`/`revoke`), registry (`skills` list/get/create/patch/fork, `mcps` list/get, recordings list/get/create/proctor/promote/decline), people (`list`/`create`/`get`/`update`), messages (`list`/`create`/`read`), presence (`list`/`get`/`heartbeat`), events, meta, export_ledger, whoami, onboarding.
 
 ## Human page
 
