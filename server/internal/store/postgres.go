@@ -115,9 +115,9 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`,
 		dropNotNullIfPresentSQL("mcps", "content_hash"),
 		// Python PK was (account_id, id), so the same skill id can exist on many
-		// accounts. Go upserts ON CONFLICT (id) and needs a single row per id.
-		dedupeByIDSQL("skills"),
-		dedupeByIDSQL("skill_recordings"),
+		// accounts. Go upserts ON CONFLICT (id). Remap losers; do not delete them.
+		remapDuplicateIDSQL("skills"),
+		remapDuplicateIDSQL("skill_recordings"),
 		`CREATE UNIQUE INDEX IF NOT EXISTS skills_id_uidx ON skills (id)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS skill_recordings_id_uidx ON skill_recordings (id)`,
 		// Python Hub stored these as INTEGER 0/1. Go writes bool; pgx cannot encode
@@ -206,40 +206,94 @@ END
 $migrate$;`, table, column, table, column, table, column)
 }
 
-// dedupeByIDSQL drops extra rows that share an id so CREATE UNIQUE INDEX on id
-// can succeed on databases upgraded from Python's (account_id, id) primary key.
-func dedupeByIDSQL(table string) string {
-	orderBy := "ctid ASC"
+// remapDuplicateIDSQL keeps every tenant row when Python-era (account_id, id)
+// primary keys collide under Go's global id uniqueness. The winner keeps the
+// bare id; losers are remapped to account_id:id (with a hash suffix on clash).
+func remapDuplicateIDSQL(table string) string {
 	switch table {
 	case "skills":
-		orderBy = `CASE WHEN status = 'approved' THEN 0 ELSE 1 END,
-      CASE WHEN scope = 'shared' THEN 0 ELSE 1 END,
-      version DESC NULLS LAST,
-      updated_at DESC NULLS LAST,
-      created_at DESC NULLS LAST,
-      ctid ASC`
-	case "skill_recordings":
-		orderBy = `CASE WHEN status = 'approved' THEN 0 WHEN status = 'pending' THEN 1 ELSE 2 END,
-      created_at DESC NULLS LAST,
-      ctid ASC`
-	default:
-		// Keep the helper locked to known tables; callers pass constants only.
-	}
-	return fmt.Sprintf(`
-DELETE FROM %s
-WHERE ctid IN (
-  SELECT ctid FROM (
-    SELECT ctid,
-           ROW_NUMBER() OVER (PARTITION BY id ORDER BY %s) AS rn
-    FROM %s
-  ) ranked
+		return `
+WITH ranked AS (
+  SELECT ctid AS rid, id, account_id,
+         ROW_NUMBER() OVER (
+           PARTITION BY id
+           ORDER BY
+             CASE WHEN status = 'approved' THEN 0 ELSE 1 END,
+             CASE WHEN scope = 'shared' THEN 0 ELSE 1 END,
+             version DESC NULLS LAST,
+             updated_at DESC NULLS LAST,
+             created_at DESC NULLS LAST,
+             ctid ASC
+         ) AS rn
+  FROM skills
+),
+losers AS (
+  SELECT rid, id AS old_id, account_id,
+         account_id || ':' || id AS candidate
+  FROM ranked
   WHERE rn > 1
-);`, table, orderBy, table)
+),
+planned AS (
+  SELECT l.rid, l.old_id, l.account_id,
+         CASE
+           WHEN NOT EXISTS (SELECT 1 FROM skills s WHERE s.id = l.candidate)
+             THEN l.candidate
+           ELSE l.account_id || ':' || l.old_id || ':' || substr(md5(l.rid::text), 1, 12)
+         END AS new_id
+  FROM losers l
+),
+upd_rec AS (
+  UPDATE skill_recordings r
+  SET skill_id = p.new_id
+  FROM planned p
+  WHERE r.account_id = p.account_id AND r.skill_id = p.old_id
+  RETURNING 1
+)
+UPDATE skills s
+SET id = p.new_id
+FROM planned p
+WHERE s.ctid = p.rid;
+`
+	case "skill_recordings":
+		return `
+WITH ranked AS (
+  SELECT ctid AS rid, id, account_id,
+         ROW_NUMBER() OVER (
+           PARTITION BY id
+           ORDER BY
+             CASE WHEN status = 'approved' THEN 0 WHEN status = 'pending' THEN 1 ELSE 2 END,
+             created_at DESC NULLS LAST,
+             ctid ASC
+         ) AS rn
+  FROM skill_recordings
+),
+losers AS (
+  SELECT rid, id AS old_id, account_id,
+         account_id || ':' || id AS candidate
+  FROM ranked
+  WHERE rn > 1
+),
+planned AS (
+  SELECT l.rid, l.account_id,
+         CASE
+           WHEN NOT EXISTS (SELECT 1 FROM skill_recordings s WHERE s.id = l.candidate)
+             THEN l.candidate
+           ELSE l.account_id || ':' || l.old_id || ':' || substr(md5(l.rid::text), 1, 12)
+         END AS new_id
+  FROM losers l
+)
+UPDATE skill_recordings r
+SET id = p.new_id
+FROM planned p
+WHERE r.ctid = p.rid;
+`
+	default:
+		return fmt.Sprintf(`SELECT 1 /* unknown remap table %s */`, table)
+	}
 }
 
-// RetryableOpenError is true for transient Postgres connectivity failures.
-// Schema conflicts (unique violations during migrate) must not loop until the
-// Cloud Run / Railway listen probe times out.
+// RetryableOpenError is true only for transient connectivity / retryable
+// Postgres classes. Permission and schema errors must fail immediately.
 func RetryableOpenError(err error) bool {
 	if err == nil {
 		return false
@@ -247,16 +301,32 @@ func RetryableOpenError(err error) bool {
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) {
 		switch pg.Code {
-		case "23505", "42P07", "42701", "42703", "42P01":
-			return false
+		case "08000", "08001", "08003", "08004", "08006", "08007", "08P01",
+			"57P01", "57P02", "57P03", "53300", "40001", "40P01":
+			return true
 		default:
+			return false
+		}
+	}
+	msg := strings.ToLower(err.Error())
+	for _, needle := range []string{
+		"connection refused",
+		"connection reset",
+		"i/o timeout",
+		"tls handshake timeout",
+		"no such host",
+		"network is unreachable",
+		"temporary failure",
+		"server closed the connection",
+		"unexpected eof",
+		"broken pipe",
+		"connect: connection timed out",
+	} {
+		if strings.Contains(msg, needle) {
 			return true
 		}
 	}
-	if strings.Contains(err.Error(), "SQLSTATE 23505") {
-		return false
-	}
-	return true
+	return false
 }
 
 func (p *Postgres) Name() string { return "postgres" }
