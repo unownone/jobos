@@ -1,140 +1,291 @@
 package httpapi
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/unownone/jobos/server/internal/agentflow"
+	"github.com/unownone/jobos/server/internal/blob"
+	"github.com/unownone/jobos/server/internal/cache"
+	"github.com/unownone/jobos/server/internal/config"
+	"github.com/unownone/jobos/server/internal/realtime"
+	"github.com/unownone/jobos/server/internal/store"
+	"github.com/unownone/jobos/server/internal/telemetry"
 )
 
-func TestMCPParityInvitesAndJobsViaAdminOAuth(t *testing.T) {
-	ts := testServer(t)
+func TestMCPParitySurfacesViaTools(t *testing.T) {
+	ts, repoRoot := parityTestServer(t)
 	defer ts.Close()
+	_ = repoRoot
+
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: jar}
-
-	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"parityops","password":"long-enough"}`, "")
+	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"parityadmin","password":"long-enough"}`, "")
 	csrf := res.Header.Get("X-CSRF")
 	res.Body.Close()
 	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
 	res.Body.Close()
+	res = putBody(t, client, ts.URL+"/api/candidate/resume", "application/pdf", "%PDF-1.4 resume", csrf)
+	res.Body.Close()
 
-	access := oauthAccessToken(t, client, ts.URL, csrf)
+	// Admin OAuth MCP session
+	access, session := mcpOAuthSession(t, client, ts.URL, csrf)
 
-	init := mcpCall(t, ts.URL, access, "", `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"Parity"}}}`)
-	session := init.Header.Get("Mcp-Session-Id")
-	if init.StatusCode != 200 || session == "" {
-		t.Fatalf("init %d %s", init.StatusCode, readBody(init))
-	}
-
-	listed := mcpCall(t, ts.URL, access, session, `{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`)
+	listed := mcpCall(t, ts.URL, access, session, `{"jsonrpc":"2.0","id":10,"method":"tools/list","params":{}}`)
 	listBody := readBody(listed)
 	for _, name := range []string{
-		"create_invite", "list_invites", "meta", "create_job", "memory_pods", "create_message",
-		"export_ledger", "list_agents", "create_agent", "rotate_agent_key", "hygiene",
-		"skills_zip", "add_token_burn", "a2a_directory", "create_peer", "poll_events",
-		"create_skill", "fork_skill", "create_recording", "proctor_recording",
+		"create_invite", "create_agent", "rotate_agent_key", "create_message",
+		"create_skill", "fork_skill", "promote_recording", "skills_zip",
+		"hygiene", "import_jobs", "export_ledger", "add_token_burn",
+		"a2a_directory", "create_peer", "poll_events",
 	} {
 		if !strings.Contains(listBody, `"name":"`+name+`"`) {
-			t.Fatalf("tools/list missing %s", name)
+			t.Fatalf("tools/list missing %s: %s", name, listBody)
 		}
 	}
 
-	meta := mcpCall(t, ts.URL, access, session, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"meta","arguments":{}}}`)
-	metaBody := readBody(meta)
-	if !strings.Contains(metaBody, "prefer long-lived Hub API key") {
-		t.Fatalf("meta %s", metaBody)
+	meta := mcpToolText(t, ts.URL, access, session, 11, "meta", `{}`)
+	if !strings.Contains(meta, `"mcp": true`) && !strings.Contains(meta, `"mcp":true`) {
+		t.Fatalf("meta %s", meta)
 	}
 
-	inv := mcpCall(t, ts.URL, access, session, `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"create_invite","arguments":{"track":"application","mode":"agents_only","max_redemptions":2}}}`)
-	invBody := readBody(inv)
-	if strings.Contains(invBody, `"isError": true`) || strings.Contains(invBody, `"isError":true`) {
-		t.Fatalf("create_invite %s", invBody)
+	inviteText := mcpToolText(t, ts.URL, access, session, 12, "create_invite", `{"track":"discovery","mcp_bootstrap":true}`)
+	if !strings.Contains(inviteText, "jh_own_") && !strings.Contains(inviteText, "jh_agt_") {
+		t.Fatalf("create_invite missing api key: %s", inviteText)
 	}
-	if !strings.Contains(invBody, "jh_agt_") {
-		t.Fatalf("create_invite missing api key %s", invBody)
-	}
-	if !strings.Contains(invBody, "mcp_clients") || !strings.Contains(invBody, "Cursor") {
-		t.Fatalf("create_invite missing snippets %s", invBody)
-	}
-
-	pods := mcpCall(t, ts.URL, access, session, `{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"memory_pods","arguments":{}}}`)
-	podsBody := readBody(pods)
-	if !strings.Contains(podsBody, "common") {
-		t.Fatalf("memory_pods %s", podsBody)
-	}
-
-	export := mcpCall(t, ts.URL, access, session, `{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"export_ledger","arguments":{}}}`)
-	exportBody := readBody(export)
-	if !strings.Contains(exportBody, "exported_at") {
-		t.Fatalf("export_ledger %s", exportBody)
-	}
-}
-
-func TestMCPAPIKeyJobAndQueueParity(t *testing.T) {
-	ts := testServer(t)
-	defer ts.Close()
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{Jar: jar}
-
-	res := postJSON(t, client, ts.URL+"/api/auth/signup", `{"username":"finder","password":"long-enough"}`, "")
-	csrf := res.Header.Get("X-CSRF")
-	res.Body.Close()
-	res = putBody(t, client, ts.URL+"/api/candidate", "text/yaml", readyCandidateYAML, csrf)
-	res.Body.Close()
-
-	created := postJSON(t, client, ts.URL+"/api/invites", `{"track":"discovery","mode":"owner_then_agents","max_redemptions":3}`, csrf)
-	body := readBody(created)
-	var payload struct {
+	var invitePayload struct {
 		APIKey string `json:"api_key"`
+		Invite struct {
+			ID string `json:"id"`
+		} `json:"invite"`
+		User struct {
+			ID string `json:"id"`
+		} `json:"user"`
 	}
-	if err := json.Unmarshal([]byte(body), &payload); err != nil || payload.APIKey == "" {
-		t.Fatalf("invite %s", body)
-	}
-
-	init := mcpCall(t, ts.URL, payload.APIKey, "", `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"Cursor"}}}`)
-	session := init.Header.Get("Mcp-Session-Id")
-	readBody(init)
-
-	lanes := mcpCall(t, ts.URL, payload.APIKey, session, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"set_session_lanes","arguments":{"lanes":["find"]}}}`)
-	readBody(lanes)
-	caps := mcpCall(t, ts.URL, payload.APIKey, session, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"report_capabilities","arguments":{"browser":true,"email":false}}}`)
-	readBody(caps)
-
-	job := mcpCall(t, ts.URL, payload.APIKey, session, `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"create_job","arguments":{"company":"Acme","title":"SWE","url":"https://example.com/j"}}}`)
-	jobBody := readBody(job)
-	if strings.Contains(jobBody, `"isError":true`) || strings.Contains(jobBody, `"isError": true`) {
-		t.Fatalf("create_job %s", jobBody)
-	}
-	if !strings.Contains(jobBody, "Acme") {
-		t.Fatalf("create_job missing company %s", jobBody)
+	if err := json.Unmarshal([]byte(inviteText), &invitePayload); err != nil {
+		t.Fatalf("invite decode %v %s", err, inviteText)
 	}
 
-	listed := mcpCall(t, ts.URL, payload.APIKey, session, `{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"list_jobs","arguments":{}}}`)
-	listBody := readBody(listed)
-	if !strings.Contains(listBody, "Acme") {
-		t.Fatalf("list_jobs %s", listBody)
+	agentText := mcpToolText(t, ts.URL, access, session, 13, "create_agent", `{"display_name":"parity-bot","track":"discovery"}`)
+	var agentPayload struct {
+		APIKey string `json:"api_key"`
+		User   struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal([]byte(agentText), &agentPayload); err != nil || agentPayload.APIKey == "" || agentPayload.User.ID == "" {
+		t.Fatalf("create_agent %s", agentText)
+	}
+	rotated := mcpToolText(t, ts.URL, access, session, 14, "rotate_agent_key", `{"id":"`+agentPayload.User.ID+`"}`)
+	if !strings.Contains(rotated, "jh_agt_") {
+		t.Fatalf("rotate_agent_key %s", rotated)
 	}
 
-	mem := mcpCall(t, ts.URL, payload.APIKey, session, `{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"write_memory","arguments":{"kind":"note","body":"portal quirk","pod":"common","title":"tip"}}}`)
-	memBody := readBody(mem)
-	if strings.Contains(memBody, `"isError":true`) || strings.Contains(memBody, `"isError": true`) {
-		t.Fatalf("write_memory %s", memBody)
+	msgText := mcpToolText(t, ts.URL, access, session, 15, "create_message", `{"body":"hello parity","to_track":"discovery"}`)
+	var msgPayload struct {
+		Message struct {
+			ID string `json:"id"`
+		} `json:"message"`
+	}
+	_ = json.Unmarshal([]byte(msgText), &msgPayload)
+	if msgPayload.Message.ID == "" {
+		t.Fatalf("create_message %s", msgText)
+	}
+	listedMsgs := mcpToolText(t, ts.URL, access, session, 16, "list_messages", `{}`)
+	if !strings.Contains(listedMsgs, msgPayload.Message.ID) {
+		t.Fatalf("list_messages %s", listedMsgs)
+	}
+	readMsg := mcpToolText(t, ts.URL, access, session, 17, "read_message", `{"id":"`+msgPayload.Message.ID+`"}`)
+	if !strings.Contains(readMsg, `"read_at"`) {
+		t.Fatalf("read_message %s", readMsg)
+	}
+
+	poll1 := mcpToolText(t, ts.URL, access, session, 18, "poll_events", `{"after_seq":0}`)
+	if !strings.Contains(poll1, `"event": "message"`) && !strings.Contains(poll1, `"event":"message"`) {
+		t.Fatalf("poll_events missing message publish: %s", poll1)
+	}
+	var pollPayload struct {
+		NextSeq int64 `json:"next_seq"`
+		Count   int   `json:"count"`
+	}
+	_ = json.Unmarshal([]byte(poll1), &pollPayload)
+	if pollPayload.Count < 1 || pollPayload.NextSeq < 1 {
+		t.Fatalf("poll_events seq %#v %s", pollPayload, poll1)
+	}
+	poll2 := mcpToolText(t, ts.URL, access, session, 19, "poll_events", `{"after_seq":`+itoa64(pollPayload.NextSeq)+`}`)
+	if !strings.Contains(poll2, `"count": 0`) && !strings.Contains(poll2, `"count":0`) {
+		t.Fatalf("poll_events should be empty after cursor: %s", poll2)
+	}
+
+	skillText := mcpToolText(t, ts.URL, access, session, 20, "create_skill", `{"name":"parity-skill","body":"# parity"}`)
+	var skillPayload struct {
+		Skill struct {
+			ID string `json:"id"`
+		} `json:"skill"`
+	}
+	_ = json.Unmarshal([]byte(skillText), &skillPayload)
+	if skillPayload.Skill.ID == "" {
+		t.Fatalf("create_skill %s", skillText)
+	}
+	forked := mcpToolText(t, ts.URL, access, session, 21, "fork_skill", `{"id":"`+skillPayload.Skill.ID+`"}`)
+	if !strings.Contains(forked, `"origin": "mutation"`) && !strings.Contains(forked, `"origin":"mutation"`) {
+		t.Fatalf("fork_skill %s", forked)
+	}
+
+	recText := mcpToolText(t, ts.URL, access, session, 22, "create_recording", `{"body":"note","skill_id":"`+skillPayload.Skill.ID+`"}`)
+	var recPayload struct {
+		Recording struct {
+			ID string `json:"id"`
+		} `json:"recording"`
+	}
+	_ = json.Unmarshal([]byte(recText), &recPayload)
+	if recPayload.Recording.ID == "" {
+		t.Fatalf("create_recording %s", recText)
+	}
+	promoted := mcpToolText(t, ts.URL, access, session, 23, "promote_recording", `{"id":"`+recPayload.Recording.ID+`","note":"ok"}`)
+	if !strings.Contains(promoted, `"status": "promoted"`) && !strings.Contains(promoted, `"status":"promoted"`) {
+		t.Fatalf("promote_recording %s", promoted)
+	}
+
+	hygiene := mcpToolText(t, ts.URL, access, session, 24, "hygiene", `{}`)
+	if !strings.Contains(hygiene, `"counts"`) {
+		t.Fatalf("hygiene %s", hygiene)
+	}
+	imported := mcpToolText(t, ts.URL, access, session, 25, "import_jobs", `{"jobs":[{"company":"Parity Co","title":"Engineer","status":"discovered"}]}`)
+	if !strings.Contains(imported, `"imported": 1`) && !strings.Contains(imported, `"imported":1`) {
+		t.Fatalf("import_jobs %s", imported)
+	}
+	exported := mcpToolText(t, ts.URL, access, session, 26, "export_ledger", `{}`)
+	if !strings.Contains(exported, "Parity Co") {
+		t.Fatalf("export_ledger %s", exported)
+	}
+
+	zipText := mcpToolText(t, ts.URL, access, session, 27, "skills_zip", `{}`)
+	var zipPayload struct {
+		Base64 string `json:"base64"`
+		Bytes  int    `json:"bytes"`
+	}
+	_ = json.Unmarshal([]byte(zipText), &zipPayload)
+	if zipPayload.Bytes < 10 || zipPayload.Base64 == "" {
+		t.Fatalf("skills_zip %s", zipText)
+	}
+	if _, err := base64.StdEncoding.DecodeString(zipPayload.Base64); err != nil {
+		t.Fatalf("skills_zip base64: %v", err)
+	}
+
+	burn := mcpToolText(t, ts.URL, access, session, 28, "add_token_burn", `{"tool_name":"parity","prompt_tokens":3,"completion_tokens":2,"cost_usd":0.01}`)
+	if !strings.Contains(burn, `"tool_name": "parity"`) && !strings.Contains(burn, `"tool_name":"parity"`) {
+		t.Fatalf("add_token_burn %s", burn)
+	}
+	summary := mcpToolText(t, ts.URL, access, session, 29, "token_burn_summary", `{}`)
+	if !strings.Contains(summary, `"prompt_tokens": 3`) && !strings.Contains(summary, `"prompt_tokens":3`) {
+		t.Fatalf("token_burn_summary %s", summary)
+	}
+
+	peerText := mcpToolText(t, ts.URL, access, session, 30, "create_peer", `{"name":"peer-a","url":"https://peer.example/a2a"}`)
+	var peerPayload struct {
+		Peer struct {
+			ID string `json:"id"`
+		} `json:"peer"`
+	}
+	_ = json.Unmarshal([]byte(peerText), &peerPayload)
+	if peerPayload.Peer.ID == "" {
+		t.Fatalf("create_peer %s", peerText)
+	}
+	dir := mcpToolText(t, ts.URL, access, session, 31, "a2a_directory", `{}`)
+	if !strings.Contains(dir, peerPayload.Peer.ID) {
+		t.Fatalf("a2a_directory %s", dir)
+	}
+	sent := mcpToolText(t, ts.URL, access, session, 32, "send_peer", `{"id":"`+peerPayload.Peer.ID+`","payload":{"hello":true}}`)
+	if !strings.Contains(sent, `"state": "submitted"`) && !strings.Contains(sent, `"state":"submitted"`) {
+		t.Fatalf("send_peer %s", sent)
+	}
+
+	resume := mcpToolText(t, ts.URL, access, session, 33, "get_resume", `{}`)
+	if !strings.Contains(resume, `"present": true`) && !strings.Contains(resume, `"present":true`) {
+		t.Fatalf("get_resume %s", resume)
+	}
+
+	// Bootstrapped invite key can also call MCP tools
+	if invitePayload.APIKey != "" {
+		init := mcpCall(t, ts.URL, invitePayload.APIKey, "", `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"ParityInvite"}}}`)
+		invSession := init.Header.Get("Mcp-Session-Id")
+		initBody := readBody(init)
+		if init.StatusCode != 200 || invSession == "" {
+			t.Fatalf("invite key init %d %s", init.StatusCode, initBody)
+		}
+		who := mcpToolText(t, ts.URL, invitePayload.APIKey, invSession, 2, "whoami", `{}`)
+		if !strings.Contains(who, "discovery") {
+			t.Fatalf("invite whoami %s", who)
+		}
 	}
 }
 
-func oauthAccessToken(t *testing.T, client *http.Client, base, csrf string) string {
+func TestRealtimeRecentPollBuffer(t *testing.T) {
+	hub := realtime.New()
+	hub.Publish("acc", "job", map[string]any{"id": "j1"})
+	hub.Publish("acc", "message", map[string]any{"id": "m1"})
+	all := hub.Recent("acc", 0, 10)
+	if len(all) != 2 {
+		t.Fatalf("want 2 got %d", len(all))
+	}
+	after := hub.Recent("acc", all[0].Seq, 10)
+	if len(after) != 1 || after[0].Event != "message" {
+		t.Fatalf("after cursor %#v", after)
+	}
+	empty := hub.Recent("acc", all[1].Seq, 10)
+	if len(empty) != 0 {
+		t.Fatalf("expected empty %#v", empty)
+	}
+}
+
+func parityTestServer(t *testing.T) (*httptest.Server, string) {
+	t.Helper()
+	telemetry.Init(telemetry.Options{Exporter: "none", ServiceName: "jobos-hub-test"})
+	root := findRepoRoot(t)
+	srv := New(config.Config{RepoRoot: root}, store.NewMemory(), blob.NewMemory(), cache.NewMemory(), realtime.New())
+	if n := srv.Seed(context.Background()); n < 5 {
+		t.Fatalf("seeded %d", n)
+	}
+	return httptest.NewServer(srv.Router()), root
+}
+
+func findRepoRoot(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := wd
+	for i := 0; i < 8; i++ {
+		if _, err := os.Stat(filepath.Join(dir, "skills", "job-discovery")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	t.Fatalf("repo root not found from %s", wd)
+	return ""
+}
+
+func mcpOAuthSession(t *testing.T, client *http.Client, base, csrf string) (access, session string) {
 	t.Helper()
 	res := postJSON(t, client, base+"/oauth/register", `{"client_name":"Parity","redirect_uris":["http://127.0.0.1:9/cb"],"token_endpoint_auth_method":"none"}`, "")
 	body := readBody(res)
 	var registered map[string]any
-	if err := json.Unmarshal([]byte(body), &registered); err != nil {
-		t.Fatal(err)
-	}
+	_ = json.Unmarshal([]byte(body), &registered)
 	clientID := registered["client_id"].(string)
 	verifier := strings.Repeat("b", 64)
 	challenge := agentflow.PKCSES256(verifier)
@@ -143,19 +294,55 @@ func oauthAccessToken(t *testing.T, client *http.Client, base, csrf string) stri
 	body = readBody(res)
 	var approved map[string]string
 	_ = json.Unmarshal([]byte(body), &approved)
-	parsed, _ := url.Parse(approved["redirect"])
-	code := parsed.Query().Get("code")
-	form := url.Values{"grant_type": {"authorization_code"}, "client_id": {clientID}, "code": {code}, "redirect_uri": {"http://127.0.0.1:9/cb"}, "code_verifier": {verifier}}
-	res, err := client.PostForm(base+"/oauth/token", form)
+	code := strings.Split(strings.Split(approved["redirect"], "code=")[1], "&")[0]
+
+	formBody := "grant_type=authorization_code&client_id=" + clientID + "&code=" + code + "&redirect_uri=http://127.0.0.1:9/cb&code_verifier=" + verifier
+	req, _ := http.NewRequest(http.MethodPost, base+"/oauth/token", strings.NewReader(formBody))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	body = readBody(res)
 	var tok map[string]any
 	_ = json.Unmarshal([]byte(body), &tok)
-	access, _ := tok["access_token"].(string)
-	if access == "" {
-		t.Fatalf("token %s", body)
+	access = tok["access_token"].(string)
+
+	init := mcpCall(t, base, access, "", `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"Parity"}}}`)
+	session = init.Header.Get("Mcp-Session-Id")
+	initBody := readBody(init)
+	if init.StatusCode != 200 || session == "" {
+		t.Fatalf("init %d %s", init.StatusCode, initBody)
 	}
-	return access
+	return access, session
 }
+
+func mcpToolText(t *testing.T, base, token, session string, id int, name, argsJSON string) string {
+	t.Helper()
+	payload := `{"jsonrpc":"2.0","id":` + itoa(id) + `,"method":"tools/call","params":{"name":"` + name + `","arguments":` + argsJSON + `}}`
+	res := mcpCall(t, base, token, session, payload)
+	body := readBody(res)
+	if res.StatusCode != 200 {
+		t.Fatalf("%s status %d %s", name, res.StatusCode, body)
+	}
+	var envelope struct {
+		Result struct {
+			IsError bool `json:"isError"`
+			Content []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"result"`
+		Error any `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
+		t.Fatalf("%s decode %v %s", name, err, body)
+	}
+	if envelope.Error != nil || envelope.Result.IsError || len(envelope.Result.Content) == 0 {
+		t.Fatalf("%s error response %s", name, body)
+	}
+	return envelope.Result.Content[0].Text
+}
+
+func itoa(n int) string { return strconv.Itoa(n) }
+
+func itoa64(n int64) string { return strconv.FormatInt(n, 10) }
