@@ -33,7 +33,12 @@ func TestMCPParityInvitesAndJobsViaAdminOAuth(t *testing.T) {
 
 	listed := mcpCall(t, ts.URL, access, session, `{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`)
 	listBody := readBody(listed)
-	for _, name := range []string{"create_invite", "list_invites", "meta", "create_job", "memory_pods", "create_message", "export_ledger"} {
+	for _, name := range []string{
+		"create_invite", "list_invites", "meta", "create_job", "memory_pods", "create_message",
+		"export_ledger", "list_agents", "create_agent", "rotate_agent_key", "hygiene",
+		"skills_zip", "add_token_burn", "a2a_directory", "create_peer", "poll_events",
+		"create_skill", "fork_skill", "create_recording", "proctor_recording",
+	} {
 		if !strings.Contains(listBody, `"name":"`+name+`"`) {
 			t.Fatalf("tools/list missing %s", name)
 		}
