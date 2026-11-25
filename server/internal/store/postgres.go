@@ -89,6 +89,14 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1`,
 		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE skills ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`,
+		// ADD COLUMN IF NOT EXISTS is a no-op when a prior nullable column exists, so
+		// older rows can still hold NULL in owner_user_id (and peers). Backfill them.
+		`UPDATE skills SET owner_user_id = '' WHERE owner_user_id IS NULL`,
+		`UPDATE skills SET role = '' WHERE role IS NULL`,
+		`UPDATE skills SET platform = '' WHERE platform IS NULL`,
+		`UPDATE skills SET body = '' WHERE body IS NULL`,
+		`UPDATE skills SET origin = '' WHERE origin IS NULL`,
+		`UPDATE skills SET tags_json = '[]' WHERE tags_json IS NULL`,
 		copyColumnIfPresentSQL("skills", "body_md", "body"),
 		// Go inserts omit Python-era NOT NULL columns; drop the constraint after copy.
 		dropNotNullIfPresentSQL("skills", "body_md"),
@@ -113,6 +121,13 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT 'github'`,
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE mcps ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`,
+		`UPDATE mcps SET capability_json = '[]' WHERE capability_json IS NULL`,
+		`UPDATE mcps SET roles_json = '[]' WHERE roles_json IS NULL`,
+		`UPDATE mcps SET platforms_json = '[]' WHERE platforms_json IS NULL`,
+		`UPDATE mcps SET source = '' WHERE source IS NULL`,
+		`UPDATE mcps SET install = '' WHERE install IS NULL`,
+		`UPDATE mcps SET auth = '' WHERE auth IS NULL`,
+		`UPDATE mcps SET notes = '' WHERE notes IS NULL`,
 		dropNotNullIfPresentSQL("mcps", "content_hash"),
 		// Python PK was (account_id, id), so the same skill id can exist on many
 		// accounts. Go upserts ON CONFLICT (id). Remap losers; do not delete them.
@@ -1088,18 +1103,50 @@ func (p *Postgres) SaveSkill(ctx context.Context, s Skill) error {
 	return err
 }
 
+// nullText scans nullable TEXT into Go strings. Python-era rows and ADD COLUMN
+// IF NOT EXISTS drift leave NULLs that plain string Scan rejects.
+func nullText(p *string, fallback string) string {
+	if p == nil {
+		return fallback
+	}
+	return *p
+}
+
 func scanSkill(row pgx.Row) (Skill, error) {
 	var s Skill
-	var tags string
-	err := row.Scan(&s.ID, &s.AccountID, &s.Slug, &s.Name, &s.Kind, &s.Role, &tags, &s.Scope, &s.OwnerID, &s.Status, &s.Platform, &s.Body, &s.Origin, &s.Version, &s.CreatedAt, &s.UpdatedAt)
+	var accountID, slug, name, kind, role, tags, scope, owner, status, platform, body, origin, createdAt, updatedAt *string
+	var version *int
+	err := row.Scan(&s.ID, &accountID, &slug, &name, &kind, &role, &tags, &scope, &owner, &status, &platform, &body, &origin, &version, &createdAt, &updatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Skill{}, ErrNotFound
 	}
-	s.Tags = []byte(tags)
-	return s, err
+	if err != nil {
+		return Skill{}, err
+	}
+	s.AccountID = nullText(accountID, "")
+	s.Slug = nullText(slug, "")
+	s.Name = nullText(name, "")
+	s.Kind = nullText(kind, "skill")
+	s.Role = nullText(role, "")
+	s.Tags = []byte(nullText(tags, "[]"))
+	s.Scope = nullText(scope, "shared")
+	s.OwnerID = nullText(owner, "")
+	s.Status = nullText(status, "approved")
+	s.Platform = nullText(platform, "")
+	s.Body = nullText(body, "")
+	s.Origin = nullText(origin, "")
+	if version != nil {
+		s.Version = *version
+	} else {
+		s.Version = 1
+	}
+	s.CreatedAt = nullText(createdAt, "")
+	s.UpdatedAt = nullText(updatedAt, "")
+	return s, nil
 }
 
-const skillSelect = `SELECT id, account_id, slug, name, kind, role, tags_json, scope, owner_user_id, status, platform, body, origin, version, created_at, updated_at FROM skills`
+// COALESCE keeps NULLs from older Python / schema-drift rows scannable.
+const skillSelect = `SELECT id, coalesce(account_id,''), coalesce(slug,''), coalesce(name,''), coalesce(kind,'skill'), coalesce(role,''), coalesce(tags_json,'[]'), coalesce(scope,'shared'), coalesce(owner_user_id,''), coalesce(status,'approved'), coalesce(platform,''), coalesce(body,''), coalesce(origin,''), coalesce(version,1), coalesce(created_at,''), coalesce(updated_at,'') FROM skills`
 
 func (p *Postgres) Skill(ctx context.Context, id string) (Skill, error) {
 	return scanSkill(p.pool.QueryRow(ctx, skillSelect+` WHERE id=$1`, id))
@@ -1151,16 +1198,34 @@ func (p *Postgres) SaveMCP(ctx context.Context, item MCP) error {
 
 func scanMCP(row pgx.Row) (MCP, error) {
 	var item MCP
-	var capability, roles, platforms string
-	err := row.Scan(&item.AccountID, &item.ID, &item.Slug, &item.Name, &item.Kind, &item.Status, &capability, &roles, &platforms, &item.Source, &item.Install, &item.Auth, &item.Notes, &item.Origin, &item.CreatedAt, &item.UpdatedAt)
+	var accountID, id, slug, name, kind, status, capability, roles, platforms, source, install, auth, notes, origin, createdAt, updatedAt *string
+	err := row.Scan(&accountID, &id, &slug, &name, &kind, &status, &capability, &roles, &platforms, &source, &install, &auth, &notes, &origin, &createdAt, &updatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return MCP{}, ErrNotFound
 	}
-	item.Capability, item.Roles, item.Platforms = []byte(capability), []byte(roles), []byte(platforms)
-	return item, err
+	if err != nil {
+		return MCP{}, err
+	}
+	item.AccountID = nullText(accountID, "")
+	item.ID = nullText(id, "")
+	item.Slug = nullText(slug, "")
+	item.Name = nullText(name, "")
+	item.Kind = nullText(kind, "mcp")
+	item.Status = nullText(status, "adopted")
+	item.Capability = []byte(nullText(capability, "[]"))
+	item.Roles = []byte(nullText(roles, "[]"))
+	item.Platforms = []byte(nullText(platforms, "[]"))
+	item.Source = nullText(source, "")
+	item.Install = nullText(install, "")
+	item.Auth = nullText(auth, "")
+	item.Notes = nullText(notes, "")
+	item.Origin = nullText(origin, "github")
+	item.CreatedAt = nullText(createdAt, "")
+	item.UpdatedAt = nullText(updatedAt, "")
+	return item, nil
 }
 
-const mcpSelect = `SELECT account_id, id, slug, name, kind, status, capability_json, roles_json, platforms_json, source, install, auth, notes, origin, created_at, updated_at FROM mcps`
+const mcpSelect = `SELECT coalesce(account_id,''), id, coalesce(slug,''), coalesce(name,''), coalesce(kind,'mcp'), coalesce(status,'adopted'), coalesce(capability_json,'[]'), coalesce(roles_json,'[]'), coalesce(platforms_json,'[]'), coalesce(source,''), coalesce(install,''), coalesce(auth,''), coalesce(notes,''), coalesce(origin,'github'), coalesce(created_at,''), coalesce(updated_at,'') FROM mcps`
 
 func (p *Postgres) MCP(ctx context.Context, accountID, idOrSlug string) (MCP, error) {
 	item, err := scanMCP(p.pool.QueryRow(ctx, mcpSelect+` WHERE (account_id=$1 OR account_id='shared') AND (id=$2 OR slug=$2) LIMIT 1`, accountID, idOrSlug))
