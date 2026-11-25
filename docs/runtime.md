@@ -22,6 +22,25 @@ docker compose up -d --build
 docker compose --profile data --profile cache --profile blobs up -d --build
 ```
 
+### Database migrations (manual)
+
+The Hub process **does not** migrate Postgres on boot. Apply schema yourself before (or instead of) deploying a revision that needs new tables/indexes:
+
+```bash
+# local / CI
+DATABASE_URL='postgres://…' bash scripts/hub_migrate.sh
+# or
+DATABASE_URL='postgres://…' go run ./cmd/hub migrate   # from server/
+
+# Compose one-shot (same image as hub)
+docker compose --profile migrate run --rm migrate
+
+# Cloud Run Job (same image as the service, args: migrate)
+# gcloud run jobs execute jobos-migrate --region=…
+```
+
+Boot fails fast with `database schema missing; run: hub migrate` when `accounts` is absent. Idempotent repair statements (column copies, bool coercion, skill id dedupe) live in the same `hub migrate` path.
+
 `HUB_PLUGINS` defaults to `auto` in Compose. When `postgres`, `redis`, or `minio` resolves on the API network, the empty driver switches to that service: Postgres at `postgres:5432`, Redis at `redis:6379`, and MinIO at `http://minio:9000` with bucket `jobos`. The API creates the bucket on startup and retries Postgres until it accepts connections. Set `DATABASE_URL`, `REDIS_URL`, or `BLOB_DRIVER` to keep a driver you chose yourself. Set `HUB_PLUGINS=off` to leave every optional service unused even when it is running.
 
 The API image is built from the repo root (`dockerfile: server/Dockerfile`) and ships `skills/`, `docs/`, `mcp/`, `scripts/`, `handoffs/`, and `AGENTS.md` at `HUB_REPO_ROOT=/opt/jobos`, so onboarding works without a bind mount.

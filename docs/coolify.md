@@ -49,9 +49,10 @@ To use a database Coolify (or another host) already runs, set secret `DATABASE_U
 2. Compose file: `docker-compose.yml` (single `hub` on **8787** + Postgres). Do **not** point Coolify at `docker-compose.split.yml` unless you intentionally want separate `api`/`web` services.
 3. Set `HUB_PUBLIC_URL` (and usually `HUB_PUBLIC_HOST`) to the Coolify FQDN (`https://jobs.example.com`).
 4. Confirm Persistent Storage shows `pgdata` and `blobs`. Do not convert them to bind mounts with `${` or `~`.
-5. After first boot: `/login`, then `/onboarding`. Probe `GET /health` on port **8787**.
-6. If Coolify is configured as a **Dockerfile** app instead of Compose, keep the public port on **8787** (image default `BOARD_PORT=8787`). Railway/Render may inject `PORT`; that wins over `BOARD_PORT`. A Dockerfile-only deploy does **not** include the Compose Postgres service — set secret `DATABASE_URL` to an external Postgres, and set durable blobs (`BLOB_ADAPTER=filesystem` + a persistent `BLOB_ROOT`, or S3/`BLOB_DRIVER=s3`). Leaving those unset uses in-memory defaults that are wiped on restart.
-7. Redeploy on every push to `main`. Named volumes are not recreated.
+5. Before first boot (and after schema-changing merges): run migrations manually — `docker compose --profile migrate run --rm migrate`, or `DATABASE_URL=… bash scripts/hub_migrate.sh`. The Hub container does **not** migrate on start.
+6. After migrate + boot: `/login`, then `/onboarding`. Probe `GET /health` on port **8787**.
+7. If Coolify is configured as a **Dockerfile** app instead of Compose, keep the public port on **8787** (image default `BOARD_PORT=8787`). Railway/Render may inject `PORT`; that wins over `BOARD_PORT`. A Dockerfile-only deploy does **not** include the Compose Postgres service — set secret `DATABASE_URL` to an external Postgres, and set durable blobs (`BLOB_ADAPTER=filesystem` + a persistent `BLOB_ROOT`, or S3/`BLOB_DRIVER=s3`). Leaving those unset uses in-memory defaults that are wiped on restart.
+8. Redeploy on every push to `main`. Named volumes are not recreated. Run `hub migrate` yourself when a release needs schema changes.
 
 If a previous deploy already failed on `${` in volume sources, Coolify may have stored a broken Persistent Storage row (it then errors even after git is fixed). Remove those storage entries or recreate the Compose resource so it reparses this file, then deploy again.
 

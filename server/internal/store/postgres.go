@@ -20,12 +20,7 @@ func OpenPostgres(ctx context.Context, url string) (*Postgres, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := &Postgres{pool: pool}
-	if err := p.migrate(ctx); err != nil {
-		pool.Close()
-		return nil, err
-	}
-	return p, nil
+	return &Postgres{pool: pool}, nil
 }
 
 func Open(ctx context.Context, databaseURL string) (Store, error) {
@@ -33,6 +28,37 @@ func Open(ctx context.Context, databaseURL string) (Store, error) {
 		return NewMemory(), nil
 	}
 	return OpenPostgres(ctx, databaseURL)
+}
+
+// Migrate applies schema + repair statements. Operators run this deliberately
+// (`hub migrate`); the API process does not migrate on boot.
+func (p *Postgres) Migrate(ctx context.Context) error {
+	return p.migrate(ctx)
+}
+
+// MigrateURL opens Postgres, applies migrations, and closes the pool.
+func MigrateURL(ctx context.Context, databaseURL string) error {
+	if strings.TrimSpace(databaseURL) == "" {
+		return fmt.Errorf("DATABASE_URL is required for migrate")
+	}
+	p, err := OpenPostgres(ctx, databaseURL)
+	if err != nil {
+		return err
+	}
+	defer p.Close()
+	return p.Migrate(ctx)
+}
+
+// RequireSchema fails fast when the operator has not run `hub migrate` yet.
+func (p *Postgres) RequireSchema(ctx context.Context) error {
+	var name *string
+	if err := p.pool.QueryRow(ctx, `SELECT to_regclass(current_schema() || '.accounts')::text`).Scan(&name); err != nil {
+		return fmt.Errorf("schema check: %w", err)
+	}
+	if name == nil || *name == "" {
+		return fmt.Errorf("database schema missing; run: hub migrate")
+	}
+	return nil
 }
 
 func (p *Postgres) migrate(ctx context.Context) error {
