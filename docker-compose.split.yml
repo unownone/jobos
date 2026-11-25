@@ -8,6 +8,23 @@
 name: jobos-split
 
 services:
+  # One-shot: `docker compose -f docker-compose.split.yml --profile migrate run --rm migrate`
+  migrate:
+    profiles: ["migrate"]
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    entrypoint: ["/usr/local/bin/hub", "migrate"]
+    environment:
+      HUB_PLUGINS: "${HUB_PLUGINS:-auto}"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      JOBOS_PG_USER: "${JOBOS_PG_USER:-jobos}"
+      JOBOS_PG_PASSWORD: "${JOBOS_PG_PASSWORD:-jobos}"
+      JOBOS_PG_HOST: "${JOBOS_PG_HOST:-postgres}"
+      JOBOS_PG_PORT: "${JOBOS_PG_PORT:-5432}"
+      JOBOS_PG_DB: "${JOBOS_PG_DB:-jobos}"
+    restart: "no"
+
   api:
     build:
       context: .

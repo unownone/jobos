@@ -126,16 +126,31 @@ function Who({ me, id }: { me: SessionMe; id: string }) {
 }
 
 function Shell({ me, who = "who", narrow, children }: { me?: SessionMe; who?: string; narrow?: boolean; children: ReactNode }) {
+  const location = useLocation();
+  const links = [
+    { to: "/board", label: "Board" },
+    { to: "/onboarding", label: "Onboarding" },
+    { to: "/admin", label: "Invites", exact: true },
+    { to: "/admin/skills", label: "Skills" },
+    { to: "/admin/memory", label: "Memory" },
+  ] as const;
   return (
     <div className="shell">
       <header className="top">
-        <h1>jobOS</h1>
+        <Link to="/board" className="brand-lockup">
+          <h1>job<span className="accent">OS</span></h1>
+        </Link>
         <nav>
-          <Link to="/board">Board</Link>
-          <Link to="/onboarding">Onboarding</Link>
-          <Link to="/admin">Invites</Link>
-          <Link to="/admin/skills">Skills</Link>
-          <Link to="/admin/memory">Memory</Link>
+          {links.map((link) => {
+            const active = "exact" in link && link.exact
+              ? location.pathname === link.to
+              : location.pathname === link.to || location.pathname.startsWith(`${link.to}/`);
+            return (
+              <Link key={link.to} to={link.to} className={active ? "nav-active" : undefined} aria-current={active ? "page" : undefined}>
+                {link.label}
+              </Link>
+            );
+          })}
           {me ? <Logout /> : <Link to="/login">Log in</Link>}
         </nav>
       </header>
@@ -515,6 +530,38 @@ export function Home({ me }: { me: SessionMe }) {
   );
 }
 
+function countByStatus(jobs: JobRow[]): { key: string; label: string; count: number }[] {
+  const buckets = [
+    { key: "discovered", label: "Found" },
+    { key: "shortlisted", label: "Shortlist" },
+    { key: "apply_ready", label: "Apply ready" },
+    { key: "applied", label: "Applied" },
+    { key: "outreach_ready", label: "Outreach" },
+    { key: "rejected", label: "Rejected" },
+  ];
+  return buckets.map((bucket) => ({
+    ...bucket,
+    count: jobs.filter((job) => (job.stopped ? "stopped" : job.status || "") === bucket.key).length,
+  }));
+}
+
+function statusTone(status: string): string {
+  switch (status) {
+    case "applied":
+    case "outreach_ready":
+      return "tone-good";
+    case "rejected":
+    case "closed_withdrawn":
+    case "stopped":
+      return "tone-bad";
+    case "shortlisted":
+    case "apply_ready":
+      return "tone-hot";
+    default:
+      return "tone-muted";
+  }
+}
+
 export function Board({ me }: { me: SessionMe }) {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobRow[]>([]);
@@ -527,17 +574,24 @@ export function Board({ me }: { me: SessionMe }) {
   const [cand, setCand] = useState<CandidateStatus | null>(null);
   const [pausing, setPausing] = useState(false);
   const [pauseReason, setPauseReason] = useState("");
+  const [live, setLive] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const statusCounts = useMemo(() => countByStatus(jobs), [jobs]);
+  const stoppedCount = useMemo(() => jobs.filter((job) => job.stopped).length, [jobs]);
 
   async function load(query = q): Promise<JobRow[]> {
     const data = await api<{ jobs?: JobRow[] }>(`/api/jobs?q=${encodeURIComponent(query)}`);
     setJobs(data.jobs || []);
     setNeedsCandidate(false);
+    setLoaded(true);
     return data.jobs || [];
   }
 
   useEffect(() => {
     api<CandidateStatus>("/api/candidate/status").then(setCand).catch(() => {});
     load("").catch((err) => {
+      setLoaded(true);
       if (isCandidateRequired(err)) {
         setNeedsCandidate(true);
         setError("Onboard the candidate profile before the board can load jobs.");
@@ -546,7 +600,12 @@ export function Board({ me }: { me: SessionMe }) {
       setError(errMessage(err));
     });
     const source = new EventSource("/api/stream", { withCredentials: true });
-    source.onmessage = () => load().catch(() => {});
+    source.onopen = () => setLive(true);
+    source.onerror = () => setLive(false);
+    source.onmessage = () => {
+      setLive(true);
+      load().catch(() => {});
+    };
     return () => source.close();
   }, []);
 
@@ -599,72 +658,165 @@ export function Board({ me }: { me: SessionMe }) {
     <Shell me={me} who="whoLabel">
       <CandidateGateBanner status={cand} />
       {needsCandidate ? (
-        <div className="card-panel empty-state">
-          <h2>Board is waiting on onboarding</h2>
-          <p className="muted">Jobs and live streams return <code>409 candidate_required</code> until the profile has a name, email, title, and location.</p>
+        <div className="card-panel empty-state board-gate">
+          <p className="eyebrow">Hunt board</p>
+          <h2>Finish onboarding first</h2>
+          <p className="muted">Jobs and live streams stay locked until the candidate has a name, email, title, and location.</p>
           <button type="button" onClick={() => navigate("/onboarding")}>Go to onboarding</button>
           {error ? <p className="error">{error}</p> : null}
         </div>
       ) : (
         <>
-          <div className="row toolbar">
-            <input id="q" value={q} placeholder="Search company or title" onChange={(e) => setQ(e.target.value)} />
-            <button id="refresh" type="button" onClick={() => load(q).catch((err) => setError(errMessage(err)))}>Refresh</button>
+          <header className="board-head">
+            <div>
+              <p className="eyebrow">Hunt board</p>
+              <h2>Pipeline</h2>
+              <p className="muted">Discovery agents land jobs here. Steer status, pause lanes, and push apply / outreach from each row.</p>
+            </div>
+            <div className="board-head-actions">
+              <span className={`live-pill ${live ? "on" : ""}`} title={live ? "SSE connected" : "SSE reconnecting"}>
+                <span className="live-dot" aria-hidden="true" />
+                {live ? "Live" : "Connecting"}
+              </span>
+              <Link className="button" to="/admin">Mint invite</Link>
+            </div>
+          </header>
+
+          <section className={`metric-strip ${jobs.length ? "" : "metric-strip-ready"}`.trim()} aria-label="Board summary">
+            <div className="metric">
+              <span className="metric-value">{jobs.length}</span>
+              <span className="metric-label">Jobs</span>
+            </div>
+            {jobs.length
+              ? statusCounts.filter((item) => item.count > 0).map((item) => (
+                <div key={item.key} className="metric">
+                  <span className="metric-value">{item.count}</span>
+                  <span className="metric-label">{item.label}</span>
+                </div>
+              ))
+              : (
+                <div className="metric metric-soft metric-wide">
+                  <span className="metric-value">Start discovery</span>
+                  <span className="metric-label">Next step · mint an invite, then redeem from an agent</span>
+                </div>
+              )}
+            {stoppedCount ? (
+              <div className="metric">
+                <span className="metric-value">{stoppedCount}</span>
+                <span className="metric-label">Paused</span>
+              </div>
+            ) : null}
+            <div className="metric metric-soft">
+              <span className="metric-value">{cand?.resume_present ? "Yes" : "No"}</span>
+              <span className="metric-label">Resume</span>
+            </div>
+            <div className="metric metric-soft">
+              <span className="metric-value">{cand?.ready_for_agents ? "Ready" : "Wait"}</span>
+              <span className="metric-label">Agents</span>
+            </div>
+          </section>
+
+          <div className="row toolbar board-toolbar">
+            <input id="q" value={q} placeholder="Search company or title" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => {
+              if (e.key === "Enter") load(q).catch((err) => setError(errMessage(err)));
+            }} />
+            <button id="refresh" type="button" className="quiet" onClick={() => load(q).catch((err) => setError(errMessage(err)))}>Refresh</button>
           </div>
           {error ? <p className="error">{error}</p> : null}
-          {!jobs.length ? (
-            <div className="empty-state">
-              <p className="muted">No jobs yet. Discovery agents write rows here after you mint a discovery invite.</p>
-              <Link className="button quiet" to="/admin">Create invite</Link>
-            </div>
-          ) : null}
-          <div className="split">
-            <table id="list">
-              <thead><tr><th>Company</th><th>Title</th><th>Status</th></tr></thead>
-              <tbody>
-                {jobs.map((job) => (
-                  <tr key={job.id} onClick={() => open(job)}>
-                    <td>{job.company}</td>
-                    <td>{job.title}</td>
-                    <td>{job.stopped ? "stopped" : job.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {draft ? (
-              <form className="stack card-panel" onSubmit={save}>
-                <label>Company<input id="f_company" value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} /></label>
-                <label>Title<input id="f_title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
-                <label>Notes<textarea id="f_notes" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></label>
-                <label>Status
-                  <select id="f_status" value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
-                    {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-                  </select>
-                </label>
-                <label>Rejection by
-                  <select id="f_rejection_by" value={draft.rejection_by} onChange={(e) => setDraft({ ...draft, rejection_by: e.target.value })}>
-                    <option value="">—</option>
-                    <option value="company">company</option>
-                    <option value="user">user</option>
-                  </select>
-                </label>
-                <label>Company remarks<textarea id="f_company_remarks" value={draft.company_remarks} onChange={(e) => setDraft({ ...draft, company_remarks: e.target.value })} /></label>
-                <label>Your remarks<textarea id="f_user_remarks" value={draft.user_remarks} onChange={(e) => setDraft({ ...draft, user_remarks: e.target.value })} /></label>
-                <p id="sideErr">{side}</p>
-                <div className="row">
-                  <button id="saveBtn" type="submit">Save</button>
-                  <button id="pauseBtn" type="button" onClick={() => setPausing(true)}>Pause</button>
-                  <button id="resumeBtn" type="button" onClick={resume}>Resume</button>
+
+          {!loaded ? (
+            <p className="muted">Loading jobs…</p>
+          ) : !jobs.length ? (
+            <section className="board-empty" aria-label="Empty board">
+              <div className="board-empty-hero card-panel">
+                <h3>No jobs on the board yet</h3>
+                <p className="muted">Mint a discovery invite, redeem it from an agent with a browser, and shortlisted roles show up in this list automatically.</p>
+                <div className="row actions">
+                  <Link className="button" to="/admin">Create discovery invite</Link>
+                  <Link className="button quiet" to="/admin/skills">Review skills</Link>
                 </div>
-                {pausing ? (
+              </div>
+              <div className="next-grid">
+                <article className="next-card">
+                  <p className="eyebrow">1 · Find</p>
+                  <h4>Discovery lane</h4>
+                  <p className="muted">Agents catalog openings. Never Easy Apply on this track.</p>
+                  <Link className="text-link" to="/admin">Open invites</Link>
+                </article>
+                <article className="next-card">
+                  <p className="eyebrow">2 · Submit</p>
+                  <h4>Application lane</h4>
+                  <p className="muted">When a row is apply_ready, send a packet and log proof here.</p>
+                  <Link className="text-link" to="/onboarding">Check candidate</Link>
+                </article>
+                <article className="next-card">
+                  <p className="eyebrow">3 · Reach out</p>
+                  <h4>Outreach lane</h4>
+                  <p className="muted">Email with the resume PDF; keep LinkedIn notes short.</p>
+                  <Link className="text-link" to="/admin/memory">Read memory</Link>
+                </article>
+              </div>
+            </section>
+          ) : (
+            <div className="split board-split">
+              <div className="job-table-wrap card-panel">
+                <table id="list" className="job-table">
+                  <thead><tr><th>Company</th><th>Title</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {jobs.map((job) => {
+                      const status = job.stopped ? "stopped" : (job.status || "discovered");
+                      return (
+                        <tr key={job.id} className={selected === job.id ? "is-selected" : undefined} onClick={() => open(job)}>
+                          <td>{job.company || "—"}</td>
+                          <td>{job.title || "—"}</td>
+                          <td><span className={`status-pill ${statusTone(status)}`}>{status.replaceAll("_", " ")}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {draft ? (
+                <form className="stack card-panel job-editor" onSubmit={save}>
+                  <h3 className="editor-title">Edit job</h3>
+                  <label>Company<input id="f_company" value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} /></label>
+                  <label>Title<input id="f_title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
+                  <label>Notes<textarea id="f_notes" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></label>
+                  <label>Status
+                    <select id="f_status" value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
+                      {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                    </select>
+                  </label>
+                  <label>Rejection by
+                    <select id="f_rejection_by" value={draft.rejection_by} onChange={(e) => setDraft({ ...draft, rejection_by: e.target.value })}>
+                      <option value="">—</option>
+                      <option value="company">company</option>
+                      <option value="user">user</option>
+                    </select>
+                  </label>
+                  <label>Company remarks<textarea id="f_company_remarks" value={draft.company_remarks} onChange={(e) => setDraft({ ...draft, company_remarks: e.target.value })} /></label>
+                  <label>Your remarks<textarea id="f_user_remarks" value={draft.user_remarks} onChange={(e) => setDraft({ ...draft, user_remarks: e.target.value })} /></label>
+                  <p id="sideErr">{side}</p>
                   <div className="row">
-                    <input id="laneReason" value={pauseReason} placeholder="Why pause" onChange={(e) => setPauseReason(e.target.value)} />
-                    <button id="laneConfirm" type="button" onClick={confirmPause}>Confirm pause</button>
+                    <button id="saveBtn" type="submit">Save</button>
+                    <button id="pauseBtn" type="button" className="quiet" onClick={() => setPausing(true)}>Pause</button>
+                    <button id="resumeBtn" type="button" className="quiet" onClick={resume}>Resume</button>
                   </div>
-                ) : null}
-              </form>
-            ) : null}
-          </div>
+                  {pausing ? (
+                    <div className="row">
+                      <input id="laneReason" value={pauseReason} placeholder="Why pause" onChange={(e) => setPauseReason(e.target.value)} />
+                      <button id="laneConfirm" type="button" onClick={confirmPause}>Confirm pause</button>
+                    </div>
+                  ) : null}
+                </form>
+              ) : (
+                <aside className="card-panel job-editor-placeholder">
+                  <h3>Select a job</h3>
+                  <p className="muted">Click a row to edit status, notes, pause a lane, or record a rejection.</p>
+                </aside>
+              )}
+            </div>
+          )}
         </>
       )}
     </Shell>

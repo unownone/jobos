@@ -53,6 +53,13 @@ docker compose up -d --build
 docker compose logs -f api web
 ```
 
+Apply schema once before the API can serve (migrations are not automatic on boot):
+
+```bash
+docker compose --profile migrate run --rm migrate
+# or: DATABASE_URL=… bash scripts/hub_migrate.sh
+```
+
 Open `http://127.0.0.1:8080/login`. After signup, `/onboarding`. Board UI is `/board`.
 
 ### Outside Postgres

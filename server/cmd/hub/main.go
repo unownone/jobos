@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,6 +20,57 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "migrate":
+			os.Exit(runMigrate())
+		case "help", "-h", "--help":
+			printHelp()
+			return
+		default:
+			fmt.Fprintf(os.Stderr, "unknown command %q\n\n", os.Args[1])
+			printHelp()
+			os.Exit(2)
+		}
+	}
+	runServer()
+}
+
+func printHelp() {
+	fmt.Fprintf(os.Stderr, `jobOS Hub
+
+Usage:
+  hub              Start the HTTP API (does not migrate the database)
+  hub migrate      Apply Postgres schema + repair migrations, then exit
+  hub help         Show this help
+
+Migrations are manual. Run hub migrate against DATABASE_URL before deploying
+a revision that needs new tables or indexes (Cloud Run Job, compose one-shot,
+or docker run --rm ... hub migrate).
+`)
+}
+
+func runMigrate() int {
+	log := telemetry.Init(telemetry.Options{})
+	defer func() { _ = telemetry.Shutdown(context.Background()) }()
+
+	cfg := config.Load()
+	cfg.Plug()
+	if cfg.DatabaseURL == "" {
+		log.Error("migrate requires DATABASE_URL")
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if err := store.MigrateURL(ctx, cfg.DatabaseURL); err != nil {
+		log.Error("migrate failed", "error.message", err.Error())
+		return 1
+	}
+	log.Info("migrate ok", "store", "postgres")
+	return 0
+}
+
+func runServer() {
 	log := telemetry.Init(telemetry.Options{})
 	defer func() { _ = telemetry.Shutdown(context.Background()) }()
 
@@ -34,6 +86,10 @@ func main() {
 		if err == nil || cfg.DatabaseURL == "" {
 			break
 		}
+		if !store.RetryableOpenError(err) {
+			log.Error("store open failed", "error.message", err.Error())
+			os.Exit(1)
+		}
 		if ctx.Err() != nil {
 			log.Error("store open failed", "error.message", err.Error())
 			os.Exit(1)
@@ -42,6 +98,13 @@ func main() {
 		time.Sleep(time.Second)
 	}
 	defer db.Close()
+
+	if checker, ok := db.(interface{ RequireSchema(context.Context) error }); ok {
+		if err := checker.RequireSchema(ctx); err != nil {
+			log.Error("store schema not ready", "error.message", err.Error())
+			os.Exit(1)
+		}
+	}
 
 	blobs, err := blob.Open(blob.Settings{
 		Driver: cfg.BlobDriver, Root: cfg.BlobRoot, Endpoint: cfg.S3Endpoint, Region: cfg.S3Region,
