@@ -481,9 +481,14 @@ func (s *Server) createInvite(c *gin.Context) {
 		MaxRedemptions      int    `json:"max_redemptions"`
 		TTLHours            int    `json:"ttl_hours"`
 		AllowMultipleOwners bool   `json:"allow_multiple_owners"`
+		MCPBootstrap        *bool  `json:"mcp_bootstrap"`
 	}
 	if err := c.BindJSON(&body); err != nil {
 		return
+	}
+	mcpBootstrap := true
+	if body.MCPBootstrap != nil {
+		mcpBootstrap = *body.MCPBootstrap
 	}
 	track := canonicalTrack(body.Track)
 	if track == "" {
@@ -514,8 +519,58 @@ func (s *Server) createInvite(c *gin.Context) {
 		fail(c, 500, err.Error())
 		return
 	}
-	url := s.publicURL(c) + "/join/" + inv.ID + "?s=" + secret
-	c.JSON(http.StatusOK, gin.H{"invite": publicInvite(inv), "secret": secret, "join_url": url, "token": "jh_inv_" + inv.ID + "." + secret, "shown_once": true})
+	origin := strings.TrimRight(s.publicURL(c), "/")
+	url := origin + "/join/" + inv.ID + "?s=" + secret
+	token := "jh_inv_" + inv.ID + "." + secret
+	out := gin.H{
+		"invite": publicInvite(inv), "secret": secret, "join_url": url, "token": token,
+		"mcp_url": origin + "/mcp", "shown_once": true,
+		"auth_hint": "Paste an MCP client block into your AI. Bearer API key auth lasts ~90 days on /mcp. OAuth via /connect still works (access 24h, refresh 90d). Browser /join is fallback only.",
+	}
+	out["mcp_clients"] = []MCPClientSnippet{}
+	if mcpBootstrap {
+		// MCP-first: mint one long-lived Hub key so operators paste configs without /join.
+		if kind, err := s.chooseJoinKind(c, inv); err == nil {
+			display := "mcp-" + track + "-" + random(4)
+			user, apiKey, mintErr := s.mintInviteUser(c, inv, kind, display, nil)
+			if mintErr == nil {
+				inv.Redemptions++
+				_ = s.DB.SaveInvite(c.Request.Context(), inv)
+				out["invite"] = publicInvite(inv)
+				out["api_key"] = apiKey
+				out["user"] = publicUser(user)
+				out["mcp_clients"] = BuildMCPClientSnippets(origin, apiKey)
+			} else {
+				out["mcp_bootstrap_error"] = mintErr.Error()
+			}
+		} else {
+			out["mcp_bootstrap_error"] = err.Error()
+		}
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (s *Server) mintInviteUser(c *gin.Context, inv store.Invite, kind, displayName string, metadata map[string]any) (store.User, string, error) {
+	meta := mustJSON(metadata)
+	user := store.User{
+		ID: newID("usr_"), AccountID: inv.AccountID, Kind: kind, Track: inv.Track,
+		DisplayName: displayName, Metadata: meta, CreatedBy: inv.CreatedBy, CreatedAt: now(),
+	}
+	if err := s.DB.CreateUser(c.Request.Context(), user); err != nil {
+		return store.User{}, "", err
+	}
+	plain := "jh_agt_" + random(16)
+	prefix := "jh_agt_"
+	if kind == "owner" {
+		plain = "jh_own_" + inv.Track + "_" + random(12)
+		prefix = "jh_own_" + inv.Track + "_"
+	}
+	if err := s.DB.CreateAPIKey(c.Request.Context(), store.APIKey{
+		ID: newID("key_"), AccountID: inv.AccountID, UserID: user.ID, Prefix: prefix, KeyHash: hash(plain), CreatedAt: now(),
+	}); err != nil {
+		return store.User{}, "", err
+	}
+	return user, plain, nil
 }
 
 func canonicalTrack(v string) string {
@@ -706,22 +761,19 @@ func (s *Server) join(c *gin.Context) {
 		fail(c, 403, err.Error())
 		return
 	}
-	meta := mustJSON(body.Metadata)
-	user := store.User{ID: newID("usr_"), AccountID: inv.AccountID, Kind: kind, Track: inv.Track, DisplayName: body.DisplayName, Metadata: meta, CreatedBy: inv.CreatedBy, CreatedAt: now()}
-	if err := s.DB.CreateUser(c.Request.Context(), user); err != nil {
+	user, plain, err := s.mintInviteUser(c, inv, kind, body.DisplayName, body.Metadata)
+	if err != nil {
 		fail(c, 500, err.Error())
 		return
 	}
-	plain := "jh_agt_" + random(16)
-	prefix := "jh_agt_"
-	if kind == "owner" {
-		plain = "jh_own_" + inv.Track + "_" + random(12)
-		prefix = "jh_own_" + inv.Track + "_"
-	}
-	_ = s.DB.CreateAPIKey(c.Request.Context(), store.APIKey{ID: newID("key_"), AccountID: inv.AccountID, UserID: user.ID, Prefix: prefix, KeyHash: hash(plain), CreatedAt: now()})
 	inv.Redemptions++
 	_ = s.DB.SaveInvite(c.Request.Context(), inv)
-	c.JSON(http.StatusOK, gin.H{"user": publicUser(user), "api_key": plain, "shown_once": true})
+	origin := strings.TrimRight(s.publicURL(c), "/")
+	c.JSON(http.StatusOK, gin.H{
+		"user": publicUser(user), "api_key": plain, "shown_once": true,
+		"mcp_url": origin + "/mcp", "mcp_clients": BuildMCPClientSnippets(origin, plain),
+		"auth_hint": "Prefer MCP: paste a client block with this API key as Bearer. Key lasts ~90 days on /mcp.",
+	})
 }
 
 func (s *Server) listAgents(c *gin.Context) {
