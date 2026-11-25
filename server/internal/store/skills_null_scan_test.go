@@ -160,6 +160,19 @@ func TestListSkillsPostgresNullOwner(t *testing.T) {
 	if err := p.Migrate(ctx); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
+	// Migrate creates owner_user_id as NOT NULL. Production still has legacy
+	// nullable columns from older schemas (ADD COLUMN IF NOT EXISTS is a no-op
+	// when the column already exists nullable). Relax the constraint so this
+	// test can insert the NULL row the coalesce scan path must tolerate.
+	_, err = p.pool.Exec(ctx, `ALTER TABLE skills ALTER COLUMN owner_user_id DROP NOT NULL`)
+	if err != nil {
+		t.Fatalf("drop NOT NULL on owner_user_id: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = p.pool.Exec(context.Background(), `
+			UPDATE skills SET owner_user_id = '' WHERE owner_user_id IS NULL;
+			ALTER TABLE skills ALTER COLUMN owner_user_id SET NOT NULL`)
+	})
 	id := fmt.Sprintf("test_null_owner_%d", time.Now().UnixNano())
 	_, err = p.pool.Exec(ctx, `
 		INSERT INTO skills (id, account_id, slug, name, kind, role, tags_json, scope, owner_user_id, status, platform, body, origin, version, created_at, updated_at)
