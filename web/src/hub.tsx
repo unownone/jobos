@@ -646,9 +646,16 @@ export function Board({ me }: { me: SessionMe }) {
   );
 }
 
+const INVITE_MODES = [
+  { id: "owner_then_agents", label: "Owner then agents", help: "First join on an empty track becomes the owner; later joins are agents." },
+  { id: "owner_only", label: "Owner only", help: "Every redemption is a track owner. Needs multi-owner if the track already has one." },
+  { id: "agents_only", label: "Agents only", help: "All redemptions are agents. An owner must already exist or be minted another way." },
+] as const;
+
 export function Invites({ me }: { me: SessionMe }) {
   const navigate = useNavigate();
   const [track, setTrack] = useState("discovery");
+  const [mode, setMode] = useState<(typeof INVITE_MODES)[number]["id"]>("owner_then_agents");
   const [maxRedemptions, setMaxRedemptions] = useState(5);
   const [ttlHours, setTtlHours] = useState(72);
   const [allowMultiple, setAllowMultiple] = useState(false);
@@ -684,7 +691,7 @@ export function Invites({ me }: { me: SessionMe }) {
         method: "POST",
         body: JSON.stringify({
           track,
-          mode: "owner_then_agents",
+          mode,
           max_redemptions: maxRedemptions,
           ttl_hours: ttlHours,
           allow_multiple_owners: allowMultiple,
@@ -708,6 +715,7 @@ export function Invites({ me }: { me: SessionMe }) {
   }
 
   const trackMeta = TRACKS.find((item) => item.id === track) || TRACKS[0];
+  const modeMeta = INVITE_MODES.find((item) => item.id === mode) || INVITE_MODES[0];
   const prompt = fresh
     ? `Join ${fresh.join_url} and read AGENTS.md before you search. Review the packet before any apply.`
     : "Create an invite. Share the join URL once — the secret is shown only here.";
@@ -733,6 +741,13 @@ export function Invites({ me }: { me: SessionMe }) {
                 </select>
                 <span className="field-hint">{trackMeta.help}</span>
               </label>
+              <label>
+                Mode
+                <select id="mode" value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
+                  {INVITE_MODES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </select>
+                <span className="field-hint">{modeMeta.help}</span>
+              </label>
               <div className="row">
                 <label>
                   Max redemptions
@@ -747,6 +762,7 @@ export function Invites({ me }: { me: SessionMe }) {
                 <input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} />
                 Allow multiple owners on this track
               </label>
+              <span className="field-hint">Needed for a second owner_only invite when the track already has an owner. Does not turn later owner_then_agents joins into owners.</span>
               <button type="submit">Create invite</button>
             </form>
             {fresh ? (

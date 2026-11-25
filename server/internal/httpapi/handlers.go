@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -492,6 +493,11 @@ func (s *Server) createInvite(c *gin.Context) {
 	if body.Mode == "" {
 		body.Mode = "owner_then_agents"
 	}
+	if canonicalInviteMode(body.Mode) == "" {
+		fail(c, 422, "mode must be owner_then_agents, owner_only, or agents_only")
+		return
+	}
+	body.Mode = canonicalInviteMode(body.Mode)
 	if body.MaxRedemptions <= 0 {
 		body.MaxRedemptions = 5
 	}
@@ -524,6 +530,57 @@ func canonicalTrack(v string) string {
 		return "maintenance"
 	default:
 		return ""
+	}
+}
+
+func canonicalInviteMode(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "owner_then_agents", "owner-then-agents":
+		return "owner_then_agents"
+	case "owner_only", "owner-only":
+		return "owner_only"
+	case "agents_only", "agents-only", "agent_only":
+		return "agents_only"
+	default:
+		return ""
+	}
+}
+
+func (s *Server) countTrackOwners(c *gin.Context, accountID, track string) (int, error) {
+	users, err := s.DB.ListUsers(c.Request.Context(), accountID, "owner", track)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, u := range users {
+		if u.DisabledAt == "" {
+			n++
+		}
+	}
+	return n, nil
+}
+
+// chooseJoinKind mirrors the Python Hub: owner_only creates owners (extra owners
+// need allow_multiple_owners), agents_only creates agents, owner_then_agents
+// makes the first track owner then agents.
+func (s *Server) chooseJoinKind(c *gin.Context, inv store.Invite) (string, error) {
+	owners, err := s.countTrackOwners(c, inv.AccountID, inv.Track)
+	if err != nil {
+		return "", err
+	}
+	switch inv.Mode {
+	case "owner_only":
+		if owners > 0 && !inv.AllowMultipleOwners {
+			return "", fmt.Errorf("track already has an owner")
+		}
+		return "owner", nil
+	case "agents_only":
+		return "agent", nil
+	default: // owner_then_agents
+		if owners == 0 {
+			return "owner", nil
+		}
+		return "agent", nil
 	}
 }
 
@@ -640,12 +697,13 @@ func (s *Server) join(c *gin.Context) {
 		c.JSON(409, gin.H{"detail": candidateRequiredBody()})
 		return
 	}
-	kind := "agent"
-	if inv.Mode == "owner_only" || (inv.Mode == "owner_then_agents" && inv.Redemptions == 0) {
-		kind = "owner"
-	}
 	if body.DisplayName == "" {
 		fail(c, 422, "display_name is required")
+		return
+	}
+	kind, err := s.chooseJoinKind(c, inv)
+	if err != nil {
+		fail(c, 403, err.Error())
 		return
 	}
 	meta := mustJSON(body.Metadata)
