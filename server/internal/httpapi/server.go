@@ -596,7 +596,28 @@ func (s *Server) publicURL(c *gin.Context) string {
 	if s.Cfg.PublicURL != "" {
 		return s.Cfg.PublicURL
 	}
-	return "http://" + c.Request.Host
+	host := c.Request.Host
+	if fwd := strings.TrimSpace(c.GetHeader("X-Forwarded-Host")); fwd != "" {
+		// First hop only — Cloudflare / Cloud Run may append a list.
+		if i := strings.IndexByte(fwd, ','); i >= 0 {
+			fwd = strings.TrimSpace(fwd[:i])
+		}
+		if fwd != "" {
+			host = fwd
+		}
+	}
+	scheme := "http"
+	if proto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")); proto != "" {
+		if i := strings.IndexByte(proto, ','); i >= 0 {
+			proto = strings.TrimSpace(proto[:i])
+		}
+		if strings.EqualFold(proto, "https") {
+			scheme = "https"
+		}
+	} else if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	return scheme + "://" + host
 }
 
 func fallbackBriefing(name, hub string) string {
