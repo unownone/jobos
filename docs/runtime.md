@@ -39,7 +39,7 @@ docker compose --profile migrate run --rm migrate
 # gcloud run jobs execute jobos-migrate --region=…
 ```
 
-Boot fails fast with `database schema missing; run: hub migrate` when `accounts` is absent. Idempotent repair statements (column copies, bool coercion, remapping cross-account skill ids) live in the same `hub migrate` path.
+Boot fails fast with `database schema missing; run: hub migrate` when `accounts` is absent, and when Python-era `INTEGER` flag columns remain (e.g. `invites.allow_multiple_owners`) — those break Create invite until coerced to `BOOLEAN`. Idempotent repair statements (column copies, bool coercion, remapping cross-account skill ids) live in the same `hub migrate` path.
 
 `HUB_PLUGINS` defaults to `auto` in Compose. When `postgres`, `redis`, or `minio` resolves on the API network, the empty driver switches to that service: Postgres at `postgres:5432`, Redis at `redis:6379`, and MinIO at `http://minio:9000` with bucket `jobos`. The API creates the bucket on startup and retries Postgres until it accepts connections. Set `DATABASE_URL`, `REDIS_URL`, or `BLOB_DRIVER` to keep a driver you chose yourself. Set `HUB_PLUGINS=off` to leave every optional service unused even when it is running.
 

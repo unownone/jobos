@@ -1,6 +1,7 @@
 package store
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -20,6 +21,24 @@ func TestCoerceIntBoolSQLTargetsPythonColumns(t *testing.T) {
 	}
 	if strings.Contains(sql, "%%") {
 		t.Fatalf("sprintf left doubled percent: %s", sql)
+	}
+}
+
+func TestMigrateOrdersBoolCoerceBeforeSkillsUniqueIndex(t *testing.T) {
+	// Source-order guard: coerce must run before skills_id_uidx so a 23505
+	// cannot leave allow_multiple_owners as int4.
+	data, err := os.ReadFile("postgres.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(data)
+	coerceAt := strings.Index(src, `coerceIntBoolSQL("invites", "allow_multiple_owners")`)
+	indexAt := strings.Index(src, `skills_id_uidx`)
+	if coerceAt < 0 || indexAt < 0 {
+		t.Fatal("missing coerce or skills_id_uidx marker")
+	}
+	if coerceAt > indexAt {
+		t.Fatalf("coerceIntBoolSQL(invites) must appear before skills_id_uidx (coerce=%d index=%d)", coerceAt, indexAt)
 	}
 }
 

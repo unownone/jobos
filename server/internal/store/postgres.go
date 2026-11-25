@@ -58,6 +58,21 @@ func (p *Postgres) RequireSchema(ctx context.Context) error {
 	if name == nil || *name == "" {
 		return fmt.Errorf("database schema missing; run: hub migrate")
 	}
+	// Python Hub stored flag columns as INTEGER 0/1. Go writes bool; leftover
+	// int4 breaks CREATE invite (pgx cannot encode false into int4).
+	for _, col := range [][2]string{
+		{"invites", "allow_multiple_owners"},
+		{"jobs", "stopped"},
+		{"people", "do_not_contact"},
+		{"memory_items", "pinned"},
+		{"skills", "reproducible"},
+	} {
+		dt, _ := p.columnType(ctx, col[0], col[1])
+		switch dt {
+		case "integer", "smallint", "bigint":
+			return fmt.Errorf("column %s.%s is still %s (Python-era); run: hub migrate", col[0], col[1], dt)
+		}
+	}
 	return nil
 }
 
@@ -129,19 +144,21 @@ func (p *Postgres) migrate(ctx context.Context) error {
 		`UPDATE mcps SET auth = '' WHERE auth IS NULL`,
 		`UPDATE mcps SET notes = '' WHERE notes IS NULL`,
 		dropNotNullIfPresentSQL("mcps", "content_hash"),
+		// Python Hub stored these as INTEGER 0/1. Go writes bool; pgx cannot encode
+		// false into int4. Coerce BEFORE unique-index rebuilds so a 23505 on skills
+		// cannot skip the bool repair (that left prod invites.allow_multiple_owners
+		// as int4 after #50 boot-migrate aborted).
+		coerceIntBoolSQL("invites", "allow_multiple_owners"),
+		coerceIntBoolSQL("jobs", "stopped"),
+		coerceIntBoolSQL("people", "do_not_contact"),
+		coerceIntBoolSQL("memory_items", "pinned"),
+		coerceIntBoolSQL("skills", "reproducible"),
 		// Python PK was (account_id, id), so the same skill id can exist on many
 		// accounts. Go upserts ON CONFLICT (id). Remap losers; do not delete them.
 		remapDuplicateIDSQL("skills"),
 		remapDuplicateIDSQL("skill_recordings"),
 		`CREATE UNIQUE INDEX IF NOT EXISTS skills_id_uidx ON skills (id)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS skill_recordings_id_uidx ON skill_recordings (id)`,
-		// Python Hub stored these as INTEGER 0/1. Go writes bool; pgx cannot encode
-		// false into int4. Coerce leftover integer columns on every boot.
-		coerceIntBoolSQL("invites", "allow_multiple_owners"),
-		coerceIntBoolSQL("jobs", "stopped"),
-		coerceIntBoolSQL("people", "do_not_contact"),
-		coerceIntBoolSQL("memory_items", "pinned"),
-		coerceIntBoolSQL("skills", "reproducible"),
 	} {
 		if _, err := p.pool.Exec(ctx, stmt); err != nil {
 			return fmt.Errorf("migrate: %w", err)
@@ -557,10 +574,36 @@ func (p *Postgres) RevokeUserKeys(ctx context.Context, userID string, at string)
 }
 
 func (p *Postgres) CreateInvite(ctx context.Context, inv Invite) error {
+	flag := p.encodeBoolFlag(ctx, "invites", "allow_multiple_owners", inv.AllowMultipleOwners)
+	// DescribeExec: re-describe params so a post-migrate TYPE change is visible
+	// even if an older statement cache still holds int4 OIDs.
 	_, err := p.pool.Exec(ctx, `INSERT INTO invites (id, account_id, track, mode, secret_hash, max_redemptions, redemptions, expires_at, revoked_at, created_by, allow_multiple_owners, created_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-		inv.ID, inv.AccountID, inv.Track, inv.Mode, inv.SecretHash, inv.MaxRedemptions, inv.Redemptions, inv.ExpiresAt, inv.RevokedAt, inv.CreatedBy, inv.AllowMultipleOwners, inv.CreatedAt)
+		pgx.QueryExecModeDescribeExec,
+		inv.ID, inv.AccountID, inv.Track, inv.Mode, inv.SecretHash, inv.MaxRedemptions, inv.Redemptions, inv.ExpiresAt, inv.RevokedAt, inv.CreatedBy, flag, inv.CreatedAt)
 	return err
+}
+
+// encodeBoolFlag returns a Go value pgx can bind for a flag column that may still
+// be Python-era INTEGER (0/1) or BOOLEAN. Prefer migrate (coerceIntBoolSQL); this
+// keeps CreateInvite working until operators run hub migrate.
+func (p *Postgres) encodeBoolFlag(ctx context.Context, table, column string, v bool) any {
+	dt, _ := p.columnType(ctx, table, column)
+	switch dt {
+	case "integer", "smallint", "bigint":
+		if v {
+			return 1
+		}
+		return 0
+	default:
+		return v
+	}
+}
+
+func (p *Postgres) columnType(ctx context.Context, table, column string) (dataType, udt string) {
+	_ = p.pool.QueryRow(ctx, `SELECT data_type, udt_name FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name=$1 AND column_name=$2`, table, column).Scan(&dataType, &udt)
+	return dataType, udt
 }
 
 func scanInvite(row pgx.Row) (Invite, error) {
@@ -572,7 +615,8 @@ func scanInvite(row pgx.Row) (Invite, error) {
 	return inv, err
 }
 
-const inviteSelect = `SELECT id, account_id, track, mode, secret_hash, max_redemptions, redemptions, expires_at, revoked_at, created_by, allow_multiple_owners, created_at FROM invites`
+// Cast through int so both Python-era INTEGER and BOOLEAN columns scan into *bool.
+const inviteSelect = `SELECT id, account_id, track, mode, secret_hash, max_redemptions, redemptions, expires_at, revoked_at, created_by, (allow_multiple_owners::int <> 0), created_at FROM invites`
 
 func (p *Postgres) Invite(ctx context.Context, id string) (Invite, error) {
 	return scanInvite(p.pool.QueryRow(ctx, inviteSelect+` WHERE id=$1`, id))
