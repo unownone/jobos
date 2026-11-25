@@ -47,6 +47,7 @@ func TestMCPParitySurfacesViaTools(t *testing.T) {
 		"create_skill", "fork_skill", "promote_recording", "skills_zip",
 		"hygiene", "import_jobs", "export_ledger", "add_token_burn",
 		"a2a_directory", "create_peer", "poll_events",
+		"dashboard", "list_users", "seed_registry",
 	} {
 		if !strings.Contains(listBody, `"name":"`+name+`"`) {
 			t.Fatalf("tools/list missing %s: %s", name, listBody)
@@ -56,6 +57,19 @@ func TestMCPParitySurfacesViaTools(t *testing.T) {
 	meta := mcpToolText(t, ts.URL, access, session, 11, "meta", `{}`)
 	if !strings.Contains(meta, `"mcp": true`) && !strings.Contains(meta, `"mcp":true`) {
 		t.Fatalf("meta %s", meta)
+	}
+
+	dash := mcpToolText(t, ts.URL, access, session, 110, "dashboard", `{}`)
+	if !strings.Contains(dash, "counts") || !strings.Contains(dash, "candidate_onboarded") {
+		t.Fatalf("dashboard %s", dash)
+	}
+	users := mcpToolText(t, ts.URL, access, session, 111, "list_users", `{"kind":"admin"}`)
+	if !strings.Contains(users, `"count"`) || !(strings.Contains(users, `"kind": "admin"`) || strings.Contains(users, `"kind":"admin"`)) {
+		t.Fatalf("list_users %s", users)
+	}
+	seed := mcpToolText(t, ts.URL, access, session, 112, "seed_registry", `{}`)
+	if !strings.Contains(seed, `"seeded"`) {
+		t.Fatalf("seed_registry %s", seed)
 	}
 
 	inviteText := mcpToolText(t, ts.URL, access, session, 12, "create_invite", `{"track":"discovery","mcp_bootstrap":true}`)
