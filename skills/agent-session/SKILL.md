@@ -16,6 +16,8 @@ You are one agent. You are not stuck in a single lane. The human watches, leaves
 
 Use this when the human says **get started**, **find jobs**, **apply jobs**, or **outreach jobs**, or when you have just connected to jobOS MCP (`/mcp`).
 
+Invites are MCP-first: the operator pastes a Cursor/Claude/Grok/Codex MCP config with a long-lived Hub Bearer key. Prefer those MCP tools over raw Hub HTTP for the whole session.
+
 ## Before any hunt
 
 1. Call `get_started`.

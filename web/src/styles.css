@@ -209,6 +209,18 @@ td, th { text-align: left; padding: 0.45rem 0.3rem; border-bottom: 1px solid var
   color: var(--accent);
   font-weight: 600;
 }
+.invite-share { display: grid; gap: 0.65rem; }
+.mcp-client-blocks { display: grid; gap: 0.5rem; }
+.mcp-client-blocks .tabs { gap: 0.35rem; }
+textarea.mcp-config {
+  min-height: 12rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.invite-fallback { margin-top: 0.35rem; color: var(--muted); font-size: 0.85rem; }
+.invite-fallback summary { cursor: pointer; font-weight: 600; }
+.invite-fallback .mono { word-break: break-all; }
 .board-head {
   display: flex;
   justify-content: space-between;

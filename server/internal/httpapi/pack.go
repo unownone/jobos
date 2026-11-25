@@ -335,6 +335,16 @@ func (s *Server) sendRepo(c *gin.Context, rel string) {
 
 func (s *Server) skillsZip(c *gin.Context) {
 	p := principalFrom(c)
+	data, track, err := s.buildSkillsZip(p)
+	if err != nil {
+		fail(c, 404, err.Error())
+		return
+	}
+	c.Header("Content-Disposition", `attachment; filename="skills-`+track+`.zip"`)
+	c.Data(http.StatusOK, "application/zip", data)
+}
+
+func (s *Server) buildSkillsZip(p principal) ([]byte, string, error) {
 	track := p.Track
 	if track == "" {
 		track = "discovery"
@@ -352,13 +362,12 @@ func (s *Server) skillsZip(c *gin.Context) {
 			}
 		}
 	}
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
 	root := s.Cfg.RepoRoot
 	if root == "" {
-		fail(c, 404, "pack zip not found")
-		return
+		return nil, track, errString("pack zip not found")
 	}
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
 	for _, name := range names {
 		dir := filepath.Join(root, "skills", name)
 		_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -383,11 +392,9 @@ func (s *Server) skillsZip(c *gin.Context) {
 		})
 	}
 	if err := zw.Close(); err != nil {
-		fail(c, 500, err.Error())
-		return
+		return nil, track, err
 	}
-	c.Header("Content-Disposition", `attachment; filename="skills-`+track+`.zip"`)
-	c.Data(http.StatusOK, "application/zip", buf.Bytes())
+	return buf.Bytes(), track, nil
 }
 
 func (s *Server) rebuildPack(c *gin.Context) {

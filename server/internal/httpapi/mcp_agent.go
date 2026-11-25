@@ -14,6 +14,9 @@ import (
 
 const agentInstructions = "You are connected to jobOS as one agent. You are not stuck in a single lane. " +
 	"The human observes, shares insights, and steers. You do the work. " +
+	"Auth: this MCP connection uses a long-lived Hub API key Bearer (from an invite paste) " +
+	"or OAuth (access ~24h, refresh ~90d via /connect). Operate exclusively through these MCP tools — " +
+	"do not fall back to raw Hub HTTP unless a tool is missing. " +
 	"Call get_started. If lanes are empty, ask the human which of find, apply, and outreach " +
 	"this session should run — they may pick more than one — then set_session_lanes. " +
 	"Call report_capabilities with the truth: browser only if you can drive a browser here, " +
@@ -23,7 +26,7 @@ const agentInstructions = "You are connected to jobOS as one agent. You are not 
 	"Use start_loop and keep calling next_loop until the loop is done or blocked. " +
 	"Do not wait for the human to ask again. Read skills with read_skill. " +
 	"Record what you used with record_use. Read steers with read_steers. " +
-	"The older Hub HTTP API still exists for invite-key bots. Prefer these tools."
+	"Jobs, queue, memory, candidate, registry, people, events, and presence are available as tools."
 
 func (s *Server) flow() *agentflow.Flow {
 	if s.Flow == nil {
@@ -209,13 +212,10 @@ func (s *Server) oauthToken(c *gin.Context) {
 }
 
 func (s *Server) mcpPost(c *gin.Context) {
-	origin := strings.TrimRight(s.publicURL(c), "/")
 	token := bearerToken(c)
-	grant, reason := s.flow().GrantForAccess(token)
+	grant, reason := s.resolveMCPGrant(c, token)
 	if reason != "" {
-		c.Header("WWW-Authenticate", `Bearer realm="jobos", resource_metadata="`+origin+`/.well-known/oauth-protected-resource/mcp", scope="jobos"`)
-		c.Header("Cache-Control", "no-store")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": reason})
+		s.mcpUnauthorized(c, reason)
 		return
 	}
 	raw, err := c.GetRawData()
@@ -282,11 +282,9 @@ func (s *Server) mcpGet(c *gin.Context) {
 }
 
 func (s *Server) mcpDelete(c *gin.Context) {
-	grant, reason := s.flow().GrantForAccess(bearerToken(c))
+	grant, reason := s.resolveMCPGrant(c, bearerToken(c))
 	if reason != "" {
-		origin := strings.TrimRight(s.publicURL(c), "/")
-		c.Header("WWW-Authenticate", `Bearer realm="jobos", resource_metadata="`+origin+`/.well-known/oauth-protected-resource/mcp", scope="jobos"`)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": reason})
+		s.mcpUnauthorized(c, reason)
 		return
 	}
 	supplied := strings.TrimSpace(c.GetHeader("Mcp-Session-Id"))
@@ -446,6 +444,148 @@ func (s *Server) callTool(c *gin.Context, grant agentflow.Grant, session *agentf
 		payload, err = s.toolUpdateJob(c, grant, *session, args)
 	case "list_people":
 		payload, err = s.toolPeople(c, grant, args)
+	case "create_person":
+		payload, err = s.toolCreatePerson(c, grant, args)
+	case "get_person":
+		payload, err = s.toolGetPerson(c, grant, strAny(args["id"]))
+	case "update_person":
+		payload, err = s.toolUpdatePerson(c, grant, args)
+	case "delete_job":
+		payload, err = s.toolDeleteJob(c, grant, strAny(args["id"]))
+	case "stop_job":
+		payload, err = s.toolStopJob(c, grant, args)
+	case "pause_job":
+		payload, err = s.toolPauseResumeJob(c, grant, strAny(args["id"]), true)
+	case "resume_job":
+		payload, err = s.toolPauseResumeJob(c, grant, strAny(args["id"]), false)
+	case "queue_push":
+		payload, err = s.toolQueuePush(c, grant, args)
+	case "queue_claim":
+		payload, err = s.toolQueueClaim(c, grant, args)
+	case "queue_ack":
+		payload, err = s.toolQueueAck(c, grant, strAny(args["id"]), true)
+	case "queue_nack":
+		payload, err = s.toolQueueAck(c, grant, strAny(args["id"]), false)
+	case "queue_mine":
+		payload, err = s.toolQueueList(c, grant, true)
+	case "queue_list":
+		payload, err = s.toolQueueList(c, grant, false)
+	case "get_candidate":
+		payload, err = s.toolGetCandidate(c, grant)
+	case "candidate_status":
+		payload = s.candidateState(c, grant.AccountID)
+	case "list_skills":
+		payload, err = s.toolListSkills(c, grant, args)
+	case "get_skill":
+		payload, err = s.toolGetSkill(c, grant, strAny(args["id"]))
+	case "list_mcps":
+		payload, err = s.toolListMCPs(c, grant)
+	case "get_mcp":
+		payload, err = s.toolGetMCP(c, grant, strAny(args["id"]))
+	case "list_memory":
+		payload, err = s.toolRecall(c, grant, args)
+	case "delete_memory":
+		payload, err = s.toolDeleteMemory(c, grant, strAny(args["id"]))
+	case "solidify_memory":
+		payload, err = s.toolSolidifyMemory(c, grant, strAny(args["id"]))
+	case "list_events":
+		payload, err = s.toolListEvents(c, grant, args)
+	case "heartbeat":
+		payload, err = s.toolHeartbeat(c, grant, args)
+	case "whoami":
+		payload, err = s.toolWhoami(c, grant)
+	case "onboarding":
+		payload, err = s.toolOnboarding(c, grant)
+	case "meta":
+		payload, err = s.toolMeta(c, grant)
+	case "list_invites":
+		payload, err = s.toolListInvites(c, grant)
+	case "create_invite":
+		payload, err = s.toolCreateInvite(c, grant, args)
+	case "revoke_invite":
+		payload, err = s.toolRevokeInvite(c, grant, strAny(args["id"]))
+	case "list_agents":
+		payload, err = s.toolListAgents(c, grant)
+	case "create_agent":
+		payload, err = s.toolCreateAgent(c, grant, args)
+	case "rotate_agent_key":
+		payload, err = s.toolRotateAgentKey(c, grant, strAny(args["id"]))
+	case "disable_agent":
+		payload, err = s.toolDisableAgent(c, grant, strAny(args["id"]))
+	case "put_candidate":
+		payload, err = s.toolPutCandidate(c, grant, args)
+	case "get_resume":
+		payload, err = s.toolGetResume(c, grant)
+	case "put_resume":
+		payload, err = s.toolPutResume(c, grant, args)
+	case "memory_pods":
+		payload, err = s.toolMemoryPods(c, grant)
+	case "patch_memory":
+		payload, err = s.toolPatchMemory(c, grant, args)
+	case "move_memory":
+		payload, err = s.toolMoveMemory(c, grant, args)
+	case "list_presence":
+		payload, err = s.toolListPresence(c, grant)
+	case "get_presence":
+		payload, err = s.toolGetPresence(c, grant, strAny(args["user_id"]))
+	case "create_message":
+		payload, err = s.toolCreateMessage(c, grant, args)
+	case "list_messages":
+		payload, err = s.toolListMessages(c, grant, args)
+	case "read_message":
+		payload, err = s.toolReadMessage(c, grant, strAny(args["id"]))
+	case "create_skill":
+		payload, err = s.toolCreateSkill(c, grant, args)
+	case "patch_skill":
+		payload, err = s.toolPatchSkill(c, grant, args)
+	case "fork_skill":
+		payload, err = s.toolForkSkill(c, grant, strAny(args["id"]))
+	case "create_recording":
+		payload, err = s.toolCreateRecording(c, grant, args)
+	case "list_recordings":
+		payload, err = s.toolListRecordings(c, grant, args)
+	case "get_recording":
+		payload, err = s.toolGetRecording(c, grant, strAny(args["id"]))
+	case "proctor_recording":
+		payload, err = s.toolSetRecording(c, grant, strAny(args["id"]), "", args)
+	case "promote_recording":
+		payload, err = s.toolSetRecording(c, grant, strAny(args["id"]), "promoted", args)
+	case "decline_recording":
+		payload, err = s.toolSetRecording(c, grant, strAny(args["id"]), "declined", args)
+	case "hygiene":
+		payload, err = s.toolHygiene(c, grant)
+	case "vacuum":
+		payload, err = s.toolVacuum(c, grant)
+	case "import_jobs":
+		payload, err = s.toolImportJobs(c, grant, args)
+	case "export_ledger":
+		payload, err = s.toolExportLedger(c, grant)
+	case "skills_zip":
+		payload, err = s.toolSkillsZip(c, grant)
+	case "rebuild_pack":
+		payload, err = s.toolRebuildPack(c, grant)
+	case "dashboard":
+		payload, err = s.toolDashboard(c, grant)
+	case "list_users":
+		payload, err = s.toolListUsers(c, grant, args)
+	case "seed_registry":
+		payload, err = s.toolSeedRegistry(c, grant)
+	case "add_token_burn":
+		payload, err = s.toolAddTokenBurn(c, grant, args)
+	case "list_token_burns":
+		payload, err = s.toolListTokenBurns(c, grant, args)
+	case "token_burn_summary":
+		payload, err = s.toolTokenBurnSummary(c, grant)
+	case "a2a_directory":
+		payload, err = s.toolA2ADirectory(c, grant)
+	case "list_peers":
+		payload, err = s.toolListPeers(c, grant)
+	case "create_peer":
+		payload, err = s.toolCreatePeer(c, grant, args)
+	case "send_peer":
+		payload, err = s.toolSendPeer(c, grant, args)
+	case "poll_events":
+		payload, err = s.toolPollEvents(c, grant, args)
 	default:
 		return toolResult(gin.H{"error": "unknown tool " + name}, true)
 	}
@@ -653,9 +793,7 @@ func (s *Server) toolUpdateJob(c *gin.Context, grant agentflow.Grant, session ag
 	if status := strAny(args["status"]); status != "" {
 		job.Status = status
 	}
-	if notes := strAny(args["notes"]); notes != "" {
-		job.Notes = notes
-	}
+	applyJobToolPatch(&job, args)
 	job.UpdatedAt = now()
 	if err := s.DB.SaveJob(c.Request.Context(), job); err != nil {
 		return nil, err
@@ -734,13 +872,84 @@ func toolCatalog() []gin.H {
 		{"name": "read_skill", "description": "Read a skill body.", "inputSchema": obj(gin.H{"skill": gin.H{"type": "string"}}, "skill")},
 		{"name": "record_use", "description": "Record a tool or source you used.", "inputSchema": obj(gin.H{"kind": gin.H{"type": "string"}, "name": gin.H{"type": "string"}}, "kind", "name")},
 		{"name": "read_steers", "description": "Read human steers.", "inputSchema": obj(gin.H{})},
+		{"name": "whoami", "description": "Return the Hub principal for this MCP grant.", "inputSchema": obj(gin.H{})},
+		{"name": "onboarding", "description": "Return onboarding pack hints for this track.", "inputSchema": obj(gin.H{})},
+		{"name": "candidate_status", "description": "Candidate onboard status (public fields).", "inputSchema": obj(gin.H{})},
+		{"name": "get_candidate", "description": "Read candidate YAML if present.", "inputSchema": obj(gin.H{})},
 		{"name": "recall_memory", "description": "Recall memory for this account.", "inputSchema": obj(gin.H{"q": gin.H{"type": "string"}, "pod": gin.H{"type": "string"}})},
-		{"name": "write_memory", "description": "Write a memory item.", "inputSchema": obj(gin.H{"kind": gin.H{"type": "string"}, "body": gin.H{"type": "string"}}, "kind", "body")},
+		{"name": "list_memory", "description": "List/recall memory items (alias of recall_memory).", "inputSchema": obj(gin.H{"q": gin.H{"type": "string"}, "pod": gin.H{"type": "string"}})},
+		{"name": "write_memory", "description": "Write a memory item.", "inputSchema": obj(gin.H{"kind": gin.H{"type": "string"}, "body": gin.H{"type": "string"}, "pod": gin.H{"type": "string"}, "title": gin.H{"type": "string"}, "job_id": gin.H{"type": "string"}, "company": gin.H{"type": "string"}}, "kind", "body")},
+		{"name": "delete_memory", "description": "Delete a memory item.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "solidify_memory", "description": "Mark a memory item for solidify/playbook promotion.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
 		{"name": "list_jobs", "description": "List jobs.", "inputSchema": obj(gin.H{"status": gin.H{"type": "string"}})},
 		{"name": "get_job", "description": "Read one job.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
-		{"name": "create_job", "description": "Create a discovered job. Find lane only.", "inputSchema": obj(gin.H{"company": gin.H{"type": "string"}, "title": gin.H{"type": "string"}}, "company", "title")},
-		{"name": "update_job", "description": "Update a job from the lane that owns the status.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "lane": lane, "status": gin.H{"type": "string"}}, "id")},
+		{"name": "create_job", "description": "Create a discovered job. Find lane only.", "inputSchema": obj(gin.H{"company": gin.H{"type": "string"}, "title": gin.H{"type": "string"}, "url": gin.H{"type": "string"}, "apply_url": gin.H{"type": "string"}, "location": gin.H{"type": "string"}, "id": gin.H{"type": "string"}}, "company", "title")},
+		{"name": "update_job", "description": "Patch a job (status/notes/packets) from the owning lane.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "lane": lane, "status": gin.H{"type": "string"}, "notes": gin.H{"type": "string"}, "url": gin.H{"type": "string"}, "apply_url": gin.H{"type": "string"}, "location": gin.H{"type": "string"}, "description": gin.H{"type": "string"}}, "id")},
+		{"name": "delete_job", "description": "Delete a job (admin).", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "stop_job", "description": "Stop a job with a reason.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "reason": gin.H{"type": "string"}}, "id")},
+		{"name": "pause_job", "description": "Pause (stop) a job.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "resume_job", "description": "Resume a stopped job.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "queue_push", "description": "Push a queue item.", "inputSchema": obj(gin.H{"kind": gin.H{"type": "string"}, "job_id": gin.H{"type": "string"}}, "kind")},
+		{"name": "queue_claim", "description": "Claim queue work for this track.", "inputSchema": obj(gin.H{"kinds": gin.H{"type": "array", "items": gin.H{"type": "string"}}, "limit": gin.H{"type": "integer"}})},
+		{"name": "queue_ack", "description": "Ack a claimed queue item.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "queue_nack", "description": "Nack a claimed queue item.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "queue_mine", "description": "List queue items claimed by this agent.", "inputSchema": obj(gin.H{})},
+		{"name": "queue_list", "description": "List open queue items.", "inputSchema": obj(gin.H{})},
 		{"name": "list_people", "description": "List people.", "inputSchema": obj(gin.H{"company": gin.H{"type": "string"}, "job_id": gin.H{"type": "string"}})},
+		{"name": "create_person", "description": "Create a person (outreach).", "inputSchema": obj(gin.H{"name": gin.H{"type": "string"}, "company": gin.H{"type": "string"}, "job_id": gin.H{"type": "string"}, "email": gin.H{"type": "string"}, "linkedin": gin.H{"type": "string"}, "title": gin.H{"type": "string"}}, "name")},
+		{"name": "get_person", "description": "Read one person.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "update_person", "description": "Patch a person.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "email": gin.H{"type": "string"}, "linkedin": gin.H{"type": "string"}, "title": gin.H{"type": "string"}, "notes": gin.H{"type": "string"}}, "id")},
+		{"name": "list_skills", "description": "List registry skills.", "inputSchema": obj(gin.H{"tag": gin.H{"type": "string"}, "scope": gin.H{"type": "string"}, "status": gin.H{"type": "string"}})},
+		{"name": "get_skill", "description": "Get one registry skill.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "list_mcps", "description": "List registry MCPs.", "inputSchema": obj(gin.H{})},
+		{"name": "get_mcp", "description": "Get one registry MCP.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "list_events", "description": "List job events.", "inputSchema": obj(gin.H{"job_id": gin.H{"type": "string"}, "limit": gin.H{"type": "integer"}})},
+		{"name": "heartbeat", "description": "Presence heartbeat for this agent.", "inputSchema": obj(gin.H{"status": gin.H{"type": "string"}, "note": gin.H{"type": "string"}})},
+		{"name": "meta", "description": "Hub meta (statuses, tracks, capabilities).", "inputSchema": obj(gin.H{})},
+		{"name": "list_invites", "description": "List invites (admin).", "inputSchema": obj(gin.H{})},
+		{"name": "create_invite", "description": "Create an MCP-first invite (admin). Bootstraps a long-lived API key by default.", "inputSchema": obj(gin.H{"track": gin.H{"type": "string"}, "mode": gin.H{"type": "string"}, "max_redemptions": gin.H{"type": "integer"}, "ttl_hours": gin.H{"type": "integer"}, "allow_multiple_owners": gin.H{"type": "boolean"}, "mcp_bootstrap": gin.H{"type": "boolean"}}, "track")},
+		{"name": "revoke_invite", "description": "Revoke an invite (admin).", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "list_agents", "description": "List track owners and agents.", "inputSchema": obj(gin.H{})},
+		{"name": "create_agent", "description": "Mint an agent API key (owner/admin).", "inputSchema": obj(gin.H{"display_name": gin.H{"type": "string"}, "track": gin.H{"type": "string"}}, "display_name")},
+		{"name": "rotate_agent_key", "description": "Rotate an agent/owner API key.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "disable_agent", "description": "Disable an agent or owner.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "put_candidate", "description": "Write candidate YAML (admin).", "inputSchema": obj(gin.H{"yaml": gin.H{"type": "string"}}, "yaml")},
+		{"name": "get_resume", "description": "Download resume as base64 PDF.", "inputSchema": obj(gin.H{})},
+		{"name": "put_resume", "description": "Upload resume PDF as base64 (admin).", "inputSchema": obj(gin.H{"base64": gin.H{"type": "string"}}, "base64")},
+		{"name": "memory_pods", "description": "List writable memory pods and policy.", "inputSchema": obj(gin.H{})},
+		{"name": "patch_memory", "description": "Patch a memory item.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "title": gin.H{"type": "string"}, "body": gin.H{"type": "string"}, "kind": gin.H{"type": "string"}}, "id")},
+		{"name": "move_memory", "description": "Move or copy a memory item to another pod.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "pod": gin.H{"type": "string"}, "kind": gin.H{"type": "string"}, "keep_original": gin.H{"type": "boolean"}}, "id", "pod")},
+		{"name": "list_presence", "description": "List presence heartbeats.", "inputSchema": obj(gin.H{})},
+		{"name": "get_presence", "description": "Get one user's presence.", "inputSchema": obj(gin.H{"user_id": gin.H{"type": "string"}}, "user_id")},
+		{"name": "create_message", "description": "Send an in-hub message.", "inputSchema": obj(gin.H{"body": gin.H{"type": "string"}, "to_user_id": gin.H{"type": "string"}, "to_track": gin.H{"type": "string"}, "job_id": gin.H{"type": "string"}, "type": gin.H{"type": "string"}}, "body")},
+		{"name": "list_messages", "description": "List visible messages.", "inputSchema": obj(gin.H{"unread": gin.H{"type": "boolean"}})},
+		{"name": "read_message", "description": "Mark a message read.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "create_skill", "description": "Create a local draft skill.", "inputSchema": obj(gin.H{"name": gin.H{"type": "string"}, "body": gin.H{"type": "string"}, "kind": gin.H{"type": "string"}}, "name", "body")},
+		{"name": "patch_skill", "description": "Patch a registry skill.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "name": gin.H{"type": "string"}, "body": gin.H{"type": "string"}, "status": gin.H{"type": "string"}}, "id")},
+		{"name": "fork_skill", "description": "Fork a skill to a local draft.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "create_recording", "description": "Enqueue a skill.record recording.", "inputSchema": obj(gin.H{"body": gin.H{"type": "string"}, "skill_id": gin.H{"type": "string"}, "origin": gin.H{"type": "string"}})},
+		{"name": "list_recordings", "description": "List skill recordings.", "inputSchema": obj(gin.H{"status": gin.H{"type": "string"}})},
+		{"name": "get_recording", "description": "Get one recording.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}}, "id")},
+		{"name": "proctor_recording", "description": "Proctor a recording (maintainer).", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "status": gin.H{"type": "string"}, "note": gin.H{"type": "string"}}, "id")},
+		{"name": "promote_recording", "description": "Promote a recording (maintainer).", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "note": gin.H{"type": "string"}}, "id")},
+		{"name": "decline_recording", "description": "Decline a recording (maintainer).", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "note": gin.H{"type": "string"}}, "id")},
+		{"name": "hygiene", "description": "Job status hygiene counts (admin/maintainer).", "inputSchema": obj(gin.H{})},
+		{"name": "vacuum", "description": "Hygiene vacuum note (admin/maintainer).", "inputSchema": obj(gin.H{})},
+		{"name": "import_jobs", "description": "Import historical jobs (admin/maintainer).", "inputSchema": obj(gin.H{"jobs": gin.H{"type": "array"}}, "jobs")},
+		{"name": "export_ledger", "description": "Export jobs+events ledger snapshot (admin/maintainer).", "inputSchema": obj(gin.H{})},
+		{"name": "skills_zip", "description": "Download the skills pack zip as base64.", "inputSchema": obj(gin.H{})},
+		{"name": "rebuild_pack", "description": "Rebuild/seed the skills pack (maintainer).", "inputSchema": obj(gin.H{})},
+		{"name": "dashboard", "description": "Job status counts and onboard/cache/blob summary.", "inputSchema": obj(gin.H{})},
+		{"name": "list_users", "description": "List account users (optional kind/track filters).", "inputSchema": obj(gin.H{"kind": gin.H{"type": "string"}, "track": gin.H{"type": "string"}})},
+		{"name": "seed_registry", "description": "Seed shared skills/MCPs into the registry (maintainer).", "inputSchema": obj(gin.H{})},
+		{"name": "add_token_burn", "description": "Record a token burn metric.", "inputSchema": obj(gin.H{"tool_name": gin.H{"type": "string"}, "prompt_tokens": gin.H{"type": "integer"}, "completion_tokens": gin.H{"type": "integer"}, "total_tokens": gin.H{"type": "integer"}, "cost_usd": gin.H{"type": "number"}, "skill": gin.H{"type": "string"}, "lane": gin.H{"type": "string"}, "job_id": gin.H{"type": "string"}}, "tool_name")},
+		{"name": "list_token_burns", "description": "List token burns (admin/maintainer).", "inputSchema": obj(gin.H{"limit": gin.H{"type": "integer"}})},
+		{"name": "token_burn_summary", "description": "Summarize token burns (admin/maintainer).", "inputSchema": obj(gin.H{})},
+		{"name": "a2a_directory", "description": "List local A2A cards and peers.", "inputSchema": obj(gin.H{})},
+		{"name": "list_peers", "description": "List A2A peers.", "inputSchema": obj(gin.H{})},
+		{"name": "create_peer", "description": "Register an A2A peer.", "inputSchema": obj(gin.H{"url": gin.H{"type": "string"}, "name": gin.H{"type": "string"}}, "url")},
+		{"name": "send_peer", "description": "Submit a task toward an A2A peer.", "inputSchema": obj(gin.H{"id": gin.H{"type": "string"}, "payload": gin.H{"type": "object"}}, "id")},
+		{"name": "poll_events", "description": "Poll buffered Hub events (MCP equivalent of /ws and /api/stream).", "inputSchema": obj(gin.H{"after_seq": gin.H{"type": "integer"}, "epoch": gin.H{"type": "string"}, "limit": gin.H{"type": "integer"}})},
 	}
 }
 

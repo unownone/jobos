@@ -596,7 +596,22 @@ func (s *Server) publicURL(c *gin.Context) string {
 	if s.Cfg.PublicURL != "" {
 		return s.Cfg.PublicURL
 	}
-	return "http://" + c.Request.Host
+	// Invite join_url / MCP paste origins must not trust client-controlled
+	// X-Forwarded-Host (open redirect / phishing). Set HUB_PUBLIC_URL or
+	// HUB_PUBLIC_HOST in production. Fall back to Request.Host only.
+	host := c.Request.Host
+	scheme := "http"
+	if proto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")); proto != "" {
+		if i := strings.IndexByte(proto, ','); i >= 0 {
+			proto = strings.TrimSpace(proto[:i])
+		}
+		if strings.EqualFold(proto, "https") {
+			scheme = "https"
+		}
+	} else if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	return scheme + "://" + host
 }
 
 func fallbackBriefing(name, hub string) string {
