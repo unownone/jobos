@@ -784,6 +784,51 @@ func (s *Server) toolRebuildPack(c *gin.Context, grant agentflow.Grant) (gin.H, 
 	return gin.H{"ok": true, "seeded": n}, nil
 }
 
+func (s *Server) toolDashboard(c *gin.Context, grant agentflow.Grant) (gin.H, error) {
+	p, err := s.principalFromGrant(c, grant)
+	if err != nil {
+		return nil, err
+	}
+	counts, err := s.DB.CountByStatus(c.Request.Context(), p.AccountID)
+	if err != nil {
+		return nil, err
+	}
+	return gin.H{
+		"counts": counts, "candidate_onboarded": s.onboarded(c, p.AccountID),
+		"cache": s.Cache.Name(), "blob": s.Blobs.Name(),
+	}, nil
+}
+
+func (s *Server) toolListUsers(c *gin.Context, grant agentflow.Grant, args map[string]any) (gin.H, error) {
+	p, err := s.principalFromGrant(c, grant)
+	if err != nil {
+		return nil, err
+	}
+	kind := strAny(args["kind"])
+	track := strAny(args["track"])
+	rows, err := s.DB.ListUsers(c.Request.Context(), p.AccountID, kind, track)
+	if err != nil {
+		return nil, err
+	}
+	out := []gin.H{}
+	for _, user := range rows {
+		out = append(out, publicUser(user))
+	}
+	return gin.H{"users": out, "count": len(out)}, nil
+}
+
+func (s *Server) toolSeedRegistry(c *gin.Context, grant agentflow.Grant) (gin.H, error) {
+	p, err := s.principalFromGrant(c, grant)
+	if err != nil {
+		return nil, err
+	}
+	if p.Role != "admin" && p.Role != "maintenance" {
+		return nil, errString("maintainer only")
+	}
+	n := s.Seed(c.Request.Context())
+	return gin.H{"seeded": n}, nil
+}
+
 func (s *Server) toolAddTokenBurn(c *gin.Context, grant agentflow.Grant, args map[string]any) (gin.H, error) {
 	p, err := s.principalFromGrant(c, grant)
 	if err != nil {

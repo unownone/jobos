@@ -564,6 +564,12 @@ func (s *Server) callTool(c *gin.Context, grant agentflow.Grant, session *agentf
 		payload, err = s.toolSkillsZip(c, grant)
 	case "rebuild_pack":
 		payload, err = s.toolRebuildPack(c, grant)
+	case "dashboard":
+		payload, err = s.toolDashboard(c, grant)
+	case "list_users":
+		payload, err = s.toolListUsers(c, grant, args)
+	case "seed_registry":
+		payload, err = s.toolSeedRegistry(c, grant)
 	case "add_token_burn":
 		payload, err = s.toolAddTokenBurn(c, grant, args)
 	case "list_token_burns":
@@ -933,6 +939,9 @@ func toolCatalog() []gin.H {
 		{"name": "export_ledger", "description": "Export jobs+events ledger snapshot (admin/maintainer).", "inputSchema": obj(gin.H{})},
 		{"name": "skills_zip", "description": "Download the skills pack zip as base64.", "inputSchema": obj(gin.H{})},
 		{"name": "rebuild_pack", "description": "Rebuild/seed the skills pack (maintainer).", "inputSchema": obj(gin.H{})},
+		{"name": "dashboard", "description": "Job status counts and onboard/cache/blob summary.", "inputSchema": obj(gin.H{})},
+		{"name": "list_users", "description": "List account users (optional kind/track filters).", "inputSchema": obj(gin.H{"kind": gin.H{"type": "string"}, "track": gin.H{"type": "string"}})},
+		{"name": "seed_registry", "description": "Seed shared skills/MCPs into the registry (maintainer).", "inputSchema": obj(gin.H{})},
 		{"name": "add_token_burn", "description": "Record a token burn metric.", "inputSchema": obj(gin.H{"tool_name": gin.H{"type": "string"}, "prompt_tokens": gin.H{"type": "integer"}, "completion_tokens": gin.H{"type": "integer"}, "total_tokens": gin.H{"type": "integer"}, "cost_usd": gin.H{"type": "number"}, "skill": gin.H{"type": "string"}, "lane": gin.H{"type": "string"}, "job_id": gin.H{"type": "string"}}, "tool_name")},
 		{"name": "list_token_burns", "description": "List token burns (admin/maintainer).", "inputSchema": obj(gin.H{"limit": gin.H{"type": "integer"}})},
 		{"name": "token_burn_summary", "description": "Summarize token burns (admin/maintainer).", "inputSchema": obj(gin.H{})},
