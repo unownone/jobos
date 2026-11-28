@@ -39,6 +39,10 @@ type JobRow = {
   notes?: string;
   status?: string;
   stopped?: boolean;
+  url?: string;
+  apply_url?: string;
+  location?: string;
+  updated_at?: string;
   rejection?: JobRejection | null;
 };
 type JobDraft = {
@@ -46,10 +50,22 @@ type JobDraft = {
   title: string;
   notes: string;
   status: string;
+  url: string;
+  apply_url: string;
   rejection_by: string;
   company_remarks: string;
   user_remarks: string;
 };
+type BoardSortKey = "company" | "title" | "status" | "updated";
+type BoardPageSize = 10 | 20;
+
+function jobLink(job: Pick<JobRow, "url" | "apply_url">): string {
+  return (job.apply_url || job.url || "").trim();
+}
+
+function jobStatusKey(job: JobRow): string {
+  return job.stopped ? "stopped" : (job.status || "discovered");
+}
 type MemoryScope = keyof typeof KINDS;
 type MemoryItem = { id: string; pod: string; kind: string; title: string; body: string };
 type InviteRow = {
@@ -583,6 +599,12 @@ export function Board({ me }: { me: SessionMe }) {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [pausedFilter, setPausedFilter] = useState<"all" | "active" | "paused">("all");
+  const [sortKey, setSortKey] = useState<BoardSortKey>("updated");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [pageSize, setPageSize] = useState<BoardPageSize>(10);
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState<JobDraft | null>(null);
   const [side, setSide] = useState("");
@@ -597,8 +619,67 @@ export function Board({ me }: { me: SessionMe }) {
   const statusCounts = useMemo(() => countByStatus(jobs), [jobs]);
   const stoppedCount = useMemo(() => jobs.filter((job) => job.stopped).length, [jobs]);
 
-  async function load(query = q): Promise<JobRow[]> {
-    const data = await api<{ jobs?: JobRow[] }>(`/api/jobs?q=${encodeURIComponent(query)}`);
+  const filteredJobs = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    let rows = jobs.filter((job) => {
+      const status = jobStatusKey(job);
+      if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (pausedFilter === "paused" && !job.stopped) return false;
+      if (pausedFilter === "active" && job.stopped) return false;
+      if (!needle) return true;
+      const hay = `${job.company || ""} ${job.title || ""} ${job.location || ""} ${job.url || ""} ${job.apply_url || ""}`.toLowerCase();
+      return hay.includes(needle);
+    });
+    const dir = sortDir === "asc" ? 1 : -1;
+    rows = [...rows].sort((a, b) => {
+      const av = (() => {
+        switch (sortKey) {
+          case "company":
+            return (a.company || "").toLowerCase();
+          case "title":
+            return (a.title || "").toLowerCase();
+          case "status":
+            return jobStatusKey(a);
+          case "updated":
+            return a.updated_at || a.id;
+          default: {
+            const _exhaustive: never = sortKey;
+            return _exhaustive;
+          }
+        }
+      })();
+      const bv = (() => {
+        switch (sortKey) {
+          case "company":
+            return (b.company || "").toLowerCase();
+          case "title":
+            return (b.title || "").toLowerCase();
+          case "status":
+            return jobStatusKey(b);
+          case "updated":
+            return b.updated_at || b.id;
+          default: {
+            const _exhaustive: never = sortKey;
+            return _exhaustive;
+          }
+        }
+      })();
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return (a.company || "").localeCompare(b.company || "") * dir;
+    });
+    return rows;
+  }, [jobs, q, statusFilter, pausedFilter, sortKey, sortDir]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredJobs.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageJobs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredJobs.slice(start, start + pageSize);
+  }, [filteredJobs, currentPage, pageSize]);
+
+  async function load(): Promise<JobRow[]> {
+    const data = await api<{ jobs?: JobRow[] }>("/api/jobs");
     setJobs(data.jobs || []);
     setNeedsCandidate(false);
     setLoaded(true);
@@ -606,8 +687,12 @@ export function Board({ me }: { me: SessionMe }) {
   }
 
   useEffect(() => {
+    setPage(1);
+  }, [q, statusFilter, pausedFilter, sortKey, sortDir, pageSize]);
+
+  useEffect(() => {
     api<CandidateStatus>("/api/candidate/status").then(setCand).catch(() => {});
-    load("").catch((err) => {
+    load().catch((err) => {
       setLoaded(true);
       if (isCandidateRequired(err)) {
         setNeedsCandidate(true);
@@ -634,6 +719,8 @@ export function Board({ me }: { me: SessionMe }) {
       title: job.title || "",
       notes: job.notes || "",
       status: job.status || "discovered",
+      url: job.url || "",
+      apply_url: job.apply_url || "",
       rejection_by: rejection.by || "",
       company_remarks: rejection.company_remarks || "",
       user_remarks: rejection.user_remarks || "",
@@ -641,10 +728,26 @@ export function Board({ me }: { me: SessionMe }) {
     setSide("");
   }
 
+  function toggleSort(key: BoardSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === "updated" ? "desc" : "asc");
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft || !selected) return;
-    const body: Record<string, unknown> = { company: draft.company, title: draft.title, notes: draft.notes, status: draft.status };
+    const body: Record<string, unknown> = {
+      company: draft.company,
+      title: draft.title,
+      notes: draft.notes,
+      status: draft.status,
+      url: draft.url,
+      apply_url: draft.apply_url,
+    };
     if (draft.status === "rejected") {
       body.rejection = { by: draft.rejection_by, company_remarks: draft.company_remarks, user_remarks: draft.user_remarks };
     }
@@ -727,17 +830,50 @@ export function Board({ me }: { me: SessionMe }) {
               <span className="metric-value">{cand?.resume_present ? "Yes" : "No"}</span>
               <span className="metric-label">Resume</span>
             </div>
-            <div className="metric metric-soft">
+            <div className="metric metric-soft" title={cand?.ready_for_agents ? "Candidate + resume ready for agents" : "Upload a resume (and finish onboarding) before agents should run"}>
               <span className="metric-value">{cand?.ready_for_agents ? "Ready" : "Wait"}</span>
-              <span className="metric-label">Agents</span>
+              <span className="metric-label">Agent-ready</span>
             </div>
           </section>
 
           <div className="row toolbar board-toolbar">
-            <input id="q" value={q} placeholder="Search company or title" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => {
-              if (e.key === "Enter") load(q).catch((err) => setError(errMessage(err)));
-            }} />
-            <button id="refresh" type="button" className="quiet" onClick={() => load(q).catch((err) => setError(errMessage(err)))}>Refresh</button>
+            <input id="q" value={q} placeholder="Search company, title, or URL" onChange={(e) => setQ(e.target.value)} />
+            <label className="board-filter">
+              <span className="sr-only">Status</span>
+              <select id="statusFilter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
+                <option value="all">All statuses</option>
+                {STATUSES.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}
+                <option value="stopped">paused</option>
+              </select>
+            </label>
+            <label className="board-filter">
+              <span className="sr-only">Paused</span>
+              <select id="pausedFilter" value={pausedFilter} onChange={(e) => setPausedFilter(e.target.value as "all" | "active" | "paused")} aria-label="Filter paused jobs">
+                <option value="all">Active + paused</option>
+                <option value="active">Active only</option>
+                <option value="paused">Paused only</option>
+              </select>
+            </label>
+            <label className="board-filter">
+              <span className="sr-only">Sort</span>
+              <select id="sortKey" value={sortKey} onChange={(e) => setSortKey(e.target.value as BoardSortKey)} aria-label="Sort by">
+                <option value="updated">Sort · updated</option>
+                <option value="company">Sort · company</option>
+                <option value="title">Sort · title</option>
+                <option value="status">Sort · status</option>
+              </select>
+            </label>
+            <button type="button" className="quiet" onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))} aria-label="Toggle sort direction">
+              {sortDir === "asc" ? "Asc" : "Desc"}
+            </button>
+            <label className="board-filter">
+              <span className="sr-only">Page size</span>
+              <select id="pageSize" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value) as BoardPageSize)} aria-label="Rows per page">
+                <option value={10}>10 / page</option>
+                <option value={20}>20 / page</option>
+              </select>
+            </label>
+            <button id="refresh" type="button" className="quiet" onClick={() => load().catch((err) => setError(errMessage(err)))}>Refresh</button>
           </div>
           {error ? <p className="error">{error}</p> : null}
 
@@ -777,27 +913,73 @@ export function Board({ me }: { me: SessionMe }) {
           ) : (
             <div className="split board-split">
               <div className="job-table-wrap card-panel">
-                <table id="list" className="job-table">
-                  <thead><tr><th>Company</th><th>Title</th><th>Status</th></tr></thead>
-                  <tbody>
-                    {jobs.map((job) => {
-                      const status = job.stopped ? "stopped" : (job.status || "discovered");
-                      return (
-                        <tr key={job.id} className={selected === job.id ? "is-selected" : undefined} onClick={() => open(job)}>
-                          <td>{job.company || "—"}</td>
-                          <td>{job.title || "—"}</td>
-                          <td><span className={`status-pill ${statusTone(status)}`}>{status.replaceAll("_", " ")}</span></td>
+                {!filteredJobs.length ? (
+                  <p className="muted board-filter-empty">No jobs match these filters.</p>
+                ) : (
+                  <>
+                    <table id="list" className="job-table">
+                      <thead>
+                        <tr>
+                          <th><button type="button" className="th-sort" onClick={() => toggleSort("company")}>Company{sortKey === "company" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}</button></th>
+                          <th><button type="button" className="th-sort" onClick={() => toggleSort("title")}>Title{sortKey === "title" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}</button></th>
+                          <th>URL</th>
+                          <th><button type="button" className="th-sort" onClick={() => toggleSort("status")}>Status{sortKey === "status" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}</button></th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {pageJobs.map((job) => {
+                          const status = jobStatusKey(job);
+                          const link = jobLink(job);
+                          return (
+                            <tr key={job.id} className={selected === job.id ? "is-selected" : undefined} onClick={() => open(job)}>
+                              <td>{job.company || "—"}</td>
+                              <td>{job.title || "—"}</td>
+                              <td className="job-url-cell">
+                                {link ? (
+                                  <a
+                                    className="job-url-link"
+                                    href={link}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title={link}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {link.replace(/^https?:\/\//, "").slice(0, 42)}{link.replace(/^https?:\/\//, "").length > 42 ? "…" : ""}
+                                  </a>
+                                ) : (
+                                  <span className="muted">—</span>
+                                )}
+                              </td>
+                              <td><span className={`status-pill ${statusTone(status)}`}>{status.replaceAll("_", " ")}</span></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <div className="board-pager" aria-label="Pagination">
+                      <span className="muted">
+                        {filteredJobs.length} match{(filteredJobs.length === 1 ? "" : "es")} · page {currentPage} / {pageCount}
+                      </span>
+                      <div className="row">
+                        <button type="button" className="quiet" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</button>
+                        <button type="button" className="quiet" disabled={currentPage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))}>Next</button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               {draft ? (
                 <form className="stack card-panel job-editor" onSubmit={save}>
                   <h3 className="editor-title">Edit job</h3>
                   <label>Company<input id="f_company" value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} /></label>
                   <label>Title<input id="f_title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
+                  <label>Posting URL<input id="f_url" value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} placeholder="https://…" /></label>
+                  <label>Apply URL<input id="f_apply_url" value={draft.apply_url} onChange={(e) => setDraft({ ...draft, apply_url: e.target.value })} placeholder="https://…" /></label>
+                  {(draft.apply_url || draft.url) ? (
+                    <p className="job-url-preview">
+                      <a href={draft.apply_url || draft.url} target="_blank" rel="noreferrer">{draft.apply_url || draft.url}</a>
+                    </p>
+                  ) : null}
                   <label>Notes<textarea id="f_notes" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></label>
                   <label>Status
                     <select id="f_status" value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
