@@ -18,7 +18,14 @@ import {
 } from "./profile";
 import { useSession, type SessionMe } from "./session";
 
+/** Writable statuses offered in the job editor (common lane transitions). */
 const STATUSES = ["discovered", "shortlisted", "apply_ready", "applied", "outreach_ready", "rejected", "closed_withdrawn"];
+/** Full server status set for board filtering (see server/internal/httpapi/domain.go). */
+const FILTER_STATUSES = [
+  "discovered", "enriching", "shortlisted", "skipped", "apply_ready", "applying", "applied",
+  "apply_blocked", "outreach_ready", "outreaching", "waiting", "chatting", "interview", "offer",
+  "rejected", "closed_expired", "closed_rejected", "closed_withdrawn",
+];
 const TRACKS = [
   { id: "discovery", label: "Discovery", help: "Find and shortlist jobs. Never Easy Apply." },
   { id: "application", label: "Application", help: "Submit from an apply packet and log proof." },
@@ -673,10 +680,19 @@ export function Board({ me }: { me: SessionMe }) {
 
   const pageCount = Math.max(1, Math.ceil(filteredJobs.length / pageSize));
   const currentPage = Math.min(page, pageCount);
+  useEffect(() => {
+    if (page !== currentPage) setPage(currentPage);
+  }, [page, currentPage]);
   const pageJobs = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredJobs.slice(start, start + pageSize);
   }, [filteredJobs, currentPage, pageSize]);
+  const filterStatusOptions = useMemo(() => {
+    const extras = jobs
+      .map((job) => jobStatusKey(job))
+      .filter((status) => status !== "stopped" && !FILTER_STATUSES.includes(status));
+    return [...FILTER_STATUSES, ...Array.from(new Set(extras))];
+  }, [jobs]);
 
   async function load(): Promise<JobRow[]> {
     const data = await api<{ jobs?: JobRow[] }>("/api/jobs");
@@ -842,7 +858,7 @@ export function Board({ me }: { me: SessionMe }) {
               <span className="sr-only">Status</span>
               <select id="statusFilter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
                 <option value="all">All statuses</option>
-                {STATUSES.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}
+                {filterStatusOptions.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}
                 <option value="stopped">paused</option>
               </select>
             </label>
@@ -961,8 +977,8 @@ export function Board({ me }: { me: SessionMe }) {
                         {filteredJobs.length} match{(filteredJobs.length === 1 ? "" : "es")} · page {currentPage} / {pageCount}
                       </span>
                       <div className="row">
-                        <button type="button" className="quiet" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</button>
-                        <button type="button" className="quiet" disabled={currentPage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))}>Next</button>
+                        <button type="button" className="quiet" disabled={currentPage <= 1} onClick={() => setPage(Math.max(1, currentPage - 1))}>Prev</button>
+                        <button type="button" className="quiet" disabled={currentPage >= pageCount} onClick={() => setPage(Math.min(pageCount, currentPage + 1))}>Next</button>
                       </div>
                     </div>
                   </>
